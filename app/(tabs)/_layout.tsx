@@ -1,59 +1,79 @@
-import React from 'react';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Link, Tabs } from 'expo-router';
-import { Pressable } from 'react-native';
+import { Tabs } from 'expo-router';
+import { View, useColorScheme } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import Colors from '@/constants/Colors';
-import { useColorScheme } from '@/components/useColorScheme';
-import { useClientOnlyValue } from '@/components/useClientOnlyValue';
-
-// You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
-function TabBarIcon(props: {
-  name: React.ComponentProps<typeof FontAwesome>['name'];
-  color: string;
-}) {
-  return <FontAwesome size={28} style={{ marginBottom: -3 }} {...props} />;
-}
+// Import SVGs
+import HomeIcon from '../../assets/icons/home.svg';
+import ForYouIcon from '../../assets/icons/for_you.svg';
+import DealIcon from '../../assets/icons/deal.svg';
+import NotificationIcon from '../../assets/icons/notification.svg';
+import ProfileIcon from '../../assets/icons/profile.svg';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+    const colorScheme = useColorScheme();
+    const isDark = colorScheme === 'dark';
+    const insets = useSafeAreaInsets();
 
-  return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        // Disable the static render of the header on web
-        // to prevent a hydration error in React Navigation v6.
-        headerShown: useClientOnlyValue(false, true),
-      }}>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Tab One',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
-          headerRight: () => (
-            <Link href="/modal" asChild>
-              <Pressable>
-                {({ pressed }) => (
-                  <FontAwesome
-                    name="info-circle"
-                    size={25}
-                    color={Colors[colorScheme ?? 'light'].text}
-                    style={{ marginRight: 15, opacity: pressed ? 0.5 : 1 }}
-                  />
-                )}
-              </Pressable>
-            </Link>
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="two"
-        options={{
-          title: 'Tab Two',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
-        }}
-      />
-    </Tabs>
-  );
+    return (
+        <Tabs
+            screenOptions={{
+                headerShown: false,
+                tabBarStyle: {
+                    position: 'absolute',
+                    bottom: 0,
+                    backgroundColor: isDark ? '#000000' : '#FFFFFF',
+                    borderTopWidth: 1,
+                    borderTopColor: isDark ? '#333333' : '#E5E7EB',
+                    paddingBottom: insets.bottom,
+                    paddingTop: 5, // Vertically center the 28px icon in the 50px-ish space
+                    paddingHorizontal: 24,
+                    height: 50 + insets.bottom,
+                },
+                tabBarActiveTintColor: isDark ? 'white' : 'black',
+                tabBarInactiveTintColor: isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)',
+                tabBarShowLabel: false,
+            }}
+        >
+            <Tabs.Screen
+                name="index"
+                options={{
+                    tabBarIcon: ({ color, size }) => (
+                        <HomeIcon width={28} height={28} color={color} />
+                    ),
+                }}
+            />
+            <Tabs.Screen
+                name="explore"
+                options={{
+                    tabBarIcon: ({ color, size }) => (
+                        <ForYouIcon width={28} height={28} color={color} />
+                    ),
+                }}
+            />
+            <Tabs.Screen
+                name="deals"
+                options={{
+                    tabBarIcon: ({ color, size }) => (
+                        <DealIcon width={28} height={28} color={color} />
+                    ),
+                }}
+            />
+            <Tabs.Screen
+                name="notifications"
+                options={{
+                    tabBarIcon: ({ color, size }) => (
+                        <NotificationIcon width={28} height={28} color={color} />
+                    ),
+                }}
+            />
+            <Tabs.Screen
+                name="profile"
+                options={{
+                    tabBarIcon: ({ color, size }) => (
+                        <ProfileIcon width={28} height={28} color={color} />
+                    ),
+                }}
+            />
+        </Tabs>
+    );
 }
