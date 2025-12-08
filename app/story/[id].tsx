@@ -3,8 +3,8 @@ import { View, Text, StyleSheet, Pressable, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStoryViewer } from '../../src/presentation/hooks/useStoryViewer';
 import { ProgressBar } from '../../src/presentation/components/story/ProgressBar';
-import Video, { OnLoadData, OnProgressData } from 'react-native-video';
-import { useEffect, useState, useRef, useCallback } from 'react';
+import Video from 'react-native-video';
+import { useEffect, useState, useRef, useCallback, ComponentRef } from 'react';
 import { Avatar } from '../../src/presentation/components/shared/Avatar';
 import { X } from 'lucide-react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
@@ -29,7 +29,7 @@ export default function StoryScreen() {
     const [progressKey, setProgressKey] = useState(0);
     const [isPaused, setIsPaused] = useState(false);
 
-    const videoRef = useRef<Video>(null);
+    const videoRef = useRef<ComponentRef<typeof Video>>(null);
 
     // Animation values
     const translateY = useSharedValue(0);
@@ -161,6 +161,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 8,
+        zIndex: 20, // Ensure header interactions sit above tap zones if needed
     },
     userInfo: {
         flexDirection: 'row',

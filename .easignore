@@ -1,0 +1,10 @@
+# Exclude backup zips explicitly (even if deleted, good habit)
+*.zip
+*.tar.gz
+
+# Exclude native builds 
+android/
+ios/
+
+# Exclude node_modules
+node_modules/

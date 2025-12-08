@@ -1,44 +1,39 @@
-import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import { Image } from 'expo-image';
-import { Video } from '../../src/domain/entities/Video';
+import MorphingDiscoveryBar from '../../src/presentation/components/discovery/MorphingDiscoveryBar';
 
 const CATEGORIES = ['For You', 'Trending', 'Food', 'Travel', 'Tech', 'Art', 'Music'];
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const ITEM_SIZE = (SCREEN_WIDTH - 40) / 2;
 
 export default function ExploreScreen() {
+    // Insets handled by DiscoveryBar for top, but bottom might need handling
     const insets = useSafeAreaInsets();
     const { videos } = useVideoFeed();
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top }]}>
-            {/* Search Bar */}
-            <View style={styles.header}>
-                <View style={styles.searchBar}>
-                    <Text style={styles.searchIcon}>🔍</Text>
-                    <TextInput
-                        placeholder="Search WizyClub"
-                        placeholderTextColor="#888"
-                        style={styles.input}
-                    />
+        <View style={[styles.container, { paddingTop: 0 }]}>
+            {/* Morphing Discovery Header - Handles top inset internally */}
+            <MorphingDiscoveryBar />
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+                {/* Categories - Optional: Integrate into tabs or keep as sub-filter? 
+                    Design implies DiscoveryBar tabs (Popular/Favorites) ARE the main filter. 
+                    Maybe keep chips as sub-categories below? 
+                */}
+                <View style={styles.categoriesContainer}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesContent}>
+                        {CATEGORIES.map((cat, index) => (
+                            <TouchableOpacity key={index} style={[styles.categoryChip, index === 0 && styles.activeChip]}>
+                                <Text style={[styles.categoryText, index === 0 && styles.activeCategoryText]}>{cat}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
                 </View>
-            </View>
 
-            {/* Categories */}
-            <View style={styles.categoriesContainer}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesContent}>
-                    {CATEGORIES.map((cat, index) => (
-                        <TouchableOpacity key={index} style={[styles.categoryChip, index === 0 && styles.activeChip]}>
-                            <Text style={[styles.categoryText, index === 0 && styles.activeCategoryText]}>{cat}</Text>
-                        </TouchableOpacity>
-                    ))}
-                </ScrollView>
-            </View>
-
-            {/* Simple Grid */}
-            <ScrollView showsVerticalScrollIndicator={false}>
+                {/* Simple Grid */}
                 <View style={styles.videoGrid}>
                     {videos.map((video) => (
                         <TouchableOpacity key={video.id} style={styles.videoItem}>
@@ -50,7 +45,6 @@ export default function ExploreScreen() {
                         </TouchableOpacity>
                     ))}
                 </View>
-                <View style={{ height: 100 }} />
             </ScrollView>
         </View>
     );
@@ -61,33 +55,13 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: 'black',
     },
-    header: {
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-    },
-    searchBar: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#1a1a1a',
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        height: 40,
-    },
-    searchIcon: {
-        fontSize: 16,
-    },
-    input: {
-        flex: 1,
-        color: 'white',
-        marginLeft: 8,
-        fontSize: 16,
-    },
     categoriesContainer: {
         height: 50,
+        marginVertical: 10,
     },
     categoriesContent: {
         paddingHorizontal: 16,
-        alignItems: 'center',
+        alignItems: 'center', // Center vertically in container
         gap: 12,
     },
     categoryChip: {
