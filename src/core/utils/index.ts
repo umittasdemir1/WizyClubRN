@@ -1,5 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { Platform } from 'react-native';
+import { Image } from 'expo-image';
 
 // ===================================
 // 📱 HAPTICS
@@ -75,4 +76,33 @@ export const clamp = (value: number, min: number, max: number): number => {
 export const toPercentage = (value: number, total: number): number => {
     if (total <= 0) return 0;
     return clamp(value / total, 0, 1);
+};
+
+// ===================================
+// 🎬 VIDEO CACHE & PRELOAD
+// ===================================
+/**
+ * Preloads video thumbnails for smooth scrolling
+ * Uses expo-image's built-in cache system
+ */
+export const preloadThumbnails = async (thumbnailUrls: string[]): Promise<void> => {
+    try {
+        const validUrls = thumbnailUrls.filter(url => url && typeof url === 'string');
+        if (validUrls.length === 0) return;
+
+        // Preload thumbnails in parallel
+        await Promise.all(
+            validUrls.map(url => Image.prefetch(url).catch(err => {
+                // Silently fail - don't block UI
+                if (__DEV__) {
+                    console.warn('Thumbnail preload failed:', url, err);
+                }
+            }))
+        );
+    } catch (error) {
+        // Silently fail - preload is optimization, not critical
+        if (__DEV__) {
+            console.warn('Preload batch failed:', error);
+        }
+    }
 };

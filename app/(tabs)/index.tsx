@@ -29,6 +29,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { preloadThumbnails } from '../../src/core/utils';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -94,6 +95,25 @@ export default function FeedScreen() {
         setCurrentTime(0);
         setDuration(0);
     }, [activeVideoId]);
+
+    // Preload next videos' thumbnails for smooth scrolling
+    useEffect(() => {
+        const activeIndex = videos.findIndex(v => v.id === activeVideoId);
+        if (activeIndex === -1) return;
+
+        // Preload next 3 videos' thumbnails
+        const nextThumbnails: string[] = [];
+        for (let i = 1; i <= 3; i++) {
+            const nextVideo = videos[activeIndex + i];
+            if (nextVideo?.thumbnailUrl) {
+                nextThumbnails.push(nextVideo.thumbnailUrl);
+            }
+        }
+
+        if (nextThumbnails.length > 0) {
+            preloadThumbnails(nextThumbnails);
+        }
+    }, [activeVideoId, videos]);
 
     const onViewableItemsChanged = useCallback(
         ({ viewableItems }: { viewableItems: ViewToken<Video>[] }) => {
