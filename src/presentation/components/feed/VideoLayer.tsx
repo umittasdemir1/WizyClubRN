@@ -8,6 +8,8 @@ import { useActiveVideoStore } from '../../store/useActiveVideoStore';
 import * as Haptics from 'expo-haptics';
 import { BrightnessOverlay } from './BrightnessOverlay';
 import { RefreshCcw, AlertCircle } from 'lucide-react-native';
+import { useNetInfo } from '@react-native-community/netinfo';
+import { getBufferConfig } from '../../../core/utils/bufferConfig';
 
 interface VideoLayerProps {
     video: VideoEntity;
@@ -21,14 +23,6 @@ interface VideoLayerProps {
 const MAX_LOOPS = 2;
 const MAX_RETRIES = 3;
 
-// 🚀 OPTIMIZED BUFFER CONFIG (Reactive Native Video)
-const BUFFER_CONFIG = {
-    minBufferMs: 2000,
-    maxBufferMs: 10000,
-    bufferForPlaybackMs: 250,
-    bufferForPlaybackAfterRebufferMs: 500,
-};
-
 export const VideoLayer = memo(function VideoLayer({
     video,
     isActive,
@@ -41,6 +35,9 @@ export const VideoLayer = memo(function VideoLayer({
     const isSeeking = useActiveVideoStore((state) => state.isSeeking);
     const isPausedGlobal = useActiveVideoStore((state) => state.isPaused);
     const setPaused = useActiveVideoStore((state) => state.setPaused);
+
+    const { type: networkType } = useNetInfo();
+    const bufferConfig = getBufferConfig(networkType);
 
     const [isFinished, setIsFinished] = useState(false);
     const [duration, setDuration] = useState(0);
@@ -134,29 +131,6 @@ export const VideoLayer = memo(function VideoLayer({
     const showPlayIcon = isPausedGlobal && !isSeeking && isActive && !isFinished && !hasError;
     const showReplayIcon = isFinished && isActive && !hasError;
 
-    // Handle tap to pause/play
-    const handleTap = useCallback(() => {
-        if (hasError) return;
-
-        if (isFinished) {
-            // Replay
-            setIsFinished(false);
-            loopCount.current = 0;
-            setPaused(false);
-            videoRef.current?.seek(0);
-            if (Platform.OS !== 'web') {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            }
-        } else {
-            // Toggle pause
-            const togglePause = useActiveVideoStore.getState().togglePause;
-            togglePause();
-            if (Platform.OS !== 'web') {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            }
-        }
-    }, [isFinished, setPaused, hasError]);
-
     return (
         <View style={styles.container}>
             <Video
@@ -172,7 +146,7 @@ export const VideoLayer = memo(function VideoLayer({
                 repeat={false}
                 paused={!shouldPlay}
                 muted={isMuted}
-                bufferConfig={BUFFER_CONFIG}
+                bufferConfig={bufferConfig}
                 onLoad={handleLoad}
                 onError={handleVideoError}
                 onProgress={handleProgress}
@@ -226,7 +200,8 @@ export const VideoLayer = memo(function VideoLayer({
     return (
         prev.video.id === next.video.id &&
         prev.isActive === next.isActive &&
-        prev.isMuted === next.isMuted
+        prev.isMuted === next.isMuted &&
+        true
     );
 });
 

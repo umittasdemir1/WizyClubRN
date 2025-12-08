@@ -25,10 +25,10 @@ interface VideoSeekBarProps {
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
 const TAB_BAR_HEIGHT = 60;
-const HORIZONTAL_PADDING = 16; // Match MetadataLayer left margin
+const HORIZONTAL_PADDING = 16;
 const TOUCH_AREA_HEIGHT = 40;
 const THUMB_SIZE = 12;
-const TRACK_HEIGHT = 4; // Thicker track
+const TRACK_HEIGHT = 4;
 const TRACK_HEIGHT_EXPANDED = 6;
 const BAR_WIDTH = SCREEN_WIDTH - (HORIZONTAL_PADDING * 2);
 
@@ -48,17 +48,14 @@ export function VideoSeekBar({
     const trackHeight = useSharedValue(TRACK_HEIGHT);
     const tooltipOpacity = useSharedValue(0);
 
-    // Seek bar positioned
     const finalBottomPosition = -18;
 
-    // Update progress - instant, no animation
     useEffect(() => {
         if (!isScrubbing.value && duration > 0) {
-            progress.value = currentTime / duration; // No animation, instant update
+            progress.value = currentTime / duration;
         }
     }, [currentTime, duration]);
 
-    // ... (Gestures) ...
     const triggerHaptic = useCallback(() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }, []);
@@ -100,7 +97,6 @@ export function VideoSeekBar({
             const newProgress = Math.max(0, Math.min(absoluteX / BAR_WIDTH, 1));
             progress.value = newProgress;
             runOnJS(setDisplayTime)(newProgress * (duration || 0));
-            // Removed runOnJS(updateSeek) to prevent stuttering. Seek only on end.
         })
         .onEnd(() => {
             'worklet';
@@ -133,7 +129,15 @@ export function VideoSeekBar({
         height: trackHeight.value,
     }));
 
+    // Fade opacity based on scrubbing
+    const thumbOpacity = useDerivedValue(() => {
+        // Show thumb if scrubbing or if recently tapped (could add logic), 
+        // for now just scrubbing or interacting
+        return withTiming(isScrubbing.value ? 1 : 0, { duration: 200 });
+    });
+
     const animatedThumbStyle = useAnimatedStyle(() => ({
+        opacity: thumbOpacity.value,
         transform: [
             { translateX: progress.value * BAR_WIDTH - THUMB_SIZE / 2 },
             { scale: thumbScale.value },
@@ -142,7 +146,6 @@ export function VideoSeekBar({
 
     const animatedTooltipStyle = useAnimatedStyle(() => {
         const leftPosition = progress.value * BAR_WIDTH;
-        // Tooltip width is ~100, center it so "|" (middle) aligns with progress tip
         const tooltipHalfWidth = 50;
         const clampedLeft = Math.max(tooltipHalfWidth, Math.min(leftPosition, BAR_WIDTH - tooltipHalfWidth));
         return {
@@ -171,7 +174,8 @@ export function VideoSeekBar({
                 <View style={styles.touchArea}>
                     <Animated.View style={[styles.track, animatedTrackStyle]} />
                     <Animated.View style={[styles.progressFill, animatedProgressStyle]} />
-                    {/* Thumb hidden per user request */}
+                    {/* Thumb with opacity animation */}
+                    <Animated.View style={[styles.thumb, animatedThumbStyle]} />
                 </View>
             </GestureDetector>
         </View>

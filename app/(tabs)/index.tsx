@@ -63,10 +63,6 @@ export default function FeedScreen() {
     // App State Sync
     useAppStateSync();
 
-    // 🔥 REMOVED useVideoPreloader Hook to prevent "DDoS" effect.
-    // FlashList windowSize={3} will handle mounting/unmounting.
-    // VideoLayer's `paused` prop will handle buffering.
-
     // Video progress state
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
@@ -77,7 +73,6 @@ export default function FeedScreen() {
     const listRef = useRef<any>(null);
 
     // Calculate video height - full screen for proper paging
-    const TAB_BAR_HEIGHT = 60 + insets.bottom;
     const ITEM_HEIGHT = Dimensions.get('window').height;
 
     const hasUnseenStories = true;
@@ -197,7 +192,7 @@ export default function FeedScreen() {
                         </View>
                     </DoubleTapLike>
 
-                    {/* Layer 2: UI Overlays (Foreground) - No HeaderOverlay here, moved outside */}
+                    {/* Layer 2: UI Overlays (Foreground) */}
                     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
 
                         <ActionButtons
@@ -212,9 +207,6 @@ export default function FeedScreen() {
 
                         <MetadataLayer
                             video={item}
-                            // Pass itemHeight to MetadataLayer if needed to bottom align? 
-                            // Actually MetadataLayer is absolute positioned bottom: 20 + padding.
-                            // It should be fine relative to the container.
                             onAvatarPress={() => console.log('Open Story/Profile')}
                             onFollowPress={() => toggleFollow(item.id)}
                             onReadMorePress={() => console.log('Open Description')}
@@ -234,15 +226,11 @@ export default function FeedScreen() {
             toggleLike,
             toggleSave,
             router,
-            hasUnseenStories,
             ITEM_HEIGHT,
         ]
     );
 
     const keyExtractor = useCallback((item: Video) => item.id, []);
-
-    // ... Loading/Error/Empty States (omitted for brevity, same as before) ...
-    // Note: Re-inserting them for completeness
 
     // Loading State
     if (isLoading && videos.length === 0) {
@@ -295,8 +283,8 @@ export default function FeedScreen() {
                     />
                 }
                 removeClippedSubviews={true}
-                maxToRenderPerBatch={1}
-                windowSize={3}
+                maxToRenderPerBatch={3}
+                windowSize={5}
                 initialNumToRender={1}
                 bounces={false}
                 overScrollMode="never"
@@ -340,9 +328,8 @@ const styles = StyleSheet.create({
     actionsContainer: {
         position: 'absolute',
         right: 12,
-        bottom: 120, // This is overridden by ActionButtons absolute position inside layout logic
+        bottom: 120,
         zIndex: 30,
-        // Remove ActionButtons layout styles from here if they are inside component
     },
     loadingContainer: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
     loadingText: { color: '#FFF', marginTop: 16 },
