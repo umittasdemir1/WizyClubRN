@@ -34,6 +34,7 @@ export const MOCK_VIDEOS: Video[] = [
         likesCount: 1200,
         commentsCount: 45,
         sharesCount: 12,
+        shopsCount: 8,
         isLiked: false,
         isSaved: false,
         savesCount: 456,
@@ -49,6 +50,7 @@ export const MOCK_VIDEOS: Video[] = [
         likesCount: 850,
         commentsCount: 20,
         sharesCount: 5,
+        shopsCount: 3,
         isLiked: true,
         isSaved: true,
         savesCount: 123,
@@ -64,6 +66,7 @@ export const MOCK_VIDEOS: Video[] = [
         likesCount: 2300,
         commentsCount: 150,
         sharesCount: 89,
+        shopsCount: 45,
         isLiked: false,
         isSaved: false,
         savesCount: 789,
@@ -79,6 +82,7 @@ export const MOCK_VIDEOS: Video[] = [
         likesCount: 500,
         commentsCount: 10,
         sharesCount: 2,
+        shopsCount: 1,
         isLiked: false,
         isSaved: false,
         savesCount: 89,
@@ -130,13 +134,15 @@ export const MOCK_STORIES: Story[] = [
 
 export class MockVideoDataSource {
     async getVideos(page: number, limit: number): Promise<Video[]> {
-        // Simulate network delay
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        // 🚀 SPEED UP: Delay kaldırıldı (Development için)
+        // Gerçek API bağlandığında loading spinner'ı test etmek için geri açabilirsin.
+        // await new Promise((resolve) => setTimeout(resolve, 500));
         return MOCK_VIDEOS;
     }
 
     async getStories(): Promise<Story[]> {
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        // 🚀 SPEED UP: Delay kaldırıldı
+        // await new Promise((resolve) => setTimeout(resolve, 500));
         return MOCK_STORIES;
     }
 }

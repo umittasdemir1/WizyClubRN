@@ -5,7 +5,8 @@ import Animated, {
     useAnimatedStyle,
     withTiming,
     Easing,
-    cancelAnimation
+    cancelAnimation,
+    runOnJS
 } from 'react-native-reanimated';
 
 interface ProgressBarProps {
@@ -25,12 +26,8 @@ export function ProgressBar({ duration, isActive, onFinish }: ProgressBarProps) 
                 duration: duration,
                 easing: Easing.linear,
             }, (finished) => {
-                if (finished && onFinish) {
-                    // runOnJS(onFinish)(); // Reanimated requires runOnJS for callbacks
-                    // For simplicity in this snippet, we assume caller handles timing or we use a simpler approach.
-                    // Actually, let's rely on the parent to drive the progress or use a JS timer for the callback 
-                    // to avoid Reanimated complexity if not needed.
-                    // But the requirement is "Animates width".
+                if (finished) {
+                    runOnJS(onFinish)();
                 }
             });
         } else {

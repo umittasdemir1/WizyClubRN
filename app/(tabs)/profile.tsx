@@ -1,15 +1,17 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, FlatList, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '../../src/presentation/components/shared/Avatar';
-import { MasonryList } from '../../src/presentation/components/explore/MasonryList';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
-import { Settings, Share2 } from 'lucide-react-native';
+import { Image } from 'expo-image';
+import { Video } from '../../src/domain/entities/Video';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const ITEM_SIZE = (SCREEN_WIDTH - 48) / 3;
 
 export default function ProfileScreen() {
     const insets = useSafeAreaInsets();
-    const { videos } = useVideoFeed(); // Reuse feed data for demo
+    const { videos } = useVideoFeed();
 
-    // Mock User
     const user = {
         username: 'wizy_official',
         avatarUrl: 'https://ui-avatars.com/api/?name=Wizy+Club&background=random',
@@ -19,44 +21,55 @@ export default function ProfileScreen() {
         bio: 'Official WizyClub Account 🚀\nBuilding the future of social video.',
     };
 
+    const renderVideoItem = ({ item }: { item: Video }) => (
+        <TouchableOpacity style={styles.videoItem}>
+            <Image
+                source={{ uri: item.thumbnailUrl }}
+                style={styles.videoThumbnail}
+                contentFit="cover"
+            />
+        </TouchableOpacity>
+    );
+
     return (
         <View style={[styles.container, { paddingTop: insets.top }]}>
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>{user.username}</Text>
                 <View style={styles.headerIcons}>
-                    {/* @ts-ignore */}
-                    <Share2 size={24} color="white" style={{ marginRight: 16 }} />
-                    {/* @ts-ignore */}
-                    <Settings size={24} color="white" />
+                    <View style={styles.headerIcon} />
+                    <View style={styles.headerIcon} />
                 </View>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-                {/* Profile Info */}
                 <View style={styles.profileInfo}>
                     <Avatar url={user.avatarUrl} size={96} hasBorder />
                     <Text style={styles.username}>@{user.username}</Text>
 
                     <View style={styles.statsContainer}>
-                        <StatItem label="Following" value={user.following.toString()} />
-                        <StatItem label="Followers" value={user.followers.toString()} />
-                        <StatItem label="Likes" value={user.likes} />
+                        <View style={styles.statItem}>
+                            <Text style={styles.statValue}>{user.following}</Text>
+                            <Text style={styles.statLabel}>Following</Text>
+                        </View>
+                        <View style={styles.statItem}>
+                            <Text style={styles.statValue}>{user.followers}</Text>
+                            <Text style={styles.statLabel}>Followers</Text>
+                        </View>
+                        <View style={styles.statItem}>
+                            <Text style={styles.statValue}>{user.likes}</Text>
+                            <Text style={styles.statLabel}>Likes</Text>
+                        </View>
                     </View>
 
                     <View style={styles.actionButtons}>
                         <TouchableOpacity style={styles.editButton}>
                             <Text style={styles.editButtonText}>Edit Profile</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.shareButton}>
-                            {/* @ts-ignore */}
-                            <Share2 size={20} color="white" />
-                        </TouchableOpacity>
                     </View>
 
                     <Text style={styles.bio}>{user.bio}</Text>
                 </View>
 
-                {/* Tabs */}
                 <View style={styles.tabs}>
                     <View style={[styles.tab, styles.activeTab]}>
                         <Text style={styles.activeTabText}>Videos</Text>
@@ -66,19 +79,20 @@ export default function ProfileScreen() {
                     </View>
                 </View>
 
-                {/* Content */}
-                <MasonryList videos={videos} />
+                {/* Simple Grid instead of MasonryFlashList */}
+                <View style={styles.videoGrid}>
+                    {videos.map((video) => (
+                        <TouchableOpacity key={video.id} style={styles.videoItem}>
+                            <Image
+                                source={{ uri: video.thumbnailUrl }}
+                                style={styles.videoThumbnail}
+                                contentFit="cover"
+                            />
+                        </TouchableOpacity>
+                    ))}
+                </View>
                 <View style={{ height: 100 }} />
             </ScrollView>
-        </View>
-    );
-}
-
-function StatItem({ label, value }: { label: string; value: string }) {
-    return (
-        <View style={styles.statItem}>
-            <Text style={styles.statValue}>{value}</Text>
-            <Text style={styles.statLabel}>{label}</Text>
         </View>
     );
 }
@@ -102,6 +116,13 @@ const styles = StyleSheet.create({
     },
     headerIcons: {
         flexDirection: 'row',
+        gap: 16,
+    },
+    headerIcon: {
+        width: 24,
+        height: 24,
+        backgroundColor: '#333',
+        borderRadius: 12,
     },
     profileInfo: {
         alignItems: 'center',
@@ -115,7 +136,7 @@ const styles = StyleSheet.create({
     },
     statsContainer: {
         flexDirection: 'row',
-        gap: 24,
+        gap: 32,
         marginTop: 20,
     },
     statItem: {
@@ -138,18 +159,13 @@ const styles = StyleSheet.create({
     },
     editButton: {
         backgroundColor: '#333',
-        paddingHorizontal: 32,
-        paddingVertical: 10,
+        paddingHorizontal: 48,
+        paddingVertical: 12,
         borderRadius: 4,
     },
     editButtonText: {
         color: 'white',
         fontWeight: '600',
-    },
-    shareButton: {
-        backgroundColor: '#333',
-        padding: 10,
-        borderRadius: 4,
     },
     bio: {
         color: 'white',
@@ -181,5 +197,23 @@ const styles = StyleSheet.create({
     activeTabText: {
         color: 'white',
         fontWeight: '600',
+    },
+    videoGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        paddingHorizontal: 16,
+        paddingTop: 8,
+    },
+    videoItem: {
+        width: ITEM_SIZE,
+        height: ITEM_SIZE * 1.5,
+        margin: 2,
+        borderRadius: 4,
+        overflow: 'hidden',
+        backgroundColor: '#222',
+    },
+    videoThumbnail: {
+        width: '100%',
+        height: '100%',
     },
 });

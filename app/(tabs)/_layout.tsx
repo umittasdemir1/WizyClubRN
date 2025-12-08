@@ -19,15 +19,12 @@ export default function TabLayout() {
             screenOptions={{
                 headerShown: false,
                 tabBarStyle: {
-                    position: 'absolute',
-                    bottom: 0,
+                    // Normal flow - not absolute positioned
                     backgroundColor: isDark ? '#000000' : '#FFFFFF',
-                    borderTopWidth: 1,
-                    borderTopColor: isDark ? '#333333' : '#E5E7EB',
-                    paddingBottom: insets.bottom,
-                    paddingTop: 5, // Vertically center the 28px icon in the 50px-ish space
-                    paddingHorizontal: 24,
-                    height: 50 + insets.bottom,
+                    borderTopWidth: 0,
+                    paddingBottom: insets.bottom + 6,
+                    paddingTop: 6,
+                    height: 60 + insets.bottom,
                 },
                 tabBarActiveTintColor: isDark ? 'white' : 'black',
                 tabBarInactiveTintColor: isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)',
@@ -37,40 +34,50 @@ export default function TabLayout() {
             <Tabs.Screen
                 name="index"
                 options={{
-                    tabBarIcon: ({ color, size }) => (
-                        <HomeIcon width={28} height={28} color={color} />
+                    tabBarIcon: ({ color }) => (
+                        <View style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}>
+                            <HomeIcon width={28} height={28} color={color} />
+                        </View>
                     ),
                 }}
             />
             <Tabs.Screen
                 name="explore"
                 options={{
-                    tabBarIcon: ({ color, size }) => (
-                        <ForYouIcon width={28} height={28} color={color} />
+                    tabBarIcon: ({ color }) => (
+                        <View style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}>
+                            <ForYouIcon width={28} height={28} color={color} />
+                        </View>
                     ),
                 }}
             />
             <Tabs.Screen
                 name="deals"
                 options={{
-                    tabBarIcon: ({ color, size }) => (
-                        <DealIcon width={28} height={28} color={color} />
+                    tabBarIcon: ({ color }) => (
+                        <View style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}>
+                            <DealIcon width={32} height={32} color={color} />
+                        </View>
                     ),
                 }}
             />
             <Tabs.Screen
                 name="notifications"
                 options={{
-                    tabBarIcon: ({ color, size }) => (
-                        <NotificationIcon width={28} height={28} color={color} />
+                    tabBarIcon: ({ color }) => (
+                        <View style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}>
+                            <NotificationIcon width={28} height={28} color={color} />
+                        </View>
                     ),
                 }}
             />
             <Tabs.Screen
                 name="profile"
                 options={{
-                    tabBarIcon: ({ color, size }) => (
-                        <ProfileIcon width={28} height={28} color={color} />
+                    tabBarIcon: ({ color }) => (
+                        <View style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}>
+                            <ProfileIcon width={28} height={28} color={color} />
+                        </View>
                     ),
                 }}
             />

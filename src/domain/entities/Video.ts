@@ -8,6 +8,7 @@ export interface Video {
     likesCount: number;
     commentsCount: number;
     sharesCount: number;
+    shopsCount: number;
     isLiked: boolean;
     isSaved: boolean;
     savesCount: number;

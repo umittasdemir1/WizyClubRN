@@ -1,22 +1,23 @@
-import { View, Text, StyleSheet, TextInput, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Search } from 'lucide-react-native';
-import { MasonryList } from '../../src/presentation/components/explore/MasonryList';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
+import { Image } from 'expo-image';
+import { Video } from '../../src/domain/entities/Video';
 
 const CATEGORIES = ['For You', 'Trending', 'Food', 'Travel', 'Tech', 'Art', 'Music'];
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const ITEM_SIZE = (SCREEN_WIDTH - 40) / 2;
 
 export default function ExploreScreen() {
     const insets = useSafeAreaInsets();
-    const { videos } = useVideoFeed(); // Reuse feed data for demo
+    const { videos } = useVideoFeed();
 
     return (
         <View style={[styles.container, { paddingTop: insets.top }]}>
             {/* Search Bar */}
             <View style={styles.header}>
                 <View style={styles.searchBar}>
-                    {/* @ts-ignore */}
-                    <Search size={20} color="#888" />
+                    <Text style={styles.searchIcon}>🔍</Text>
                     <TextInput
                         placeholder="Search WizyClub"
                         placeholderTextColor="#888"
@@ -29,15 +30,28 @@ export default function ExploreScreen() {
             <View style={styles.categoriesContainer}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesContent}>
                     {CATEGORIES.map((cat, index) => (
-                        <View key={index} style={[styles.categoryChip, index === 0 && styles.activeChip]}>
+                        <TouchableOpacity key={index} style={[styles.categoryChip, index === 0 && styles.activeChip]}>
                             <Text style={[styles.categoryText, index === 0 && styles.activeCategoryText]}>{cat}</Text>
-                        </View>
+                        </TouchableOpacity>
                     ))}
                 </ScrollView>
             </View>
 
-            {/* Grid */}
-            <MasonryList videos={videos} />
+            {/* Simple Grid */}
+            <ScrollView showsVerticalScrollIndicator={false}>
+                <View style={styles.videoGrid}>
+                    {videos.map((video) => (
+                        <TouchableOpacity key={video.id} style={styles.videoItem}>
+                            <Image
+                                source={{ uri: video.thumbnailUrl }}
+                                style={styles.videoThumbnail}
+                                contentFit="cover"
+                            />
+                        </TouchableOpacity>
+                    ))}
+                </View>
+                <View style={{ height: 100 }} />
+            </ScrollView>
         </View>
     );
 }
@@ -58,6 +72,9 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         paddingHorizontal: 12,
         height: 40,
+    },
+    searchIcon: {
+        fontSize: 16,
     },
     input: {
         flex: 1,
@@ -91,5 +108,23 @@ const styles = StyleSheet.create({
     },
     activeCategoryText: {
         color: 'black',
+    },
+    videoGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        paddingHorizontal: 16,
+        paddingTop: 8,
+    },
+    videoItem: {
+        width: ITEM_SIZE,
+        height: ITEM_SIZE * 1.4,
+        margin: 4,
+        borderRadius: 8,
+        overflow: 'hidden',
+        backgroundColor: '#222',
+    },
+    videoThumbnail: {
+        width: '100%',
+        height: '100%',
     },
 });

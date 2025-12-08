@@ -14,7 +14,10 @@ export class VideoMapper {
             likesCount: dto.likesCount,
             commentsCount: dto.commentsCount,
             sharesCount: dto.sharesCount,
+            shopsCount: dto.shopsCount || 0,
             isLiked: dto.isLiked,
+            isSaved: dto.isSaved,
+            savesCount: dto.savesCount,
             user: {
                 id: dto.user.id,
                 username: dto.user.username,

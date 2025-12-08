@@ -1,13 +1,40 @@
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronDown } from 'lucide-react-native';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
+import Animated, {
+    useSharedValue,
+    useAnimatedStyle,
+    withRepeat,
+    withSequence,
+    withTiming,
+    Easing,
+    cancelAnimation,
+} from 'react-native-reanimated';
+import { useBrightnessStore } from '../../store/useBrightnessStore';
 
 // Import SVGs
 import VoiceOnIcon from '../../../../assets/icons/voice_on.svg';
-import VoiceOffIcon from '../../../../assets/icons/voice_off.svg';
 import SunIcon from '../../../../assets/icons/sun.svg';
-import MoreIcon from '../../../../assets/icons/more.svg';
+
+// Brightness Button sub-component
+function BrightnessButton() {
+    const { brightness, toggleController } = useBrightnessStore();
+    const isActive = brightness < 1.0;
+
+    return (
+        <Pressable
+            style={styles.iconButton}
+            onPress={toggleController}
+            hitSlop={12}
+        >
+            <SunIcon
+                width={24}
+                height={24}
+                color={isActive ? '#FFD700' : 'white'}
+            />
+        </Pressable>
+    );
+}
 
 interface HeaderOverlayProps {
     isMuted: boolean;
@@ -17,6 +44,8 @@ interface HeaderOverlayProps {
     hasUnseenStories?: boolean;
 }
 
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
 export function HeaderOverlay({
     isMuted,
     onToggleMute,
@@ -25,72 +54,59 @@ export function HeaderOverlay({
     hasUnseenStories = false,
 }: HeaderOverlayProps) {
     const insets = useSafeAreaInsets();
-    const pulseAnim = useRef(new Animated.Value(1)).current;
+    const pulseOpacity = useSharedValue(1);
 
-    // Pulse animation for unmuted state
+    // Pulse animation when unmuted
     useEffect(() => {
         if (!isMuted) {
-            const pulseAnimation = Animated.loop(
-                Animated.sequence([
-                    Animated.timing(pulseAnim, {
-                        toValue: 0.5,
-                        duration: 1000,
-                        easing: Easing.bezier(0.4, 0, 0.6, 1),
-                        useNativeDriver: true,
-                    }),
-                    Animated.timing(pulseAnim, {
-                        toValue: 1,
-                        duration: 1000,
-                        easing: Easing.bezier(0.4, 0, 0.6, 1),
-                        useNativeDriver: true,
-                    }),
-                ])
+            pulseOpacity.value = withRepeat(
+                withSequence(
+                    withTiming(0.6, { duration: 800, easing: Easing.inOut(Easing.ease) }),
+                    withTiming(1, { duration: 800, easing: Easing.inOut(Easing.ease) })
+                ),
+                -1,
+                true
             );
-            pulseAnimation.start();
-            return () => pulseAnimation.stop();
         } else {
-            // Reset to full opacity when muted
-            pulseAnim.setValue(1);
+            cancelAnimation(pulseOpacity);
+            pulseOpacity.value = withTiming(0.5, { duration: 200 });
         }
-    }, [isMuted, pulseAnim]);
+    }, [isMuted]);
+
+    const voiceAnimatedStyle = useAnimatedStyle(() => ({
+        opacity: pulseOpacity.value,
+    }));
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top + 24 }]}>
-            {/* Left: Voice Button */}
-            <TouchableOpacity onPress={onToggleMute} style={styles.voiceButton}>
-                <Animated.View
-                    style={{
-                        opacity: isMuted ? 0.5 : pulseAnim,
-                    }}
-                >
-                    <VoiceOnIcon
-                        width={32}
-                        height={32}
-                        color={isMuted ? "#9CA3AF" : "#FFFFFF"}
-                    />
-                </Animated.View>
-            </TouchableOpacity>
+        <View style={[styles.container, { paddingTop: insets.top + 16 }]} pointerEvents="box-none">
+            {/* Left: Voice Button - NO shadow, NO background */}
+            <AnimatedPressable
+                onPress={onToggleMute}
+                style={[styles.iconButton, voiceAnimatedStyle]}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+                <VoiceOnIcon
+                    width={28}
+                    height={28}
+                    color={isMuted ? "#6B7280" : "#FFFFFF"}
+                />
+            </AnimatedPressable>
 
             {/* Center: Stories Pill */}
-            <TouchableOpacity
+            <Pressable
                 onPress={onStoryPress}
                 style={styles.storiesPill}
+                hitSlop={{ top: 8, bottom: 8 }}
             >
                 <Text style={styles.storiesText}>Hikayeler</Text>
-                <ChevronDown size={16} color="white" />
                 {hasUnseenStories && (
                     <View style={styles.badge} />
                 )}
-            </TouchableOpacity>
+            </Pressable>
 
-            {/* Right: Brightness & More */}
+            {/* Right: Brightness - toggles brightness controller */}
             <View style={styles.rightButtons}>
-                <TouchableOpacity style={styles.iconButton}>
-                    <SunIcon width={24} height={24} color="white" />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={onMorePress} style={styles.iconButton}>
-                    <MoreIcon width={24} height={24} color="white" />
-                </TouchableOpacity>
+                <BrightnessButton />
             </View>
         </View>
     );
@@ -102,41 +118,51 @@ const styles = StyleSheet.create({
         top: 0,
         left: 0,
         right: 0,
-        zIndex: 20,
+        zIndex: 100,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 16,
     },
-    voiceButton: {
-        padding: 8, // 48x48 touch area
+    iconButton: {
+        padding: 8,
+        // NO background, NO shadow
     },
     storiesPill: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.3)',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 20,
-        gap: 4,
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 24,
+        gap: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+        // Glass shadow
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 5,
     },
     storiesText: {
         color: 'white',
-        fontSize: 14,
-        fontWeight: '600',
+        fontSize: 15,
+        fontWeight: '700',
+    },
+    chevron: {
+        color: 'rgba(255, 255, 255, 0.8)',
+        fontSize: 8,
+        marginTop: 1,
     },
     badge: {
         width: 8,
         height: 8,
         borderRadius: 4,
         backgroundColor: '#FF3B30',
-        marginLeft: 4,
     },
     rightButtons: {
         flexDirection: 'row',
-        gap: 12,
-    },
-    iconButton: {
-        padding: 8,
+        gap: 8,
     },
 });

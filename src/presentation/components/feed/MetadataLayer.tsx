@@ -1,4 +1,5 @@
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
+// Remove useSafeAreaInsets
 import { Video } from '../../../domain/entities/Video';
 import { Avatar } from '../shared/Avatar';
 import FollowIcon from '../../../../assets/icons/followbottom.svg';
@@ -9,53 +10,74 @@ interface MetadataLayerProps {
     onAvatarPress: () => void;
     onFollowPress: () => void;
     onReadMorePress: () => void;
+    onCommercialTagPress: () => void;
 }
+
+const FIXED_BOTTOM_POSITION = 70; // Moved up for more space
 
 export function MetadataLayer({
     video,
     onAvatarPress,
     onFollowPress,
     onReadMorePress,
+    onCommercialTagPress,
 }: MetadataLayerProps) {
+
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { bottom: FIXED_BOTTOM_POSITION }]} pointerEvents="box-none">
             {/* User Row */}
             <View style={styles.userRow}>
-                <TouchableOpacity onPress={onAvatarPress}>
+                <Pressable onPress={onAvatarPress} hitSlop={8}>
                     <Avatar url={video.user.avatarUrl} size={40} hasBorder={true} />
-                </TouchableOpacity>
+                </Pressable>
 
-                <TouchableOpacity onPress={onAvatarPress} style={styles.nameContainer}>
+                <Pressable
+                    onPress={onAvatarPress}
+                    style={styles.nameContainer}
+                    hitSlop={8}
+                >
                     <Text style={styles.nameText}>
                         {video.user.username}
                     </Text>
-                </TouchableOpacity>
+                </Pressable>
 
                 {!video.user.isFollowing && (
-                    <TouchableOpacity onPress={onFollowPress}>
-                        <FollowIcon width={16} height={16} color="white" />
-                    </TouchableOpacity>
+                    <Pressable
+                        onPress={onFollowPress}
+                        style={styles.followButton}
+                        hitSlop={12}
+                    >
+                        <FollowIcon width={20} height={20} color="white" />
+                    </Pressable>
                 )}
             </View>
 
-            {/* Description */}
+            {/* Description Row */}
             <View style={styles.descriptionRow}>
                 <Text style={styles.descriptionText}>
                     {video.description.length > 70
                         ? video.description.substring(0, 70) + '...'
                         : video.description}
                 </Text>
-                <TouchableOpacity onPress={onReadMorePress} style={styles.readMoreButton}>
+                <Pressable
+                    onPress={onReadMorePress}
+                    style={styles.readMoreButton}
+                    hitSlop={12}
+                >
                     <ReadMoreIcon width={16} height={16} color="white" />
-                </TouchableOpacity>
+                </Pressable>
             </View>
 
             {/* Commercial Tag */}
-            <View style={styles.commercialTag}>
+            <Pressable
+                style={styles.commercialTag}
+                onPress={onCommercialTagPress}
+                hitSlop={8}
+            >
                 <Text style={styles.commercialText}>
                     İş Birliği | Marka
                 </Text>
-            </View>
+            </Pressable>
         </View>
     );
 }
@@ -64,10 +86,9 @@ const styles = StyleSheet.create({
     container: {
         position: 'absolute',
         left: 16,
-        bottom: 130, // Moved up to avoid overlap with Seek Bar (70-110)
-        right: 80,
+        right: 80, // Leave room for actions
         alignItems: 'flex-start',
-        zIndex: 20,
+        zIndex: 50, // High Z-index
     },
     userRow: {
         flexDirection: 'row',
@@ -86,6 +107,9 @@ const styles = StyleSheet.create({
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 2,
     },
+    followButton: {
+        padding: 4,
+    },
     descriptionRow: {
         flexDirection: 'row',
         alignItems: 'flex-end',
@@ -101,7 +125,8 @@ const styles = StyleSheet.create({
         textShadowRadius: 2,
     },
     readMoreButton: {
-        marginLeft: 4,
+        marginLeft: 6,
+        padding: 4,
     },
     commercialTag: {
         backgroundColor: 'rgba(255, 255, 255, 0.9)',
