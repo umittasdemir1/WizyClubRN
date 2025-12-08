@@ -3,8 +3,8 @@ import { View, Text, StyleSheet, Pressable, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStoryViewer } from '../../src/presentation/hooks/useStoryViewer';
 import { ProgressBar } from '../../src/presentation/components/story/ProgressBar';
-import { VideoView, useVideoPlayer } from 'expo-video';
-import { useEffect, useState } from 'react';
+import Video, { VideoRef } from 'react-native-video';
+import { useEffect, useState, useRef } from 'react';
 import { Avatar } from '../../src/presentation/components/shared/Avatar';
 import { X } from 'lucide-react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
@@ -19,15 +19,13 @@ export default function StoryScreen() {
     const insets = useSafeAreaInsets();
     const { currentStory, isLoading, goToNext, goToPrev } = useStoryViewer(id);
     const [progressKey, setProgressKey] = useState(0);
+    const [paused, setPaused] = useState(false);
 
     // Animation values
     const translateY = useSharedValue(0);
 
-    // Video Player
-    const player = useVideoPlayer(currentStory?.videoUrl ?? '', (player) => {
-        player.loop = false;
-        player.play();
-    });
+    // Video ref
+    const videoRef = useRef<VideoRef>(null);
 
     // Auto-advance
     useEffect(() => {
@@ -41,15 +39,12 @@ export default function StoryScreen() {
     // Reset progress bar on story change
     useEffect(() => {
         setProgressKey(prev => prev + 1);
-        if (currentStory) {
-            // @ts-ignore: replaceAsync is needed for iOS to prevent freezing
-            if (player.replaceAsync) {
-                player.replaceAsync(currentStory.videoUrl);
-            } else {
-                player.replace(currentStory.videoUrl);
-            }
+        setPaused(false);
+        // Video will auto-restart when source changes
+        if (videoRef.current) {
+            videoRef.current.seek(0);
         }
-    }, [currentStory, player]);
+    }, [currentStory]);
 
     const handleClose = () => {
         router.back();
@@ -81,11 +76,16 @@ export default function StoryScreen() {
         <GestureDetector gesture={panGesture}>
             <Animated.View style={[styles.container, animatedStyle]}>
                 {/* Video Background */}
-                <VideoView
-                    player={player}
+                <Video
+                    ref={videoRef}
+                    source={{ uri: currentStory.videoUrl }}
                     style={styles.video}
-                    contentFit="cover"
-                    nativeControls={false}
+                    resizeMode="cover"
+                    paused={paused}
+                    repeat={false}
+                    muted={false}
+                    playInBackground={false}
+                    playWhenInactive={false}
                 />
 
                 {/* Overlay Content */}

@@ -67,12 +67,6 @@ export function VideoSeekBar({
         setSeeking(true);
     }, [setSeeking]);
 
-    const updateSeek = useCallback((percentage: number) => {
-        if (duration > 0) {
-            onSeek(percentage * duration);
-        }
-    }, [duration, onSeek]);
-
     const endScrubbing = useCallback((percentage: number) => {
         if (duration > 0) {
             onSeek(percentage * duration);
@@ -100,7 +94,7 @@ export function VideoSeekBar({
             const newProgress = Math.max(0, Math.min(absoluteX / BAR_WIDTH, 1));
             progress.value = newProgress;
             runOnJS(setDisplayTime)(newProgress * (duration || 0));
-            runOnJS(updateSeek)(newProgress);
+            // No video seek here - only UI update for smoothness
         })
         .onEnd(() => {
             'worklet';
@@ -118,7 +112,7 @@ export function VideoSeekBar({
             const absoluteX = event.absoluteX - HORIZONTAL_PADDING;
             const newProgress = Math.max(0, Math.min(absoluteX / BAR_WIDTH, 1));
             progress.value = newProgress;
-            runOnJS(updateSeek)(newProgress);
+            runOnJS(endScrubbing)(newProgress);
             runOnJS(triggerHaptic)();
         });
 

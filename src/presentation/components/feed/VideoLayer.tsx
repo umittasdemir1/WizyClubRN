@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback, memo } from 'react';
-import { StyleSheet, View, Pressable, Platform } from 'react-native';
-import Video, { OnProgressData, OnLoadData, VideoRef } from 'react-native-video';
+import { StyleSheet, View, Pressable, Platform, Text } from 'react-native';
+import Video, { OnProgressData, OnLoadData, VideoRef, OnVideoErrorData } from 'react-native-video';
 import { Video as VideoEntity } from '../../../domain/entities/Video';
 import PlayIcon from '../../../../assets/icons/play.svg';
 import ReplayIcon from '../../../../assets/icons/replay.svg';
@@ -42,6 +42,8 @@ export const VideoLayer = memo(function VideoLayer({
 
     const [isFinished, setIsFinished] = useState(false);
     const [duration, setDuration] = useState(0);
+    const [hasError, setHasError] = useState(false);
+    const [retryCount, setRetryCount] = useState(0);
 
     const videoRef = useRef<VideoRef>(null);
     const loopCount = useRef(0);
@@ -49,6 +51,8 @@ export const VideoLayer = memo(function VideoLayer({
     // Reset finished state if video changes
     useEffect(() => {
         setIsFinished(false);
+        setHasError(false);
+        setRetryCount(0);
         loopCount.current = 0;
     }, [video.id]);
 
@@ -83,6 +87,29 @@ export const VideoLayer = memo(function VideoLayer({
             videoRef.current?.seek(0);
         }
     }, [onVideoEnd, setPaused]);
+
+    const handleError = useCallback((error: OnVideoErrorData) => {
+        console.error('Video error:', error);
+        setHasError(true);
+
+        // Auto retry up to 3 times
+        if (retryCount < 3) {
+            setTimeout(() => {
+                setRetryCount(prev => prev + 1);
+                setHasError(false);
+            }, 1000);
+        } else {
+            // After 3 failed attempts, skip to next video
+            console.warn('Video failed after 3 attempts, skipping...');
+            onVideoEnd?.();
+        }
+    }, [retryCount, onVideoEnd]);
+
+    const handleRetry = useCallback(() => {
+        setHasError(false);
+        setRetryCount(prev => prev + 1);
+        videoRef.current?.seek(0);
+    }, []);
 
     const seekTo = useCallback((time: number) => {
         videoRef.current?.seek(time);
@@ -145,10 +172,11 @@ export const VideoLayer = memo(function VideoLayer({
                 onLoad={handleLoad}
                 onProgress={handleProgress}
                 onEnd={handleEnd}
+                onError={handleError}
                 playInBackground={false}
                 playWhenInactive={false}
                 ignoreSilentSwitch="ignore"
-                progressUpdateInterval={33}
+                progressUpdateInterval={isSeeking ? 50 : 250}
             />
 
             {/* Brightness Overlay */}
@@ -171,6 +199,24 @@ export const VideoLayer = memo(function VideoLayer({
                     </View>
                 )}
             </View>
+
+            {/* Error Overlay */}
+            {hasError && isActive && retryCount < 3 && (
+                <View style={styles.errorOverlay}>
+                    <View style={styles.errorContainer}>
+                        <Text style={styles.errorText}>Video yüklenemedi</Text>
+                        <Pressable
+                            style={styles.retryButton}
+                            onPress={handleRetry}
+                        >
+                            <Text style={styles.retryButtonText}>Tekrar Dene</Text>
+                        </Pressable>
+                        <Text style={styles.retryCountText}>
+                            Deneme {retryCount}/3
+                        </Text>
+                    </View>
+                </View>
+            )}
         </View>
     );
 }, (prev, next) => {
@@ -207,5 +253,43 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    errorOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 100,
+    },
+    errorContainer: {
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        borderRadius: 16,
+        padding: 24,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    errorText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '600',
+        marginBottom: 16,
+        textAlign: 'center',
+    },
+    retryButton: {
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 32,
+        paddingVertical: 12,
+        borderRadius: 24,
+        marginBottom: 12,
+    },
+    retryButtonText: {
+        color: '#000000',
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    retryCountText: {
+        color: 'rgba(255, 255, 255, 0.6)',
+        fontSize: 12,
     },
 });
