@@ -295,8 +295,8 @@ export default function FeedScreen() {
                     />
                 }
                 removeClippedSubviews={true}
-                maxToRenderPerBatch={1}
-                windowSize={3}
+                maxToRenderPerBatch={3}
+                windowSize={5}
                 initialNumToRender={1}
                 bounces={false}
                 overScrollMode="never"

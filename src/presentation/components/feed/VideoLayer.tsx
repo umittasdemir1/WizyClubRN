@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback, memo } from 'react';
+import { useRef, useState, useEffect, useCallback, memo, useMemo } from 'react';
 import { StyleSheet, View, Pressable, Platform, Text } from 'react-native';
 import Video, { OnProgressData, OnLoadData, VideoRef, OnVideoErrorData } from 'react-native-video';
 import { Video as VideoEntity } from '../../../domain/entities/Video';
@@ -7,6 +7,7 @@ import ReplayIcon from '../../../../assets/icons/replay.svg';
 import { useActiveVideoStore } from '../../store/useActiveVideoStore';
 import * as Haptics from 'expo-haptics';
 import { BrightnessOverlay } from './BrightnessOverlay';
+import { useNetInfo } from '@react-native-community/netinfo';
 
 interface VideoLayerProps {
     video: VideoEntity;
@@ -19,12 +20,34 @@ interface VideoLayerProps {
 
 const MAX_LOOPS = 2;
 
-// 🚀 OPTIMIZED BUFFER CONFIG (Reactive Native Video)
-const BUFFER_CONFIG = {
-    minBufferMs: 2000,
-    maxBufferMs: 10000,
-    bufferForPlaybackMs: 250,
-    bufferForPlaybackAfterRebufferMs: 500,
+// 🚀 ADAPTIVE BUFFER CONFIG based on network type
+const getBufferConfig = (connectionType: string | null) => {
+    switch (connectionType) {
+        case 'wifi':
+            // WiFi: Aggressive buffering for seamless playback
+            return {
+                minBufferMs: 2000,
+                maxBufferMs: 60000, // 60 seconds
+                bufferForPlaybackMs: 250,
+                bufferForPlaybackAfterRebufferMs: 500,
+            };
+        case 'cellular':
+            // 4G/5G: Balanced buffering
+            return {
+                minBufferMs: 2500,
+                maxBufferMs: 10000,
+                bufferForPlaybackMs: 300,
+                bufferForPlaybackAfterRebufferMs: 600,
+            };
+        default:
+            // Slow/Unknown: Conservative buffering for quick start
+            return {
+                minBufferMs: 3000,
+                maxBufferMs: 6000,
+                bufferForPlaybackMs: 500,
+                bufferForPlaybackAfterRebufferMs: 800,
+            };
+    }
 };
 
 export const VideoLayer = memo(function VideoLayer({
@@ -47,6 +70,12 @@ export const VideoLayer = memo(function VideoLayer({
 
     const videoRef = useRef<VideoRef>(null);
     const loopCount = useRef(0);
+
+    // Network-aware buffer config
+    const netInfo = useNetInfo();
+    const bufferConfig = useMemo(() => {
+        return getBufferConfig(netInfo.type);
+    }, [netInfo.type]);
 
     // Reset finished state if video changes
     useEffect(() => {
@@ -168,7 +197,7 @@ export const VideoLayer = memo(function VideoLayer({
                 repeat={false}
                 paused={!shouldPlay}
                 muted={isMuted}
-                bufferConfig={BUFFER_CONFIG}
+                bufferConfig={bufferConfig}
                 onLoad={handleLoad}
                 onProgress={handleProgress}
                 onEnd={handleEnd}
