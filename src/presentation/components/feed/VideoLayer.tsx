@@ -1,12 +1,13 @@
 import { useRef, useState, useEffect, useCallback, memo } from 'react';
-import { StyleSheet, View, Pressable, Platform } from 'react-native';
-import Video, { OnProgressData, OnLoadData, VideoRef } from 'react-native-video';
+import { StyleSheet, View, Text, Pressable, Platform, ActivityIndicator } from 'react-native';
+import Video, { OnProgressData, OnLoadData, VideoRef, OnVideoErrorData } from 'react-native-video';
 import { Video as VideoEntity } from '../../../domain/entities/Video';
 import PlayIcon from '../../../../assets/icons/play.svg';
 import ReplayIcon from '../../../../assets/icons/replay.svg';
 import { useActiveVideoStore } from '../../store/useActiveVideoStore';
 import * as Haptics from 'expo-haptics';
 import { BrightnessOverlay } from './BrightnessOverlay';
+import { RefreshCcw, AlertCircle } from 'lucide-react-native';
 
 interface VideoLayerProps {
     video: VideoEntity;
@@ -18,6 +19,7 @@ interface VideoLayerProps {
 }
 
 const MAX_LOOPS = 2;
+const MAX_RETRIES = 3;
 
 // 🚀 OPTIMIZED BUFFER CONFIG (Reactive Native Video)
 const BUFFER_CONFIG = {
@@ -42,6 +44,9 @@ export const VideoLayer = memo(function VideoLayer({
 
     const [isFinished, setIsFinished] = useState(false);
     const [duration, setDuration] = useState(0);
+    const [hasError, setHasError] = useState(false);
+    const [retryCount, setRetryCount] = useState(0);
+    const [key, setKey] = useState(0); // For forcing re-render implementation
 
     const videoRef = useRef<VideoRef>(null);
     const loopCount = useRef(0);
@@ -49,6 +54,9 @@ export const VideoLayer = memo(function VideoLayer({
     // Reset finished state if video changes
     useEffect(() => {
         setIsFinished(false);
+        setHasError(false);
+        setRetryCount(0);
+        setKey(prev => prev + 1);
         loopCount.current = 0;
     }, [video.id]);
 
@@ -63,10 +71,28 @@ export const VideoLayer = memo(function VideoLayer({
         }
     }, [isPausedGlobal, isFinished, isActive]);
 
-    const shouldPlay = isActive && isAppActive && !isSeeking && !isPausedGlobal && !isFinished;
+    const shouldPlay = isActive && isAppActive && !isSeeking && !isPausedGlobal && !isFinished && !hasError;
 
     const handleLoad = useCallback((data: OnLoadData) => {
         setDuration(data.duration);
+        setHasError(false);
+    }, []);
+
+    const handleVideoError = useCallback((error: OnVideoErrorData) => {
+        console.error(`[VideoLayer] Error playing video ${video.id}:`, error);
+        setHasError(true);
+
+        if (retryCount >= MAX_RETRIES) {
+            console.log(`[VideoLayer] Max retries (${MAX_RETRIES}) reached, skipping video.`);
+            onVideoEnd?.(); // Auto-skip
+        }
+    }, [video.id, retryCount, onVideoEnd]);
+
+    const handleRetry = useCallback(() => {
+        setRetryCount(prev => prev + 1);
+        setHasError(false);
+        setKey(prev => prev + 1); // Force re-mount of video component
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }, []);
 
     const handleProgress = useCallback((data: OnProgressData) => {
@@ -95,19 +121,23 @@ export const VideoLayer = memo(function VideoLayer({
     // Reset loop & seek on active
     useEffect(() => {
         if (isActive) {
-            loopCount.current = 0;
-            setIsFinished(false);
-            videoRef.current?.seek(0);
+            if (!hasError) {
+                loopCount.current = 0;
+                setIsFinished(false);
+                // videoRef.current?.seek(0); // Optional: reset to start when becoming active
+            }
             onSeekReady?.(seekTo);
         }
-    }, [isActive, seekTo, onSeekReady]);
+    }, [isActive, seekTo, onSeekReady, hasError]);
 
     // Icons
-    const showPlayIcon = isPausedGlobal && !isSeeking && isActive && !isFinished;
-    const showReplayIcon = isFinished && isActive;
+    const showPlayIcon = isPausedGlobal && !isSeeking && isActive && !isFinished && !hasError;
+    const showReplayIcon = isFinished && isActive && !hasError;
 
     // Handle tap to pause/play
     const handleTap = useCallback(() => {
+        if (hasError) return;
+
         if (isFinished) {
             // Replay
             setIsFinished(false);
@@ -125,11 +155,12 @@ export const VideoLayer = memo(function VideoLayer({
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             }
         }
-    }, [isFinished, setPaused]);
+    }, [isFinished, setPaused, hasError]);
 
     return (
         <View style={styles.container}>
             <Video
+                key={key}
                 ref={videoRef}
                 source={typeof video.videoUrl === 'string'
                     ? { uri: video.videoUrl }
@@ -143,16 +174,34 @@ export const VideoLayer = memo(function VideoLayer({
                 muted={isMuted}
                 bufferConfig={BUFFER_CONFIG}
                 onLoad={handleLoad}
+                onError={handleVideoError}
                 onProgress={handleProgress}
                 onEnd={handleEnd}
                 playInBackground={false}
                 playWhenInactive={false}
                 ignoreSilentSwitch="ignore"
-                progressUpdateInterval={33}
+                progressUpdateInterval={isActive && isSeeking ? 50 : 250}
             />
 
             {/* Brightness Overlay */}
             <BrightnessOverlay />
+
+            {/* Error Overlay */}
+            {hasError && (
+                <View style={[styles.touchArea, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
+                    <View style={styles.errorContainer}>
+                        <AlertCircle color="#EF4444" size={48} style={{ marginBottom: 12 }} />
+                        <Text style={styles.errorText}>Video failed to load</Text>
+                        <Pressable style={styles.retryButton} onPress={handleRetry}>
+                            <RefreshCcw color="#FFF" size={20} />
+                            <Text style={styles.retryText}>Retry</Text>
+                        </Pressable>
+                        {retryCount > 0 && (
+                            <Text style={styles.retryCountText}>Attempt {retryCount}/{MAX_RETRIES}</Text>
+                        )}
+                    </View>
+                </View>
+            )}
 
             {/* Icons overlay - tap handled by DoubleTapLike */}
             <View style={styles.touchArea} pointerEvents="none">
@@ -208,4 +257,35 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
+    errorContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    errorText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '600',
+        marginBottom: 16,
+    },
+    retryButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 25,
+        gap: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.3)'
+    },
+    retryText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    retryCountText: {
+        color: '#9CA3AF',
+        fontSize: 12,
+        marginTop: 12,
+    }
 });

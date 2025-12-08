@@ -100,7 +100,7 @@ export function VideoSeekBar({
             const newProgress = Math.max(0, Math.min(absoluteX / BAR_WIDTH, 1));
             progress.value = newProgress;
             runOnJS(setDisplayTime)(newProgress * (duration || 0));
-            runOnJS(updateSeek)(newProgress);
+            // Removed runOnJS(updateSeek) to prevent stuttering. Seek only on end.
         })
         .onEnd(() => {
             'worklet';

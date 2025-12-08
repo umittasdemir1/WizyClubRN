@@ -3,8 +3,8 @@ import { View, Text, StyleSheet, Pressable, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStoryViewer } from '../../src/presentation/hooks/useStoryViewer';
 import { ProgressBar } from '../../src/presentation/components/story/ProgressBar';
-import { VideoView, useVideoPlayer } from 'expo-video';
-import { useEffect, useState } from 'react';
+import Video, { OnLoadData, OnProgressData } from 'react-native-video';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Avatar } from '../../src/presentation/components/shared/Avatar';
 import { X } from 'lucide-react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
@@ -13,21 +13,26 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming, runOnJS } from 
 const STORY_DURATION = 5000; // 5 seconds
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+// Buffer config for partial load speed
+const BUFFER_CONFIG = {
+    minBufferMs: 1000,
+    maxBufferMs: 5000,
+    bufferForPlaybackMs: 100,
+    bufferForPlaybackAfterRebufferMs: 250,
+};
+
 export default function StoryScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { currentStory, isLoading, goToNext, goToPrev } = useStoryViewer(id);
     const [progressKey, setProgressKey] = useState(0);
+    const [isPaused, setIsPaused] = useState(false);
+
+    const videoRef = useRef<Video>(null);
 
     // Animation values
     const translateY = useSharedValue(0);
-
-    // Video Player
-    const player = useVideoPlayer(currentStory?.videoUrl ?? '', (player) => {
-        player.loop = false;
-        player.play();
-    });
 
     // Auto-advance
     useEffect(() => {
@@ -41,15 +46,8 @@ export default function StoryScreen() {
     // Reset progress bar on story change
     useEffect(() => {
         setProgressKey(prev => prev + 1);
-        if (currentStory) {
-            // @ts-ignore: replaceAsync is needed for iOS to prevent freezing
-            if (player.replaceAsync) {
-                player.replaceAsync(currentStory.videoUrl);
-            } else {
-                player.replace(currentStory.videoUrl);
-            }
-        }
-    }, [currentStory, player]);
+        setIsPaused(false);
+    }, [currentStory]);
 
     const handleClose = () => {
         router.back();
@@ -81,11 +79,20 @@ export default function StoryScreen() {
         <GestureDetector gesture={panGesture}>
             <Animated.View style={[styles.container, animatedStyle]}>
                 {/* Video Background */}
-                <VideoView
-                    player={player}
+                <Video
+                    ref={videoRef}
+                    source={typeof currentStory.videoUrl === 'string'
+                        ? { uri: currentStory.videoUrl }
+                        : currentStory.videoUrl}
                     style={styles.video}
-                    contentFit="cover"
-                    nativeControls={false}
+                    resizeMode="cover"
+                    repeat={false}
+                    paused={isPaused}
+                    bufferConfig={BUFFER_CONFIG}
+                // No separate onProgress needed unless creating custom progress logic 
+                // (we actally rely on Timer for simple story progress here, 
+                // though syncing with actual video progress is better for buffering)
+                // For now keeping simple timer-based approach as per original code structure
                 />
 
                 {/* Overlay Content */}
