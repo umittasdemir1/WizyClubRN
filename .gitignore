@@ -39,3 +39,9 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Backend
+wizy-backend/temp_uploads/
+wizy-backend/*.mp4
+wizy-backend/test_*.py
+wizy-backend/.env
