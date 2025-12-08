@@ -13,6 +13,7 @@
     "@react-native-community/netinfo": "11.4.1",
     "@react-native-community/slider": "5.0.1",
     "@shopify/flash-list": "^2.0.2",
+    "@supabase/supabase-js": "^2.87.0",
     "expo": "~54.0.27",
     "expo-blur": "~15.0.8",
     "expo-build-properties": "^1.0.10",

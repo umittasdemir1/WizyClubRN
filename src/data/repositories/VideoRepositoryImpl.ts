@@ -1,18 +1,18 @@
 import { IVideoRepository } from '../../domain/repositories/IVideoRepository';
 import { Video } from '../../domain/entities/Video';
-import { MockVideoDataSource } from '../datasources/MockVideoDataSource';
+import { SupabaseVideoDataSource } from '../datasources/SupabaseVideoDataSource';
 import { VideoMapper } from '../mappers/VideoMapper';
 
 export class VideoRepositoryImpl implements IVideoRepository {
-    private dataSource: MockVideoDataSource;
+    private dataSource: SupabaseVideoDataSource;
 
     constructor() {
-        this.dataSource = new MockVideoDataSource();
+        this.dataSource = new SupabaseVideoDataSource();
     }
 
     async getFeed(page: number, limit: number): Promise<Video[]> {
-        const videoDtos = await this.dataSource.getVideos(page, limit);
-        return videoDtos.map(VideoMapper.toEntity);
+        // Supabase data source already returns Video entities
+        return this.dataSource.getVideos(page, limit);
     }
 
     async toggleLike(videoId: string): Promise<boolean> {
