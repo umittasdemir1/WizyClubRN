@@ -68,18 +68,22 @@ app.post('/upload', upload.single('video'), async (req, res) => {
     console.log(`🎬 Processing: ${file.originalname}`);
 
     try {
-        // Step 1: Process video (FastStart optimization with copy codecs to avoid re-encoding)
+        // Step 1: Compress video (H.264, 720p, CRF 23 = ~50% smaller, visually lossless)
         await new Promise((resolve, reject) => {
             ffmpeg(inputPath)
-                .outputOptions('-movflags +faststart')
-                .outputOptions('-c:v copy')  // Copy video codec (faster, no quality loss)
-                .outputOptions('-c:a copy')  // Copy audio codec
+                .outputOptions('-movflags +faststart')  // FastStart for instant playback
+                .outputOptions('-c:v libx264')          // H.264 codec
+                .outputOptions('-preset fast')          // Speed/quality balance
+                .outputOptions('-crf 23')               // Quality (18-28, lower=better)
+                .outputOptions('-vf scale=720:-2')      // 720p width, auto height
+                .outputOptions('-c:a aac')              // AAC audio
+                .outputOptions('-b:a 128k')             // Audio bitrate
                 .save(processedVideoPath)
                 .on('progress', (progress) => {
-                    console.log(`Processing: ${progress.percent?.toFixed(1)}%`);
+                    console.log(`🔄 Compressing: ${progress.percent?.toFixed(1)}%`);
                 })
                 .on('end', () => {
-                    console.log('✅ Video processing complete');
+                    console.log('✅ Video compression complete');
                     resolve();
                 })
                 .on('error', (err) => {
