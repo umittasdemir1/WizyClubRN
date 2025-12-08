@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useCallback, memo, useMemo } from 'react';
-import { StyleSheet, View, Pressable, Platform, Text } from 'react-native';
+import { StyleSheet, View, Pressable, Platform, Text, ActivityIndicator } from 'react-native';
 import Video, { OnProgressData, OnLoadData, VideoRef, OnVideoErrorData } from 'react-native-video';
 import { Video as VideoEntity } from '../../../domain/entities/Video';
 import PlayIcon from '../../../../assets/icons/play.svg';
@@ -126,19 +126,13 @@ export const VideoLayer = memo(function VideoLayer({
             setTimeout(() => {
                 setRetryCount(prev => prev + 1);
                 setHasError(false);
-            }, 1000);
+            }, 1500); // Slightly longer delay for better UX
         } else {
             // After 3 failed attempts, skip to next video
             console.warn('Video failed after 3 attempts, skipping...');
             onVideoEnd?.();
         }
     }, [retryCount, onVideoEnd]);
-
-    const handleRetry = useCallback(() => {
-        setHasError(false);
-        setRetryCount(prev => prev + 1);
-        videoRef.current?.seek(0);
-    }, []);
 
     const seekTo = useCallback((time: number) => {
         videoRef.current?.seek(time);
@@ -229,21 +223,11 @@ export const VideoLayer = memo(function VideoLayer({
                 )}
             </View>
 
-            {/* Error Overlay */}
+            {/* Loading Overlay */}
             {hasError && isActive && retryCount < 3 && (
-                <View style={styles.errorOverlay}>
-                    <View style={styles.errorContainer}>
-                        <Text style={styles.errorText}>Video yüklenemedi</Text>
-                        <Pressable
-                            style={styles.retryButton}
-                            onPress={handleRetry}
-                        >
-                            <Text style={styles.retryButtonText}>Tekrar Dene</Text>
-                        </Pressable>
-                        <Text style={styles.retryCountText}>
-                            Deneme {retryCount}/3
-                        </Text>
-                    </View>
+                <View style={styles.loadingOverlay}>
+                    <ActivityIndicator size="large" color="#FFFFFF" />
+                    <Text style={styles.loadingText}>Video hazırlanıyor...</Text>
                 </View>
             )}
         </View>
@@ -283,42 +267,17 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    errorOverlay: {
+    loadingOverlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
         justifyContent: 'center',
         alignItems: 'center',
         zIndex: 100,
     },
-    errorContainer: {
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        borderRadius: 16,
-        padding: 24,
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.2)',
-    },
-    errorText: {
+    loadingText: {
         color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: '600',
-        marginBottom: 16,
-        textAlign: 'center',
-    },
-    retryButton: {
-        backgroundColor: '#FFFFFF',
-        paddingHorizontal: 32,
-        paddingVertical: 12,
-        borderRadius: 24,
-        marginBottom: 12,
-    },
-    retryButtonText: {
-        color: '#000000',
-        fontSize: 16,
-        fontWeight: '700',
-    },
-    retryCountText: {
-        color: 'rgba(255, 255, 255, 0.6)',
-        fontSize: 12,
+        fontSize: 14,
+        fontWeight: '500',
+        marginTop: 12,
+        opacity: 0.9,
     },
 });
