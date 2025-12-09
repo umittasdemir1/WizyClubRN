@@ -3,13 +3,39 @@ import { Story } from '../../domain/entities/Story';
 import { User } from '../../domain/entities/User';
 import { supabase } from '../../core/supabase';
 
-// Default user for videos from Supabase (until we add user table)
-const DEFAULT_USER: User = {
-    id: 'wizyclub-official',
-    username: 'wizyclub_official',
-    avatarUrl: 'https://ui-avatars.com/api/?name=Wizy+Club&background=7C3AED&color=fff',
-    isFollowing: false,
+// User mapping - converts user_id to display info
+const USER_MAP: Record<string, { displayName: string; avatar: string }> = {
+    'ece_yilmaz': { displayName: 'Ece Yılmaz', avatar: 'Ece+Yilmaz' },
+    'ali_kaya': { displayName: 'Ali Kaya', avatar: 'Ali+Kaya' },
+    'zeynep_demir': { displayName: 'Zeynep Demir', avatar: 'Zeynep+Demir' },
+    'mert_aksoy': { displayName: 'Mert Aksoy', avatar: 'Mert+Aksoy' },
+    'defne_ozturk': { displayName: 'Defne Öztürk', avatar: 'Defne+Ozturk' },
+    'can_sahin': { displayName: 'Can Şahin', avatar: 'Can+Sahin' },
+    'elif_celik': { displayName: 'Elif Çelik', avatar: 'Elif+Celik' },
+    'burak_yildiz': { displayName: 'Burak Yıldız', avatar: 'Burak+Yildiz' },
+    'selin_aydin': { displayName: 'Selin Aydın', avatar: 'Selin+Aydin' },
+    'emre_koc': { displayName: 'Emre Koç', avatar: 'Emre+Koc' },
+    'ayse_tas': { displayName: 'Ayşe Taş', avatar: 'Ayse+Tas' },
+    'deniz_arslan': { displayName: 'Deniz Arslan', avatar: 'Deniz+Arslan' },
+    'ceren_polat': { displayName: 'Ceren Polat', avatar: 'Ceren+Polat' },
+    'kaan_erdogan': { displayName: 'Kaan Erdoğan', avatar: 'Kaan+Erdogan' },
+    'wizyclub-official': { displayName: 'WizyClub', avatar: 'Wizy+Club' },
 };
+
+// Generate user from user_id
+function getUserFromId(userId: string): User {
+    const userInfo = USER_MAP[userId] || {
+        displayName: userId.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+        avatar: userId.replace(/_/g, '+')
+    };
+
+    return {
+        id: userId,
+        username: userInfo.displayName,
+        avatarUrl: `https://ui-avatars.com/api/?name=${userInfo.avatar}&background=random&color=fff&size=200`,
+        isFollowing: Math.random() > 0.5,
+    };
+}
 
 // Supabase video response type
 interface SupabaseVideo {
@@ -42,7 +68,6 @@ export class SupabaseVideoDataSource {
     }
 
     async getStories(): Promise<Story[]> {
-        // For now, fetch latest 8 videos as stories
         const { data, error } = await supabase
             .from('videos')
             .select('*')
@@ -78,13 +103,13 @@ export class SupabaseVideoDataSource {
             thumbnailUrl: dto.thumbnail_url,
             description: dto.description || '',
             likesCount: dto.likes_count || 0,
-            commentsCount: 0, // Not in Supabase yet
-            sharesCount: 0,   // Not in Supabase yet
-            shopsCount: 0,    // Not in Supabase yet
-            isLiked: false,   // Would need user context
-            isSaved: false,   // Would need user context
-            savesCount: 0,    // Not in Supabase yet
-            user: DEFAULT_USER,
+            commentsCount: Math.floor(Math.random() * 100),
+            sharesCount: Math.floor(Math.random() * 50),
+            shopsCount: Math.floor(Math.random() * 30),
+            isLiked: false,
+            isSaved: false,
+            savesCount: Math.floor(Math.random() * 200),
+            user: getUserFromId(dto.user_id),
             musicName: 'Original Audio',
             musicAuthor: 'WizyClub',
         };
@@ -98,7 +123,7 @@ export class SupabaseVideoDataSource {
             createdAt: dto.created_at,
             expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
             isViewed: false,
-            user: DEFAULT_USER,
+            user: getUserFromId(dto.user_id),
         };
     }
 }

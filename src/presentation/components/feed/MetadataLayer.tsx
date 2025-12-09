@@ -52,20 +52,21 @@ export function MetadataLayer({
                 )}
             </View>
 
-            {/* Description Row */}
+            {/* Description Row - inline text with read more */}
             <View style={styles.descriptionRow}>
                 <Text style={styles.descriptionText}>
                     {video.description.length > 70
-                        ? video.description.substring(0, 70) + '...'
+                        ? video.description.substring(0, 70)
                         : video.description}
+                    {video.description.length > 70 && (
+                        <Text onPress={onReadMorePress} style={styles.readMoreInline}>
+                            {'... '}
+                            <View style={styles.readMoreIconWrapper}>
+                                <ReadMoreIcon width={14} height={14} color="white" />
+                            </View>
+                        </Text>
+                    )}
                 </Text>
-                <Pressable
-                    onPress={onReadMorePress}
-                    style={styles.readMoreButton}
-                    hitSlop={12}
-                >
-                    <ReadMoreIcon width={16} height={16} color="white" />
-                </Pressable>
             </View>
 
             {/* Commercial Tag */}
@@ -124,9 +125,11 @@ const styles = StyleSheet.create({
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 2,
     },
-    readMoreButton: {
-        marginLeft: 6,
-        padding: 4,
+    readMoreInline: {
+        color: 'rgba(255,255,255,0.8)',
+    },
+    readMoreIconWrapper: {
+        marginLeft: 2,
     },
     commercialTag: {
         backgroundColor: 'rgba(255, 255, 255, 0.9)',

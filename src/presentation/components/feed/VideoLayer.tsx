@@ -115,13 +115,13 @@ export const VideoLayer = memo(function VideoLayer({
         }
     }, [isFinished, setPaused]);
 
-    // Reset loop & seek on active
+    // Reset to start when video becomes active (scrolled back)
     useEffect(() => {
         if (isActive) {
             if (!hasError) {
                 loopCount.current = 0;
                 setIsFinished(false);
-                // videoRef.current?.seek(0); // Optional: reset to start when becoming active
+                videoRef.current?.seek(0); // Reset video to start when becoming active
             }
             onSeekReady?.(seekTo);
         }
