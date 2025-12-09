@@ -10,6 +10,8 @@ import { BrightnessOverlay } from './BrightnessOverlay';
 import { RefreshCcw, AlertCircle } from 'lucide-react-native';
 import { useNetInfo } from '@react-native-community/netinfo';
 import { getBufferConfig } from '../../../core/utils/bufferConfig';
+import { VideoSeekBar } from './VideoSeekBar';
+import { useSharedValue, SharedValue } from 'react-native-reanimated';
 
 interface VideoLayerProps {
     video: VideoEntity;
@@ -18,6 +20,7 @@ interface VideoLayerProps {
     onVideoEnd?: () => void;
     onProgressUpdate?: (progress: number, duration: number) => void;
     onSeekReady?: (seekFn: (time: number) => void) => void;
+    isScrolling?: SharedValue<boolean>;
 }
 
 const MAX_LOOPS = 2;
@@ -30,6 +33,7 @@ export const VideoLayer = memo(function VideoLayer({
     onVideoEnd,
     onProgressUpdate,
     onSeekReady,
+    isScrolling,
 }: VideoLayerProps) {
     const isAppActive = useActiveVideoStore((state) => state.isAppActive);
     const isSeeking = useActiveVideoStore((state) => state.isSeeking);
@@ -45,6 +49,10 @@ export const VideoLayer = memo(function VideoLayer({
     const [retryCount, setRetryCount] = useState(0);
     const [key, setKey] = useState(0); // For forcing re-render implementation
 
+    // Local SharedValues for SeekBar
+    const currentTimeSV = useSharedValue(0);
+    const durationSV = useSharedValue(0);
+
     const videoRef = useRef<VideoRef>(null);
     const loopCount = useRef(0);
 
@@ -55,6 +63,8 @@ export const VideoLayer = memo(function VideoLayer({
         setRetryCount(0);
         setKey(prev => prev + 1);
         loopCount.current = 0;
+        currentTimeSV.value = 0;
+        durationSV.value = 0;
     }, [video.id]);
 
     // Handle Global Pause Toggle for Replay
@@ -72,6 +82,7 @@ export const VideoLayer = memo(function VideoLayer({
 
     const handleLoad = useCallback((data: OnLoadData) => {
         setDuration(data.duration);
+        durationSV.value = data.duration;
         setHasError(false);
     }, []);
 
@@ -94,6 +105,10 @@ export const VideoLayer = memo(function VideoLayer({
 
     const handleProgress = useCallback((data: OnProgressData) => {
         onProgressUpdate?.(data.currentTime, duration);
+        currentTimeSV.value = data.currentTime;
+        if (duration > 0 && durationSV.value !== duration) {
+            durationSV.value = duration;
+        }
     }, [duration, onProgressUpdate]);
 
     const handleEnd = useCallback(() => {
@@ -194,6 +209,15 @@ export const VideoLayer = memo(function VideoLayer({
                     </View>
                 )}
             </View>
+
+            {/* Per-Video Seekbar */}
+            <VideoSeekBar
+                currentTime={currentTimeSV}
+                duration={durationSV}
+                isScrolling={isScrolling}
+                onSeek={seekTo}
+                isActive={isActive}
+            />
         </View>
     );
 }, (prev, next) => {

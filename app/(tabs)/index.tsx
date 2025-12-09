@@ -65,9 +65,6 @@ export default function FeedScreen() {
     useAppStateSync();
 
     // Video progress - use SharedValues for high performance
-    // Video progress - use SharedValues for high performance
-    const currentTimeSV = useSharedValue(0);
-    const durationSV = useSharedValue(0);
     const isScrollingSV = useSharedValue(false);
     const videoSeekRef = useRef<((time: number) => void) | null>(null);
 
@@ -137,11 +134,7 @@ export default function FeedScreen() {
         [videos, toggleLike]
     );
 
-    const handleProgressUpdate = useCallback((time: number, dur: number) => {
-        // Update SharedValues directly - NO React re-render!
-        currentTimeSV.value = time;
-        if (dur > 0) durationSV.value = dur;
-    }, []);
+    // Progress update handler removed (handled internally by VideoLayer)
 
     const handleSeekReady = useCallback((seekFn: (time: number) => void) => {
         videoSeekRef.current = seekFn;
@@ -178,7 +171,7 @@ export default function FeedScreen() {
                                 video={item}
                                 isActive={isActive}
                                 isMuted={isMuted}
-                                onProgressUpdate={isActive ? handleProgressUpdate : undefined}
+                                isScrolling={isScrollingSV}
                                 onSeekReady={isActive ? handleSeekReady : undefined}
                             />
                             {/* ... Gradients ... */}
@@ -307,16 +300,6 @@ export default function FeedScreen() {
                 onStoryPress={() => router.push('/story/1')}
                 onMorePress={() => console.log('Open More Options')}
                 hasUnseenStories={hasUnseenStories}
-            />
-
-            {/* Always render, handle visibility internally or via opacity */}
-            <VideoSeekBar
-                key={activeVideoId} // Force remount on video change to clear dirty state
-                currentTime={currentTimeSV}
-                duration={durationSV}
-                isScrolling={isScrollingSV}
-                onSeek={handleSeek}
-                isActive={true}
             />
 
             {/* Brightness Controller Overlay - Global for the screen */}
