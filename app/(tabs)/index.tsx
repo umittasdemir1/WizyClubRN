@@ -1,4 +1,4 @@
-const { FlashList } = require('@shopify/flash-list');
+import { FlashList } from '@shopify/flash-list';
 import type { ViewToken } from 'react-native';
 import {
     Dimensions,
@@ -67,7 +67,7 @@ export default function FeedScreen() {
     // Video progress - use SharedValues for high performance
     const currentTimeSV = useSharedValue(0);
     const durationSV = useSharedValue(0);
-    const isScrollingSV = useSharedValue(false);
+    // const isScrollingSV = useSharedValue(false); // Disabled for stability
     const videoSeekRef = useRef<((time: number) => void) | null>(null);
 
     const insets = useSafeAreaInsets();
@@ -268,6 +268,24 @@ export default function FeedScreen() {
             <FlashList
                 ref={listRef}
                 data={videos}
+                renderItem={renderItem}
+                estimatedItemSize={ITEM_HEIGHT}
+                keyExtractor={keyExtractor}
+                pagingEnabled
+                decelerationRate="fast"
+                snapToInterval={ITEM_HEIGHT}
+                snapToAlignment="start"
+                showsVerticalScrollIndicator={false}
+                viewabilityConfigCallbackPairs={viewabilityConfigCallbackPairs.current}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={isRefreshing}
+                        onRefresh={refreshFeed}
+                        tintColor="#FFFFFF"
+                        progressViewOffset={insets.top}
+                    />
+                }
+                removeClippedSubviews={true}
                 maxToRenderPerBatch={3}
                 windowSize={5}
                 initialNumToRender={1}
@@ -286,15 +304,12 @@ export default function FeedScreen() {
             />
 
             {/* Always render, handle visibility internally or via opacity */}
-            {/* VideoSeekBar disabled for debugging
             <VideoSeekBar
                 currentTime={currentTimeSV}
                 duration={durationSV}
-                isScrolling={isScrollingSV}
                 onSeek={handleSeek}
                 isActive={true}
-            /> 
-            */}
+            />
 
             {/* Brightness Controller Overlay - Global for the screen */}
             <BrightnessController />
