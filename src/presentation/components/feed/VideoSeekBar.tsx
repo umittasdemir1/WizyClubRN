@@ -51,8 +51,22 @@ export function VideoSeekBar({
     const trackHeight = useSharedValue(TRACK_HEIGHT);
     const tooltipOpacity = useSharedValue(0);
 
-    // Set to -16 per user command
-    const finalBottomPosition = -16;
+    // --- LAYOUT CONFIGURATION ---
+    // 'safe': Automatically calculates TabBar height + Safe Area (Visible)
+    // 'hidden': Pushes it below screen (-22)
+    // 'custom': Use specific value
+    const POSITION_MODE = 'safe' as 'safe' | 'hidden' | 'custom';
+    const CUSTOM_OFFSET = -22;
+
+    const insets = useSafeAreaInsets();
+    const TAB_BAR_HEIGHT = 50; // Standard Tab Bar Height
+    const MARGIN_BOTTOM = 15;  // Extra spacing
+
+    const finalBottomPosition = useDerivedValue(() => {
+        if (POSITION_MODE === 'hidden') return CUSTOM_OFFSET;
+        if (POSITION_MODE === 'safe') return insets.bottom + TAB_BAR_HEIGHT + MARGIN_BOTTOM;
+        return CUSTOM_OFFSET;
+    }, [insets.bottom]);
 
     // Internal animated progress for smoothness
     const animatedProgress = useSharedValue(0);
