@@ -154,7 +154,7 @@ export const VideoLayer = memo(function VideoLayer({
                 playInBackground={false}
                 playWhenInactive={false}
                 ignoreSilentSwitch="ignore"
-                progressUpdateInterval={isActive && isSeeking ? 50 : 100}
+                progressUpdateInterval={33}
             />
 
             {/* Brightness Overlay */}

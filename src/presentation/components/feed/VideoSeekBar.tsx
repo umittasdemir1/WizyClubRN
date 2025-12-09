@@ -50,24 +50,11 @@ export function VideoSeekBar({
 
     const finalBottomPosition = -18;
 
-    // Butter smooth: continuous animation from current position to end
+    // Standard approach: Direct value assignment (no animation)
+    // Used by TikTok, YouTube, Instagram
     useEffect(() => {
         if (!isScrubbing.value && duration > 0) {
-            const targetProgress = currentTime / duration;
-            const currentProgress = progress.value;
-            const drift = Math.abs(targetProgress - currentProgress);
-
-            if (drift > 0.05) {
-                // Large drift (seeking, video change) - jump immediately
-                progress.value = targetProgress;
-            } else {
-                // Small drift - animate remaining duration with linear easing
-                const remainingDuration = (1 - targetProgress) * duration * 1000;
-                progress.value = withTiming(1, {
-                    duration: remainingDuration,
-                    easing: Easing.linear,
-                });
-            }
+            progress.value = currentTime / duration;
         }
     }, [currentTime, duration]);
 
