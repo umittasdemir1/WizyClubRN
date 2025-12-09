@@ -50,12 +50,27 @@ export function VideoSeekBar({
 
     const finalBottomPosition = -18;
 
-    // Animate progress smoothly between updates
+    // Butter smooth: Start continuous animation when video starts
+    // Re-sync only when there's significant drift or scrubbing
     useEffect(() => {
         if (!isScrubbing.value && duration > 0) {
             const targetProgress = currentTime / duration;
-            // Match animation duration with progressUpdateInterval (100ms)
-            progress.value = withTiming(targetProgress, { duration: 100 });
+            const currentProgress = progress.value;
+            const drift = Math.abs(targetProgress - currentProgress);
+
+            // If drift is small, animate smoothly to predicted position
+            // If drift is large (seeking, video change), jump immediately
+            if (drift > 0.05) {
+                // Large drift - jump to position
+                progress.value = targetProgress;
+            } else {
+                // Small drift - animate remaining duration from current position
+                const remainingDuration = (1 - targetProgress) * duration * 1000;
+                progress.value = withTiming(1, {
+                    duration: remainingDuration,
+                    easing: (t) => t, // Linear easing for constant speed
+                });
+            }
         }
     }, [currentTime, duration]);
 
