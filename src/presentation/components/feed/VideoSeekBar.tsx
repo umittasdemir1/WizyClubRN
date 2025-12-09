@@ -28,10 +28,10 @@ interface VideoSeekBarProps {
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const HORIZONTAL_PADDING = 16;
-const TOUCH_AREA_HEIGHT = 60; // Increased from 40 for easier touch
+const TOUCH_AREA_HEIGHT = 60; // Increased
 const THUMB_SIZE = 14;
-const TRACK_HEIGHT = 2;
-const TRACK_HEIGHT_EXPANDED = 12;
+const TRACK_HEIGHT = 2; // Very thin by default
+const TRACK_HEIGHT_EXPANDED = 12; // Thick on touch
 const BAR_WIDTH = SCREEN_WIDTH - (HORIZONTAL_PADDING * 2);
 
 export function VideoSeekBar({
@@ -49,8 +49,8 @@ export function VideoSeekBar({
     const trackHeight = useSharedValue(TRACK_HEIGHT);
     const tooltipOpacity = useSharedValue(0);
 
-    // Moved up by 8px per user request (-18 -> -10)
-    const finalBottomPosition = -10;
+    // Moved up by 2px per user request (-18 -> -16)
+    const finalBottomPosition = -16;
 
     // Internal animated progress for smoothness
     const animatedProgress = useSharedValue(0);
@@ -197,18 +197,16 @@ export function VideoSeekBar({
         let opacity = 1;
 
         if (!isInteracting) {
-            // First 0.5s fade out (gray)
-            if (time < 0.5) {
-                opacity = interpolate(time, [0, 0.5], [0.4, 1], Extrapolation.CLAMP);
+            // First 1.5s fade in
+            if (time < 1.5) {
+                opacity = interpolate(time, [0, 1.5], [0.15, 1], Extrapolation.CLAMP);
             }
-            // Last 0.5s fade out (gray)
-            else if (time > dur - 0.5) {
-                opacity = interpolate(time, [dur - 0.5, dur], [1, 0.4], Extrapolation.CLAMP);
+            // Last 1.5s fade out
+            else if (time > dur - 1.5) {
+                opacity = interpolate(time, [dur - 1.5, dur], [1, 0.15], Extrapolation.CLAMP);
             }
         }
 
-        // Active: Pure White (#FFFFFF)
-        // Passive: Dimmed White (rgba(255,255,255, opacity))
         return {
             width: `${animatedProgress.value * 100}%`,
             height: trackHeight.value,
@@ -253,7 +251,6 @@ export function VideoSeekBar({
                         {formatTime(displayTime)} | {formatTime(displayDuration)}
                     </Text>
                 </View>
-                {/* <View style={styles.tooltipArrow} /> */}
             </Animated.View>
 
             <GestureDetector gesture={composedGesture}>
@@ -291,7 +288,7 @@ const styles = StyleSheet.create({
     },
     thumb: {
         position: 'absolute',
-        top: (TOUCH_AREA_HEIGHT - THUMB_SIZE) / 2, // Centered vertically in touch area but offset logic handled by transform
+        top: (TOUCH_AREA_HEIGHT - THUMB_SIZE) / 2,
         left: 0,
         width: THUMB_SIZE,
         height: THUMB_SIZE,
