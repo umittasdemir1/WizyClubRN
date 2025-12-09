@@ -84,11 +84,7 @@ export default function FeedScreen() {
         }
     }, [videos, activeVideoId, setActiveVideo]);
 
-    // Reset progress on video change
-    useEffect(() => {
-        currentTimeSV.value = 0;
-        durationSV.value = 0;
-    }, [activeVideoId]);
+    // Reset logic moved to VideoLayer components
 
     const onViewableItemsChanged = useCallback(
         ({ viewableItems }: { viewableItems: ViewToken<Video>[] }) => {
@@ -98,9 +94,7 @@ export default function FeedScreen() {
 
                 if (newId !== activeVideoId) {
                     setActiveVideo(newId, newIndex);
-                    // Reset seekbar when video changes
-                    currentTimeSV.value = 0;
-                    durationSV.value = 0;
+                    // Reset logic moved to VideoLayer components
                 }
             }
         },
@@ -175,17 +169,7 @@ export default function FeedScreen() {
                                 onSeekReady={isActive ? handleSeekReady : undefined}
                             />
                             {/* ... Gradients ... */}
-                            <LinearGradient
-                                colors={[
-                                    'rgba(0,0,0,0.15)',
-                                    'transparent',
-                                    'transparent',
-                                    'rgba(0,0,0,0.5)',
-                                ]}
-                                locations={[0, 0.2, 0.6, 1]}
-                                style={StyleSheet.absoluteFill}
-                                pointerEvents="none"
-                            />
+                            {/* Gradient moved to VideoLayer */}
                         </View>
                     </DoubleTapLike>
 
@@ -219,7 +203,7 @@ export default function FeedScreen() {
             isMuted,
             handleToggleMute,
             handleDoubleTapLike,
-            handleProgressUpdate,
+            // handleProgressUpdate removed
             toggleLike,
             toggleSave,
             router,
@@ -260,6 +244,7 @@ export default function FeedScreen() {
         <View style={styles.container}>
             {/* @ts-ignore */}
             <FlashList
+                // @ts-ignore
                 ref={listRef}
                 data={videos}
                 renderItem={renderItem}

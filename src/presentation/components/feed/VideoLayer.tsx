@@ -12,6 +12,7 @@ import { useNetInfo } from '@react-native-community/netinfo';
 import { getBufferConfig } from '../../../core/utils/bufferConfig';
 import { VideoSeekBar } from './VideoSeekBar';
 import { useSharedValue, SharedValue } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface VideoLayerProps {
     video: VideoEntity;
@@ -174,6 +175,14 @@ export const VideoLayer = memo(function VideoLayer({
 
             {/* Brightness Overlay */}
             <BrightnessOverlay />
+
+            {/* Gradient Overlay - moved here to be behind Seekbar */}
+            <LinearGradient
+                colors={['rgba(0,0,0,0.15)', 'transparent', 'transparent', 'rgba(0,0,0,0.5)']}
+                locations={[0, 0.2, 0.6, 1]}
+                style={StyleSheet.absoluteFill}
+                pointerEvents="none"
+            />
 
             {/* Error Overlay */}
             {hasError && (
