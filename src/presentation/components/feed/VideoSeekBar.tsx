@@ -54,8 +54,8 @@ export function VideoSeekBar({
     useEffect(() => {
         if (!isScrubbing.value && duration > 0) {
             const targetProgress = currentTime / duration;
-            // Use smooth animation instead of instant jump
-            progress.value = withTiming(targetProgress, { duration: 200 });
+            // Match animation duration with progressUpdateInterval (100ms)
+            progress.value = withTiming(targetProgress, { duration: 100 });
         }
     }, [currentTime, duration]);
 
