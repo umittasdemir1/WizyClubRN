@@ -311,6 +311,7 @@ export default function FeedScreen() {
 
             {/* Always render, handle visibility internally or via opacity */}
             <VideoSeekBar
+                key={activeVideoId} // Force remount on video change to clear dirty state
                 currentTime={currentTimeSV}
                 duration={durationSV}
                 isScrolling={isScrollingSV}
