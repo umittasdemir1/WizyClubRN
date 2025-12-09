@@ -273,12 +273,7 @@ export default function FeedScreen() {
                 initialNumToRender={1}
                 bounces={false}
                 overScrollMode="never"
-                onScrollBeginDrag={() => { isScrollingSV.value = true; }}
-                onScrollEndDrag={() => { isScrollingSV.value = false; }}
-                onMomentumScrollEnd={(e) => {
-                    isScrollingSV.value = false;
-                    handleScrollEnd(e);
-                }}
+                onMomentumScrollEnd={handleScrollEnd}
             />
 
             {/* Fixed Header Overlay - stays on screen during scroll */}
