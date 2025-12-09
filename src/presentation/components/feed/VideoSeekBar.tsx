@@ -28,10 +28,10 @@ interface VideoSeekBarProps {
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const HORIZONTAL_PADDING = 16;
-const TOUCH_AREA_HEIGHT = 40;
+const TOUCH_AREA_HEIGHT = 60; // Increased from 40 for easier touch
 const THUMB_SIZE = 14;
-const TRACK_HEIGHT = 2; // Very thin by default
-const TRACK_HEIGHT_EXPANDED = 12; // Thick on touch for easy scrubbing
+const TRACK_HEIGHT = 2;
+const TRACK_HEIGHT_EXPANDED = 12;
 const BAR_WIDTH = SCREEN_WIDTH - (HORIZONTAL_PADDING * 2);
 
 export function VideoSeekBar({
@@ -49,7 +49,8 @@ export function VideoSeekBar({
     const trackHeight = useSharedValue(TRACK_HEIGHT);
     const tooltipOpacity = useSharedValue(0);
 
-    const finalBottomPosition = -18;
+    // Moved up by 8px per user request (-18 -> -10)
+    const finalBottomPosition = -10;
 
     // Internal animated progress for smoothness
     const animatedProgress = useSharedValue(0);
@@ -187,16 +188,34 @@ export function VideoSeekBar({
         borderRadius: trackHeight.value / 2,
     }));
 
-    const animatedProgressStyle = useAnimatedStyle(() => ({
-        width: `${animatedProgress.value * 100}%`,
-        height: trackHeight.value,
-        backgroundColor: interpolateColor(
-            isScrubbing.value ? 1 : 0,
-            [0, 1],
-            ['rgba(255,255,255,0.6)', '#FFFFFF'] // Passive: 60% white, Active: 100% white
-        ),
-        borderRadius: trackHeight.value / 2,
-    }));
+    const animatedProgressStyle = useAnimatedStyle(() => {
+        const dur = duration.value > 0 ? duration.value : 1;
+        const time = currentTime.value;
+        const isInteracting = isScrubbing.value;
+
+        // Default opacity for "white"
+        let opacity = 1;
+
+        if (!isInteracting) {
+            // First 0.5s fade out (gray)
+            if (time < 0.5) {
+                opacity = interpolate(time, [0, 0.5], [0.4, 1], Extrapolation.CLAMP);
+            }
+            // Last 0.5s fade out (gray)
+            else if (time > dur - 0.5) {
+                opacity = interpolate(time, [dur - 0.5, dur], [1, 0.4], Extrapolation.CLAMP);
+            }
+        }
+
+        // Active: Pure White (#FFFFFF)
+        // Passive: Dimmed White (rgba(255,255,255, opacity))
+        return {
+            width: `${animatedProgress.value * 100}%`,
+            height: trackHeight.value,
+            backgroundColor: isInteracting ? '#FFFFFF' : `rgba(255,255,255,${opacity})`,
+            borderRadius: trackHeight.value / 2,
+        };
+    });
 
     const thumbOpacity = useDerivedValue(() => {
         return withTiming(isScrubbing.value ? 1 : 0, { duration: 200 });
