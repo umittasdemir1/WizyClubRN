@@ -41,6 +41,7 @@ export function VideoSeekBar({
 }: VideoSeekBarProps) {
     const setSeeking = useActiveVideoStore((state: ActiveVideoState) => state.setSeeking);
     const [displayTime, setDisplayTime] = useState(0); // Only for tooltip text
+    const [displayDuration, setDisplayDuration] = useState(0); // Avoid reading SharedValue during render
 
     const isScrubbing = useSharedValue(false);
     const thumbScale = useSharedValue(1);
@@ -60,6 +61,9 @@ export function VideoSeekBar({
             scrubbing: isScrubbing.value
         }),
         (result, prevResult) => {
+            // Safely update duration display state
+            runOnJS(setDisplayDuration)(result.dur);
+
             if (result.dur <= 0) {
                 animatedProgress.value = 0;
                 return;
@@ -214,7 +218,7 @@ export function VideoSeekBar({
             <Animated.View style={[styles.tooltip, animatedTooltipStyle]}>
                 <View style={styles.tooltipContent}>
                     <Text style={styles.tooltipText}>
-                        {formatTime(displayTime)} | {formatTime(duration.value)}
+                        {formatTime(displayTime)} | {formatTime(displayDuration)}
                     </Text>
                 </View>
                 {/* <View style={styles.tooltipArrow} /> */}
