@@ -50,9 +50,12 @@ export function VideoSeekBar({
 
     const finalBottomPosition = -18;
 
+    // Animate progress smoothly between updates
     useEffect(() => {
         if (!isScrubbing.value && duration > 0) {
-            progress.value = currentTime / duration;
+            const targetProgress = currentTime / duration;
+            // Use smooth animation instead of instant jump
+            progress.value = withTiming(targetProgress, { duration: 200 });
         }
     }, [currentTime, duration]);
 
