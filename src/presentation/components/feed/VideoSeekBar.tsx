@@ -49,8 +49,8 @@ export function VideoSeekBar({
     const trackHeight = useSharedValue(TRACK_HEIGHT);
     const tooltipOpacity = useSharedValue(0);
 
-    // Moved up by 2px per user request (-18 -> -16)
-    const finalBottomPosition = -16;
+    // Reverted to original position per user request (-18)
+    const finalBottomPosition = -18;
 
     // Internal animated progress for smoothness
     const animatedProgress = useSharedValue(0);
