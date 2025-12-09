@@ -15,4 +15,6 @@ export interface Video {
     user: User;
     musicName?: string;
     musicAuthor?: string;
+    hlsUrl?: string; // HLS Master Playlist URL
+    processingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
 }

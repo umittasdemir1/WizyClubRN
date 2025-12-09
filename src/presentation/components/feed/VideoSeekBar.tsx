@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { StyleSheet, View, Text, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
@@ -19,6 +19,17 @@ import * as Haptics from 'expo-haptics';
 import { useActiveVideoStore, ActiveVideoState } from '../../store/useActiveVideoStore';
 import { formatTime } from '../../../core/utils';
 
+// Usage Configuration
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const HORIZONTAL_PADDING = 16;
+const TOUCH_AREA_HEIGHT = 80; // Increased to 80px per user request
+const THUMB_SIZE = 14;
+const TRACK_HEIGHT = 2; // Very thin by default
+const TRACK_HEIGHT_EXPANDED = 12; // Thick on touch
+const BAR_WIDTH = SCREEN_WIDTH - (HORIZONTAL_PADDING * 2);
+const TOOLTIP_WIDTH = 110; // Fixed width for perfect centering
+const TOOLTIP_HALF_WIDTH = TOOLTIP_WIDTH / 2;
+
 interface VideoSeekBarProps {
     currentTime: SharedValue<number>;
     duration: SharedValue<number>;
@@ -26,14 +37,6 @@ interface VideoSeekBarProps {
     onSeek: (time: number) => void;
     isActive?: boolean;
 }
-
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const HORIZONTAL_PADDING = 16;
-const TOUCH_AREA_HEIGHT = 60; // Increased
-const THUMB_SIZE = 14;
-const TRACK_HEIGHT = 2; // Very thin by default
-const TRACK_HEIGHT_EXPANDED = 12; // Thick on touch
-const BAR_WIDTH = SCREEN_WIDTH - (HORIZONTAL_PADDING * 2);
 
 export function VideoSeekBar({
     currentTime,
@@ -59,8 +62,8 @@ export function VideoSeekBar({
     const CUSTOM_OFFSET = -22;
 
     const insets = useSafeAreaInsets();
-    const TAB_BAR_HEIGHT = 50; // Standard Tab Bar Height
-    const MARGIN_BOTTOM = 15;  // Extra spacing
+    const TAB_BAR_HEIGHT = -45; // User confirmed -45
+    const MARGIN_BOTTOM = 0;
 
     const finalBottomPosition = useDerivedValue(() => {
         if (POSITION_MODE === 'hidden') return CUSTOM_OFFSET;
@@ -95,8 +98,7 @@ export function VideoSeekBar({
                 return;
             }
 
-            // Detect discontinuities (seek, loop, video change)
-            // If prev was close to target, it's continuous playback
+            // Detect discontinuities
             let isContinuous = false;
             if (prevResult && prevResult.dur === result.dur) {
                 const prevTarget = prevResult.time / prevResult.dur;
@@ -106,13 +108,13 @@ export function VideoSeekBar({
             }
 
             if (isContinuous) {
-                // Linear tween to next update point (33ms) to eliminate stutter
+                // Linear tween to next update point (33ms)
                 animatedProgress.value = withTiming(targetProgress, {
                     duration: 33,
                     easing: Easing.linear
                 });
             } else {
-                // Jump instantly for seeks/resets
+                // Jump instantly
                 animatedProgress.value = targetProgress;
             }
         }
@@ -130,7 +132,6 @@ export function VideoSeekBar({
         if (duration.value > 0) {
             const seekTime = percentage * duration.value;
             onSeek(seekTime);
-            // Update shared value immediately for UI feedback
             currentTime.value = seekTime;
         }
     }, [duration, onSeek, currentTime]);
@@ -153,8 +154,6 @@ export function VideoSeekBar({
 
             const absoluteX = event.absoluteX - HORIZONTAL_PADDING;
             const newProgress = Math.max(0, Math.min(absoluteX / BAR_WIDTH, 1));
-
-            // Only update current time while scrubbing, not the actual video yet
             currentTime.value = newProgress * duration.value;
 
             runOnJS(setDisplayTime)(currentTime.value);
@@ -165,9 +164,7 @@ export function VideoSeekBar({
             'worklet';
             const absoluteX = event.absoluteX - HORIZONTAL_PADDING;
             const newProgress = Math.max(0, Math.min(absoluteX / BAR_WIDTH, 1));
-
             currentTime.value = newProgress * duration.value;
-
             runOnJS(setDisplayTime)(currentTime.value);
         })
         .onEnd(() => {
@@ -180,6 +177,20 @@ export function VideoSeekBar({
             const finalProgress = currentTime.value / duration.value;
             runOnJS(endScrubbing)(finalProgress);
             runOnJS(triggerHaptic)();
+        })
+        .onFinalize(() => {
+            'worklet';
+            // If the gesture was cancelled (e.g. by Tap winning) or failed,
+            // we must ensure state is reset.
+            if (isScrubbing.value) {
+                isScrubbing.value = false;
+                thumbScale.value = withTiming(1, { duration: 150 });
+                trackHeight.value = withTiming(TRACK_HEIGHT, { duration: 150 });
+                tooltipOpacity.value = withTiming(0, { duration: 150 });
+
+                // Ensure we stop seeking status
+                runOnJS(setSeeking)(false);
+            }
         });
 
     const tap = Gesture.Tap()
@@ -187,7 +198,6 @@ export function VideoSeekBar({
             'worklet';
             const absoluteX = event.absoluteX - HORIZONTAL_PADDING;
             const newProgress = Math.max(0, Math.min(absoluteX / BAR_WIDTH, 1));
-
             runOnJS(updateSeek)(newProgress);
             runOnJS(triggerHaptic)();
         });
@@ -208,25 +218,18 @@ export function VideoSeekBar({
         const dur = duration.value > 0 ? duration.value : 1;
         const time = currentTime.value;
         const isInteracting = isScrubbing.value;
-
-        // Default opacity for "white"
         let opacity = 1;
 
         if (!isInteracting) {
-            // First 1.5s fade in (0.15 -> 1)
             if (time < 1.5) {
                 opacity = interpolate(time, [0, 1.5], [0.15, 1], Extrapolation.CLAMP);
-            }
-            // Last 1.5s fade out (1 -> 0.15)
-            else if (time > dur - 1.5) {
+            } else if (time > dur - 1.5) {
                 opacity = interpolate(time, [dur - 1.5, dur], [1, 0.15], Extrapolation.CLAMP);
             }
         }
 
-        // Global opacity control (scrolling)
-        let containerOpacity = opacity;
         if (isScrolling && isScrolling.value) {
-            containerOpacity = 0;
+            opacity = 0;
         }
 
         return {
@@ -258,37 +261,37 @@ export function VideoSeekBar({
 
     const animatedTooltipStyle = useAnimatedStyle(() => {
         const leftPosition = animatedProgress.value * BAR_WIDTH;
-        const tooltipHalfWidth = 50;
-        const clampedLeft = Math.max(tooltipHalfWidth, Math.min(leftPosition, BAR_WIDTH - tooltipHalfWidth));
+
+        // Ensure tooltip stays within bounds but is centered on thumb
+        const clampedLeft = Math.max(TOOLTIP_HALF_WIDTH, Math.min(leftPosition, BAR_WIDTH - TOOLTIP_HALF_WIDTH));
 
         return {
             opacity: tooltipOpacity.value,
             transform: [
-                { translateX: clampedLeft - tooltipHalfWidth },
-                { translateY: interpolate(tooltipOpacity.value, [0, 1], [5, 0]) },
+                { translateX: clampedLeft - TOOLTIP_HALF_WIDTH }, // Centers 110px tooltip relative to thumb x-pos
+                { scale: thumbScale.value },
             ],
         };
     });
 
-    if (!isActive) return null;
-
     return (
         <Animated.View style={[styles.container, { bottom: finalBottomPosition }, containerAnimatedStyle]}>
-            <Animated.View style={[styles.tooltip, animatedTooltipStyle]}>
-                <View style={styles.tooltipContent}>
-                    <Text style={styles.tooltipText}>
-                        {formatTime(displayTime)} | {formatTime(displayDuration)}
-                    </Text>
-                </View>
-            </Animated.View>
-
             <GestureDetector gesture={composedGesture}>
-                <View style={styles.touchArea}>
-                    <Animated.View style={[styles.track, animatedTrackStyle]} />
-                    <Animated.View style={[styles.progressFill, animatedProgressStyle]} />
-                    <Animated.View style={[styles.thumb, animatedThumbStyle]} />
-                </View>
+                <Animated.View style={[styles.touchArea, { height: TOUCH_AREA_HEIGHT }]}>
+                    <View style={styles.trackContainer}>
+                        <Animated.View style={[styles.trackBackground, animatedTrackStyle]}>
+                            <Animated.View style={[styles.progressFill, animatedProgressStyle]} />
+                        </Animated.View>
+                        <Animated.View style={[styles.thumb, animatedThumbStyle]} />
+                    </View>
+                </Animated.View>
             </GestureDetector>
+
+            <Animated.View style={[styles.tooltipContainer, animatedTooltipStyle]}>
+                <Text style={styles.tooltipText}>
+                    {formatTime(displayTime)} | {formatTime(displayDuration)}
+                </Text>
+            </Animated.View>
         </Animated.View>
     );
 }
@@ -296,55 +299,63 @@ export function VideoSeekBar({
 const styles = StyleSheet.create({
     container: {
         position: 'absolute',
-        left: HORIZONTAL_PADDING,
-        right: HORIZONTAL_PADDING,
-        zIndex: 50,
-    },
-    touchArea: {
-        height: TOUCH_AREA_HEIGHT,
-        justifyContent: 'center',
-    },
-    track: {
-        position: 'absolute',
         left: 0,
         right: 0,
-        // backgroundColor by animated style
+        alignItems: 'center',
+        zIndex: 100,
+    },
+    touchArea: {
+        width: '100%',
+        justifyContent: 'center',
+    },
+    trackContainer: {
+        width: BAR_WIDTH,
+        alignSelf: 'center',
+        justifyContent: 'center',
+    },
+    trackBackground: {
+        width: '100%',
+        backgroundColor: 'rgba(255,255,255,0.3)',
+        overflow: 'hidden',
     },
     progressFill: {
+        backgroundColor: '#FFFFFF',
         position: 'absolute',
         left: 0,
-        // backgroundColor by animated style
+        top: 0,
+        bottom: 0,
     },
     thumb: {
         position: 'absolute',
-        top: (TOUCH_AREA_HEIGHT - THUMB_SIZE) / 2,
         left: 0,
         width: THUMB_SIZE,
         height: THUMB_SIZE,
         borderRadius: THUMB_SIZE / 2,
         backgroundColor: '#FFFFFF',
-        shadowColor: '#000',
+        shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 4,
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
         elevation: 5,
-        // Opacity handled by animated style
     },
-    tooltip: {
+    tooltipContainer: {
         position: 'absolute',
-        bottom: TOUCH_AREA_HEIGHT + 8,
-        minWidth: 100,
+        bottom: 50, // Approx 2px above the visual track (centered at Y=40 in 80px container)
+        left: 0,
+        width: TOOLTIP_WIDTH,
+        height: 34,
+        backgroundColor: 'rgba(255, 255, 255, 0.2)', // Light Glass
         alignItems: 'center',
-    },
-    tooltipContent: {
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 10,
+        justifyContent: 'center',
+        borderRadius: 17,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.3)',
     },
     tooltipText: {
-        color: '#FFFFFF',
-        fontSize: 11,
+        color: 'white',
+        fontSize: 13,
         fontWeight: '600',
+        fontVariant: ['tabular-nums'],
+        letterSpacing: 0.5,
     },
 });

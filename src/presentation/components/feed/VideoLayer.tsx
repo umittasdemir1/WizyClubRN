@@ -13,6 +13,7 @@ import { getBufferConfig } from '../../../core/utils/bufferConfig';
 import { VideoSeekBar } from './VideoSeekBar';
 import { useSharedValue, SharedValue } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
+import { VideoCacheService } from '../../../data/services/VideoCacheService';
 
 interface VideoLayerProps {
     video: VideoEntity;
@@ -42,7 +43,7 @@ export const VideoLayer = memo(function VideoLayer({
     const setPaused = useActiveVideoStore((state) => state.setPaused);
 
     const { type: networkType } = useNetInfo();
-    const bufferConfig = getBufferConfig(networkType);
+    const defaultBufferConfig = getBufferConfig(networkType);
 
     const [isFinished, setIsFinished] = useState(false);
     const [duration, setDuration] = useState(0);
@@ -50,12 +51,63 @@ export const VideoLayer = memo(function VideoLayer({
     const [retryCount, setRetryCount] = useState(0);
     const [key, setKey] = useState(0); // For forcing re-render implementation
 
+    // Cache State - Try to get from memory cache synchronously first!
+    const [videoSource, setVideoSource] = useState<any>(() => {
+        try {
+            if (typeof video.videoUrl === 'string') {
+                const cached = VideoCacheService.getMemoryCachedPath(video.videoUrl);
+                if (cached) {
+                    return { uri: cached };
+                }
+                return { uri: video.videoUrl };
+            }
+            return video.videoUrl;
+        } catch (e) {
+            console.warn('[VideoLayer] Error reading memory cache:', e);
+            return typeof video.videoUrl === 'string' ? { uri: video.videoUrl } : video.videoUrl;
+        }
+    });
+
+    // Optimize buffer for local files
+    const isLocal = videoSource?.uri?.startsWith('file://');
+    const bufferConfig = isLocal ? {
+        minBufferMs: 100, // Increased to match bufferForPlaybackAfterRebufferMs (50 < 100 was causing crash)
+        maxBufferMs: 1000,
+        bufferForPlaybackMs: 50,
+        bufferForPlaybackAfterRebufferMs: 100
+    } : defaultBufferConfig;
+
     // Local SharedValues for SeekBar
     const currentTimeSV = useSharedValue(0);
     const durationSV = useSharedValue(0);
 
     const videoRef = useRef<VideoRef>(null);
     const loopCount = useRef(0);
+
+    // Check for cached version on mount/video change
+    useEffect(() => {
+        let isCancelled = false;
+
+        const checkCache = async () => {
+            if (typeof video.videoUrl === 'string') {
+                const cachedPath = await VideoCacheService.getCachedVideoPath(video.videoUrl);
+                if (cachedPath && !isCancelled) {
+                    console.log('[VideoLayer] Playing from cache:', cachedPath);
+                    setVideoSource({ uri: cachedPath });
+                    // Also update key to force player reload if we switched source? 
+                    // Usually react-native-video handles prop change, but sometimes it needs a kick.
+                }
+            }
+        };
+
+        // Reset to default
+        setVideoSource(typeof video.videoUrl === 'string' ? { uri: video.videoUrl } : video.videoUrl);
+
+        checkCache();
+
+        return () => { isCancelled = true; };
+    }, [video.videoUrl]);
+
 
     // Reset finished state if video changes
     useEffect(() => {
@@ -89,13 +141,15 @@ export const VideoLayer = memo(function VideoLayer({
 
     const handleVideoError = useCallback((error: OnVideoErrorData) => {
         console.error(`[VideoLayer] Error playing video ${video.id}:`, error);
+        console.error(`[VideoLayer] Faulty URL:`, video.videoUrl); // ADDED LOG
+        console.error(`[VideoLayer] Current Source:`, videoSource); // ADDED LOG
         setHasError(true);
 
         if (retryCount >= MAX_RETRIES) {
             console.log(`[VideoLayer] Max retries (${MAX_RETRIES}) reached, skipping video.`);
             onVideoEnd?.(); // Auto-skip
         }
-    }, [video.id, retryCount, onVideoEnd]);
+    }, [video.id, video.videoUrl, videoSource, retryCount, onVideoEnd]);
 
     const handleRetry = useCallback(() => {
         setRetryCount(prev => prev + 1);
@@ -152,9 +206,7 @@ export const VideoLayer = memo(function VideoLayer({
             <Video
                 key={key}
                 ref={videoRef}
-                source={typeof video.videoUrl === 'string'
-                    ? { uri: video.videoUrl }
-                    : video.videoUrl}
+                source={videoSource}
                 style={styles.video}
                 resizeMode="cover"
                 poster={video.thumbnailUrl}

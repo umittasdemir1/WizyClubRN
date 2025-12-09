@@ -8,7 +8,6 @@ import {
     Text,
     RefreshControl,
     Platform,
-    useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { VideoLayer } from '../../src/presentation/components/feed/VideoLayer';
@@ -16,7 +15,6 @@ import { ActionButtons } from '../../src/presentation/components/feed/ActionButt
 import { HeaderOverlay } from '../../src/presentation/components/feed/HeaderOverlay';
 import { MetadataLayer } from '../../src/presentation/components/feed/MetadataLayer';
 import { DoubleTapLike } from '../../src/presentation/components/feed/DoubleTapLike';
-import { VideoSeekBar } from '../../src/presentation/components/feed/VideoSeekBar';
 import { BrightnessController } from '../../src/presentation/components/feed/BrightnessController';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import {
@@ -27,9 +25,9 @@ import {
 import { Video } from '../../src/domain/entities/Video';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useSharedValue } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { FeedSkeleton } from '../../src/presentation/components/feed/FeedSkeleton';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -43,6 +41,8 @@ export default function FeedScreen() {
         videos,
         isLoading,
         isRefreshing,
+        isLoadingMore,
+        hasMore,
         error,
         toggleLike,
         toggleSave,
@@ -50,6 +50,7 @@ export default function FeedScreen() {
         toggleShare,
         toggleShop,
         refreshFeed,
+        loadMore,
     } = useVideoFeed();
 
     // Global Store
@@ -84,8 +85,6 @@ export default function FeedScreen() {
         }
     }, [videos, activeVideoId, setActiveVideo]);
 
-    // Reset logic moved to VideoLayer components
-
     const onViewableItemsChanged = useCallback(
         ({ viewableItems }: { viewableItems: ViewToken<Video>[] }) => {
             if (viewableItems.length > 0) {
@@ -94,7 +93,6 @@ export default function FeedScreen() {
 
                 if (newId !== activeVideoId) {
                     setActiveVideo(newId, newIndex);
-                    // Reset logic moved to VideoLayer components
                 }
             }
         },
@@ -128,14 +126,8 @@ export default function FeedScreen() {
         [videos, toggleLike]
     );
 
-    // Progress update handler removed (handled internally by VideoLayer)
-
     const handleSeekReady = useCallback((seekFn: (time: number) => void) => {
         videoSeekRef.current = seekFn;
-    }, []);
-
-    const handleSeek = useCallback((time: number) => {
-        videoSeekRef.current?.(time);
     }, []);
 
     // Snap back when on last video and scrolled past
@@ -168,8 +160,6 @@ export default function FeedScreen() {
                                 isScrolling={isScrollingSV}
                                 onSeekReady={isActive ? handleSeekReady : undefined}
                             />
-                            {/* ... Gradients ... */}
-                            {/* Gradient moved to VideoLayer */}
                         </View>
                     </DoubleTapLike>
 
@@ -203,7 +193,6 @@ export default function FeedScreen() {
             isMuted,
             handleToggleMute,
             handleDoubleTapLike,
-            // handleProgressUpdate removed
             toggleLike,
             toggleSave,
             router,
@@ -217,8 +206,7 @@ export default function FeedScreen() {
     if (isLoading && videos.length === 0) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#FFFFFF" />
-                <Text style={styles.loadingText}>Videolar yükleniyor...</Text>
+                <FeedSkeleton />
             </View>
         );
     }
@@ -239,6 +227,15 @@ export default function FeedScreen() {
             </View>
         );
     }
+
+    const renderFooter = () => {
+        if (!isLoadingMore) return null;
+        return (
+            <View style={styles.footerLoader}>
+                <ActivityIndicator size="small" color="#FFF" />
+            </View>
+        );
+    };
 
     return (
         <View style={styles.container}>
@@ -264,6 +261,9 @@ export default function FeedScreen() {
                         progressViewOffset={insets.top}
                     />
                 }
+                onEndReached={hasMore ? loadMore : null}
+                onEndReachedThreshold={0.5}
+                ListFooterComponent={renderFooter}
                 removeClippedSubviews={true}
                 maxToRenderPerBatch={3}
                 windowSize={5}
@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
         bottom: 120,
         zIndex: 30,
     },
-    loadingContainer: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
+    loadingContainer: { flex: 1, backgroundColor: '#000' },
     loadingText: { color: '#FFF', marginTop: 16 },
     errorContainer: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
     errorText: { color: 'red', marginBottom: 16 },
@@ -317,4 +317,10 @@ const styles = StyleSheet.create({
     emptyContainer: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
     emptyText: { color: '#FFF' },
     emptySubtext: { color: '#aaa' },
+    footerLoader: {
+        height: 50,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'transparent'
+    }
 });

@@ -3,19 +3,20 @@ import { Video } from '../../domain/entities/Video';
 import { GetVideoFeedUseCase } from '../../domain/usecases/GetVideoFeedUseCase';
 import { ToggleLikeUseCase } from '../../domain/usecases/ToggleLikeUseCase';
 import { VideoRepositoryImpl } from '../../data/repositories/VideoRepositoryImpl';
+import { VideoCacheService } from '../../data/services/VideoCacheService';
+import { useActiveVideoStore } from '../store/useActiveVideoStore';
 
-// 🚀 SINGLETON PATTERN: Her render'da yeni instance oluşmasını engeller
-const videoRepository = new VideoRepositoryImpl();
-const getVideoFeedUseCase = new GetVideoFeedUseCase(videoRepository);
-const toggleLikeUseCase = new ToggleLikeUseCase(videoRepository);
-
+// Interfaces
 interface UseVideoFeedReturn {
     videos: Video[];
     isLoading: boolean;
     isRefreshing: boolean;
+    isLoadingMore: boolean;
+    hasMore: boolean;
     error: string | null;
     fetchFeed: () => Promise<void>;
     refreshFeed: () => Promise<void>;
+    loadMore: () => Promise<void>;
     toggleLike: (videoId: string) => Promise<void>;
     toggleSave: (videoId: string) => void;
     toggleFollow: (videoId: string) => void;
@@ -24,12 +25,44 @@ interface UseVideoFeedReturn {
 }
 
 export function useVideoFeed(): UseVideoFeedReturn {
+    // Repository & UseCases (Memoized to prevent recreation)
+    const videoRepository = useRef(new VideoRepositoryImpl()).current;
+    const getVideoFeedUseCase = useRef(new GetVideoFeedUseCase(videoRepository)).current;
+    const toggleLikeUseCase = useRef(new ToggleLikeUseCase(videoRepository)).current;
+
+    // State
     const [videos, setVideos] = useState<Video[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(true);
 
     const isMounted = useRef(true);
+    const activeVideoId = useActiveVideoStore((state) => state.activeVideoId);
+
+    // Initialize Cache
+    useEffect(() => {
+        VideoCacheService.initialize();
+    }, []);
+
+    // Prefetching Logic
+    useEffect(() => {
+        if (!activeVideoId || videos.length === 0) return;
+
+        const currentIndex = videos.findIndex(v => v.id === activeVideoId);
+        if (currentIndex === -1) return;
+
+        // Prefetch next 3 videos
+        const videosToPrefetch = videos.slice(currentIndex + 1, currentIndex + 4);
+
+        videosToPrefetch.forEach(video => {
+            if (typeof video.videoUrl === 'string') {
+                VideoCacheService.cacheVideo(video.videoUrl);
+            }
+        });
+    }, [activeVideoId, videos]);
 
     useEffect(() => {
         isMounted.current = true;
@@ -42,10 +75,12 @@ export function useVideoFeed(): UseVideoFeedReturn {
         try {
             setIsLoading(true);
             setError(null);
-            const fetchedVideos = await getVideoFeedUseCase.execute();
+            const fetchedVideos = await getVideoFeedUseCase.execute(1, 10);
 
             if (isMounted.current) {
                 setVideos(fetchedVideos);
+                setPage(2);
+                setHasMore(fetchedVideos.length >= 10);
             }
         } catch (err) {
             if (isMounted.current) {
@@ -57,7 +92,7 @@ export function useVideoFeed(): UseVideoFeedReturn {
                 setIsLoading(false);
             }
         }
-    }, []);
+    }, [getVideoFeedUseCase]);
 
     const refreshFeed = useCallback(async () => {
         if (isRefreshing) return;
@@ -65,10 +100,13 @@ export function useVideoFeed(): UseVideoFeedReturn {
         try {
             setIsRefreshing(true);
             setError(null);
-            const fetchedVideos = await getVideoFeedUseCase.execute();
+            // Reset to page 1
+            const fetchedVideos = await getVideoFeedUseCase.execute(1, 10);
 
             if (isMounted.current) {
                 setVideos(fetchedVideos);
+                setPage(2);
+                setHasMore(fetchedVideos.length >= 10);
             }
         } catch (err) {
             if (isMounted.current) {
@@ -80,7 +118,32 @@ export function useVideoFeed(): UseVideoFeedReturn {
                 setIsRefreshing(false);
             }
         }
-    }, [isRefreshing]);
+    }, [isRefreshing, getVideoFeedUseCase]);
+
+    const loadMore = useCallback(async () => {
+        if (isLoadingMore || !hasMore || isLoading) return;
+
+        try {
+            setIsLoadingMore(true);
+            const fetchedVideos = await getVideoFeedUseCase.execute(page, 10);
+
+            if (isMounted.current) {
+                if (fetchedVideos.length > 0) {
+                    setVideos(prev => [...prev, ...fetchedVideos]);
+                    setPage(prev => prev + 1);
+                    setHasMore(fetchedVideos.length >= 10);
+                } else {
+                    setHasMore(false);
+                }
+            }
+        } catch (err) {
+            console.error('Load more error:', err);
+        } finally {
+            if (isMounted.current) {
+                setIsLoadingMore(false);
+            }
+        }
+    }, [isLoadingMore, hasMore, isLoading, page, getVideoFeedUseCase]);
 
     // Optimistic Update with Rollback
     const toggleLike = useCallback(async (videoId: string) => {
@@ -120,7 +183,7 @@ export function useVideoFeed(): UseVideoFeedReturn {
                 })
             );
         }
-    }, []);
+    }, [toggleLikeUseCase]);
 
     const toggleSave = useCallback((videoId: string) => {
         setVideos((prevVideos) =>
@@ -192,9 +255,12 @@ export function useVideoFeed(): UseVideoFeedReturn {
         videos,
         isLoading,
         isRefreshing,
+        isLoadingMore,
+        hasMore,
         error,
         fetchFeed,
         refreshFeed,
+        loadMore,
         toggleLike,
         toggleSave,
         toggleFollow,

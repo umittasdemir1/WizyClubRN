@@ -11,17 +11,17 @@ export const getBufferConfig = (type: NetInfoStateType | null): BufferConfig => 
     switch (type) {
         case NetInfoStateType.wifi:
         case NetInfoStateType.ethernet:
-            // High speed: Aggressive buffering for quality and less rebuffering
+            // High speed: Moderate buffering for faster start
             return {
-                minBufferMs: 2500,
+                minBufferMs: 2000,
                 maxBufferMs: 60000,
-                bufferForPlaybackMs: 500, // Wait a bit more to ensure smooth start? Actually reduced for fast start.
+                bufferForPlaybackMs: 500,
                 bufferForPlaybackAfterRebufferMs: 1000,
             };
         case NetInfoStateType.cellular:
-            // Cellular: Conservative to save data, but keep enough for stability
+            // Cellular: Balance speed and data
             return {
-                minBufferMs: 2000,
+                minBufferMs: 1500,
                 maxBufferMs: 10000,
                 bufferForPlaybackMs: 250,
                 bufferForPlaybackAfterRebufferMs: 500,
