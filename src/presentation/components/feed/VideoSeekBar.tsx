@@ -10,6 +10,7 @@ import Animated, {
     runOnJS,
     interpolate,
     useDerivedValue,
+    Easing,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useActiveVideoStore, ActiveVideoState } from '../../store/useActiveVideoStore';
@@ -24,7 +25,6 @@ interface VideoSeekBarProps {
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
-const TAB_BAR_HEIGHT = 60;
 const HORIZONTAL_PADDING = 16;
 const TOUCH_AREA_HEIGHT = 40;
 const THUMB_SIZE = 12;
@@ -50,25 +50,22 @@ export function VideoSeekBar({
 
     const finalBottomPosition = -18;
 
-    // Butter smooth: Start continuous animation when video starts
-    // Re-sync only when there's significant drift or scrubbing
+    // Butter smooth: continuous animation from current position to end
     useEffect(() => {
         if (!isScrubbing.value && duration > 0) {
             const targetProgress = currentTime / duration;
             const currentProgress = progress.value;
             const drift = Math.abs(targetProgress - currentProgress);
 
-            // If drift is small, animate smoothly to predicted position
-            // If drift is large (seeking, video change), jump immediately
             if (drift > 0.05) {
-                // Large drift - jump to position
+                // Large drift (seeking, video change) - jump immediately
                 progress.value = targetProgress;
             } else {
-                // Small drift - animate remaining duration from current position
+                // Small drift - animate remaining duration with linear easing
                 const remainingDuration = (1 - targetProgress) * duration * 1000;
                 progress.value = withTiming(1, {
                     duration: remainingDuration,
-                    easing: (t) => t, // Linear easing for constant speed
+                    easing: Easing.linear,
                 });
             }
         }
@@ -147,10 +144,7 @@ export function VideoSeekBar({
         height: trackHeight.value,
     }));
 
-    // Fade opacity based on scrubbing
     const thumbOpacity = useDerivedValue(() => {
-        // Show thumb if scrubbing or if recently tapped (could add logic), 
-        // for now just scrubbing or interacting
         return withTiming(isScrubbing.value ? 1 : 0, { duration: 200 });
     });
 
@@ -192,7 +186,6 @@ export function VideoSeekBar({
                 <View style={styles.touchArea}>
                     <Animated.View style={[styles.track, animatedTrackStyle]} />
                     <Animated.View style={[styles.progressFill, animatedProgressStyle]} />
-                    {/* Thumb with opacity animation */}
                     <Animated.View style={[styles.thumb, animatedThumbStyle]} />
                 </View>
             </GestureDetector>
@@ -240,7 +233,7 @@ const styles = StyleSheet.create({
     tooltip: {
         position: 'absolute',
         bottom: TOUCH_AREA_HEIGHT + 8,
-        minWidth: 100, // Wider for side-by-side format
+        minWidth: 100,
         alignItems: 'center',
     },
     tooltipContent: {
@@ -248,7 +241,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 10,
-        // Simple glass - no inner border
     },
     tooltipText: {
         color: '#FFFFFF',
@@ -256,7 +248,6 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     tooltipArrow: {
-        // Hidden - user requested just box and text
         display: 'none',
     },
 });
