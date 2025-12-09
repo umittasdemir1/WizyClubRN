@@ -6,11 +6,13 @@ import Animated, {
     useSharedValue,
     useAnimatedStyle,
     useDerivedValue,
+    useAnimatedReaction,
     withTiming,
     runOnJS,
     SharedValue,
     interpolate,
     Extrapolation,
+    Easing,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useActiveVideoStore, ActiveVideoState } from '../../store/useActiveVideoStore';
@@ -47,11 +49,52 @@ export function VideoSeekBar({
 
     const finalBottomPosition = -18;
 
-    // Derived progress value (0-1)
-    const progress = useDerivedValue(() => {
-        if (duration.value <= 0) return 0;
-        return currentTime.value / duration.value;
-    });
+    // Internal animated progress for smoothness
+    const animatedProgress = useSharedValue(0);
+
+    // Sync with external progress using linear interpolation
+    useAnimatedReaction(
+        () => ({
+            time: currentTime.value,
+            dur: duration.value,
+            scrubbing: isScrubbing.value
+        }),
+        (result, prevResult) => {
+            if (result.dur <= 0) {
+                animatedProgress.value = 0;
+                return;
+            }
+
+            const targetProgress = result.time / result.dur;
+
+            if (result.scrubbing) {
+                // Instant update while scrubbing
+                animatedProgress.value = targetProgress;
+                return;
+            }
+
+            // Detect discontinuities (seek, loop, video change)
+            // If prev was close to target, it's continuous playback
+            let isContinuous = false;
+            if (prevResult && prevResult.dur === result.dur) {
+                const prevTarget = prevResult.time / prevResult.dur;
+                if (Math.abs(targetProgress - prevTarget) < 0.05) {
+                    isContinuous = true;
+                }
+            }
+
+            if (isContinuous) {
+                // Linear tween to next update point (33ms) to eliminate stutter
+                animatedProgress.value = withTiming(targetProgress, {
+                    duration: 33,
+                    easing: Easing.linear
+                });
+            } else {
+                // Jump instantly for seeks/resets
+                animatedProgress.value = targetProgress;
+            }
+        }
+    );
 
     const triggerHaptic = useCallback(() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -134,7 +177,7 @@ export function VideoSeekBar({
     }));
 
     const animatedProgressStyle = useAnimatedStyle(() => ({
-        width: `${progress.value * 100}%`,
+        width: `${animatedProgress.value * 100}%`,
         height: trackHeight.value,
     }));
 
@@ -145,13 +188,13 @@ export function VideoSeekBar({
     const animatedThumbStyle = useAnimatedStyle(() => ({
         opacity: thumbOpacity.value,
         transform: [
-            { translateX: progress.value * BAR_WIDTH - THUMB_SIZE / 2 },
+            { translateX: animatedProgress.value * BAR_WIDTH - THUMB_SIZE / 2 },
             { scale: thumbScale.value },
         ],
     }));
 
     const animatedTooltipStyle = useAnimatedStyle(() => {
-        const leftPosition = progress.value * BAR_WIDTH;
+        const leftPosition = animatedProgress.value * BAR_WIDTH;
         const tooltipHalfWidth = 50;
         const clampedLeft = Math.max(tooltipHalfWidth, Math.min(leftPosition, BAR_WIDTH - tooltipHalfWidth));
 
