@@ -65,9 +65,10 @@ export default function FeedScreen() {
     useAppStateSync();
 
     // Video progress - use SharedValues for high performance
+    // Video progress - use SharedValues for high performance
     const currentTimeSV = useSharedValue(0);
     const durationSV = useSharedValue(0);
-    // const isScrollingSV = useSharedValue(false); // Disabled for stability
+    const isScrollingSV = useSharedValue(false);
     const videoSeekRef = useRef<((time: number) => void) | null>(null);
 
     const insets = useSafeAreaInsets();
@@ -291,7 +292,12 @@ export default function FeedScreen() {
                 initialNumToRender={1}
                 bounces={false}
                 overScrollMode="never"
-                onMomentumScrollEnd={handleScrollEnd}
+                onScrollBeginDrag={() => { isScrollingSV.value = true; }}
+                onScrollEndDrag={() => { isScrollingSV.value = false; }}
+                onMomentumScrollEnd={(e) => {
+                    isScrollingSV.value = false;
+                    handleScrollEnd(e);
+                }}
             />
 
             {/* Fixed Header Overlay - stays on screen during scroll */}
@@ -307,6 +313,7 @@ export default function FeedScreen() {
             <VideoSeekBar
                 currentTime={currentTimeSV}
                 duration={durationSV}
+                isScrolling={isScrollingSV}
                 onSeek={handleSeek}
                 isActive={true}
             />
