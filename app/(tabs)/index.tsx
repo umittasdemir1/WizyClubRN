@@ -26,6 +26,7 @@ import {
 } from '../../src/presentation/store/useActiveVideoStore';
 import { Video } from '../../src/domain/entities/Video';
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { useSharedValue } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -63,9 +64,9 @@ export default function FeedScreen() {
     // App State Sync
     useAppStateSync();
 
-    // Video progress state
-    const [currentTime, setCurrentTime] = useState(0);
-    const [duration, setDuration] = useState(0);
+    // Video progress - use SharedValues for high performance
+    const currentTimeSV = useSharedValue(0);
+    const durationSV = useSharedValue(0);
     const videoSeekRef = useRef<((time: number) => void) | null>(null);
 
     const insets = useSafeAreaInsets();
@@ -84,10 +85,10 @@ export default function FeedScreen() {
         }
     }, [videos, activeVideoId, setActiveVideo]);
 
-    // Reset progress
+    // Reset progress on video change
     useEffect(() => {
-        setCurrentTime(0);
-        setDuration(0);
+        currentTimeSV.value = 0;
+        durationSV.value = 0;
     }, [activeVideoId]);
 
     const onViewableItemsChanged = useCallback(
@@ -99,8 +100,8 @@ export default function FeedScreen() {
                 if (newId !== activeVideoId) {
                     setActiveVideo(newId, newIndex);
                     // Reset seekbar when video changes
-                    setCurrentTime(0);
-                    setDuration(0);
+                    currentTimeSV.value = 0;
+                    durationSV.value = 0;
                 }
             }
         },
@@ -135,8 +136,9 @@ export default function FeedScreen() {
     );
 
     const handleProgressUpdate = useCallback((time: number, dur: number) => {
-        setCurrentTime(time);
-        if (dur > 0) setDuration(dur);
+        // Update SharedValues directly - NO React re-render!
+        currentTimeSV.value = time;
+        if (dur > 0) durationSV.value = dur;
     }, []);
 
     const handleSeekReady = useCallback((seekFn: (time: number) => void) => {
@@ -300,14 +302,13 @@ export default function FeedScreen() {
                 hasUnseenStories={hasUnseenStories}
             />
 
-            {duration > 0 && (
-                <VideoSeekBar
-                    currentTime={currentTime}
-                    duration={duration}
-                    onSeek={handleSeek}
-                    isActive={true}
-                />
-            )}
+            {/* Always render, handle visibility internally or via opacity */}
+            <VideoSeekBar
+                currentTime={currentTimeSV}
+                duration={durationSV}
+                onSeek={handleSeek}
+                isActive={true}
+            />
 
             {/* Brightness Controller Overlay - Global for the screen */}
             <BrightnessController />
