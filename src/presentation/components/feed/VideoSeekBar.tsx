@@ -11,6 +11,7 @@ import Animated, {
     runOnJS,
     SharedValue,
     interpolate,
+    interpolateColor,
     Extrapolation,
     Easing,
 } from 'react-native-reanimated';
@@ -28,9 +29,9 @@ interface VideoSeekBarProps {
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const HORIZONTAL_PADDING = 16;
 const TOUCH_AREA_HEIGHT = 40;
-const THUMB_SIZE = 12;
-const TRACK_HEIGHT = 4;
-const TRACK_HEIGHT_EXPANDED = 6;
+const THUMB_SIZE = 14;
+const TRACK_HEIGHT = 2; // Very thin by default
+const TRACK_HEIGHT_EXPANDED = 12; // Thick on touch for easy scrubbing
 const BAR_WIDTH = SCREEN_WIDTH - (HORIZONTAL_PADDING * 2);
 
 export function VideoSeekBar({
@@ -129,9 +130,9 @@ export function VideoSeekBar({
         .onBegin((event) => {
             'worklet';
             isScrubbing.value = true;
-            thumbScale.value = withTiming(1.5, { duration: 100 });
-            trackHeight.value = withTiming(TRACK_HEIGHT_EXPANDED, { duration: 100 });
-            tooltipOpacity.value = withTiming(1, { duration: 100 });
+            thumbScale.value = withTiming(1, { duration: 150 });
+            trackHeight.value = withTiming(TRACK_HEIGHT_EXPANDED, { duration: 150 });
+            tooltipOpacity.value = withTiming(1, { duration: 150 });
 
             const absoluteX = event.absoluteX - HORIZONTAL_PADDING;
             const newProgress = Math.max(0, Math.min(absoluteX / BAR_WIDTH, 1));
@@ -178,11 +179,23 @@ export function VideoSeekBar({
 
     const animatedTrackStyle = useAnimatedStyle(() => ({
         height: trackHeight.value,
+        backgroundColor: interpolateColor(
+            isScrubbing.value ? 1 : 0,
+            [0, 1],
+            ['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.3)']
+        ),
+        borderRadius: trackHeight.value / 2,
     }));
 
     const animatedProgressStyle = useAnimatedStyle(() => ({
         width: `${animatedProgress.value * 100}%`,
         height: trackHeight.value,
+        backgroundColor: interpolateColor(
+            isScrubbing.value ? 1 : 0,
+            [0, 1],
+            ['rgba(255,255,255,0.6)', '#FFFFFF'] // Passive: 60% white, Active: 100% white
+        ),
+        borderRadius: trackHeight.value / 2,
     }));
 
     const thumbOpacity = useDerivedValue(() => {
@@ -250,17 +263,16 @@ const styles = StyleSheet.create({
         position: 'absolute',
         left: 0,
         right: 0,
-        backgroundColor: 'rgba(255,255,255,0.3)',
-        borderRadius: 1,
+        // backgroundColor by animated style
     },
     progressFill: {
         position: 'absolute',
         left: 0,
-        backgroundColor: '#FFFFFF',
-        borderRadius: 1,
+        // backgroundColor by animated style
     },
     thumb: {
         position: 'absolute',
+        top: (TOUCH_AREA_HEIGHT - THUMB_SIZE) / 2, // Centered vertically in touch area but offset logic handled by transform
         left: 0,
         width: THUMB_SIZE,
         height: THUMB_SIZE,
@@ -271,6 +283,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.3,
         shadowRadius: 4,
         elevation: 5,
+        // Opacity handled by animated style
     },
     tooltip: {
         position: 'absolute',
