@@ -22,6 +22,7 @@ import { formatTime } from '../../../core/utils';
 interface VideoSeekBarProps {
     currentTime: SharedValue<number>;
     duration: SharedValue<number>;
+    isScrolling?: SharedValue<boolean>;
     onSeek: (time: number) => void;
     isActive?: boolean;
 }
@@ -37,6 +38,7 @@ const BAR_WIDTH = SCREEN_WIDTH - (HORIZONTAL_PADDING * 2);
 export function VideoSeekBar({
     currentTime,
     duration,
+    isScrolling,
     onSeek,
     isActive = true
 }: VideoSeekBarProps) {
@@ -197,22 +199,35 @@ export function VideoSeekBar({
         let opacity = 1;
 
         if (!isInteracting) {
-            // First 1.5s fade in
+            // First 1.5s fade in (0.15 -> 1)
             if (time < 1.5) {
                 opacity = interpolate(time, [0, 1.5], [0.15, 1], Extrapolation.CLAMP);
             }
-            // Last 1.5s fade out
+            // Last 1.5s fade out (1 -> 0.15)
             else if (time > dur - 1.5) {
                 opacity = interpolate(time, [dur - 1.5, dur], [1, 0.15], Extrapolation.CLAMP);
             }
         }
 
+        // Global opacity control (scrolling)
+        let containerOpacity = opacity;
+        if (isScrolling && isScrolling.value) {
+            containerOpacity = 0;
+        }
+
         return {
             width: `${animatedProgress.value * 100}%`,
             height: trackHeight.value,
-            backgroundColor: isInteracting ? '#FFFFFF' : `rgba(255,255,255,${opacity})`,
+            backgroundColor: isInteracting ? '#FFFFFF' : `rgba(255,255,255,${isInteracting ? 1 : opacity})`,
             borderRadius: trackHeight.value / 2,
         };
+    });
+
+    const containerAnimatedStyle = useAnimatedStyle(() => {
+        if (isScrolling && isScrolling.value) {
+            return { opacity: withTiming(0, { duration: 150 }) };
+        }
+        return { opacity: withTiming(1, { duration: 150 }) };
     });
 
     const thumbOpacity = useDerivedValue(() => {
@@ -244,7 +259,7 @@ export function VideoSeekBar({
     if (!isActive) return null;
 
     return (
-        <View style={[styles.container, { bottom: finalBottomPosition }]}>
+        <Animated.View style={[styles.container, { bottom: finalBottomPosition }, containerAnimatedStyle]}>
             <Animated.View style={[styles.tooltip, animatedTooltipStyle]}>
                 <View style={styles.tooltipContent}>
                     <Text style={styles.tooltipText}>
@@ -260,7 +275,7 @@ export function VideoSeekBar({
                     <Animated.View style={[styles.thumb, animatedThumbStyle]} />
                 </View>
             </GestureDetector>
-        </View>
+        </Animated.View>
     );
 }
 
