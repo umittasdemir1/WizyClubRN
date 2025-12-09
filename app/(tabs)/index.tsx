@@ -286,13 +286,15 @@ export default function FeedScreen() {
             />
 
             {/* Always render, handle visibility internally or via opacity */}
+            {/* VideoSeekBar disabled for debugging
             <VideoSeekBar
                 currentTime={currentTimeSV}
                 duration={durationSV}
                 isScrolling={isScrollingSV}
                 onSeek={handleSeek}
                 isActive={true}
-            />
+            /> 
+            */}
 
             {/* Brightness Controller Overlay - Global for the screen */}
             <BrightnessController />
