@@ -99,6 +99,7 @@ const styles = StyleSheet.create({
     tapLayer: {
         ...StyleSheet.absoluteFillObject,
         zIndex: 5, // Below UI buttons but above video
+        bottom: 100, // Leave space for Seekbar (80px + margin)
     },
     iconContainer: {
         ...StyleSheet.absoluteFillObject,

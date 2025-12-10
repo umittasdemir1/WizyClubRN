@@ -15,6 +15,7 @@ export class VideoMapper {
             commentsCount: dto.commentsCount,
             sharesCount: dto.sharesCount,
             shopsCount: dto.shopsCount || 0,
+            spriteUrl: dto.sprite_url, // Sprite sheet for seekbar thumbnails
             isLiked: dto.isLiked,
             isSaved: dto.isSaved,
             savesCount: dto.savesCount,

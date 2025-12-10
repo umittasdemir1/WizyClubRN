@@ -51,6 +51,12 @@ export class VideoCacheService {
     static async cacheVideo(url: string | number): Promise<string | null> {
         if (typeof url !== 'string') return null;
 
+        // Skip HLS streams - they should stream directly, not be cached
+        if (url.endsWith('.m3u8')) {
+            console.log('[VideoCache] Skipping HLS stream (not cacheable):', url);
+            return null;
+        }
+
         const filename = url.split('/').pop()?.split('?')[0] || `video_${Date.now()}.mp4`;
         const path = `${CACHE_FOLDER}${filename}`;
 

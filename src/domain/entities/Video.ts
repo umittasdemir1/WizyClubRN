@@ -9,6 +9,7 @@ export interface Video {
     commentsCount: number;
     sharesCount: number;
     shopsCount: number;
+    spriteUrl?: string; // Sprite sheet URL for seekbar thumbnails
     isLiked: boolean;
     isSaved: boolean;
     savesCount: number;
@@ -17,4 +18,8 @@ export interface Video {
     musicAuthor?: string;
     hlsUrl?: string; // HLS Master Playlist URL
     processingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
+    brandName?: string | null;
+    brandUrl?: string | null;
+    isCommercial?: boolean;
+    commercialType?: string | null;
 }

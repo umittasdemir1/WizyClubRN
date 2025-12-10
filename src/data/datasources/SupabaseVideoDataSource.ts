@@ -47,6 +47,7 @@ interface SupabaseVideo {
     likes_count: number;
     views_count: number;
     created_at: string;
+    sprite_url?: string; // Seekbar thumbnail sprite sheet
 }
 
 export class SupabaseVideoDataSource {
@@ -106,6 +107,7 @@ export class SupabaseVideoDataSource {
             commentsCount: Math.floor(Math.random() * 100),
             sharesCount: Math.floor(Math.random() * 50),
             shopsCount: Math.floor(Math.random() * 30),
+            spriteUrl: dto.sprite_url, // Seekbar thumbnail sprite
             isLiked: false,
             isSaved: false,
             savesCount: Math.floor(Math.random() * 200),

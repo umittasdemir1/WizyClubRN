@@ -146,8 +146,8 @@ export const VideoLayer = memo(function VideoLayer({
         setHasError(true);
 
         if (retryCount >= MAX_RETRIES) {
-            console.log(`[VideoLayer] Max retries (${MAX_RETRIES}) reached, skipping video.`);
-            onVideoEnd?.(); // Auto-skip
+            console.log(`[VideoLayer] Max retries (${MAX_RETRIES}) reached.`);
+            // onVideoEnd?.(); // Auto-skip iptal edildi, hata mesajı görünsün
         }
     }, [video.id, video.videoUrl, videoSource, retryCount, onVideoEnd]);
 
@@ -241,13 +241,13 @@ export const VideoLayer = memo(function VideoLayer({
                 <View style={[styles.touchArea, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
                     <View style={styles.errorContainer}>
                         <AlertCircle color="#EF4444" size={48} style={{ marginBottom: 12 }} />
-                        <Text style={styles.errorText}>Video failed to load</Text>
+                        <Text style={styles.errorText}>Video oynatılamadı</Text>
                         <Pressable style={styles.retryButton} onPress={handleRetry}>
                             <RefreshCcw color="#FFF" size={20} />
-                            <Text style={styles.retryText}>Retry</Text>
+                            <Text style={styles.retryText}>Tekrar Dene</Text>
                         </Pressable>
                         {retryCount > 0 && (
-                            <Text style={styles.retryCountText}>Attempt {retryCount}/{MAX_RETRIES}</Text>
+                            <Text style={styles.retryCountText}>Deneme {retryCount}/{MAX_RETRIES}</Text>
                         )}
                     </View>
                 </View>
@@ -278,6 +278,7 @@ export const VideoLayer = memo(function VideoLayer({
                 isScrolling={isScrolling}
                 onSeek={seekTo}
                 isActive={isActive}
+                spriteUrl={video.spriteUrl}
             />
         </View>
     );

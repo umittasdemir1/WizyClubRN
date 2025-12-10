@@ -24,10 +24,12 @@ import {
 } from '../../src/presentation/store/useActiveVideoStore';
 import { Video } from '../../src/domain/entities/Video';
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { useSharedValue } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { FeedSkeleton } from '../../src/presentation/components/feed/FeedSkeleton';
+import { UploadModal } from '../../src/presentation/components/feed/UploadModal';
+import { useUploadStore } from '../../src/presentation/store/useUploadStore';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -57,10 +59,25 @@ export default function FeedScreen() {
     const setActiveVideo = useActiveVideoStore((state) => state.setActiveVideo);
     const activeVideoId = useActiveVideoStore((state) => state.activeVideoId);
     const isAppActive = useActiveVideoStore((state) => state.isAppActive);
+    const isSeeking = useActiveVideoStore((state) => state.isSeeking);
     const togglePause = useActiveVideoStore((state) => state.togglePause);
 
     // Mute controls
     const { isMuted, toggleMute } = useMuteControls();
+
+    // Upload State
+    const [isUploadModalVisible, setUploadModalVisible] = useState(false);
+    const uploadedVideoId = useUploadStore(state => state.uploadedVideoId);
+    const resetUpload = useUploadStore(state => state.reset);
+
+    // Watch for successful upload
+    useEffect(() => {
+        if (uploadedVideoId) {
+            console.log('🎉 Upload completed! Refreshing feed...');
+            refreshFeed();
+            resetUpload();
+        }
+    }, [uploadedVideoId]);
 
     // App State Sync
     useAppStateSync();
@@ -77,6 +94,13 @@ export default function FeedScreen() {
     const ITEM_HEIGHT = Dimensions.get('window').height;
 
     const hasUnseenStories = true;
+
+    // UI Opacity Animation for "Seek to Hide"
+    const uiOpacityStyle = useAnimatedStyle(() => {
+        return {
+            opacity: withTiming(isSeeking ? 0 : 1, { duration: 200 })
+        };
+    }, [isSeeking]);
 
     // Set initial active
     useEffect(() => {
@@ -163,9 +187,11 @@ export default function FeedScreen() {
                         </View>
                     </DoubleTapLike>
 
-                    {/* Layer 2: UI Overlays (Foreground) */}
-                    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-
+                    {/* Layer 2: UI Overlays (Foreground) - Animate Opacity */}
+                    <Animated.View
+                        style={[StyleSheet.absoluteFill, { zIndex: 50 }, uiOpacityStyle]}
+                        pointerEvents={isSeeking ? 'none' : 'box-none'}
+                    >
                         <ActionButtons
                             video={item}
                             onLike={() => toggleLike(item.id)}
@@ -183,7 +209,7 @@ export default function FeedScreen() {
                             onReadMorePress={() => console.log('Open Description')}
                             onCommercialTagPress={() => console.log('Open Commercial Info')}
                         />
-                    </View>
+                    </Animated.View>
                 </View>
             );
         },
@@ -197,6 +223,7 @@ export default function FeedScreen() {
             toggleSave,
             router,
             ITEM_HEIGHT,
+            isSeeking
         ]
     );
 
@@ -278,13 +305,24 @@ export default function FeedScreen() {
                 }}
             />
 
-            {/* Fixed Header Overlay - stays on screen during scroll */}
-            <HeaderOverlay
-                isMuted={isMuted}
-                onToggleMute={handleToggleMute}
-                onStoryPress={() => router.push('/story/1')}
-                onMorePress={() => console.log('Open More Options')}
-                hasUnseenStories={hasUnseenStories}
+            {/* Fixed Header Overlay - stays on screen during scroll - Animate Opacity */}
+            <Animated.View
+                style={[StyleSheet.absoluteFill, { zIndex: 50 }, uiOpacityStyle]}
+                pointerEvents={isSeeking ? 'none' : 'box-none'}
+            >
+                <HeaderOverlay
+                    isMuted={isMuted}
+                    onToggleMute={handleToggleMute}
+                    onStoryPress={() => router.push('/story/1')}
+                    onMorePress={() => console.log('Open More Options')}
+                    onUploadPress={() => setUploadModalVisible(true)}
+                    hasUnseenStories={hasUnseenStories}
+                />
+            </Animated.View>
+
+            <UploadModal
+                isVisible={isUploadModalVisible}
+                onClose={() => setUploadModalVisible(false)}
             />
 
             {/* Brightness Controller Overlay - Global for the screen */}

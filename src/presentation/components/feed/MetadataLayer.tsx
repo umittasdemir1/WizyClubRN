@@ -70,15 +70,18 @@ export function MetadataLayer({
             </View>
 
             {/* Commercial Tag */}
-            <Pressable
-                style={styles.commercialTag}
-                onPress={onCommercialTagPress}
-                hitSlop={8}
-            >
-                <Text style={styles.commercialText}>
-                    İş Birliği | Marka
-                </Text>
-            </Pressable>
+            {video.isCommercial && (
+                <Pressable
+                    style={styles.commercialTag}
+                    onPress={onCommercialTagPress}
+                    hitSlop={8}
+                >
+                    <Text style={styles.commercialText}>
+                        {video.commercialType ? video.commercialType : 'İş Birliği'}
+                        {video.brandName ? ` | ${video.brandName}` : ''}
+                    </Text>
+                </Pressable>
+            )}
         </View>
     );
 }

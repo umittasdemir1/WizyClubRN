@@ -17,18 +17,19 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useActiveVideoStore, ActiveVideoState } from '../../store/useActiveVideoStore';
-import { formatTime } from '../../../core/utils';
+import { SpritePreview } from './SpritePreview';
 
 // Usage Configuration
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const HORIZONTAL_PADDING = 16;
-const TOUCH_AREA_HEIGHT = 80; // Increased to 80px per user request
+const TOUCH_AREA_HEIGHT = 80; // Reverted to default to fix position
 const THUMB_SIZE = 14;
 const TRACK_HEIGHT = 2; // Very thin by default
 const TRACK_HEIGHT_EXPANDED = 12; // Thick on touch
 const BAR_WIDTH = SCREEN_WIDTH - (HORIZONTAL_PADDING * 2);
-const TOOLTIP_WIDTH = 110; // Fixed width for perfect centering
+const TOOLTIP_WIDTH = 100; // 100px width
 const TOOLTIP_HALF_WIDTH = TOOLTIP_WIDTH / 2;
+const TOOLTIP_SCREEN_MARGIN = 16;
 
 interface VideoSeekBarProps {
     currentTime: SharedValue<number>;
@@ -36,6 +37,7 @@ interface VideoSeekBarProps {
     isScrolling?: SharedValue<boolean>;
     onSeek: (time: number) => void;
     isActive?: boolean;
+    spriteUrl?: string;
 }
 
 export function VideoSeekBar({
@@ -43,26 +45,22 @@ export function VideoSeekBar({
     duration,
     isScrolling,
     onSeek,
-    isActive = true
+    isActive = true,
+    spriteUrl
 }: VideoSeekBarProps) {
     const setSeeking = useActiveVideoStore((state: ActiveVideoState) => state.setSeeking);
-    const [displayTime, setDisplayTime] = useState(0); // Only for tooltip text
-    const [displayDuration, setDisplayDuration] = useState(0); // Avoid reading SharedValue during render
+    const [displayTime, setDisplayTime] = useState(0);
 
     const isScrubbing = useSharedValue(false);
     const thumbScale = useSharedValue(1);
     const trackHeight = useSharedValue(TRACK_HEIGHT);
     const tooltipOpacity = useSharedValue(0);
 
-    // --- LAYOUT CONFIGURATION ---
-    // 'safe': Automatically calculates TabBar height + Safe Area (Visible)
-    // 'hidden': Pushes it below screen (-22)
-    // 'custom': Use specific value
     const POSITION_MODE = 'safe' as 'safe' | 'hidden' | 'custom';
     const CUSTOM_OFFSET = -22;
 
     const insets = useSafeAreaInsets();
-    const TAB_BAR_HEIGHT = -45; // User confirmed -45
+    const TAB_BAR_HEIGHT = -45; // Reverted to original
     const MARGIN_BOTTOM = 0;
 
     const finalBottomPosition = useDerivedValue(() => {
@@ -71,10 +69,8 @@ export function VideoSeekBar({
         return CUSTOM_OFFSET;
     }, [insets.bottom]);
 
-    // Internal animated progress for smoothness
     const animatedProgress = useSharedValue(0);
 
-    // Sync with external progress using linear interpolation
     useAnimatedReaction(
         () => ({
             time: currentTime.value,
@@ -82,9 +78,6 @@ export function VideoSeekBar({
             scrubbing: isScrubbing.value
         }),
         (result, prevResult) => {
-            // Safely update duration display state
-            runOnJS(setDisplayDuration)(result.dur);
-
             if (result.dur <= 0) {
                 animatedProgress.value = 0;
                 return;
@@ -93,12 +86,10 @@ export function VideoSeekBar({
             const targetProgress = result.time / result.dur;
 
             if (result.scrubbing) {
-                // Instant update while scrubbing
                 animatedProgress.value = targetProgress;
                 return;
             }
 
-            // Detect discontinuities
             let isContinuous = false;
             if (prevResult && prevResult.dur === result.dur) {
                 const prevTarget = prevResult.time / prevResult.dur;
@@ -108,13 +99,11 @@ export function VideoSeekBar({
             }
 
             if (isContinuous) {
-                // Linear tween to next update point (33ms)
                 animatedProgress.value = withTiming(targetProgress, {
                     duration: 33,
                     easing: Easing.linear
                 });
             } else {
-                // Jump instantly
                 animatedProgress.value = targetProgress;
             }
         }
@@ -145,10 +134,12 @@ export function VideoSeekBar({
     }, [duration, onSeek, setSeeking]);
 
     const pan = Gesture.Pan()
-        .onBegin((event) => {
+        //.activateAfterLongPress(200) // Removed for immediate response
+        .activeOffsetX([-10, 10]) // Require small movement to start pan (prevents accidental tiny swipes)
+        .onStart((event) => {
             'worklet';
             isScrubbing.value = true;
-            thumbScale.value = withTiming(1, { duration: 150 });
+            thumbScale.value = withTiming(1.3, { duration: 150 }); // Scale up thumb slightly
             trackHeight.value = withTiming(TRACK_HEIGHT_EXPANDED, { duration: 150 });
             tooltipOpacity.value = withTiming(1, { duration: 150 });
 
@@ -156,7 +147,6 @@ export function VideoSeekBar({
             const newProgress = Math.max(0, Math.min(absoluteX / BAR_WIDTH, 1));
             currentTime.value = newProgress * duration.value;
 
-            runOnJS(setDisplayTime)(currentTime.value);
             runOnJS(startScrubbing)();
             runOnJS(triggerHaptic)();
         })
@@ -165,7 +155,6 @@ export function VideoSeekBar({
             const absoluteX = event.absoluteX - HORIZONTAL_PADDING;
             const newProgress = Math.max(0, Math.min(absoluteX / BAR_WIDTH, 1));
             currentTime.value = newProgress * duration.value;
-            runOnJS(setDisplayTime)(currentTime.value);
         })
         .onEnd(() => {
             'worklet';
@@ -180,15 +169,11 @@ export function VideoSeekBar({
         })
         .onFinalize(() => {
             'worklet';
-            // If the gesture was cancelled (e.g. by Tap winning) or failed,
-            // we must ensure state is reset.
             if (isScrubbing.value) {
                 isScrubbing.value = false;
                 thumbScale.value = withTiming(1, { duration: 150 });
                 trackHeight.value = withTiming(TRACK_HEIGHT, { duration: 150 });
                 tooltipOpacity.value = withTiming(0, { duration: 150 });
-
-                // Ensure we stop seeking status
                 runOnJS(setSeeking)(false);
             }
         });
@@ -260,15 +245,21 @@ export function VideoSeekBar({
     }));
 
     const animatedTooltipStyle = useAnimatedStyle(() => {
-        const leftPosition = animatedProgress.value * BAR_WIDTH;
+        // Calculate visual center in screen coordinates
+        const thumbScreenX = HORIZONTAL_PADDING + (animatedProgress.value * BAR_WIDTH);
 
-        // Ensure tooltip stays within bounds but is centered on thumb
-        const clampedLeft = Math.max(TOOLTIP_HALF_WIDTH, Math.min(leftPosition, BAR_WIDTH - TOOLTIP_HALF_WIDTH));
+        // Clamp center so tooltip doesn't overflow screen
+        // Min X = TOOLTIP_HALF_WIDTH + MARGIN (left edge limit)
+        // Max X = SCREEN_WIDTH - TOOLTIP_HALF_WIDTH - MARGIN (right edge limit)
+        const minX = TOOLTIP_HALF_WIDTH + TOOLTIP_SCREEN_MARGIN;
+        const maxX = SCREEN_WIDTH - TOOLTIP_HALF_WIDTH - TOOLTIP_SCREEN_MARGIN;
+
+        const clampedScreenX = Math.max(minX, Math.min(thumbScreenX, maxX));
 
         return {
             opacity: tooltipOpacity.value,
             transform: [
-                { translateX: clampedLeft - TOOLTIP_HALF_WIDTH }, // Centers 110px tooltip relative to thumb x-pos
+                { translateX: clampedScreenX - TOOLTIP_HALF_WIDTH }, // Shift so center aligns with clampedScreenX
                 { scale: thumbScale.value },
             ],
         };
@@ -288,9 +279,14 @@ export function VideoSeekBar({
             </GestureDetector>
 
             <Animated.View style={[styles.tooltipContainer, animatedTooltipStyle]}>
-                <Text style={styles.tooltipText}>
-                    {formatTime(displayTime)} | {formatTime(displayDuration)}
-                </Text>
+                {spriteUrl && (
+                    <SpritePreview
+                        spriteUrl={spriteUrl}
+                        sharedTime={currentTime} // Pass SharedValue directly for 60fps
+                        frameWidth={100}
+                        frameHeight={180}
+                    />
+                )}
             </Animated.View>
         </Animated.View>
     );
@@ -307,6 +303,7 @@ const styles = StyleSheet.create({
     touchArea: {
         width: '100%',
         justifyContent: 'center',
+        backgroundColor: 'transparent', // Ensure clicks are caught
     },
     trackContainer: {
         width: BAR_WIDTH,
@@ -340,22 +337,11 @@ const styles = StyleSheet.create({
     },
     tooltipContainer: {
         position: 'absolute',
-        bottom: 50, // Approx 2px above the visual track (centered at Y=40 in 80px container)
-        left: 0,
+        left: 0, // Force left alignment for predictable transforms
+        bottom: 80, // Moved UP from 55
         width: TOOLTIP_WIDTH,
-        height: 34,
-        backgroundColor: 'rgba(255, 255, 255, 0.2)', // Light Glass
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 17,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.3)',
-    },
-    tooltipText: {
-        color: 'white',
-        fontSize: 13,
-        fontWeight: '600',
-        fontVariant: ['tabular-nums'],
-        letterSpacing: 0.5,
+        zIndex: 100,
     },
 });

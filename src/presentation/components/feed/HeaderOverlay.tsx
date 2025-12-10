@@ -1,6 +1,6 @@
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useEffect } from 'react';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -10,7 +10,9 @@ import Animated, {
     Easing,
     cancelAnimation,
 } from 'react-native-reanimated';
+import { Upload, Loader } from 'lucide-react-native';
 import { useBrightnessStore } from '../../store/useBrightnessStore';
+import { useUploadStore } from '../../store/useUploadStore';
 
 // Import SVGs
 import VoiceOnIcon from '../../../../assets/icons/voice_on.svg';
@@ -36,11 +38,54 @@ function BrightnessButton() {
     );
 }
 
+// Upload Button sub-component
+function UploadButton({ onPress }: { onPress: () => void }) {
+    const status = useUploadStore(state => state.status);
+    const isProcessing = status === 'compressing' || status === 'uploading' || status === 'processing';
+
+    const spin = useSharedValue(0);
+
+    const animatedStyle = useAnimatedStyle(() => ({
+        transform: [{ rotate: `${spin.value}deg` }],
+    }));
+
+    useEffect(() => {
+        if (isProcessing) {
+            spin.value = withRepeat(
+                withTiming(360, { duration: 1000, easing: Easing.linear }),
+                -1,
+                false
+            );
+        } else {
+            spin.value = 0;
+            // Ensure visual reset
+            cancelAnimation(spin);
+        }
+    }, [isProcessing]);
+
+    return (
+        <Pressable
+            style={[styles.iconButton]}
+            onPress={isProcessing ? undefined : onPress}
+            hitSlop={12}
+        >
+            {isProcessing ? (
+                <Animated.View style={animatedStyle}>
+                    <Loader width={24} height={24} color="#FFD700" />
+                </Animated.View>
+            ) : (
+                <Upload width={24} height={24} color="#FFFFFF" />
+            )}
+        </Pressable>
+    );
+}
+
 interface HeaderOverlayProps {
     isMuted: boolean;
     onToggleMute: () => void;
     onStoryPress: () => void;
     onMorePress: () => void;
+    onUploadPress?: () => void;
     hasUnseenStories?: boolean;
 }
 
@@ -51,6 +96,7 @@ export function HeaderOverlay({
     onToggleMute,
     onStoryPress,
     onMorePress,
+    onUploadPress,
     hasUnseenStories = false,
 }: HeaderOverlayProps) {
     const insets = useSafeAreaInsets();
@@ -79,18 +125,23 @@ export function HeaderOverlay({
 
     return (
         <View style={[styles.container, { paddingTop: insets.top + 16 }]} pointerEvents="box-none">
-            {/* Left: Voice Button - NO shadow, NO background */}
-            <AnimatedPressable
-                onPress={onToggleMute}
-                style={[styles.iconButton, voiceAnimatedStyle]}
-                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            >
-                <VoiceOnIcon
-                    width={28}
-                    height={28}
-                    color={isMuted ? "#6B7280" : "#FFFFFF"}
-                />
-            </AnimatedPressable>
+            {/* Left Column: Voice & Upload */}
+            <View style={styles.leftColumn}>
+                <AnimatedPressable
+                    onPress={onToggleMute}
+                    style={[styles.iconButton, voiceAnimatedStyle]}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                >
+                    <VoiceOnIcon
+                        width={28}
+                        height={28}
+                        color={isMuted ? "#6B7280" : "#FFFFFF"}
+                    />
+                </AnimatedPressable>
+
+                {/* Upload Button below Voice */}
+                {onUploadPress && <UploadButton onPress={onUploadPress} />}
+            </View>
 
             {/* Center: Stories Pill */}
             <Pressable
@@ -120,13 +171,18 @@ const styles = StyleSheet.create({
         right: 0,
         zIndex: 100,
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'flex-start', // Align to top because left column grows down
         justifyContent: 'space-between',
         paddingHorizontal: 16,
     },
     iconButton: {
         padding: 8,
         // NO background, NO shadow
+    },
+    leftColumn: {
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 8, // Space between Voice and Upload
     },
     storiesPill: {
         flexDirection: 'row',
@@ -144,6 +200,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.2,
         shadowRadius: 8,
         elevation: 5,
+        marginTop: 4, // Align roughly with top icons
     },
     storiesText: {
         color: 'white',
