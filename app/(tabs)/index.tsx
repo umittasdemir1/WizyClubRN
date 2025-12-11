@@ -9,6 +9,7 @@ import {
     RefreshControl,
     Platform,
     Alert, // Added
+    useWindowDimensions, // For dynamic dimensions on rotation
 } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -120,8 +121,9 @@ export default function FeedScreen() {
     const navigation = useNavigation();
     const listRef = useRef<any>(null);
 
-    // Calculate video height - full screen for proper paging
-    const ITEM_HEIGHT = Dimensions.get('window').height;
+    // Calculate video height - use hook to update on rotation
+    const { height: windowHeight } = useWindowDimensions();
+    const ITEM_HEIGHT = windowHeight;
 
     const hasUnseenStories = true;
     const [showFullScreen, setShowFullScreen] = useState(false); // NEW: Track if fullscreen button should show
