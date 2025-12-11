@@ -261,7 +261,7 @@ export const VideoLayer = memo(function VideoLayer({
     const showReplayIcon = isFinished && isActive && !hasError;
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, isFullScreen && styles.fullscreenContainer]}>
             <Video
                 key={key}
                 ref={videoRef}
@@ -370,6 +370,9 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#000000',
         paddingVertical: 25, // 25px top and bottom
+    },
+    fullscreenContainer: {
+        paddingVertical: 0, // Remove padding in fullscreen (landscape)
     },
     video: {
         flex: 1, // Respects container padding for black bars
