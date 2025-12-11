@@ -6,28 +6,13 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal",
-      "android": {
-        "cache": {
-          "gradle": true
-        }
-      }
+      "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal",
-      "android": {
-        "cache": {
-          "gradle": true
-        }
-      }
+      "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true,
-      "android": {
-        "cache": {
-          "gradle": true
-        }
-      }
+      "autoIncrement": true
     }
   },
   "submit": {
