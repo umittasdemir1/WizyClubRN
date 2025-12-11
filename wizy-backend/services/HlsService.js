@@ -9,48 +9,86 @@ class HlsService {
         this.bucket = bucketName;
     }
 
-    async transcodeToHls(inputPath, outputDir, videoId) {
+    async transcodeToHls(inputPath, outputDir, videoId, hasAudio = true, originalWidth = 1920, originalHeight = 1080) {
         const hlsOutputDir = path.join(outputDir, videoId);
         if (!fs.existsSync(hlsOutputDir)) {
             fs.mkdirSync(hlsOutputDir, { recursive: true });
         }
 
         const masterPlaylistName = 'master.m3u8';
+        const isPortrait = originalHeight > originalWidth;
 
-        console.log(`🎬 [HLS] Starting transcoding for ${videoId}...`);
+        console.log(`🎬 [HLS] Transcoding for ${videoId}... Shape: ${isPortrait ? 'PORTRAIT' : 'LANDSCAPE'} (${originalWidth}x${originalHeight})`);
+
+        // Dynamic Resolution Calculation (Maintain Aspect Ratio)
+        // We use 1080p as the "reference" for the highest quality short dimension
+        // Landscape: 1080 is height. Portrait: 1080 is width.
+
+        const getDims = (targetShortSide) => {
+            const ratio = originalWidth / originalHeight;
+            let w, h;
+            if (isPortrait) {
+                w = targetShortSide;
+                h = Math.round(w / ratio);
+            } else {
+                h = targetShortSide;
+                w = Math.round(h * ratio);
+            }
+            // Ensure even numbers for H.264
+            if (w % 2 !== 0) w++;
+            if (h % 2 !== 0) h++;
+            return `${w}x${h}`;
+        };
+
+        const resHigh = getDims(1080); // 1080p (or closest equivalent)
+        const resMed = getDims(720);   // 720p
+        const resLow = getDims(480);   // 480p
+
+        console.log(`   👉 Targeted Resolutions: High=${resHigh}, Med=${resMed}, Low=${resLow}`);
+
         const startTime = Date.now();
 
         return new Promise((resolve, reject) => {
-            ffmpeg(inputPath)
+            const command = ffmpeg(inputPath)
                 .outputOptions([
-                    '-preset medium',
+                    '-preset veryfast',
                     '-g 48',
                     '-sc_threshold 0',
                     '-hls_time 6',
                     '-hls_list_size 0',
                     '-hls_segment_filename', `${hlsOutputDir}/section_%v_%03d.ts`
-                ])
-                .outputOptions([
-                    '-map 0:v:0', '-map 0:a:0',
-                    '-s:v:0 1920x1080', '-c:v:0 libx264',
-                    '-b:v:0 2500k', '-maxrate:v:0 3000k', '-bufsize:v:0 4000k'
-                ])
-                .outputOptions([
-                    '-map 0:v:0', '-map 0:a:0',
-                    '-s:v:1 1280x720', '-c:v:1 libx264',
-                    '-b:v:1 1200k', '-maxrate:v:1 1500k', '-bufsize:v:1 2000k'
-                ])
-                .outputOptions([
-                    '-map 0:v:0', '-map 0:a:0',
-                    '-s:v:2 854x480', '-c:v:2 libx264',
-                    '-b:v:2 600k', '-maxrate:v:2 800k', '-bufsize:v:2 1000k'
-                ])
-                .outputOptions(['-c:a aac', '-b:a 128k', '-ar 44100'])
-                .outputOptions([
-                    '-var_stream_map', 'v:0,a:0 v:1,a:1 v:2,a:2',
-                    '-master_pl_name', masterPlaylistName,
-                    '-f hls'
-                ])
+                ]);
+
+            // Stream 0 (High)
+            const stream0 = ['-map 0:v:0', `-s:v:0 ${resHigh}`, '-c:v:0 libx264', '-b:v:0 2500k', '-maxrate:v:0 3000k', '-bufsize:v:0 4000k'];
+            if (hasAudio) stream0.unshift('-map 0:a:0');
+            command.outputOptions(stream0);
+
+            // Stream 1 (Medium)
+            const stream1 = ['-map 0:v:0', `-s:v:1 ${resMed}`, '-c:v:1 libx264', '-b:v:1 1200k', '-maxrate:v:1 1500k', '-bufsize:v:1 2000k'];
+            if (hasAudio) stream1.unshift('-map 0:a:0');
+            command.outputOptions(stream1);
+
+            // Stream 2 (Low)
+            const stream2 = ['-map 0:v:0', `-s:v:2 ${resLow}`, '-c:v:2 libx264', '-b:v:2 600k', '-maxrate:v:2 800k', '-bufsize:v:2 1000k'];
+            if (hasAudio) stream2.unshift('-map 0:a:0');
+            command.outputOptions(stream2);
+
+            // Audio codec (only if audio exists)
+            if (hasAudio) {
+                command.outputOptions(['-c:a aac', '-b:a 128k', '-ar 44100']);
+            }
+
+            // Stream Map
+            const mapStr = hasAudio
+                ? 'v:0,a:0 v:1,a:1 v:2,a:2'
+                : 'v:0 v:1 v:2';
+
+            command.outputOptions([
+                '-var_stream_map', mapStr,
+                '-master_pl_name', masterPlaylistName,
+                '-f hls'
+            ])
                 .output(`${hlsOutputDir}/stream_%v.m3u8`)
                 .on('start', (cmd) => console.log('⚡ [FFmpeg]:', cmd))
                 .on('progress', (p) => p.percent && console.log(`⏳ ${p.percent.toFixed(1)}%`))
@@ -91,49 +129,58 @@ class HlsService {
         return `${process.env.R2_PUBLIC_URL}/videos/${videoId}/${masterFile}`;
     }
 
-    async generateSpriteSheet(inputPath, outputDir, videoId) {
-        const spriteFileName = `sprite_${videoId}.jpg`;
-        const spritePath = path.join(outputDir, spriteFileName);
+    async generateSpriteSheet(inputPath, outputDir, videoId, duration = 0) {
+        // CONFIG: 200x360 (High Quality), 1s Interval, 10x10 Grid (100 spots)
+        const SEGMENT_DURATION = 100; // Each sprite sheet covers 100 seconds
+        const segments = Math.ceil((duration || 1) / SEGMENT_DURATION); // At least 1 segment
 
-        console.log(`🖼️ [Sprite] Generating VERTICAL sprite sheet (100x180, 10 columns)...`);
+        console.log(`🖼️ [Sprite] Generating MULTI-PART sprite system. Duration: ${duration}s -> ${segments} parts.`);
 
-        return new Promise((resolve, reject) => {
-            ffmpeg(inputPath)
-                .outputOptions([
-                    '-vf', 'fps=1,scale=100:180,tile=10x100', // 100x180, 1 screenshot per second
-                    '-frames:v', '1',
-                    '-q:v', '2'
-                ])
-                .output(spritePath)
-                .on('start', (cmd) => console.log('⚡ [Sprite]:', cmd))
-                .on('end', async () => {
-                    try {
-                        console.log('✅ [Sprite] Generated!');
-                        const stream = fs.readFileSync(spritePath);
-                        const r2Key = `videos/${videoId}/${spriteFileName}`;
+        let firstUrl = '';
 
-                        await this.r2.send(new PutObjectCommand({
-                            Bucket: this.bucket,
-                            Key: r2Key,
-                            Body: stream,
-                            ContentType: 'image/jpeg'
-                        }));
+        for (let i = 0; i < segments; i++) {
+            const startTime = i * SEGMENT_DURATION;
+            const spriteFileName = `sprite_${videoId}_${i}.jpg`;
+            const spritePath = path.join(outputDir, spriteFileName);
 
-                        const url = `${process.env.R2_PUBLIC_URL}/${r2Key}`;
-                        console.log(`🎉 [Sprite] Uploaded: ${url}`);
-                        fs.unlinkSync(spritePath);
-                        resolve(url);
-                    } catch (err) {
-                        console.error('❌ [Sprite Upload]:', err);
-                        reject(err);
-                    }
-                })
-                .on('error', (err) => {
-                    console.error('❌ [Sprite]:', err.message);
-                    reject(err);
-                })
-                .run();
-        });
+            console.log(`   🔸 Part ${i + 1}/${segments}: ${startTime}s to ${startTime + SEGMENT_DURATION}s -> ${spriteFileName}`);
+
+            await new Promise((resolve, reject) => {
+                ffmpeg(inputPath)
+                    .outputOptions([
+                        `-ss ${startTime}`,
+                        `-t ${SEGMENT_DURATION}`,
+                        '-vf', 'fps=1,scale=200:360:force_original_aspect_ratio=decrease,pad=200:360:(ow-iw)/2:(oh-ih)/2:black,tile=10x10', // 200x360 High Quality
+                        '-frames:v', '1',
+                        '-q:v', '2'
+                    ])
+                    .output(spritePath)
+                    .on('end', resolve)
+                    .on('error', reject)
+                    .run();
+            });
+
+            // Upload Part
+            console.log(`   ☁️ Uploading ${spriteFileName}...`);
+            const stream = fs.readFileSync(spritePath);
+            const r2Key = `videos/${videoId}/${spriteFileName}`;
+            await this.r2.send(new PutObjectCommand({
+                Bucket: this.bucket,
+                Key: r2Key,
+                Body: stream,
+                ContentType: 'image/jpeg'
+            }));
+
+            if (i === 0) {
+                firstUrl = `${process.env.R2_PUBLIC_URL}/${r2Key}`;
+            }
+
+            // Cleanup local file immediately
+            fs.unlinkSync(spritePath);
+        }
+
+        console.log(`✅ [Sprite] All ${segments} parts generated & uploaded! First URL: ${firstUrl}`);
+        return firstUrl; // Return the first one. Client will swap _0.jpg with _1.jpg etc.
     }
 }
 

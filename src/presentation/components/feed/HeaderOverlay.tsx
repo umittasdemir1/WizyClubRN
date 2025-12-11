@@ -10,7 +10,7 @@ import Animated, {
     Easing,
     cancelAnimation,
 } from 'react-native-reanimated';
-import { Upload, Loader } from 'lucide-react-native';
+import { Upload, Loader, Trash2, Fullscreen } from 'lucide-react-native';
 import { useBrightnessStore } from '../../store/useBrightnessStore';
 import { useUploadStore } from '../../store/useUploadStore';
 
@@ -86,7 +86,10 @@ interface HeaderOverlayProps {
     onStoryPress: () => void;
     onMorePress: () => void;
     onUploadPress?: () => void;
+    onDeletePress?: () => void;
+    onFullScreenPress?: () => void; // NEW
     hasUnseenStories?: boolean;
+    showFullScreen?: boolean; // NEW: Show fullscreen button for landscape videos
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -97,7 +100,10 @@ export function HeaderOverlay({
     onStoryPress,
     onMorePress,
     onUploadPress,
+    onDeletePress,
+    onFullScreenPress, // NEW
     hasUnseenStories = false,
+    showFullScreen = false, // NEW
 }: HeaderOverlayProps) {
     const insets = useSafeAreaInsets();
     const pulseOpacity = useSharedValue(1);
@@ -124,7 +130,7 @@ export function HeaderOverlay({
     }));
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top + 16 }]} pointerEvents="box-none">
+        <View style={[styles.container, { paddingTop: insets.top + 28 }]} pointerEvents="box-none">
             {/* Left Column: Voice & Upload */}
             <View style={styles.leftColumn}>
                 <AnimatedPressable
@@ -141,6 +147,17 @@ export function HeaderOverlay({
 
                 {/* Upload Button below Voice */}
                 {onUploadPress && <UploadButton onPress={onUploadPress} />}
+
+                {/* Delete Button below Upload (Cleanup Tool) */}
+                {onDeletePress && (
+                    <Pressable
+                        style={styles.iconButton}
+                        onPress={onDeletePress}
+                        hitSlop={12}
+                    >
+                        <Trash2 width={24} height={24} color="#FFFFFF" />
+                    </Pressable>
+                )}
             </View>
 
             {/* Center: Stories Pill */}
@@ -155,9 +172,20 @@ export function HeaderOverlay({
                 )}
             </Pressable>
 
-            {/* Right: Brightness - toggles brightness controller */}
+            {/* Right: Brightness + Fullscreen */}
             <View style={styles.rightButtons}>
                 <BrightnessButton />
+
+                {/* Fullscreen Button (for landscape videos) */}
+                {showFullScreen && onFullScreenPress && (
+                    <Pressable
+                        style={styles.iconButton}
+                        onPress={onFullScreenPress}
+                        hitSlop={12}
+                    >
+                        <Fullscreen width={24} height={24} color="white" />
+                    </Pressable>
+                )}
             </View>
         </View>
     );
@@ -187,25 +215,26 @@ const styles = StyleSheet.create({
     storiesPill: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        borderRadius: 24,
-        gap: 8,
+        backgroundColor: 'rgba(255, 255, 255, 0.12)', // Lighter for better glass effect
+        paddingHorizontal: 16, // Reduced from 20
+        paddingVertical: 8, // Reduced from 10
+        borderRadius: 20, // Slightly smaller
+        gap: 6, // Reduced from 8
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.2)',
+        borderColor: 'rgba(255, 255, 255, 0.25)', // Lighter border for glass effect
         // Glass shadow
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 5,
-        marginTop: 4, // Align roughly with top icons
+        shadowOffset: { width: 0, height: 2 }, // Softer shadow
+        shadowOpacity: 0.15, // Reduced from 0.2
+        shadowRadius: 6, // Softer blur
+        elevation: 3, // Reduced
+        marginTop: 4,
     },
     storiesText: {
         color: 'white',
-        fontSize: 15,
-        fontWeight: '700',
+        fontSize: 14, // Same as description text
+        fontWeight: '400', // Regular weight like description
+        letterSpacing: 0.2,
     },
     chevron: {
         color: 'rgba(255, 255, 255, 0.8)',
@@ -219,7 +248,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#FF3B30',
     },
     rightButtons: {
-        flexDirection: 'row',
+        flexDirection: 'column', // Changed from row to column for vertical stacking
         gap: 8,
     },
 });

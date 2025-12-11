@@ -1,24 +1,23 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Text, TextInput } from 'react-native';
+import { View, StyleSheet, TextInput } from 'react-native';
 import { Image } from 'expo-image';
-import Animated, { 
-    useAnimatedStyle, 
-    useDerivedValue, 
-    SharedValue,
-    createAnimatedComponent,
-    useAnimatedProps
+import Animated, {
+    useAnimatedStyle,
+    useAnimatedProps,
+    runOnJS,
+    useAnimatedReaction,
+    SharedValue
 } from 'react-native-reanimated';
 
 // Create Animated Image component
-const AnimatedImage = createAnimatedComponent(Image);
+const AnimatedImage = Animated.createAnimatedComponent(Image);
 
 // Create Animated TextInput for lag-free timer updates
 Animated.addWhitelistedNativeProps({ text: true });
-const AnimatedTextInput = createAnimatedComponent(TextInput);
+const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 
 interface SpritePreviewProps {
     spriteUrl: string;
-    currentTime?: number; // Legacy, optional if using sharedTime for text
     sharedTime: SharedValue<number>; // REQUIRED for performance
     frameWidth?: number;
     frameHeight?: number;
@@ -29,28 +28,49 @@ interface SpritePreviewProps {
 export const SpritePreview = ({
     spriteUrl,
     sharedTime,
-    frameWidth = 100, // Backend match (100x180)
-    frameHeight = 180,
+    frameWidth = 200, // HD (Matched with Backend)
+    frameHeight = 360,
     columns = 10,
     interval = 1,
 }: SpritePreviewProps) => {
     // Start with 0 size to allow correct loading logic
     const [imgSize, setImgSize] = useState({ width: 0, height: 0 });
+    const [activeUrl, setActiveUrl] = useState(spriteUrl); // Start with provided URL (usually _0.jpg)
+
+    // Handle Multi-Sprite Switching (Every 100s)
+    useAnimatedReaction(
+        () => Math.floor(sharedTime.value / 100), // Check which "Part" we need
+        (sheetIndex, prevIndex) => {
+            if (sheetIndex !== prevIndex) {
+                // Swap URL: "..._0.jpg" -> "..._{sheetIndex}.jpg"
+                let newUrl = spriteUrl;
+                if (spriteUrl.match(/_\d+\.jpg$/)) {
+                    newUrl = spriteUrl.replace(/_\d+\.jpg$/, `_${sheetIndex}.jpg`);
+                } else if (!spriteUrl.includes('_')) {
+                    // Fallback for old single files (no loop)
+                    newUrl = spriteUrl;
+                }
+
+                runOnJS(setActiveUrl)(newUrl);
+            }
+        },
+        [spriteUrl]
+    );
 
     // 1. CALCULATE TRANSFORM ON UI THREAD (60 FPS)
-    const animatedImageStyle = useAnimatedStyle(() => {
-        if (imgSize.width === 0) return { transform: [{ translateX: 0 }, { translateY: 0 }] };
+    const ROWS = 10; // Backend is configured for 10x10 grid (Safety) derived from HlsService.js
 
-        const frameIndex = Math.floor(sharedTime.value / interval);
+    const animatedImageStyle = useAnimatedStyle(() => {
+        // Frame within the CURRENT sheet (0-99)
+        const localTime = sharedTime.value % 100;
+        const frameIndex = Math.floor(localTime / interval);
+
         const colIndex = frameIndex % columns;
         let rowIndex = Math.floor(frameIndex / columns);
 
         // Safety: Clamp max row
-        if (frameHeight > 0 && imgSize.height > 0) {
-            const maxRowIndex = Math.floor(imgSize.height / frameHeight) - 1;
-            rowIndex = Math.min(rowIndex, maxRowIndex);
-            rowIndex = Math.max(0, rowIndex);
-        }
+        rowIndex = Math.min(rowIndex, ROWS - 1);
+        rowIndex = Math.max(0, rowIndex);
 
         return {
             transform: [
@@ -58,7 +78,7 @@ export const SpritePreview = ({
                 { translateY: -(rowIndex * frameHeight) }
             ]
         };
-    }, [columns, interval, frameWidth, frameHeight, imgSize]);
+    }, [columns, interval, frameWidth, frameHeight]);
 
     // 2. CALCULATE TIME TEXT ON UI THREAD (Lag-free)
     const animatedTextProps = useAnimatedProps(() => {
@@ -72,38 +92,34 @@ export const SpritePreview = ({
     }, []);
 
     return (
-        // OUTER CONTAINER: Handles the "Frame" (Size, Border, Radius, Shadow, Masking)
-        // This acts as a window. Anything outside this box is cut off.
+        // OUTER CONTAINER: Window Size (e.g. 120x216)
         <View style={[styles.frameContainer, { width: frameWidth, height: frameHeight }]}>
 
-            {/* INNER IMAGE: The massive sprite sheet that moves around */}
+            {/* INNER IMAGE: The massive sprite sheet (Scaled Down) */}
+            {/* Logic: We force the style to be (DisplayCell * Cols) x (DisplayCell * Rows). 
+                The 2000px source image will automagically scale down to fit this box. 
+                Downscale = High Quality/Retina. */}
             <AnimatedImage
-                source={{ uri: spriteUrl }}
+                source={{ uri: activeUrl }}
                 style={[{
-                    width: imgSize.width || frameWidth * columns,
-                    // Safety: Use 100 rows height to prevent container shifting off-screen during seek
-                    height: imgSize.height || frameHeight * 100,
-                }, animatedImageStyle]} // Apply animated transform here
-                onLoad={(e) => {
-                    setImgSize({
-                        width: e.source.width,
-                        height: e.source.height
-                    });
-                }}
-                contentFit="cover" // Logic: 'cover' ensures 1:1 pixel mapping (screens <-> image)
-                contentPosition={{ top: 0, left: 0 }} // Logic: Anchor top-left
+                    width: frameWidth * columns,
+                    height: frameHeight * ROWS + 6,   // Increased buffer
+                    marginTop: -3,                    // Aggressive crop (3px)
+                }, animatedImageStyle]}
+                contentFit="fill" // Force exact fill of our calculated box
+                contentPosition={{ top: 0, left: 0 }}
                 transition={0}
                 cachePolicy="memory-disk"
+                onLoad={(e) => {
+                    // Optional: We don't use this for sizing anymore, 
+                    // but keeping it if we need debug info.
+                    setImgSize({ width: e.source.width, height: e.source.height });
+                }}
             />
 
-            {/* Loading Placeholder */}
-            {imgSize.width === 0 && (
-                <View style={[StyleSheet.absoluteFill, { backgroundColor: '#1a1a1a' }]} />
-            )}
-
-            {/* Time Overlay Layer: Sits ON TOP of the image, inside the frame */}
+            {/* Time Overlay Layer */}
             <View style={styles.timeOverlay}>
-                <AnimatedTextInput 
+                <AnimatedTextInput
                     underlineColorAndroid="transparent"
                     editable={false}
                     style={styles.timeText}

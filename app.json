@@ -44,7 +44,9 @@
             "kotlinVersion": "2.0.21"
           }
         }
-      ]
+      ],
+      "expo-tracking-transparency",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true

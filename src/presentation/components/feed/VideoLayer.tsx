@@ -7,13 +7,22 @@ import ReplayIcon from '../../../../assets/icons/replay.svg';
 import { useActiveVideoStore } from '../../store/useActiveVideoStore';
 import * as Haptics from 'expo-haptics';
 import { BrightnessOverlay } from './BrightnessOverlay';
-import { RefreshCcw, AlertCircle } from 'lucide-react-native';
+import { RefreshCcw, AlertCircle, Maximize, Minimize } from 'lucide-react-native';
 import { useNetInfo } from '@react-native-community/netinfo';
 import { getBufferConfig } from '../../../core/utils/bufferConfig';
 import { VideoSeekBar } from './VideoSeekBar';
 import { useSharedValue, SharedValue } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { VideoCacheService } from '../../../data/services/VideoCacheService';
+import { Image } from 'expo-image';
+
+// Optional: Screen orientation (requires native build)
+let ScreenOrientation: any = null;
+try {
+    ScreenOrientation = require('expo-screen-orientation');
+} catch (e) {
+    console.log('[VideoLayer] expo-screen-orientation not available (native build required)');
+}
 
 interface VideoLayerProps {
     video: VideoEntity;
@@ -23,6 +32,8 @@ interface VideoLayerProps {
     onProgressUpdate?: (progress: number, duration: number) => void;
     onSeekReady?: (seekFn: (time: number) => void) => void;
     isScrolling?: SharedValue<boolean>;
+    onFullScreenPress?: () => void; // NEW: Expose fullscreen handler
+    onResizeModeChange?: (mode: 'contain' | 'cover') => void; // NEW: Notify parent of resize mode
 }
 
 const MAX_LOOPS = 2;
@@ -36,6 +47,8 @@ export const VideoLayer = memo(function VideoLayer({
     onProgressUpdate,
     onSeekReady,
     isScrolling,
+    onFullScreenPress, // NEW
+    onResizeModeChange, // NEW
 }: VideoLayerProps) {
     const isAppActive = useActiveVideoStore((state) => state.isAppActive);
     const isSeeking = useActiveVideoStore((state) => state.isSeeking);
@@ -50,6 +63,18 @@ export const VideoLayer = memo(function VideoLayer({
     const [hasError, setHasError] = useState(false);
     const [retryCount, setRetryCount] = useState(0);
     const [key, setKey] = useState(0); // For forcing re-render implementation
+
+    // Initial resizeMode based on pre-calculated dimensions
+    const [resizeMode, setResizeMode] = useState<'cover' | 'contain' | 'stretch'>(() => {
+        if (video.width && video.height) {
+            return 'contain'; // Always contain if dimensions known
+        }
+        return 'contain'; // Default to contain
+    });
+
+    // Poster State (Manual Overlay)
+    const [showPoster, setShowPoster] = useState(true);
+    const [isFullScreen, setIsFullScreen] = useState(false);
 
     // Cache State - Try to get from memory cache synchronously first!
     const [videoSource, setVideoSource] = useState<any>(() => {
@@ -120,6 +145,15 @@ export const VideoLayer = memo(function VideoLayer({
         durationSV.value = 0;
     }, [video.id]);
 
+    // Unlock orientation when component unmounts
+    useEffect(() => {
+        return () => {
+            if (ScreenOrientation) {
+                ScreenOrientation.unlockAsync?.();
+            }
+        };
+    }, []);
+
     // Handle Global Pause Toggle for Replay
     useEffect(() => {
         // If unpaused and was finished, restart
@@ -137,19 +171,43 @@ export const VideoLayer = memo(function VideoLayer({
         setDuration(data.duration);
         durationSV.value = data.duration;
         setHasError(false);
-    }, []);
+        setShowPoster(false); // Hide poster when video loads
 
-    const handleVideoError = useCallback((error: OnVideoErrorData) => {
+        if (data.naturalSize) {
+            const { width, height } = data.naturalSize;
+            const orientation = width >= height ? 'landscape' : 'portrait';
+            console.log(`[VideoLayer] Video loaded: ${width}x${height} (${orientation})`);
+            const newMode = 'contain'; // Always contain to prevent cropping
+            setResizeMode(newMode);
+            onResizeModeChange?.(newMode); // Notify parent
+        }
+    }, [onResizeModeChange]);
+
+    const handleVideoError = useCallback(async (error: OnVideoErrorData) => {
         console.error(`[VideoLayer] Error playing video ${video.id}:`, error);
-        console.error(`[VideoLayer] Faulty URL:`, video.videoUrl); // ADDED LOG
-        console.error(`[VideoLayer] Current Source:`, videoSource); // ADDED LOG
+
+        // Fallback Logic: Cache -> Network
+        if (videoSource?.uri?.startsWith('file://')) {
+            console.warn(`[VideoLayer] Cache file failed for ${video.id}. Deleting corrupt cache and falling back to Network.`);
+
+            // Delete corrupt cache file
+            await VideoCacheService.deleteCachedVideo(video.videoUrl);
+
+            // Switch to network
+            setVideoSource(typeof video.videoUrl === 'string' ? { uri: video.videoUrl } : video.videoUrl);
+            setHasError(false);
+            setKey(prev => prev + 1);
+            return;
+        }
+
+        console.error(`[VideoLayer] Faulty URL:`, video.videoUrl);
+        console.error(`[VideoLayer] Current Source:`, videoSource);
         setHasError(true);
 
         if (retryCount >= MAX_RETRIES) {
             console.log(`[VideoLayer] Max retries (${MAX_RETRIES}) reached.`);
-            // onVideoEnd?.(); // Auto-skip iptal edildi, hata mesajı görünsün
         }
-    }, [video.id, video.videoUrl, videoSource, retryCount, onVideoEnd]);
+    }, [video.id, video.videoUrl, videoSource, retryCount]);
 
     const handleRetry = useCallback(() => {
         setRetryCount(prev => prev + 1);
@@ -207,15 +265,19 @@ export const VideoLayer = memo(function VideoLayer({
                 key={key}
                 ref={videoRef}
                 source={videoSource}
-                style={styles.video}
-                resizeMode="cover"
-                poster={video.thumbnailUrl}
-                posterResizeMode="cover"
+                style={[styles.video, { backgroundColor: '#000' }]} // Black bg to prevent white flash
+                resizeMode={resizeMode}
+                // poster={video.thumbnailUrl} // Removed: Causes glitch (Start -> Thumb -> Start)
+                // posterResizeMode={resizeMode}
                 repeat={false}
                 paused={!shouldPlay}
                 muted={isMuted}
                 bufferConfig={bufferConfig}
-                onLoad={handleLoad}
+                onLoad={handleLoad} // Triggers fade out of manual poster
+                onLoadStart={() => {
+                    // Hide poster as soon as video starts loading to prevent conflicts
+                    setShowPoster(false);
+                }}
                 onError={handleVideoError}
                 onProgress={handleProgress}
                 onEnd={handleEnd}
@@ -224,6 +286,17 @@ export const VideoLayer = memo(function VideoLayer({
                 ignoreSilentSwitch="ignore"
                 progressUpdateInterval={33}
             />
+
+            {/* Manual Poster Overlay (Only show before video starts loading) */}
+            {showPoster && video.thumbnailUrl && (
+                <Image
+                    source={{ uri: video.thumbnailUrl }}
+                    style={[StyleSheet.absoluteFill, { zIndex: 1 }]}
+                    contentFit="cover" // Always use cover for poster
+                    priority="high"
+                    cachePolicy="memory-disk"
+                />
+            )}
 
             {/* Brightness Overlay */}
             <BrightnessOverlay />
@@ -348,5 +421,26 @@ const styles = StyleSheet.create({
         color: '#9CA3AF',
         fontSize: 12,
         marginTop: 12,
+    },
+    fullScreenButton: {
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: [{ translateX: -60 }, { translateY: -20 }], // Half width/height
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 20,
+        gap: 8,
+        zIndex: 50,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.2)'
+    },
+    fullScreenText: {
+        color: '#FFFFFF',
+        fontWeight: '600',
+        fontSize: 14
     }
 });

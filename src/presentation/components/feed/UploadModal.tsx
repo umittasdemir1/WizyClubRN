@@ -88,11 +88,6 @@ export function UploadModal({ isVisible, onClose }: UploadModalProps) {
         startUpload();
 
         const formData = new FormData();
-        formData.append('video', {
-            uri: selectedVideo.uri,
-            type: 'video/mp4',
-            name: 'upload.mp4',
-        } as any);
         formData.append('userId', userId);
         formData.append('description', description);
         formData.append('commercialType', commercialType);
@@ -103,6 +98,13 @@ export function UploadModal({ isVisible, onClose }: UploadModalProps) {
                 formData.append('brandUrl', brandUrl);
             }
         }
+
+        // IMPORTANT: File must be appended LAST for Multer to process body fields first!
+        formData.append('video', {
+            uri: selectedVideo.uri,
+            type: 'video/mp4',
+            name: 'upload.mp4',
+        } as any);
 
         try {
             const xhr = new XMLHttpRequest();

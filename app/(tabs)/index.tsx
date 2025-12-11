@@ -8,8 +8,18 @@ import {
     Text,
     RefreshControl,
     Platform,
+    Alert, // Added
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
+
+// Optional: Screen orientation (for fullscreen feature)
+let ScreenOrientation: any = null;
+try {
+    ScreenOrientation = require('expo-screen-orientation');
+} catch (e) {
+    console.log('[index] expo-screen-orientation not available');
+}
 import { VideoLayer } from '../../src/presentation/components/feed/VideoLayer';
 import { ActionButtons } from '../../src/presentation/components/feed/ActionButtons';
 import { HeaderOverlay } from '../../src/presentation/components/feed/HeaderOverlay';
@@ -26,7 +36,6 @@ import { Video } from '../../src/domain/entities/Video';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { FeedSkeleton } from '../../src/presentation/components/feed/FeedSkeleton';
 import { UploadModal } from '../../src/presentation/components/feed/UploadModal';
 import { useUploadStore } from '../../src/presentation/store/useUploadStore';
@@ -53,6 +62,7 @@ export default function FeedScreen() {
         toggleShop,
         refreshFeed,
         loadMore,
+        removeVideo, // Added
     } = useVideoFeed();
 
     // Global Store
@@ -61,13 +71,31 @@ export default function FeedScreen() {
     const isAppActive = useActiveVideoStore((state) => state.isAppActive);
     const isSeeking = useActiveVideoStore((state) => state.isSeeking);
     const togglePause = useActiveVideoStore((state) => state.togglePause);
+    // Upload Success -> Auto Scroll to Top
+    const uploadStatus = useUploadStore(state => state.status);
+    const uploadedVideoId = useUploadStore(state => state.uploadedVideoId);
+
+    useEffect(() => {
+        if (uploadStatus === 'success' && videos.length > 0) {
+            // 1. Scroll to Top (Instant)
+            listRef.current?.scrollToIndex({ index: 0, animated: false });
+
+            // 2. Force Active Video to the New One (if ID matches or just first)
+            if (uploadedVideoId && videos[0].id === uploadedVideoId) {
+                setActiveVideo(uploadedVideoId, 0);
+            } else {
+                // Fallback: Just play first
+                setActiveVideo(videos[0].id, 0);
+            }
+        }
+    }, [uploadStatus, videos, uploadedVideoId, setActiveVideo]);
 
     // Mute controls
     const { isMuted, toggleMute } = useMuteControls();
 
     // Upload State
     const [isUploadModalVisible, setUploadModalVisible] = useState(false);
-    const uploadedVideoId = useUploadStore(state => state.uploadedVideoId);
+    // uploadedVideoId already declared above
     const resetUpload = useUploadStore(state => state.reset);
 
     // Watch for successful upload
@@ -94,6 +122,8 @@ export default function FeedScreen() {
     const ITEM_HEIGHT = Dimensions.get('window').height;
 
     const hasUnseenStories = true;
+    const [showFullScreen, setShowFullScreen] = useState(false); // NEW: Track if fullscreen button should show
+    const [isFullScreen, setIsFullScreen] = useState(false); // NEW: Track fullscreen state
 
     // UI Opacity Animation for "Seek to Hide"
     const uiOpacityStyle = useAnimatedStyle(() => {
@@ -176,13 +206,17 @@ export default function FeedScreen() {
                         onDoubleTap={() => handleDoubleTapLike(item.id)}
                         onSingleTap={togglePause}
                     >
-                        <View style={StyleSheet.absoluteFill}>
+                        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]}>
                             <VideoLayer
                                 video={item}
                                 isActive={isActive}
                                 isMuted={isMuted}
                                 isScrolling={isScrollingSV}
                                 onSeekReady={isActive ? handleSeekReady : undefined}
+                                onResizeModeChange={(mode) => {
+                                    // Show fullscreen button for landscape videos (contain mode)
+                                    setShowFullScreen(mode === 'contain');
+                                }}
                             />
                         </View>
                     </DoubleTapLike>
@@ -316,7 +350,71 @@ export default function FeedScreen() {
                     onStoryPress={() => router.push('/story/1')}
                     onMorePress={() => console.log('Open More Options')}
                     onUploadPress={() => setUploadModalVisible(true)}
+                    onDeletePress={() => {
+                        if (!activeVideoId) return;
+                        Alert.alert(
+                            "İçerik Silinecek",
+                            "Bu videoyu ve tüm verilerini (R2, Veritabanı) kalıcı olarak silmek istediğinize emin misiniz?",
+                            [
+                                { text: "Vazgeç", style: "cancel" },
+                                {
+                                    text: "Evet, Sil",
+                                    style: "destructive",
+                                    onPress: async () => {
+                                        try {
+                                            // Optimistic Update: Remove locally first?
+                                            // For safety, let's wait for server.
+                                            // Show simple loading indicator? Or just wait.
+                                            // Haptics.
+                                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+
+                                            // Note: In a real app, use a service/repository. Directly fetching here for MVP speed.
+                                            // Using IP from UploadModal for consistency (192.168.0.138)
+                                            const response = await fetch(`http://192.168.0.138:3000/videos/${activeVideoId}`, {
+                                                method: 'DELETE'
+                                            });
+
+                                            if (response.ok) {
+                                                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                                                removeVideo(activeVideoId); // Immediate removal
+                                            } else {
+                                                const errText = await response.text();
+                                                console.error("Delete failed:", errText);
+                                                Alert.alert("Hata", "Silme başarısız: " + errText);
+                                                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+                                            }
+                                        } catch (e: any) {
+                                            console.error(e);
+                                            Alert.alert("Bağlantı Hatası", e.message || "Sunucuya ulaşılamadı.");
+                                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+                                        }
+                                    }
+                                }
+                            ]
+                        );
+                    }}
                     hasUnseenStories={hasUnseenStories}
+                    showFullScreen={showFullScreen}
+                    onFullScreenPress={async () => {
+                        if (!ScreenOrientation) {
+                            console.log('[index] Screen orientation requires native build');
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            return;
+                        }
+
+                        try {
+                            if (isFullScreen) {
+                                await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+                                setIsFullScreen(false);
+                            } else {
+                                await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+                                setIsFullScreen(true);
+                            }
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                        } catch (error) {
+                            console.error('[index] Orientation error:', error);
+                        }
+                    }}
                 />
             </Animated.View>
 

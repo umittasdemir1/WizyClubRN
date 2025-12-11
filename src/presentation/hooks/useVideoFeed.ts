@@ -22,6 +22,7 @@ interface UseVideoFeedReturn {
     toggleFollow: (videoId: string) => void;
     toggleShare: (videoId: string) => void;
     toggleShop: (videoId: string) => void;
+    removeVideo: (videoId: string) => void; // Added
 }
 
 export function useVideoFeed(): UseVideoFeedReturn {
@@ -247,6 +248,10 @@ export function useVideoFeed(): UseVideoFeedReturn {
         );
     }, []);
 
+    const removeVideo = useCallback((videoId: string) => {
+        setVideos((prevVideos) => prevVideos.filter(v => v.id !== videoId));
+    }, []);
+
     useEffect(() => {
         fetchFeed();
     }, [fetchFeed]);
@@ -266,5 +271,6 @@ export function useVideoFeed(): UseVideoFeedReturn {
         toggleFollow,
         toggleShare,
         toggleShop,
+        removeVideo, // Exported
     };
 }

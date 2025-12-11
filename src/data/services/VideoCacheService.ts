@@ -91,6 +91,29 @@ export class VideoCacheService {
         }
     }
 
+    static async deleteCachedVideo(url: string | number): Promise<void> {
+        if (typeof url !== 'string') return;
+
+        const filename = url.split('/').pop()?.split('?')[0] || '';
+        if (!filename) return;
+
+        const path = `${CACHE_FOLDER}${filename}`;
+
+        try {
+            // Remove from memory cache
+            VideoCacheService.memoryCache.delete(url);
+
+            // Delete file if exists
+            const fileInfo = await FileSystem.getInfoAsync(path);
+            if (fileInfo.exists) {
+                await FileSystem.deleteAsync(path, { idempotent: true });
+                console.log(`[VideoCache] Deleted corrupt cache file: ${filename}`);
+            }
+        } catch (error) {
+            console.error(`[VideoCache] Error deleting cached video:`, error);
+        }
+    }
+
     static async pruneCache() {
         try {
             const folderInfo = await FileSystem.getInfoAsync(CACHE_FOLDER);

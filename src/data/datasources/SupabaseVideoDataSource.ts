@@ -47,7 +47,13 @@ interface SupabaseVideo {
     likes_count: number;
     views_count: number;
     created_at: string;
-    sprite_url?: string; // Seekbar thumbnail sprite sheet
+    sprite_url?: string;
+    width?: number; // Added
+    height?: number; // Added
+    is_commercial?: boolean;
+    brand_name?: string;
+    brand_url?: string;
+    commercial_type?: string;
 }
 
 export class SupabaseVideoDataSource {
@@ -114,6 +120,12 @@ export class SupabaseVideoDataSource {
             user: getUserFromId(dto.user_id),
             musicName: 'Original Audio',
             musicAuthor: 'WizyClub',
+            width: dto.width,
+            height: dto.height,
+            isCommercial: dto.is_commercial,
+            brandName: dto.brand_name,
+            brandUrl: dto.brand_url,
+            commercialType: dto.commercial_type,
         };
     }
 

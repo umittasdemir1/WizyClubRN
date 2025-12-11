@@ -36,13 +36,19 @@ Bu dosya, sık sık `EAS Build` almayı önlemek amacıyla, gelecekte projemize 
 | Kütüphane | Amaç | Durum |
 | :--- | :--- | :--- |
 | **`react-native-pager-view`** | TikTok/Instagram tarzı "Çoklu Fotoğraf Kaydırma" (Carousel) için. FlatList'ten çok daha performanslıdır. | ⏳ Beklemede |
-| **`expo-screen-orientation`** | Yatay videoları tam ekran yapmak için ekranı döndürme kontrolü. | ⏳ Beklemede |
+| **`expo-screen-orientation`** | Yatay videoları tam ekran yapmak için ekranı döndürme kontrolü. | ✅ Kurulu |
 
 ### 6. 🛠️ Sistem ve Performans
 | Kütüphane | Amaç | Durum |
 | :--- | :--- | :--- |
 | **`expo-device`** | Cihaz modelini anlamak (örn: eski modelse animasyonları kapatmak) için. | ⏳ Beklemede |
 | **`expo-network`** | İnternet bağlantısını kontrol edip "Offline" uyarısı göstermek için (`NetInfo` alternatifi). | ⏳ Beklemede |
+### 7. 🎬 Video Editör (Ağır İşler)
+| Kütüphane | Amaç | Durum |
+| :--- | :--- | :--- |
+| **`ffmpeg-kit-react-native`** | Trim, Crop, Müzik, Transcode işlemleri için (Paket: `full-gpl` seçilmeli). | ⏳ Beklemede |
+| **`@shopify/react-native-skia`** | Video üzerine çizim, Sticker, Text ve canlı filtreler için yüksek performanslı grafik motoru. | ⏳ Beklemede |
+| **`expo-file-system`** | Video dosyalarını okuma/yazma (ffmpeg ile entegre çalışır). | ✅ Kurulu |
 
 ---
 
@@ -61,6 +67,8 @@ Bu dosya, sık sık `EAS Build` almayı önlemek amacıyla, gelecekte projemize 
 - `react-native-reanimated` (Animasyonlar)
 - `react-native-svg` (İkonlar)
 - `react-native-safe-area-context` (Çentik uyumu)
+- `expo-screen-orientation` (Ekran döndürme)
+- `expo-file-system` (Dosya okuma/yazma)
 
 ## 🚀 Strateji
 Bir sonraki `EAS Build` ihtiyacımız doğduğunda, yukarıdaki listeden (özellikle **Kamera**, **Paylaşım** ve **Galeriye Kaydet**) ihtiyacımız olabilecekleri seçip **topluca** kuracağız.

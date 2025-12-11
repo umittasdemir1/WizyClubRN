@@ -22,4 +22,6 @@ export interface Video {
     brandUrl?: string | null;
     isCommercial?: boolean;
     commercialType?: string | null;
+    width?: number;
+    height?: number;
 }
