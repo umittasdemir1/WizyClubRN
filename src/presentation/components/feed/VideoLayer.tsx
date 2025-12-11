@@ -368,7 +368,7 @@ export const VideoLayer = memo(function VideoLayer({
         prev.video.id === next.video.id &&
         prev.isActive === next.isActive &&
         prev.isMuted === next.isMuted &&
-        true
+        prev.isFullScreen === next.isFullScreen // CRITICAL: Re-render when fullscreen changes
     );
 });
 
