@@ -260,7 +260,8 @@ export default function FeedScreen() {
             toggleSave,
             router,
             ITEM_HEIGHT,
-            isSeeking
+            isSeeking,
+            isFullScreen, // CRITICAL: Re-render when fullscreen changes
         ]
     );
 
