@@ -260,12 +260,28 @@ export const VideoLayer = memo(function VideoLayer({
     const showPlayIcon = isPausedGlobal && !isSeeking && isActive && !isFinished && !hasError;
     const showReplayIcon = isFinished && isActive && !hasError;
 
-    // Debug log
+    // Debug log - Detailed
     useEffect(() => {
         if (isActive) {
-            console.log(`📺 [VideoLayer] isFullScreen=${isFullScreen}, resizeMode=${isFullScreen ? 'cover' : resizeMode}`);
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            console.log(`📺 [VideoLayer Debug]`);
+            console.log(`  - isFullScreen: ${isFullScreen}`);
+            console.log(`  - resizeMode: ${isFullScreen ? 'cover' : resizeMode}`);
+            console.log(`  - Video dimensions: ${video.width}x${video.height}`);
+            console.log(`  - Container style: ${isFullScreen ? 'ABSOLUTE (fullscreen)' : 'FLEX (normal)'}`);
+            console.log(`  - Video style: ${isFullScreen ? 'ABSOLUTE 100%x100%' : 'FLEX 1'}`);
+            console.log(`  - Elements rendering:`);
+            console.log(`    • Video component: YES`);
+            console.log(`    • Poster overlay: ${showPoster ? 'YES' : 'NO'}`);
+            console.log(`    • Brightness overlay: YES`);
+            console.log(`    • Gradient overlay: YES`);
+            console.log(`    • Error overlay: ${hasError ? 'YES' : 'NO'}`);
+            console.log(`    • Play icon: ${showPlayIcon ? 'YES' : 'NO'}`);
+            console.log(`    • Replay icon: ${showReplayIcon ? 'YES' : 'NO'}`);
+            console.log(`    • Seekbar: YES`);
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         }
-    }, [isFullScreen, resizeMode, isActive]);
+    }, [isFullScreen, resizeMode, isActive, video.width, video.height, showPoster, hasError, showPlayIcon, showReplayIcon]);
 
     return (
         <View style={[styles.container, isFullScreen && styles.fullscreenContainer]}>

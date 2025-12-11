@@ -438,11 +438,21 @@ export default function FeedScreen() {
                                 await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
                                 setIsFullScreen(false);
                                 console.log('✅ [FULLSCREEN] Switched to PORTRAIT, isFullScreen=false');
+                                console.log(`📱 [UI Elements] Portrait mode:`);
+                                console.log(`  • ActionButtons: VISIBLE`);
+                                console.log(`  • MetadataLayer: VISIBLE`);
+                                console.log(`  • HeaderOverlay: FULL UI`);
+                                console.log(`  • Tab bar: VISIBLE`);
                             } else {
                                 console.log('🔄 [FULLSCREEN] Switching to LANDSCAPE');
                                 await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
                                 setIsFullScreen(true);
                                 console.log('✅ [FULLSCREEN] Switched to LANDSCAPE, isFullScreen=true');
+                                console.log(`📱 [UI Elements] Landscape mode:`);
+                                console.log(`  • ActionButtons: HIDDEN`);
+                                console.log(`  • MetadataLayer: HIDDEN`);
+                                console.log(`  • HeaderOverlay: MINIMAL (fullscreen button only)`);
+                                console.log(`  • Tab bar: HIDDEN`);
                             }
                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                         } catch (error) {
