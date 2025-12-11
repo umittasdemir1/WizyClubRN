@@ -34,6 +34,7 @@ interface VideoLayerProps {
     isScrolling?: SharedValue<boolean>;
     onFullScreenPress?: () => void; // NEW: Expose fullscreen handler
     onResizeModeChange?: (mode: 'contain' | 'cover') => void; // NEW: Notify parent of resize mode
+    isFullScreen?: boolean; // Fullscreen state from parent
 }
 
 const MAX_LOOPS = 2;
@@ -49,6 +50,7 @@ export const VideoLayer = memo(function VideoLayer({
     isScrolling,
     onFullScreenPress, // NEW
     onResizeModeChange, // NEW
+    isFullScreen = false, // Fullscreen state from parent
 }: VideoLayerProps) {
     const isAppActive = useActiveVideoStore((state) => state.isAppActive);
     const isSeeking = useActiveVideoStore((state) => state.isSeeking);
@@ -74,7 +76,6 @@ export const VideoLayer = memo(function VideoLayer({
 
     // Poster State (Manual Overlay)
     const [showPoster, setShowPoster] = useState(true);
-    const [isFullScreen, setIsFullScreen] = useState(false);
 
     // Cache State - Try to get from memory cache synchronously first!
     const [videoSource, setVideoSource] = useState<any>(() => {
@@ -266,7 +267,7 @@ export const VideoLayer = memo(function VideoLayer({
                 ref={videoRef}
                 source={videoSource}
                 style={[styles.video, { backgroundColor: '#000' }]} // Black bg to prevent white flash
-                resizeMode={resizeMode}
+                resizeMode={isFullScreen ? 'cover' : resizeMode}
                 // poster={video.thumbnailUrl} // Removed: Causes glitch (Start -> Thumb -> Start)
                 // posterResizeMode={resizeMode}
                 repeat={false}

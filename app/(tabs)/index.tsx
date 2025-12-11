@@ -217,33 +217,36 @@ export default function FeedScreen() {
                                     // Show fullscreen button for landscape videos (contain mode)
                                     setShowFullScreen(mode === 'contain');
                                 }}
+                                isFullScreen={isFullScreen}
                             />
                         </View>
                     </DoubleTapLike>
 
                     {/* Layer 2: UI Overlays (Foreground) - Animate Opacity */}
-                    <Animated.View
-                        style={[StyleSheet.absoluteFill, { zIndex: 50 }, uiOpacityStyle]}
-                        pointerEvents={isSeeking ? 'none' : 'box-none'}
-                    >
-                        <ActionButtons
-                            video={item}
-                            onLike={() => toggleLike(item.id)}
-                            onSave={() => toggleSave(item.id)}
-                            onShare={() => toggleShare(item.id)}
-                            onShop={() => toggleShop(item.id)}
-                            onMore={() => console.log('More Options')}
-                            onProfilePress={() => console.log('Profile')}
-                        />
+                    {!isFullScreen && (
+                        <Animated.View
+                            style={[StyleSheet.absoluteFill, { zIndex: 50 }, uiOpacityStyle]}
+                            pointerEvents={isSeeking ? 'none' : 'box-none'}
+                        >
+                            <ActionButtons
+                                video={item}
+                                onLike={() => toggleLike(item.id)}
+                                onSave={() => toggleSave(item.id)}
+                                onShare={() => toggleShare(item.id)}
+                                onShop={() => toggleShop(item.id)}
+                                onMore={() => console.log('More Options')}
+                                onProfilePress={() => console.log('Profile')}
+                            />
 
-                        <MetadataLayer
-                            video={item}
-                            onAvatarPress={() => console.log('Open Story/Profile')}
-                            onFollowPress={() => toggleFollow(item.id)}
-                            onReadMorePress={() => console.log('Open Description')}
-                            onCommercialTagPress={() => console.log('Open Commercial Info')}
-                        />
-                    </Animated.View>
+                            <MetadataLayer
+                                video={item}
+                                onAvatarPress={() => console.log('Open Story/Profile')}
+                                onFollowPress={() => toggleFollow(item.id)}
+                                onReadMorePress={() => console.log('Open Description')}
+                                onCommercialTagPress={() => console.log('Open Commercial Info')}
+                            />
+                        </Animated.View>
+                    )}
                 </View>
             );
         },
@@ -345,6 +348,7 @@ export default function FeedScreen() {
                 pointerEvents={isSeeking ? 'none' : 'box-none'}
             >
                 <HeaderOverlay
+                    isFullScreen={isFullScreen}
                     isMuted={isMuted}
                     onToggleMute={handleToggleMute}
                     onStoryPress={() => router.push('/story/1')}

@@ -90,6 +90,7 @@ interface HeaderOverlayProps {
     onFullScreenPress?: () => void; // NEW
     hasUnseenStories?: boolean;
     showFullScreen?: boolean; // NEW: Show fullscreen button for landscape videos
+    isFullScreen?: boolean; // NEW: Landscape mode
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -104,6 +105,7 @@ export function HeaderOverlay({
     onFullScreenPress, // NEW
     hasUnseenStories = false,
     showFullScreen = false, // NEW
+    isFullScreen = false, // NEW: Landscape mode
 }: HeaderOverlayProps) {
     const insets = useSafeAreaInsets();
     const pulseOpacity = useSharedValue(1);
@@ -129,6 +131,26 @@ export function HeaderOverlay({
         opacity: pulseOpacity.value,
     }));
 
+    // Landscape mode: Show only fullscreen button
+    if (isFullScreen) {
+        return (
+            <View style={[styles.container, { paddingTop: insets.top + 28 }]} pointerEvents="box-none">
+                <View style={styles.fullScreenOnlyContainer}>
+                    {showFullScreen && onFullScreenPress && (
+                        <Pressable
+                            style={styles.iconButton}
+                            onPress={onFullScreenPress}
+                            hitSlop={12}
+                        >
+                            <Fullscreen width={24} height={24} color="white" />
+                        </Pressable>
+                    )}
+                </View>
+            </View>
+        );
+    }
+
+    // Portrait mode: Full UI
     return (
         <View style={[styles.container, { paddingTop: insets.top + 28 }]} pointerEvents="box-none">
             {/* Left Column: Voice & Upload */}
@@ -250,5 +272,11 @@ const styles = StyleSheet.create({
     rightButtons: {
         flexDirection: 'column', // Changed from row to column for vertical stacking
         gap: 8,
+        paddingBottom: 55, // Nav bar height
+    },
+    fullScreenOnlyContainer: {
+        position: 'absolute',
+        top: 16,
+        right: 16,
     },
 });
