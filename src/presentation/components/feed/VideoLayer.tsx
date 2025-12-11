@@ -415,8 +415,10 @@ const styles = StyleSheet.create({
         width: '100%',
         height: '100%',
         position: 'absolute',
-        zIndex: 0, // Behind overlays
-        aspectRatio: 16 / 9, // Force 16:9 aspect ratio in landscape
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
     },
     touchArea: {
         ...StyleSheet.absoluteFillObject,
