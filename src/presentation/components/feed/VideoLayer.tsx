@@ -409,11 +409,14 @@ const styles = StyleSheet.create({
     },
     video: {
         flex: 1, // Respects container padding for black bars
+        zIndex: 0, // Behind overlays
     },
     fullscreenVideo: {
         width: '100%',
         height: '100%',
         position: 'absolute',
+        zIndex: 0, // Behind overlays
+        aspectRatio: 16 / 9, // Force 16:9 aspect ratio in landscape
     },
     touchArea: {
         ...StyleSheet.absoluteFillObject,
