@@ -379,7 +379,13 @@ const styles = StyleSheet.create({
         paddingVertical: 25, // 25px top and bottom
     },
     fullscreenContainer: {
-        paddingVertical: 0, // Remove padding in fullscreen (landscape)
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        paddingVertical: 0,
+        zIndex: 100, // Above everything
     },
     video: {
         flex: 1, // Respects container padding for black bars
