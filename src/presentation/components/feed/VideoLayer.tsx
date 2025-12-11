@@ -357,6 +357,7 @@ export const VideoLayer = memo(function VideoLayer({
                 onSeek={seekTo}
                 isActive={isActive}
                 spriteUrl={video.spriteUrl}
+                isFullScreen={isFullScreen}
             />
         </View>
     );

@@ -38,6 +38,7 @@ interface VideoSeekBarProps {
     onSeek: (time: number) => void;
     isActive?: boolean;
     spriteUrl?: string;
+    isFullScreen?: boolean; // NEW: Adjust position for fullscreen landscape
 }
 
 export function VideoSeekBar({
@@ -46,7 +47,8 @@ export function VideoSeekBar({
     isScrolling,
     onSeek,
     isActive = true,
-    spriteUrl
+    spriteUrl,
+    isFullScreen = false
 }: VideoSeekBarProps) {
     const setSeeking = useActiveVideoStore((state: ActiveVideoState) => state.setSeeking);
     const [displayTime, setDisplayTime] = useState(0);
@@ -64,10 +66,12 @@ export function VideoSeekBar({
     const MARGIN_BOTTOM = 0;
 
     const finalBottomPosition = useDerivedValue(() => {
+        // In fullscreen landscape mode, position seekbar at screen bottom (no tab bar offset)
+        if (isFullScreen) return 16; // 16px from bottom
         if (POSITION_MODE === 'hidden') return CUSTOM_OFFSET;
         if (POSITION_MODE === 'safe') return insets.bottom + TAB_BAR_HEIGHT + MARGIN_BOTTOM;
         return CUSTOM_OFFSET;
-    }, [insets.bottom]);
+    }, [insets.bottom, isFullScreen]);
 
     const animatedProgress = useSharedValue(0);
 

@@ -223,13 +223,36 @@ export default function FeedScreen() {
             const isActive = item.id === activeVideoId && isAppActive;
 
             return (
-                <View style={[styles.itemContainer, { height: ITEM_HEIGHT }]}>
+                <View style={[
+                    styles.itemContainer,
+                    { height: ITEM_HEIGHT },
+                    isFullScreen && {
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        height: '100%',
+                        width: '100%',
+                        zIndex: 9999,
+                    }
+                ]}>
                     {/* Layer 1: Content & Gestures (Background) */}
                     <DoubleTapLike
                         onDoubleTap={() => handleDoubleTapLike(item.id)}
                         onSingleTap={togglePause}
                     >
-                        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]}>
+                        <View style={[
+                            StyleSheet.absoluteFill,
+                            { backgroundColor: '#000' },
+                            isFullScreen && {
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                            }
+                        ]}>
                             <VideoLayer
                                 video={item}
                                 isActive={isActive}

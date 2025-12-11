@@ -276,7 +276,8 @@ const styles = StyleSheet.create({
     },
     fullScreenOnlyContainer: {
         position: 'absolute',
-        top: 16,
-        right: 16,
+        top: '50%',
+        left: '50%',
+        transform: [{ translateX: -12 }, { translateY: -12 }], // Center 24px icon
     },
 });
