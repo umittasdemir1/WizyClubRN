@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { useNavigation } from 'expo-router';
 
 // Optional: Screen orientation (for fullscreen feature)
 let ScreenOrientation: any = null;
@@ -116,6 +117,7 @@ export default function FeedScreen() {
 
     const insets = useSafeAreaInsets();
     const router = useRouter();
+    const navigation = useNavigation();
     const listRef = useRef<any>(null);
 
     // Calculate video height - full screen for proper paging
@@ -124,6 +126,25 @@ export default function FeedScreen() {
     const hasUnseenStories = true;
     const [showFullScreen, setShowFullScreen] = useState(false); // NEW: Track if fullscreen button should show
     const [isFullScreen, setIsFullScreen] = useState(false); // NEW: Track fullscreen state
+
+    // Hide tab bar in landscape fullscreen mode
+    useEffect(() => {
+        if (isFullScreen) {
+            navigation.setOptions({
+                tabBarStyle: { display: 'none' }
+            });
+        } else {
+            navigation.setOptions({
+                tabBarStyle: {
+                    backgroundColor: '#000000',
+                    borderTopWidth: 0,
+                    paddingBottom: insets.bottom + 3.5,
+                    paddingTop: 3.5,
+                    height: 55 + insets.bottom,
+                }
+            });
+        }
+    }, [isFullScreen, navigation, insets.bottom]);
 
     // UI Opacity Animation for "Seek to Hide"
     const uiOpacityStyle = useAnimatedStyle(() => {
