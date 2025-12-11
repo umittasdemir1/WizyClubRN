@@ -260,6 +260,13 @@ export const VideoLayer = memo(function VideoLayer({
     const showPlayIcon = isPausedGlobal && !isSeeking && isActive && !isFinished && !hasError;
     const showReplayIcon = isFinished && isActive && !hasError;
 
+    // Debug log
+    useEffect(() => {
+        if (isActive) {
+            console.log(`📺 [VideoLayer] isFullScreen=${isFullScreen}, resizeMode=${isFullScreen ? 'cover' : resizeMode}`);
+        }
+    }, [isFullScreen, resizeMode, isActive]);
+
     return (
         <View style={[styles.container, isFullScreen && styles.fullscreenContainer]}>
             <Video

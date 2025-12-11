@@ -400,23 +400,31 @@ export default function FeedScreen() {
                     hasUnseenStories={hasUnseenStories}
                     showFullScreen={showFullScreen}
                     onFullScreenPress={async () => {
+                        console.log('🔵 [FULLSCREEN] Button pressed!');
+                        console.log('🔵 [FULLSCREEN] ScreenOrientation available:', !!ScreenOrientation);
+                        console.log('🔵 [FULLSCREEN] Current isFullScreen:', isFullScreen);
+
                         if (!ScreenOrientation) {
-                            console.log('[index] Screen orientation requires native build');
+                            console.log('❌ [FULLSCREEN] Screen orientation requires native build');
                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                             return;
                         }
 
                         try {
                             if (isFullScreen) {
+                                console.log('🔄 [FULLSCREEN] Switching to PORTRAIT');
                                 await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
                                 setIsFullScreen(false);
+                                console.log('✅ [FULLSCREEN] Switched to PORTRAIT, isFullScreen=false');
                             } else {
+                                console.log('🔄 [FULLSCREEN] Switching to LANDSCAPE');
                                 await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
                                 setIsFullScreen(true);
+                                console.log('✅ [FULLSCREEN] Switched to LANDSCAPE, isFullScreen=true');
                             }
                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                         } catch (error) {
-                            console.error('[index] Orientation error:', error);
+                            console.error('❌ [FULLSCREEN] Orientation error:', error);
                         }
                     }}
                 />

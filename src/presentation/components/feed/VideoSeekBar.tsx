@@ -118,17 +118,21 @@ export function VideoSeekBar({
     }, [setSeeking]);
 
     const updateSeek = useCallback((percentage: number) => {
-        if (duration.value > 0) {
+        if (duration.value > 0 && !isNaN(percentage)) {
             const seekTime = percentage * duration.value;
-            onSeek(seekTime);
-            currentTime.value = seekTime;
+            if (!isNaN(seekTime) && isFinite(seekTime)) {
+                onSeek(seekTime);
+                currentTime.value = seekTime;
+            }
         }
     }, [duration, onSeek, currentTime]);
 
     const endScrubbing = useCallback((percentage: number) => {
-        if (duration.value > 0) {
+        if (duration.value > 0 && !isNaN(percentage)) {
             const seekTime = percentage * duration.value;
-            onSeek(seekTime);
+            if (!isNaN(seekTime) && isFinite(seekTime)) {
+                onSeek(seekTime);
+            }
         }
         setSeeking(false);
     }, [duration, onSeek, setSeeking]);
