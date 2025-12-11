@@ -45,21 +45,13 @@
           }
         }
       ],
-      "@react-native-firebase/app",
-      "@react-native-firebase/crashlytics",
       [
         "expo-tracking-transparency",
         {
           "userTrackingPermission": "Sana özel içerik önermek için izin gerekiyor"
         }
       ],
-      "expo-secure-store",
-      [
-        "ffmpeg-kit-react-native",
-        {
-          "package": "https"
-        }
-      ]
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true
