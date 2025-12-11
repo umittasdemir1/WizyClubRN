@@ -273,7 +273,11 @@ export const VideoLayer = memo(function VideoLayer({
                 key={key}
                 ref={videoRef}
                 source={videoSource}
-                style={[styles.video, { backgroundColor: '#000' }]} // Black bg to prevent white flash
+                style={[
+                    styles.video,
+                    isFullScreen && styles.fullscreenVideo,
+                    { backgroundColor: '#000' }
+                ]}
                 resizeMode={isFullScreen ? 'cover' : resizeMode}
                 // poster={video.thumbnailUrl} // Removed: Causes glitch (Start -> Thumb -> Start)
                 // posterResizeMode={resizeMode}
@@ -389,6 +393,11 @@ const styles = StyleSheet.create({
     },
     video: {
         flex: 1, // Respects container padding for black bars
+    },
+    fullscreenVideo: {
+        width: '100%',
+        height: '100%',
+        position: 'absolute',
     },
     touchArea: {
         ...StyleSheet.absoluteFillObject,
