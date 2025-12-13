@@ -20,14 +20,15 @@ import { useActiveVideoStore, ActiveVideoState } from '../../store/useActiveVide
 import { SpritePreview } from './SpritePreview';
 
 // Usage Configuration
-const SCREEN_WIDTH = Dimensions.get('window').width;
+import { useWindowDimensions } from 'react-native';
+
+// Usage Configuration
 const HORIZONTAL_PADDING = 16;
-const TOUCH_AREA_HEIGHT = 80; // Reverted to default to fix position
+const TOUCH_AREA_HEIGHT = 80;
 const THUMB_SIZE = 14;
-const TRACK_HEIGHT = 2; // Very thin by default
-const TRACK_HEIGHT_EXPANDED = 12; // Thick on touch
-const BAR_WIDTH = SCREEN_WIDTH - (HORIZONTAL_PADDING * 2);
-const TOOLTIP_WIDTH = 100; // 100px width
+const TRACK_HEIGHT = 2;
+const TRACK_HEIGHT_EXPANDED = 12;
+const TOOLTIP_WIDTH = 100;
 const TOOLTIP_HALF_WIDTH = TOOLTIP_WIDTH / 2;
 const TOOLTIP_SCREEN_MARGIN = 16;
 
@@ -38,6 +39,7 @@ interface VideoSeekBarProps {
     onSeek: (time: number) => void;
     isActive?: boolean;
     spriteUrl?: string;
+    bottomOffset?: number;
 }
 
 export function VideoSeekBar({
@@ -46,8 +48,12 @@ export function VideoSeekBar({
     isScrolling,
     onSeek,
     isActive = true,
-    spriteUrl
+    spriteUrl,
+    bottomOffset
 }: VideoSeekBarProps) {
+    const { width: SCREEN_WIDTH } = useWindowDimensions();
+    const BAR_WIDTH = SCREEN_WIDTH - (HORIZONTAL_PADDING * 2);
+
     const setSeeking = useActiveVideoStore((state: ActiveVideoState) => state.setSeeking);
     const [displayTime, setDisplayTime] = useState(0);
 
@@ -64,10 +70,11 @@ export function VideoSeekBar({
     const MARGIN_BOTTOM = 0;
 
     const finalBottomPosition = useDerivedValue(() => {
+        if (bottomOffset !== undefined) return bottomOffset;
         if (POSITION_MODE === 'hidden') return CUSTOM_OFFSET;
         if (POSITION_MODE === 'safe') return insets.bottom + TAB_BAR_HEIGHT + MARGIN_BOTTOM;
         return CUSTOM_OFFSET;
-    }, [insets.bottom]);
+    }, [insets.bottom, bottomOffset]);
 
     const animatedProgress = useSharedValue(0);
 
@@ -269,7 +276,7 @@ export function VideoSeekBar({
         <Animated.View style={[styles.container, { bottom: finalBottomPosition }, containerAnimatedStyle]}>
             <GestureDetector gesture={composedGesture}>
                 <Animated.View style={[styles.touchArea, { height: TOUCH_AREA_HEIGHT }]}>
-                    <View style={styles.trackContainer}>
+                    <View style={[styles.trackContainer, { width: BAR_WIDTH }]}>
                         <Animated.View style={[styles.trackBackground, animatedTrackStyle]}>
                             <Animated.View style={[styles.progressFill, animatedProgressStyle]} />
                         </Animated.View>
@@ -306,7 +313,6 @@ const styles = StyleSheet.create({
         backgroundColor: 'transparent', // Ensure clicks are caught
     },
     trackContainer: {
-        width: BAR_WIDTH,
         alignSelf: 'center',
         justifyContent: 'center',
     },

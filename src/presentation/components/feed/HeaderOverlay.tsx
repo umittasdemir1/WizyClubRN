@@ -10,7 +10,7 @@ import Animated, {
     Easing,
     cancelAnimation,
 } from 'react-native-reanimated';
-import { Upload, Loader, Trash2, Fullscreen } from 'lucide-react-native';
+import { Upload, Loader, Trash2 } from 'lucide-react-native';
 import { useBrightnessStore } from '../../store/useBrightnessStore';
 import { useUploadStore } from '../../store/useUploadStore';
 
@@ -87,9 +87,7 @@ interface HeaderOverlayProps {
     onMorePress: () => void;
     onUploadPress?: () => void;
     onDeletePress?: () => void;
-    onFullScreenPress?: () => void; // NEW
     hasUnseenStories?: boolean;
-    showFullScreen?: boolean; // NEW: Show fullscreen button for landscape videos
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -101,9 +99,7 @@ export function HeaderOverlay({
     onMorePress,
     onUploadPress,
     onDeletePress,
-    onFullScreenPress, // NEW
     hasUnseenStories = false,
-    showFullScreen = false, // NEW
 }: HeaderOverlayProps) {
     const insets = useSafeAreaInsets();
     const pulseOpacity = useSharedValue(1);
@@ -176,16 +172,7 @@ export function HeaderOverlay({
             <View style={styles.rightButtons}>
                 <BrightnessButton />
 
-                {/* Fullscreen Button (for landscape videos) */}
-                {showFullScreen && onFullScreenPress && (
-                    <Pressable
-                        style={styles.iconButton}
-                        onPress={onFullScreenPress}
-                        hitSlop={12}
-                    >
-                        <Fullscreen width={24} height={24} color="white" />
-                    </Pressable>
-                )}
+
             </View>
         </View>
     );
