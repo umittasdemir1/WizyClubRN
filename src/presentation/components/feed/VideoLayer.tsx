@@ -78,14 +78,27 @@ export const VideoLayer = memo(function VideoLayer({
     const [videoSource, setVideoSource] = useState<any>(null);
     const [isSourceReady, setIsSourceReady] = useState(false);
 
-    // Optimize buffer for local files (Faz 5: Increased for smoother playback)
+    // Optimize buffer based on source type (Faz 5 + HLS optimization)
     const isLocal = videoSource?.uri?.startsWith('file://');
-    const bufferConfig = isLocal ? {
-        minBufferMs: 250, // Increased from 100 to 250ms for better disk I/O tolerance
-        maxBufferMs: 2000, // Increased from 1000 to 2000ms
-        bufferForPlaybackMs: 100, // Increased from 50 to 100ms
-        bufferForPlaybackAfterRebufferMs: 250 // Increased from 100 to 250ms
-    } : defaultBufferConfig;
+    const isHLS = typeof video.videoUrl === 'string' && video.videoUrl.endsWith('.m3u8');
+
+    const bufferConfig = isLocal
+        ? {
+            // Local files: smaller buffer for disk I/O
+            minBufferMs: 250,
+            maxBufferMs: 2000,
+            bufferForPlaybackMs: 100,
+            bufferForPlaybackAfterRebufferMs: 250
+        }
+        : isHLS
+        ? {
+            // HLS: larger buffer for segment streaming
+            minBufferMs: 3000,
+            maxBufferMs: 15000,
+            bufferForPlaybackMs: 1000,
+            bufferForPlaybackAfterRebufferMs: 2000
+        }
+        : defaultBufferConfig;
 
     // Local SharedValues for SeekBar
     const currentTimeSV = useSharedValue(0);
@@ -306,6 +319,9 @@ export const VideoLayer = memo(function VideoLayer({
                     playWhenInactive={false}
                     ignoreSilentSwitch="ignore"
                     progressUpdateInterval={33}
+                    // HLS optimizations
+                    automaticWaitsToMinimizeStalling={true}
+                    preventsDisplaySleepDuringVideoPlayback={true}
                 />
             )}
 

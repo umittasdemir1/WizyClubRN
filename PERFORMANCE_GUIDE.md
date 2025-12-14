@@ -309,6 +309,35 @@ useEffect(() => {
 }, [videos]);
 ```
 
+### **Problem 4: HLS videoları çok yavaş (>5 saniye)**
+
+**HLS (.m3u8) özel durum!**
+
+**Neden yavaş:**
+- HLS playlist + segment fetch gerekiyor
+- İlk segment indirme süresi uzun olabilir
+- CDN/network latency etkileri daha fazla
+
+**Çözümler:**
+1. **CDN Optimizasyonu:** Origin'e daha yakın CDN edge kullan
+2. **Segment boyutu:** Daha küçük segment boyutu (2-4 saniye yerine 1-2 saniye)
+3. **Playlist tipi:** Master playlist yerine direkt variant playlist kullan
+4. **Buffer artır:**
+   ```typescript
+   // VideoLayer.tsx'te HLS buffer config zaten optimize edildi:
+   minBufferMs: 3000,    // İlk başlatma için 3 saniye buffer
+   maxBufferMs: 15000,   // Maksimum 15 saniye buffer
+   ```
+
+**Kontrol:**
+```bash
+# HLS URL'i doğrudan test et:
+curl -I https://your-cdn.com/video.m3u8
+
+# Segment boyutlarını kontrol et:
+curl https://your-cdn.com/video.m3u8 | grep EXTINF
+```
+
 ---
 
 ## 📈 **Gelecek İyileştirmeler** (Bonus)
@@ -335,11 +364,18 @@ Büyük videoları segment segment yükle (HLS gibi) → İlk frame daha hızlı
 
 Optimizasyon başarılı sayılır eğer:
 
+### **MP4 Videoları İçin:**
 - ✅ Cache hit rate **>90%** (normal kullanım)
 - ✅ Average transition **<200ms**
 - ✅ P95 transition **<400ms**
 - ✅ Rebuffer rate **<5%**
-- ✅ Kullanıcı "takılma" hissi yok
+
+### **HLS (.m3u8) Videoları İçin:**
+- ✅ Segment prefetch çalışıyor (📺 emoji'li loglar)
+- ✅ Average transition **<2000ms** (ilk segment yükleme)
+- ✅ Sonraki videolar **<1000ms** (native cache)
+- ✅ Rebuffer rate **<10%**
+- ⚠️ **Not:** HLS videoları disk cache'lenmiyor, native player cache kullanıyor
 
 ---
 
