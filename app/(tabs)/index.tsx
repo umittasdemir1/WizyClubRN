@@ -405,6 +405,7 @@ export default function FeedScreen() {
                     showBrightnessButton={false}
                     hasUnseenStories={hasUnseenStories}
                     showFullScreen={showFullScreen}
+                    isFullScreen={isFullScreen}
                     onFullScreenPress={async () => {
                         if (!ScreenOrientation) {
                             console.log('[index] Screen orientation requires native build');
