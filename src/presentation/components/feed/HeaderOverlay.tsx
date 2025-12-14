@@ -10,7 +10,7 @@ import Animated, {
     Easing,
     cancelAnimation,
 } from 'react-native-reanimated';
-import { Upload, Loader, Trash2 } from 'lucide-react-native';
+import { Plus, Loader, Trash2 } from 'lucide-react-native';
 import { useBrightnessStore } from '../../store/useBrightnessStore';
 import { useUploadStore } from '../../store/useUploadStore';
 
@@ -74,7 +74,7 @@ function UploadButton({ onPress }: { onPress: () => void }) {
                     <Loader width={24} height={24} color="#FFD700" />
                 </Animated.View>
             ) : (
-                <Upload width={24} height={24} color="#FFFFFF" />
+                <Plus width={24} height={24} color="#FFFFFF" />
             )}
         </Pressable>
     );
