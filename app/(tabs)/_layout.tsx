@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
-import { View, useColorScheme } from 'react-native';
+import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../../src/presentation/contexts/ThemeContext';
 
 // Import SVGs
 import HomeIcon from '../../assets/icons/home.svg';
@@ -10,8 +11,7 @@ import NotificationIcon from '../../assets/icons/notification.svg';
 import ProfileIcon from '../../assets/icons/profile.svg';
 
 export default function TabLayout() {
-    const colorScheme = useColorScheme();
-    const isDark = colorScheme === 'dark';
+    const { isDark } = useTheme();
     const insets = useSafeAreaInsets();
 
     return (

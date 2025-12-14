@@ -6,7 +6,9 @@ import { Play } from 'lucide-react-native';
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const GAP = 2;
 const PADDING = 2;
-const ITEM_WIDTH = (SCREEN_WIDTH - (PADDING * 2) - (GAP * 2)) / 3; // 3 columns with 2px gap
+// Calculate item width: Total width minus padding and gaps, divided by 3
+// For 3 columns: we need 2 gaps between columns
+const ITEM_WIDTH = Math.floor((SCREEN_WIDTH - (PADDING * 2) - (GAP * 2)) / 3);
 
 interface VideoItem {
   id: string;

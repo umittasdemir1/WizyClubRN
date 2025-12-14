@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/presentation/contexts/ThemeContext';
@@ -15,9 +16,18 @@ import { HighlightPills } from '../../src/presentation/components/profile/Highli
 import { VideoGrid } from '../../src/presentation/components/profile/VideoGrid';
 import { BioBottomSheet } from '../../src/presentation/components/profile/BioBottomSheet';
 import { ClubsBottomSheet } from '../../src/presentation/components/profile/ClubsBottomSheet';
-import { ChevronLeft, Sun, Moon, MoreHorizontal, Bell, Heart, Share2, Settings } from 'lucide-react-native';
+import { ChevronLeft, Sun, Moon, MoreHorizontal, Settings } from 'lucide-react-native';
 import BottomSheet from '@gorhom/bottom-sheet';
 import Svg, { Path, Circle } from 'react-native-svg';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSequence,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
+import LikeIcon from '../../assets/icons/like.svg';
+import ShareIcon from '../../assets/icons/share.svg';
 
 // SVG Icon for verified badge
 const VerifiedBadge = () => (
@@ -50,11 +60,56 @@ const TagsIcon = ({ color }: { color: string }) => (
   </Svg>
 );
 
+// Animated Icon Button Component
+const AnimatedIconButton = ({
+  icon: Icon,
+  onPress,
+  isActive,
+  activeColor,
+  inactiveColor,
+  size = 14,
+}: {
+  icon: any;
+  onPress: () => void;
+  isActive?: boolean;
+  activeColor?: string;
+  inactiveColor: string;
+  size?: number;
+}) => {
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const handlePress = () => {
+    scale.value = withSequence(
+      withTiming(1.3, { duration: 100, easing: Easing.out(Easing.ease) }),
+      withTiming(0.9, { duration: 100, easing: Easing.inOut(Easing.ease) }),
+      withTiming(1.15, { duration: 100, easing: Easing.inOut(Easing.ease) }),
+      withTiming(1, { duration: 100, easing: Easing.out(Easing.ease) })
+    );
+    onPress();
+  };
+
+  const color = isActive && activeColor ? activeColor : inactiveColor;
+
+  return (
+    <Pressable onPress={handlePress} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+      <Animated.View style={animatedStyle}>
+        <Icon width={size} height={size} color={color} />
+      </Animated.View>
+    </Pressable>
+  );
+};
+
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { colorScheme, toggleTheme, isDark } = useTheme();
   const [isFollowing, setIsFollowing] = useState(false);
   const [activeTab, setActiveTab] = useState<'posts' | 'videos' | 'tags'>('posts');
+  const [isNotificationsOn, setIsNotificationsOn] = useState(false);
+  const [isLiked, setIsLiked] = useState(false);
   const bioSheetRef = useRef<BottomSheet>(null);
   const clubsSheetRef = useRef<BottomSheet>(null);
 
@@ -221,7 +276,7 @@ export default function ProfileScreen() {
               <Avatar url={user.avatarUrl} size={90} />
             </View>
 
-            {/* Name + Verified */}
+            {/* Name with Verified Badge */}
             <View style={styles.userNameRow}>
               <Text style={[styles.userNameText, { color: textPrimary }]}>{user.name}</Text>
               <View style={styles.verifiedBadge}>
@@ -229,7 +284,7 @@ export default function ProfileScreen() {
               </View>
             </View>
 
-            {/* Username */}
+            {/* Username - Separate from name */}
             <Text style={[styles.userHandle, { color: textSecondary }]}>@{user.username}</Text>
 
             {/* Bio */}
@@ -275,29 +330,60 @@ export default function ProfileScreen() {
                 </TouchableOpacity>
               )}
 
-              <TouchableOpacity
-                style={[styles.btnIconOnly, styles.btnSub, { borderColor: 'transparent' }]}
+              {/* Bell Button with toggle */}
+              <View
+                style={[
+                  styles.btnIconOnly,
+                  {
+                    backgroundColor: isNotificationsOn ? '#cc0000' : btnSecondaryBg,
+                    borderColor: 'rgba(255,255,255,0.1)',
+                  },
+                ]}
               >
-                <Bell size={14} color="#fff" />
-              </TouchableOpacity>
+                <AnimatedIconButton
+                  icon={({ color, width, height }: any) => (
+                    <Svg width={width} height={height} viewBox="0 0 24 24" fill={color}>
+                      <Path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
+                    </Svg>
+                  )}
+                  onPress={() => setIsNotificationsOn(!isNotificationsOn)}
+                  isActive={isNotificationsOn}
+                  activeColor="#fff"
+                  inactiveColor={iconColor}
+                />
+              </View>
 
-              <TouchableOpacity
+              {/* Like Button with animation */}
+              <View
                 style={[
                   styles.btnIconOnly,
                   { backgroundColor: btnSecondaryBg, borderColor: 'rgba(255,255,255,0.1)' },
                 ]}
               >
-                <Heart size={14} color={iconColor} />
-              </TouchableOpacity>
+                <AnimatedIconButton
+                  icon={LikeIcon}
+                  onPress={() => setIsLiked(!isLiked)}
+                  isActive={isLiked}
+                  activeColor="#FF2146"
+                  inactiveColor={iconColor}
+                />
+              </View>
 
-              <TouchableOpacity
+              {/* Share Button with animation */}
+              <View
                 style={[
                   styles.btnIconOnly,
                   { backgroundColor: btnSecondaryBg, borderColor: 'rgba(255,255,255,0.1)' },
                 ]}
               >
-                <Share2 size={14} color={iconColor} />
-              </TouchableOpacity>
+                <AnimatedIconButton
+                  icon={ShareIcon}
+                  onPress={() => {
+                    // Share functionality
+                  }}
+                  inactiveColor={iconColor}
+                />
+              </View>
             </View>
 
             {/* Stats */}
