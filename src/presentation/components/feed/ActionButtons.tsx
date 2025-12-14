@@ -22,7 +22,7 @@ interface ActionButtonsProps {
     onProfilePress: () => void;
 }
 
-const FIXED_BOTTOM_POSITION = 70; // Aligned with commercial tag (MetadataLayer)
+const FIXED_BOTTOM_POSITION = 120; // Lifted 50px to keep actions higher on screen
 const ICON_SIZE = 36; // User requested 36px
 
 // Colors

@@ -146,27 +146,23 @@ export function HeaderOverlay({
                 )}
             </View>
 
-            {/* Center: Stories Pill */}
-            <Pressable
-                onPress={onStoryPress}
-                style={styles.storiesPill}
-                hitSlop={{ top: 8, bottom: 8 }}
-            >
-                <Text style={styles.storiesText}>Hikayeler</Text>
-                {hasUnseenStories && (
-                    <View style={styles.badge} />
-                )}
-            </Pressable>
-
-            {/* Right: More + Voice + Brightness */}
-            <View style={styles.rightButtons}>
+            {/* Center: Stories Pill (absolutely centered) */}
+            <View style={styles.centerOverlay} pointerEvents="box-none">
                 <Pressable
-                    style={styles.iconButton}
-                    onPress={onMorePress}
-                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    onPress={onStoryPress}
+                    style={styles.storiesPill}
+                    hitSlop={{ top: 8, bottom: 8 }}
                 >
-                    <MoreIcon width={28} height={28} color="#FFFFFF" />
+                    <Text style={styles.storiesText}>Hikayeler</Text>
+                    {hasUnseenStories && (
+                        <View style={styles.badge} />
+                    )}
                 </Pressable>
+            </View>
+
+            {/* Right: Voice + More + Brightness */}
+            <View style={styles.rightButtons}>
+                {showBrightnessButton && <BrightnessButton />}
 
                 <AnimatedPressable
                     onPress={onToggleMute}
@@ -180,9 +176,13 @@ export function HeaderOverlay({
                     />
                 </AnimatedPressable>
 
-                {showBrightnessButton && <BrightnessButton />}
-
-
+                <Pressable
+                    style={styles.iconButton}
+                    onPress={onMorePress}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                >
+                    <MoreIcon width={28} height={28} color="#FFFFFF" />
+                </Pressable>
             </View>
         </View>
     );
@@ -208,6 +208,12 @@ const styles = StyleSheet.create({
         flexDirection: 'column',
         alignItems: 'center',
         gap: 8, // Space between Upload and Delete
+    },
+    centerOverlay: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        alignItems: 'center',
     },
     storiesPill: {
         flexDirection: 'row',
@@ -248,5 +254,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
+        minWidth: 120,
+        justifyContent: 'flex-end',
     },
 });
