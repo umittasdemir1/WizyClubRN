@@ -106,6 +106,7 @@ export function HeaderOverlay({
 }: HeaderOverlayProps) {
     const insets = useSafeAreaInsets();
     const pulseOpacity = useSharedValue(1);
+    const headerTopPadding = insets.top + 12;
 
     // Pulse animation when unmuted
     useEffect(() => {
@@ -129,7 +130,10 @@ export function HeaderOverlay({
     }));
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top + 28 }]} pointerEvents="box-none">
+        <View
+            style={[styles.container, { paddingTop: headerTopPadding }]}
+            pointerEvents="box-none"
+        >
             {/* Left Column: Upload & Delete */}
             <View style={styles.leftColumn}>
                 {onUploadPress && <UploadButton onPress={onUploadPress} />}
@@ -148,7 +152,7 @@ export function HeaderOverlay({
 
             {/* Center: Stories Pill (absolutely centered) */}
             <View
-                style={[styles.centerOverlay, { top: insets.top + 28 }]}
+                style={[styles.centerOverlay, { top: headerTopPadding }]}
                 pointerEvents="box-none"
             >
                 <Pressable
@@ -173,8 +177,8 @@ export function HeaderOverlay({
                     hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 >
                     <VoiceOnIcon
-                        width={28}
-                        height={28}
+                        width={24}
+                        height={24}
                         color={isMuted ? "#6B7280" : "#FFFFFF"}
                     />
                 </AnimatedPressable>
@@ -184,7 +188,7 @@ export function HeaderOverlay({
                     onPress={onMorePress}
                     hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 >
-                    <MoreIcon width={28} height={28} color="#FFFFFF" />
+                    <MoreIcon width={24} height={24} color="#FFFFFF" />
                 </Pressable>
             </View>
         </View>
