@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-// Remove useSafeAreaInsets
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Video } from '../../../domain/entities/Video';
 import { Avatar } from '../shared/Avatar';
 import FollowIcon from '../../../../assets/icons/followbottom.svg';
@@ -22,9 +22,13 @@ export function MetadataLayer({
     onReadMorePress,
     onCommercialTagPress,
 }: MetadataLayerProps) {
+    const insets = useSafeAreaInsets();
 
     return (
-        <View style={[styles.container, { bottom: FIXED_BOTTOM_POSITION }]} pointerEvents="box-none">
+        <View
+            style={[styles.container, { bottom: FIXED_BOTTOM_POSITION + insets.bottom }]}
+            pointerEvents="box-none"
+        >
             {/* User Row */}
             <View style={styles.userRow}>
                 <Pressable onPress={onAvatarPress} hitSlop={8}>

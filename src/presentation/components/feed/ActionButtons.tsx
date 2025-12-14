@@ -1,5 +1,6 @@
 import React, { memo } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -72,8 +73,13 @@ export const ActionButtons = memo(function ActionButtons({
     onShare,
     onShop,
 }: ActionButtonsProps) {
+    const insets = useSafeAreaInsets();
+
     return (
-        <View style={[styles.container, { bottom: FIXED_BOTTOM_POSITION }]} pointerEvents="box-none">
+        <View
+            style={[styles.container, { bottom: FIXED_BOTTOM_POSITION + insets.bottom }]}
+            pointerEvents="box-none"
+        >
             <ActionButton
                 icon={LikeIcon}
                 count={formatCount(video.likesCount)}

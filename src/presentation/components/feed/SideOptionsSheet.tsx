@@ -45,7 +45,11 @@ export function SideOptionsSheet({ visible, onClose, onDeletePress }: SideOption
             </Animated.View>
 
             <Animated.View
-                style={[styles.sheet, { paddingTop: insets.top + 16 }, sheetStyle]}
+                style={[
+                    styles.sheet,
+                    { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 },
+                    sheetStyle,
+                ]}
                 pointerEvents={visible ? 'auto' : 'none'}
             >
                 <Text style={styles.title}>Seçenekler</Text>
