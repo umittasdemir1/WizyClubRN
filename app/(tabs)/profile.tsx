@@ -30,6 +30,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import LikeIcon from '../../assets/icons/like.svg';
 import ShareIcon from '../../assets/icons/share.svg';
+import { Image } from 'expo-image';
 
 // SVG Icon for verified badge
 const VerifiedBadge = () => (
@@ -112,6 +113,7 @@ export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState<'posts' | 'videos' | 'tags'>('posts');
   const [isNotificationsOn, setIsNotificationsOn] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
+  const [previewItem, setPreviewItem] = useState<{ id: string; thumbnail: string } | null>(null);
   const bioSheetRef = useRef<BottomSheet>(null);
   const clubsSheetRef = useRef<BottomSheet>(null);
   const settingsSheetRef = useRef<BottomSheet>(null);
@@ -252,6 +254,14 @@ export default function ProfileScreen() {
 
   const toggleFollow = () => {
     setIsFollowing(!isFollowing);
+  };
+
+  const showPreview = (item: { id: string; thumbnail: string }) => {
+    setPreviewItem(item);
+  };
+
+  const hidePreview = () => {
+    setPreviewItem(null);
   };
 
   const openBioSheet = () => {
@@ -463,13 +473,27 @@ export default function ProfileScreen() {
           <HighlightPills highlights={highlights} isDark={isDark} />
 
           {/* Conditional Grid Rendering */}
-          {activeTab === 'posts' && <PostsGrid posts={posts} isDark={isDark} />}
-          {activeTab === 'videos' && <VideoGrid videos={videos} isDark={isDark} />}
-          {activeTab === 'tags' && <PostsGrid posts={tags} isDark={isDark} />}
+          {activeTab === 'posts' && (
+            <PostsGrid posts={posts} isDark={isDark} onPreview={showPreview} onPreviewEnd={hidePreview} />
+          )}
+          {activeTab === 'videos' && (
+            <VideoGrid videos={videos} isDark={isDark} onPreview={showPreview} onPreviewEnd={hidePreview} />
+          )}
+          {activeTab === 'tags' && (
+            <PostsGrid posts={tags} isDark={isDark} onPreview={showPreview} onPreviewEnd={hidePreview} />
+          )}
 
           <View style={{ height: 100 }} />
         </ScrollView>
       </View>
+
+      {previewItem && (
+        <Pressable style={styles.previewOverlay} onPress={hidePreview}>
+          <View style={styles.previewImageWrapper}>
+            <Image source={{ uri: previewItem.thumbnail }} style={styles.previewImage} contentFit="cover" />
+          </View>
+        </Pressable>
+      )}
 
       {/* Bio Bottom Sheet */}
       <BioBottomSheet ref={bioSheetRef} bio={user.bio} isDark={isDark} />
@@ -606,5 +630,24 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  previewOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 99,
+    padding: 20,
+  },
+  previewImageWrapper: {
+    width: '88%',
+    maxHeight: '80%',
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+  },
+  previewImage: {
+    width: '100%',
+    height: '100%',
   },
 });

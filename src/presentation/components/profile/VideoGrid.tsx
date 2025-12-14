@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Dimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { Play } from 'lucide-react-native';
 
@@ -19,9 +19,16 @@ interface VideoItem {
 interface VideoGridProps {
   videos: VideoItem[];
   isDark: boolean;
+  onPreview?: (video: VideoItem) => void;
+  onPreviewEnd?: () => void;
 }
 
-export const VideoGrid: React.FC<VideoGridProps> = ({ videos, isDark }) => {
+export const VideoGrid: React.FC<VideoGridProps> = ({
+  videos,
+  isDark,
+  onPreview,
+  onPreviewEnd,
+}) => {
   const bgColor = isDark ? '#1c1c1e' : '#f0f0f0';
 
   const formatViews = (views: string | number): string => {
@@ -38,7 +45,7 @@ export const VideoGrid: React.FC<VideoGridProps> = ({ videos, isDark }) => {
   return (
     <View style={styles.container}>
       {videos.map((video, index) => (
-        <TouchableOpacity
+        <Pressable
           key={video.id}
           style={[
             styles.videoItem,
@@ -47,6 +54,8 @@ export const VideoGrid: React.FC<VideoGridProps> = ({ videos, isDark }) => {
             index % 3 !== 2 && { marginRight: GAP }, // Not the last column
             { marginBottom: GAP }, // Gap between rows
           ]}
+          onLongPress={() => onPreview?.(video)}
+          onPressOut={onPreviewEnd}
         >
           <Image
             source={{ uri: video.thumbnail }}
@@ -60,7 +69,7 @@ export const VideoGrid: React.FC<VideoGridProps> = ({ videos, isDark }) => {
             <Play size={12} color="#fff" fill="#fff" />
             <Text style={styles.viewsText}>{formatViews(video.views)}</Text>
           </View>
-        </TouchableOpacity>
+        </Pressable>
       ))}
     </View>
   );
