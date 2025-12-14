@@ -7,8 +7,10 @@ import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { ThemeProvider, useTheme } from '../src/presentation/contexts/ThemeContext';
 import '../global.css';
 
+import { useThemeStore } from '../src/presentation/store/useThemeStore';
+
 function RootNavigator() {
-    const { isDark } = useTheme();
+    const isDark = useThemeStore((state) => state.isDark);
 
     return (
         <>
@@ -23,7 +25,8 @@ function RootNavigator() {
                     }}
                 />
             </Stack>
-            <StatusBar style={isDark ? 'light' : 'dark'} />
+
+            {/* Removed global StatusBar to allow per-screen control */}
         </>
     );
 }

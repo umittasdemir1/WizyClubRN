@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme } from '../../src/presentation/contexts/ThemeContext';
+import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 
 // Import SVGs
 import HomeIcon from '../../assets/icons/home.svg';
@@ -11,22 +11,29 @@ import NotificationIcon from '../../assets/icons/notification.svg';
 import ProfileIcon from '../../assets/icons/profile.svg';
 
 export default function TabLayout() {
-    const { isDark } = useTheme();
+    const isDark = useThemeStore((state) => state.isDark);
     const insets = useSafeAreaInsets();
+
+    const ICON_SIZE = 28;
+    const DEAL_ICON_SIZE = 32;
+    const BAR_HEIGHT = 55;
 
     return (
         <Tabs
             screenOptions={{
                 headerShown: false,
                 tabBarStyle: {
-                    // Normal flow - not absolute positioned
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
                     backgroundColor: isDark ? '#000000' : '#FFFFFF',
-                    borderTopWidth: 0,
-                    paddingBottom: insets.bottom + 3.5,
-                    paddingTop: 3.5,
-                    height: 55 + insets.bottom,
+                    borderTopWidth: 0, // No border requested, just clean look
+                    height: BAR_HEIGHT + insets.bottom,
+                    paddingTop: 5, // Center icons vertically (55 - 28) / 2 approx or adjusted
+                    paddingBottom: insets.bottom,
                 },
-                tabBarActiveTintColor: isDark ? 'white' : 'black',
+                tabBarActiveTintColor: isDark ? '#FFFFFF' : '#000000',
                 tabBarInactiveTintColor: isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)',
                 tabBarShowLabel: false,
             }}
@@ -35,9 +42,7 @@ export default function TabLayout() {
                 name="index"
                 options={{
                     tabBarIcon: ({ color }) => (
-                        <View style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}>
-                            <HomeIcon width={28} height={28} color={color} />
-                        </View>
+                        <HomeIcon width={ICON_SIZE} height={ICON_SIZE} color={color} />
                     ),
                 }}
             />
@@ -45,9 +50,7 @@ export default function TabLayout() {
                 name="explore"
                 options={{
                     tabBarIcon: ({ color }) => (
-                        <View style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}>
-                            <ForYouIcon width={28} height={28} color={color} />
-                        </View>
+                        <ForYouIcon width={ICON_SIZE} height={ICON_SIZE} color={color} />
                     ),
                 }}
             />
@@ -55,9 +58,7 @@ export default function TabLayout() {
                 name="deals"
                 options={{
                     tabBarIcon: ({ color }) => (
-                        <View style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}>
-                            <DealIcon width={32} height={32} color={color} />
-                        </View>
+                        <DealIcon width={DEAL_ICON_SIZE} height={DEAL_ICON_SIZE} color={color} />
                     ),
                 }}
             />
@@ -65,9 +66,7 @@ export default function TabLayout() {
                 name="notifications"
                 options={{
                     tabBarIcon: ({ color }) => (
-                        <View style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}>
-                            <NotificationIcon width={28} height={28} color={color} />
-                        </View>
+                        <NotificationIcon width={ICON_SIZE} height={ICON_SIZE} color={color} />
                     ),
                 }}
             />
@@ -75,9 +74,7 @@ export default function TabLayout() {
                 name="profile"
                 options={{
                     tabBarIcon: ({ color }) => (
-                        <View style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}>
-                            <ProfileIcon width={28} height={28} color={color} />
-                        </View>
+                        <ProfileIcon width={ICON_SIZE} height={ICON_SIZE} color={color} />
                     ),
                 }}
             />

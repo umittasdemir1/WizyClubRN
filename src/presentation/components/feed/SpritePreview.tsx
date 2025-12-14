@@ -37,6 +37,11 @@ export const SpritePreview = ({
     const [imgSize, setImgSize] = useState({ width: 0, height: 0 });
     const [activeUrl, setActiveUrl] = useState(spriteUrl); // Start with provided URL (usually _0.jpg)
 
+    // Sync state with prop (Fix for FlashList recycling)
+    React.useEffect(() => {
+        setActiveUrl(spriteUrl);
+    }, [spriteUrl]);
+
     // Handle Multi-Sprite Switching (Every 100s)
     useAnimatedReaction(
         () => Math.floor(sharedTime.value / 100), // Check which "Part" we need

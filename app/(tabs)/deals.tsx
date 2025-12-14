@@ -8,11 +8,17 @@ import { DealRepositoryImpl } from '../../src/data/repositories/DealRepositoryIm
 import { Avatar } from '../../src/presentation/components/shared/Avatar';
 import { DollarSign, Calendar, CheckCircle } from 'lucide-react-native';
 import { LoadingIndicator } from '../../src/presentation/components/shared/LoadingIndicator';
+import { useThemeStore } from '../../src/presentation/store/useThemeStore';
+import { StatusBar } from 'expo-status-bar';
 
 export default function DealsScreen() {
     const insets = useSafeAreaInsets();
     const [deals, setDeals] = useState<BrandDeal[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const isDark = useThemeStore((state) => state.isDark);
+    const bgBody = isDark ? '#000000' : '#FFFFFF';
+    const textColor = isDark ? '#FFFFFF' : '#000000';
+    const cardBg = isDark ? '#1a1a1a' : '#f0f0f0';
 
     useEffect(() => {
         const fetchDeals = async () => {
@@ -26,16 +32,16 @@ export default function DealsScreen() {
     }, []);
 
     const renderItem = ({ item }: { item: BrandDeal }) => (
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: cardBg }]}>
             <View style={styles.cardHeader}>
                 <Avatar url={item.logoUrl} size={48} />
                 <View style={styles.headerText}>
-                    <Text style={styles.brandName}>{item.brandName}</Text>
+                    <Text style={[styles.brandName, { color: textColor }]}>{item.brandName}</Text>
                     <Text style={styles.payout}>{item.payout}</Text>
                 </View>
             </View>
 
-            <Text style={styles.description}>{item.description}</Text>
+            <Text style={[styles.description, { color: isDark ? '#ccc' : '#666' }]}>{item.description}</Text>
 
             <View style={styles.requirements}>
                 {item.requirements.map((req, index) => (
@@ -61,8 +67,9 @@ export default function DealsScreen() {
     );
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top }]}>
-            <Text style={styles.title}>Brand Deals</Text>
+        <View style={[styles.container, { paddingTop: insets.top, backgroundColor: bgBody }]}>
+            <StatusBar style={isDark ? 'light' : 'dark'} />
+            <Text style={[styles.title, { color: textColor }]}>Brand Deals</Text>
             {/* @ts-ignore */}
             <FlashList
                 data={deals}
@@ -77,10 +84,9 @@ export default function DealsScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: 'black',
+        // backgroundColor: 'black', // Dynamic
     },
     title: {
-        color: 'white',
         fontSize: 24,
         fontWeight: 'bold',
         padding: 16,
@@ -89,10 +95,10 @@ const styles = StyleSheet.create({
         padding: 16,
     },
     card: {
-        backgroundColor: '#1a1a1a',
-        borderRadius: 12,
+        borderRadius: 16,
         padding: 16,
         marginBottom: 16,
+        // backgroundColor: '#111', // Dynamic
     },
     cardHeader: {
         flexDirection: 'row',
@@ -104,39 +110,46 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     brandName: {
-        color: 'white',
         fontSize: 18,
         fontWeight: 'bold',
+        // color: 'white', // Dynamic
     },
     payout: {
         color: '#4CAF50',
-        fontSize: 16,
         fontWeight: 'bold',
+        fontSize: 16,
     },
     description: {
-        color: '#ccc',
-        fontSize: 14,
-        marginBottom: 12,
+        // color: '#ccc', // Dynamic
+        marginBottom: 16,
+        lineHeight: 20,
     },
     requirements: {
-        marginBottom: 16,
+        flexDirection: 'row',
+        flexWrap: 'wrap',
         gap: 8,
+        marginBottom: 16,
     },
     reqItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        backgroundColor: 'rgba(76, 175, 80, 0.1)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        gap: 4,
     },
     reqText: {
-        color: '#888',
-        fontSize: 14,
+        color: '#4CAF50',
+        fontSize: 12,
+        fontWeight: '600',
     },
     footer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         borderTopWidth: 1,
-        borderTopColor: '#333',
+        borderTopColor: '#222',
         paddingTop: 12,
     },
     deadline: {

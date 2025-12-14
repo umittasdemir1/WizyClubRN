@@ -123,7 +123,7 @@ app.post('/upload-hls', upload.single('video'), async (req, res) => {
 
         // FEATURE FLAG: Hybrid Engine Switch
         // true = HLS (Adaptive, Multi-bitrate) | false = MP4 (Direct, High Quality, Fast)
-        const ENABLE_HLS = true;
+        const ENABLE_HLS = false;
 
         console.log(`🚀 [UPLOAD] Mode: ${ENABLE_HLS ? 'HLS (Adaptive)' : 'MP4 (Direct)'}`);
 
@@ -134,12 +134,50 @@ app.post('/upload-hls', upload.single('video'), async (req, res) => {
             videoUrl = await hlsService.transcodeToHls(inputPath, tempOutputDir, uniqueId, hasAudio, width, height);
             console.log(`🔗 [VIDEO URL] Generated HLS URL: ${videoUrl}`);
         } else {
-            // Option B: MP4 Direct Upload (Pass-through)
-            console.log('⚡ [MP4] Skipping transcoding, uploading original MP4...');
+            // Option B: Smart Optimized MP4 (1080p, CRF 23)
+            console.log('⚡ [MP4] Smart Optimization Starting...');
+
+            const optimizedPath = path.join(tempOutputDir, `optimized_${uniqueId}.mp4`);
+
+            await new Promise((resolve, reject) => {
+                ffmpeg(inputPath)
+                    .videoCodec('libx264')
+                    // Resize to 1080p width (keep aspect ratio), but only if input is larger
+                    // 'scale=1080:-2' means width=1080, height=calc(maintain aspect), ensure height divisible by 2
+                    // But we should check dimensions. Simple approach: 'scale=min(iw\,1080):-2' not supported by helper
+                    .size('1080x?')
+                    .outputOptions([
+                        '-crf 23',           // Visual Quality (Lower = Better, 18-28 is good range)
+                        '-preset veryfast',  // Fast encoding
+                        '-movflags +faststart', // Move atom to front for instant playback
+                        '-pix_fmt yuv420p',  // Ensure compatibility
+                        '-maxrate 4M',       // Cap max bitrate for safety (4Mbps is plenty for 1080p mobile)
+                        '-bufsize 8M'
+                    ])
+                    .on('start', (cmd) => console.log('   👉 FFmpeg Command:', cmd))
+                    .on('end', () => {
+                        console.log('   ✅ Optimization Complete.');
+                        resolve();
+                    })
+                    .on('error', (err) => {
+                        console.error('   ❌ Optimization Failed:', err);
+                        reject(err);
+                    })
+                    .save(optimizedPath);
+            });
+
+            // Compare Sizes
+            const originalStats = fs.statSync(inputPath);
+            const optimizedStats = fs.statSync(optimizedPath);
+            console.log(`   📉 Size: ${(originalStats.size / 1024 / 1024).toFixed(2)}MB -> ${(optimizedStats.size / 1024 / 1024).toFixed(2)}MB`);
+
             const mp4Key = `videos/${uniqueId}/master.mp4`;
-            await uploadToR2(inputPath, mp4Key, 'video/mp4');
+            await uploadToR2(optimizedPath, mp4Key, 'video/mp4');
             videoUrl = `${process.env.R2_PUBLIC_URL}/${mp4Key}`;
-            console.log(`🔗 [VIDEO URL] Direct MP4 URL: ${videoUrl}`);
+            console.log(`🔗 [VIDEO URL] Optimized MP4 URL: ${videoUrl}`);
+
+            // Cleanup optimized file
+            if (fs.existsSync(optimizedPath)) fs.unlinkSync(optimizedPath);
         }
 
         // Step 2.5: Generate Sprite Sheet (2s intervals)
@@ -258,14 +296,31 @@ app.delete('/videos/:id', async (req, res) => {
                 }
 
                 // Delete Thumbnail
-                const thumbKey = `thumbs/${timestampId}.jpg`;
+                let thumbKey = `thumbs/${timestampId}.jpg`;
+
+                // Fallback: Try to extract from thumbnail_url if it exists
+                if (video.thumbnail_url) {
+                    try {
+                        // Example: https://.../thumbs/1765...jpg
+                        const urlParts = video.thumbnail_url.split('/thumbs/');
+                        if (urlParts.length > 1) {
+                            thumbKey = `thumbs/${urlParts[1]}`;
+                            console.log(`   👉 Using thumbnail_url key: ${thumbKey}`);
+                        }
+                    } catch (e) {
+                        console.warn('Error parsing thumbnail_url, using timestampId default');
+                    }
+                }
+
                 try {
                     await r2.send(new DeleteObjectCommand({
                         Bucket: process.env.R2_BUCKET_NAME,
                         Key: thumbKey
                     }));
                     console.log(`   ✅ R2 Thumbnail Deleted: ${thumbKey}`);
-                } catch (e) { console.warn('   ⚠️ Thumbnail delete skipped/failed'); }
+                } catch (e) {
+                    console.error(`   ❌ Thumbnail delete failed for ${thumbKey}:`, e.message);
+                }
 
             } catch (r2Error) {
                 console.error('   ⚠️ R2 Cleanup Error:', r2Error.message);

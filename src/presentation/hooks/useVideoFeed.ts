@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { Alert } from 'react-native';
 import { Video } from '../../domain/entities/Video';
 import { GetVideoFeedUseCase } from '../../domain/usecases/GetVideoFeedUseCase';
 import { ToggleLikeUseCase } from '../../domain/usecases/ToggleLikeUseCase';
@@ -22,7 +23,7 @@ interface UseVideoFeedReturn {
     toggleFollow: (videoId: string) => void;
     toggleShare: (videoId: string) => void;
     toggleShop: (videoId: string) => void;
-    removeVideo: (videoId: string) => void; // Added
+    deleteVideo: (videoId: string) => Promise<void>;
 }
 
 export function useVideoFeed(): UseVideoFeedReturn {
@@ -260,9 +261,36 @@ export function useVideoFeed(): UseVideoFeedReturn {
         );
     }, []);
 
-    const removeVideo = useCallback((videoId: string) => {
-        setVideos((prevVideos) => prevVideos.filter(v => v.id !== videoId));
-    }, []);
+    const deleteVideo = useCallback(async (videoId: string) => {
+        // 1. Snapshot for rollback
+        const previousVideos = [...videos];
+
+        // 2. Optimistic Update
+        setVideos((prev) => prev.filter(v => v.id !== videoId));
+
+        try {
+            const { CONFIG } = require('../../core/config');
+            const response = await fetch(`${CONFIG.API_URL}/videos/${videoId}`, {
+                method: 'DELETE',
+            });
+
+            if (!response.ok) {
+                const errText = await response.text();
+                throw new Error(errText || 'Sunucu hatası');
+            }
+            console.log('[useVideoFeed] Delete success:', videoId);
+        } catch (error: any) {
+            console.error('[useVideoFeed] Delete failed, rolling back:', error);
+            // 3. Rollback on failure
+            setVideos(previousVideos);
+            // Re-throw to let UI handle alert if needed, or handle here
+            // Alert here is better to ensure user sees it
+            // But we need Alert import. Assuming it's not imported in hook usually.
+            // Actually, index.tsx handles the UI part nicely? No, we want centralized logic.
+            // So we MUST alert them if it fails.
+            Alert.alert("Silme Başarısız", error.message || "Bilinmeyen hata");
+        }
+    }, [videos]);
 
     useEffect(() => {
         fetchFeed();
@@ -283,6 +311,6 @@ export function useVideoFeed(): UseVideoFeedReturn {
         toggleFollow,
         toggleShare,
         toggleShop,
-        removeVideo, // Exported
+        deleteVideo,
     };
 }

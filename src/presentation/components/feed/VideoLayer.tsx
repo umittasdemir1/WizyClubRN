@@ -50,18 +50,40 @@ export const VideoLayer = memo(function VideoLayer({
     onResizeModeChange, // NEW
 }: VideoLayerProps) {
     const isAppActive = useActiveVideoStore((state) => state.isAppActive);
+    const isScreenFocused = useActiveVideoStore((state) => state.isScreenFocused);
     const isSeeking = useActiveVideoStore((state) => state.isSeeking);
     const isPausedGlobal = useActiveVideoStore((state) => state.isPaused);
     const setPaused = useActiveVideoStore((state) => state.setPaused);
+
+    // Debug Pause Logic
+    useEffect(() => {
+        if (isActive) {
+            console.log(`[VideoLayer] ${video.id} State Update:`, {
+                isActive,
+                isAppActive,
+                isScreenFocused,
+                isPausedGlobal,
+                shouldPlay: isActive && isAppActive && isScreenFocused && !isSeeking && !isPausedGlobal && !isFinished && !hasError
+            });
+        }
+    }, [isActive, isAppActive, isScreenFocused, isPausedGlobal]);
 
     const { type: networkType } = useNetInfo();
     const defaultBufferConfig = getBufferConfig(networkType);
 
     const [isFinished, setIsFinished] = useState(false);
+    // ... (unchanged lines)
+    // ...
+    // ...
+    // ...
+
+    // ... skipping directly to shouldPlay
     const [duration, setDuration] = useState(0);
     const [hasError, setHasError] = useState(false);
     const [retryCount, setRetryCount] = useState(0);
     const [key, setKey] = useState(0); // For forcing re-render implementation
+
+    const shouldPlay = isActive && isAppActive && isScreenFocused && !isSeeking && !isPausedGlobal && !isFinished && !hasError;
 
     // Initial resizeMode based on pre-calculated dimensions
     const [resizeMode, setResizeMode] = useState<'cover' | 'contain' | 'stretch'>(() => {
@@ -91,14 +113,14 @@ export const VideoLayer = memo(function VideoLayer({
             bufferForPlaybackAfterRebufferMs: 250
         }
         : isHLS
-        ? {
-            // HLS: larger buffer for segment streaming
-            minBufferMs: 3000,
-            maxBufferMs: 15000,
-            bufferForPlaybackMs: 1000,
-            bufferForPlaybackAfterRebufferMs: 2000
-        }
-        : defaultBufferConfig;
+            ? {
+                // HLS: larger buffer for segment streaming
+                minBufferMs: 3000,
+                maxBufferMs: 15000,
+                bufferForPlaybackMs: 1000,
+                bufferForPlaybackAfterRebufferMs: 2000
+            }
+            : defaultBufferConfig;
 
     // Local SharedValues for SeekBar
     const currentTimeSV = useSharedValue(0);
@@ -202,7 +224,8 @@ export const VideoLayer = memo(function VideoLayer({
         }
     }, [isPausedGlobal, isFinished, isActive]);
 
-    const shouldPlay = isActive && isAppActive && !isSeeking && !isPausedGlobal && !isFinished && !hasError;
+    // shouldPlay logic moved to top of component to include isScreenFocused
+    // const shouldPlay = isActive && isAppActive && !isSeeking && !isPausedGlobal && !isFinished && !hasError;
 
     const handleLoad = useCallback((data: OnLoadData) => {
         setDuration(data.duration);
@@ -214,10 +237,10 @@ export const VideoLayer = memo(function VideoLayer({
         const source = videoSource?.uri?.startsWith('file://')
             ? 'disk-cache'
             : isHLS
-            ? 'network'
-            : memoryCachedRef.current
-            ? 'memory-cache'
-            : 'network';
+                ? 'network'
+                : memoryCachedRef.current
+                    ? 'memory-cache'
+                    : 'network';
 
         PerformanceLogger.endTransition(video.id, source);
 
@@ -320,6 +343,7 @@ export const VideoLayer = memo(function VideoLayer({
                     // poster={video.thumbnailUrl} // Removed: Causes glitch (Start -> Thumb -> Start)
                     // posterResizeMode={resizeMode}
                     repeat={false}
+                    controls={false} // FIX: Hide ghost native controls
                     paused={!shouldPlay}
                     muted={isMuted}
                     bufferConfig={bufferConfig}
@@ -336,7 +360,7 @@ export const VideoLayer = memo(function VideoLayer({
                     ignoreSilentSwitch="ignore"
                     progressUpdateInterval={33}
                     // HLS optimizations
-                    automaticWaitsToMinimizeStalling={true}
+                    automaticallyWaitsToMinimizeStalling={true}
                     preventsDisplaySleepDuringVideoPlayback={true}
                 />
             )}
@@ -355,7 +379,6 @@ export const VideoLayer = memo(function VideoLayer({
             {/* Brightness Overlay */}
             <BrightnessOverlay />
 
-            {/* Gradient Overlay - moved here to be behind Seekbar */}
             <LinearGradient
                 colors={['rgba(0,0,0,0.15)', 'transparent', 'transparent', 'rgba(0,0,0,0.5)']}
                 locations={[0, 0.2, 0.6, 1]}

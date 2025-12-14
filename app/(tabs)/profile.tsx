@@ -8,7 +8,7 @@ import {
   Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme } from '../../src/presentation/contexts/ThemeContext';
+import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import { Avatar } from '../../src/presentation/components/shared/Avatar';
 import { ProfileStats } from '../../src/presentation/components/profile/ProfileStats';
 import { SocialLinks } from '../../src/presentation/components/profile/SocialLinks';
@@ -108,7 +108,8 @@ const AnimatedIconButton = ({
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { colorScheme, toggleTheme, isDark } = useTheme();
+  const { isDark, toggleTheme } = useThemeStore();
+  const colorScheme = isDark ? 'dark' : 'light';
   const [isFollowing, setIsFollowing] = useState(false);
   const [activeTab, setActiveTab] = useState<'posts' | 'videos' | 'tags'>('posts');
   const [isNotificationsOn, setIsNotificationsOn] = useState(false);

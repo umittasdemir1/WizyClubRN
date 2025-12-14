@@ -17,6 +17,8 @@ export interface ActiveVideoState {
     isMuted: boolean;
     // App foreground durumu
     isAppActive: boolean;
+    // Screen focus status (Pause on blur)
+    isScreenFocused: boolean;
     // Seek durumu (SeekBar'dan)
     isSeeking: boolean;
     // Pause durumu
@@ -29,6 +31,7 @@ export interface ActiveVideoState {
     setMuted: (muted: boolean) => void;
     toggleMute: () => void;
     setAppActive: (active: boolean) => void;
+    setScreenFocused: (focused: boolean) => void;
     setSeeking: (seeking: boolean) => void;
     togglePause: () => void;
     setPaused: (paused: boolean) => void;
@@ -40,6 +43,7 @@ export const useActiveVideoStore = create<ActiveVideoState>((set, get) => ({
     activeIndex: 0,
     isMuted: false,
     isAppActive: true,
+    isScreenFocused: true,
     isSeeking: false,
     isPaused: false,
     preloadIndices: [],
@@ -66,6 +70,7 @@ export const useActiveVideoStore = create<ActiveVideoState>((set, get) => ({
     toggleMute: () => set((state) => ({ isMuted: !state.isMuted })),
 
     setAppActive: (active) => set({ isAppActive: active }),
+    setScreenFocused: (focused) => set({ isScreenFocused: focused }),
 
     setSeeking: (seeking) => set({ isSeeking: seeking }),
 
@@ -176,10 +181,11 @@ export function useVideoPreloader(
 export function useShouldVideoPlay(videoId: string, videoIndex: number): boolean {
     const activeVideoId = useActiveVideoStore((state) => state.activeVideoId);
     const isAppActive = useActiveVideoStore((state) => state.isAppActive);
+    const isScreenFocused = useActiveVideoStore((state) => state.isScreenFocused);
     const isSeeking = useActiveVideoStore((state) => state.isSeeking);
 
-    // Video aktif, uygulama ön planda ve seek yapılmıyorsa oynat
-    return activeVideoId === videoId && isAppActive && !isSeeking;
+    // Video aktif, uygulama ön planda, ekran odaklı ve seek yapılmıyorsa oynat
+    return activeVideoId === videoId && isAppActive && isScreenFocused && !isSeeking;
 }
 
 // ===================================

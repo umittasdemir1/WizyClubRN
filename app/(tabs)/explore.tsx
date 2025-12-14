@@ -3,18 +3,25 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import { Image } from 'expo-image';
 import MorphingDiscoveryBar from '../../src/presentation/components/discovery/MorphingDiscoveryBar';
+import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 
 const CATEGORIES = ['For You', 'Trending', 'Food', 'Travel', 'Tech', 'Art', 'Music'];
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const ITEM_SIZE = (SCREEN_WIDTH - 40) / 2;
 
+import { StatusBar } from 'expo-status-bar';
+
 export default function ExploreScreen() {
     // Insets handled by DiscoveryBar for top, but bottom might need handling
     const insets = useSafeAreaInsets();
     const { videos } = useVideoFeed();
+    const isDark = useThemeStore((state) => state.isDark);
+    const bgBody = isDark ? '#000000' : '#FFFFFF';
+    const textColor = isDark ? '#FFFFFF' : '#000000';
 
     return (
-        <View style={[styles.container, { paddingTop: 0 }]}> 
+        <View style={[styles.container, { paddingTop: 0, backgroundColor: bgBody }]}>
+            <StatusBar style={isDark ? 'light' : 'dark'} />
             {/* Morphing Discovery Header - Handles top inset internally */}
             <MorphingDiscoveryBar />
 
@@ -56,7 +63,7 @@ export default function ExploreScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: 'black',
+        // backgroundColor: 'black', // Handled dynamically
     },
     categoriesContainer: {
         height: 50,

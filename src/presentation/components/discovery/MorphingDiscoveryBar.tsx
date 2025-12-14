@@ -97,7 +97,7 @@ export default function MorphingDiscoveryBar() {
 const styles = StyleSheet.create({
     container: {
         paddingBottom: 10,
-        backgroundColor: 'black'
+        backgroundColor: 'transparent' // Was 'black', causing strip in light mode
     },
     headerContainer: {
         flexDirection: "row",

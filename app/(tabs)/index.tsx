@@ -8,8 +8,10 @@ import {
     Text,
     RefreshControl,
     Platform,
-    Alert, // Added
+    Alert,
+    StatusBar as RNStatusBar,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { VideoLayer } from '../../src/presentation/components/feed/VideoLayer';
@@ -25,10 +27,11 @@ import {
     useAppStateSync,
     useMuteControls,
 } from '../../src/presentation/store/useActiveVideoStore';
+import { VideoCacheService } from '../../src/data/services/VideoCacheService';
 import { Video } from '../../src/domain/entities/Video';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { FeedSkeleton } from '../../src/presentation/components/feed/FeedSkeleton';
 import { UploadModal } from '../../src/presentation/components/feed/UploadModal';
 import { useUploadStore } from '../../src/presentation/store/useUploadStore';
@@ -56,56 +59,87 @@ export default function FeedScreen() {
         toggleShop,
         refreshFeed,
         loadMore,
-        removeVideo, // Added
+        deleteVideo,
     } = useVideoFeed();
 
     // Global Store
     const setActiveVideo = useActiveVideoStore((state) => state.setActiveVideo);
     const activeVideoId = useActiveVideoStore((state) => state.activeVideoId);
     const isAppActive = useActiveVideoStore((state) => state.isAppActive);
-    const isSeeking = useActiveVideoStore((state) => state.isSeeking);
-    const togglePause = useActiveVideoStore((state) => state.togglePause);
+
     // Upload Success -> Auto Scroll to Top
     const uploadStatus = useUploadStore(state => state.status);
     const uploadedVideoId = useUploadStore(state => state.uploadedVideoId);
 
-    useEffect(() => {
-        if (uploadStatus === 'success' && videos.length > 0) {
-            // 1. Scroll to Top (Instant)
-            listRef.current?.scrollToIndex({ index: 0, animated: false });
+    // Upload Recovery State
+    const [pendingUploadId, setPendingUploadId] = useState<string | null>(null);
 
-            // 2. Force Active Video to the New One (if ID matches or just first)
-            if (uploadedVideoId && videos[0].id === uploadedVideoId) {
-                setActiveVideo(uploadedVideoId, 0);
+    // 1. Detect Upload Success -> Trigger Refresh & Set Pending State
+    useEffect(() => {
+        if (uploadStatus === 'success' && uploadedVideoId) {
+            console.log('🎉 Upload success detected, refreshing feed...');
+            setPendingUploadId(uploadedVideoId);
+            refreshFeed();
+        }
+    }, [uploadStatus, uploadedVideoId]);
+
+    // 2. Watch Videos Update -> If Pending Upload Exists, Switch to it
+    useEffect(() => {
+        if (pendingUploadId && videos.length > 0) {
+            const uploadedVideoIndex = videos.findIndex(v => v.id === pendingUploadId);
+
+            if (uploadedVideoIndex !== -1) {
+                console.log(`✅ Uploaded video found at index ${uploadedVideoIndex}, switching active...`);
+
+                // Force switch
+                setActiveVideo(pendingUploadId, uploadedVideoIndex);
+                listRef.current?.scrollToIndex({ index: uploadedVideoIndex, animated: false });
+
+                // Cleanup
+                setPendingUploadId(null);
+                setTimeout(() => resetUpload(), 1000); // Delayed reset to prevent state thrashing
             } else {
-                // Fallback: Just play first
-                setActiveVideo(videos[0].id, 0);
+                console.log('⏳ Uploaded video not yet in feed, waiting...');
             }
         }
-    }, [uploadStatus, videos, uploadedVideoId, setActiveVideo]);
+    }, [videos, pendingUploadId, setActiveVideo]);
 
     // Mute controls
-    const { isMuted, toggleMute } = useMuteControls();
+    const toggleMute = useActiveVideoStore((state) => state.toggleMute);
+    const isMuted = useActiveVideoStore((state) => state.isMuted);
+    const isSeeking = useActiveVideoStore((state) => state.isSeeking);
+    const togglePause = useActiveVideoStore((state) => state.togglePause);
 
     // Upload State
     const [isUploadModalVisible, setUploadModalVisible] = useState(false);
     const [isMoreSheetVisible, setMoreSheetVisible] = useState(false);
-    // uploadedVideoId already declared above
     const resetUpload = useUploadStore(state => state.reset);
-
-    // Watch for successful upload
-    useEffect(() => {
-        if (uploadedVideoId) {
-            console.log('🎉 Upload completed! Refreshing feed...');
-            refreshFeed();
-            resetUpload();
-        }
-    }, [uploadedVideoId]);
 
     // App State Sync
     useAppStateSync();
 
-    // Video progress - use SharedValues for high performance
+    const setScreenFocused = useActiveVideoStore((state) => state.setScreenFocused);
+
+    useFocusEffect(
+        useCallback(() => {
+            console.log('[FeedScreen] 🟢 Screen FOCUSED');
+            setScreenFocused(true);
+
+            // FIXME: Force white status bar text on Feed (Dark Video Background)
+            // This is required because "Light Mode" defaults to black text, which is invisible here.
+            RNStatusBar.setBarStyle('light-content');
+
+            return () => {
+                console.log('[FeedScreen] 🔴 Screen BLURRED');
+                setScreenFocused(false);
+
+                // Reset to default (let the next screen handle it or system default)
+                RNStatusBar.setBarStyle('default');
+            };
+        }, [setScreenFocused])
+    );
+
+    // Video progress
     const isScrollingSV = useSharedValue(false);
     const videoSeekRef = useRef<((time: number) => void) | null>(null);
 
@@ -113,39 +147,53 @@ export default function FeedScreen() {
     const router = useRouter();
     const listRef = useRef<any>(null);
 
-    // Calculate video height - full screen for proper paging
     const ITEM_HEIGHT = Dimensions.get('window').height;
-
     const hasUnseenStories = true;
 
-    // UI Opacity Animation for "Seek to Hide"
+    // UI Opacity
     const uiOpacityStyle = useAnimatedStyle(() => {
         return {
             opacity: withTiming(isSeeking ? 0 : 1, { duration: 200 })
         };
     }, [isSeeking]);
 
-    // Set initial active
+    // Initial Active Video Recovery
     useEffect(() => {
-        if (videos.length > 0 && !activeVideoId) {
-            setActiveVideo(videos[0].id, 0);
+        if (videos.length > 0) {
+            if (!activeVideoId) {
+                setActiveVideo(videos[0].id, 0);
+            } else {
+                const isActiveInList = videos.find(v => v.id === activeVideoId);
+                if (!isActiveInList) {
+                    // console.log('Active video deleted, switching to first available');
+                    setActiveVideo(videos[0].id, 0);
+                }
+            }
         }
     }, [videos, activeVideoId, setActiveVideo]);
 
     const onViewableItemsChanged = useCallback(
         ({ viewableItems }: { viewableItems: ViewToken<Video>[] }) => {
             if (viewableItems.length > 0) {
-                const newIndex = viewableItems[0].index ?? 0;
-                const newId = viewableItems[0].item?.id ?? null;
+                const viewableItem = viewableItems[0];
+                const newIndex = viewableItem.index ?? 0;
+                const newId = viewableItem.item?.id ?? null;
 
                 if (newId !== activeVideoId) {
-                    // Start performance tracking
                     PerformanceLogger.startTransition(newId);
                     setActiveVideo(newId, newIndex);
+
+                    // SMART PRELOAD (N+1 Strategy)
+                    const nextIndex = newIndex + 1;
+                    if (nextIndex < videos.length) {
+                        const nextVideo = videos[nextIndex];
+                        console.log(`🚀 [Preload] Starting pre-fetch for: ${nextVideo.id}`);
+                        VideoCacheService.cacheVideo(nextVideo.videoUrl); // Fire and forget
+                    }
                 }
             }
         },
-        [activeVideoId, setActiveVideo]
+        [activeVideoId, setActiveVideo, videos]
     );
 
     const viewabilityConfigCallbackPairs = useRef([
@@ -181,32 +229,36 @@ export default function FeedScreen() {
                     text: "Evet, Sil",
                     style: "destructive",
                     onPress: async () => {
-                        try {
-                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                        // 1. Optimistic Update (Instant Removal)
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        deleteVideo(activeVideoId);
 
-                            const response = await fetch(`http://192.168.0.138:3000/videos/${activeVideoId}`, {
+                        try {
+                            // 2. Background Server Call
+                            // Use Constants for API URL if available, otherwise fallback to local but make it cleaner
+                            // Ideally this should come from process.env or Constants.expoConfig.extra
+                            const API_URL = Platform.OS === 'android' ? 'http://10.0.2.2:3000' : 'http://localhost:3000';
+
+                            // The user said "192.168.0.138", let's assume that's their machine.
+                            const SERVER_URL = 'http://192.168.0.138:3000';
+
+                            const response = await fetch(`${SERVER_URL}/videos/${activeVideoId}`, {
                                 method: 'DELETE'
                             });
 
-                            if (response.ok) {
-                                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                                removeVideo(activeVideoId);
-                            } else {
+                            if (!response.ok) {
+                                // Silent failure on UI (video already gone), but log it
                                 const errText = await response.text();
-                                console.error("Delete failed:", errText);
-                                Alert.alert("Hata", "Silme başarısız: " + errText);
-                                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+                                console.error("Background delete failed:", errText);
                             }
                         } catch (e: any) {
-                            console.error(e);
-                            Alert.alert("Bağlantı Hatası", e.message || "Sunucuya ulaşılamadı.");
-                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+                            console.error("Background delete network error:", e);
                         }
                     }
                 }
             ]
         );
-    }, [activeVideoId, removeVideo]);
+    }, [activeVideoId, deleteVideo]);
 
     const handleSheetDelete = useCallback(() => {
         handleCloseMore();
@@ -254,6 +306,7 @@ export default function FeedScreen() {
                     >
                         <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]}>
                             <VideoLayer
+                                key={item.id} // FIX: Force Remount on change to prevent stale state (Thumbnail glitch)
                                 video={item}
                                 isActive={isActive}
                                 isMuted={isMuted}
@@ -341,6 +394,8 @@ export default function FeedScreen() {
 
     return (
         <View style={styles.container}>
+            <StatusBar style="light" />
+
             {/* @ts-ignore */}
             <FlashList
                 // @ts-ignore
