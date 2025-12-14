@@ -17,6 +17,7 @@ import { useUploadStore } from '../../store/useUploadStore';
 // Import SVGs
 import VoiceOnIcon from '../../../../assets/icons/voice_on.svg';
 import SunIcon from '../../../../assets/icons/sun.svg';
+import MoreIcon from '../../../../assets/icons/more.svg';
 
 // Brightness Button sub-component
 function BrightnessButton() {
@@ -129,21 +130,8 @@ export function HeaderOverlay({
 
     return (
         <View style={[styles.container, { paddingTop: insets.top + 28 }]} pointerEvents="box-none">
-            {/* Left Column: Voice & Upload */}
+            {/* Left Column: Upload & Delete */}
             <View style={styles.leftColumn}>
-                <AnimatedPressable
-                    onPress={onToggleMute}
-                    style={[styles.iconButton, voiceAnimatedStyle]}
-                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                >
-                    <VoiceOnIcon
-                        width={28}
-                        height={28}
-                        color={isMuted ? "#6B7280" : "#FFFFFF"}
-                    />
-                </AnimatedPressable>
-
-                {/* Upload Button below Voice */}
                 {onUploadPress && <UploadButton onPress={onUploadPress} />}
 
                 {/* Delete Button below Upload (Cleanup Tool) */}
@@ -170,8 +158,28 @@ export function HeaderOverlay({
                 )}
             </Pressable>
 
-            {/* Right: Brightness + Fullscreen */}
+            {/* Right: More + Voice + Brightness */}
             <View style={styles.rightButtons}>
+                <Pressable
+                    style={styles.iconButton}
+                    onPress={onMorePress}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                >
+                    <MoreIcon width={28} height={28} color="#FFFFFF" />
+                </Pressable>
+
+                <AnimatedPressable
+                    onPress={onToggleMute}
+                    style={[styles.iconButton, voiceAnimatedStyle]}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                >
+                    <VoiceOnIcon
+                        width={28}
+                        height={28}
+                        color={isMuted ? "#6B7280" : "#FFFFFF"}
+                    />
+                </AnimatedPressable>
+
                 {showBrightnessButton && <BrightnessButton />}
 
 
@@ -199,7 +207,7 @@ const styles = StyleSheet.create({
     leftColumn: {
         flexDirection: 'column',
         alignItems: 'center',
-        gap: 8, // Space between Voice and Upload
+        gap: 8, // Space between Upload and Delete
     },
     storiesPill: {
         flexDirection: 'row',
@@ -237,7 +245,8 @@ const styles = StyleSheet.create({
         backgroundColor: '#FF3B30',
     },
     rightButtons: {
-        flexDirection: 'column', // Changed from row to column for vertical stacking
-        gap: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
     },
 });

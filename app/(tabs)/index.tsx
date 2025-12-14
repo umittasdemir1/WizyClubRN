@@ -285,7 +285,6 @@ export default function FeedScreen() {
                             onSave={() => toggleSave(item.id)}
                             onShare={() => toggleShare(item.id)}
                             onShop={() => toggleShop(item.id)}
-                            onMore={handleMorePress}
                             onProfilePress={() => console.log('Profile')}
                         />
 

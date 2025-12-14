@@ -12,7 +12,6 @@ import LikeIcon from '../../../../assets/icons/like.svg';
 import SaveIcon from '../../../../assets/icons/save.svg';
 import ShareIcon from '../../../../assets/icons/share.svg';
 import ShoppingIcon from '../../../../assets/icons/shopping.svg';
-import MoreIcon from '../../../../assets/icons/more.svg';
 
 interface ActionButtonsProps {
     video: Video;
@@ -20,7 +19,6 @@ interface ActionButtonsProps {
     onSave: () => void;
     onShare: () => void;
     onShop: () => void;
-    onMore: () => void;
     onProfilePress: () => void;
 }
 
@@ -73,7 +71,6 @@ export const ActionButtons = memo(function ActionButtons({
     onSave,
     onShare,
     onShop,
-    onMore,
 }: ActionButtonsProps) {
     return (
         <View style={[styles.container, { bottom: FIXED_BOTTOM_POSITION }]} pointerEvents="box-none">
@@ -108,15 +105,6 @@ export const ActionButtons = memo(function ActionButtons({
                 isActive={false}
                 activeColor={WHITE}
             />
-
-            {/* More button - no count */}
-            <Pressable
-                style={styles.moreButton}
-                onPress={onMore}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-                <MoreIcon width={28} height={28} color={WHITE} />
-            </Pressable>
         </View>
     );
 });
@@ -154,10 +142,5 @@ const styles = StyleSheet.create({
         textShadowRadius: 3,
         textAlign: 'center',
         marginTop: -2, // User requested -2 position
-    },
-    moreButton: {
-        padding: 4,
-        alignItems: 'center',
-        justifyContent: 'center',
     },
 });
