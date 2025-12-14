@@ -14,6 +14,7 @@ import { ProfileStats } from '../../src/presentation/components/profile/ProfileS
 import { SocialLinks } from '../../src/presentation/components/profile/SocialLinks';
 import { HighlightPills } from '../../src/presentation/components/profile/HighlightPills';
 import { VideoGrid } from '../../src/presentation/components/profile/VideoGrid';
+import { PostsGrid } from '../../src/presentation/components/profile/PostsGrid';
 import { BioBottomSheet } from '../../src/presentation/components/profile/BioBottomSheet';
 import { ClubsBottomSheet } from '../../src/presentation/components/profile/ClubsBottomSheet';
 import { SettingsBottomSheet } from '../../src/presentation/components/profile/SettingsBottomSheet';
@@ -216,7 +217,20 @@ export default function ProfileScreen() {
     },
   ];
 
-  // Videos data
+  // Posts data (square format - photos and videos)
+  const posts = [
+    { id: '1', thumbnail: 'https://picsum.photos/400/400?random=1', views: '15.2k', type: 'image' as const },
+    { id: '2', thumbnail: 'https://picsum.photos/400/400?random=2', views: '9.8k', type: 'video' as const },
+    { id: '3', thumbnail: 'https://picsum.photos/400/400?random=3', views: '3.5M', type: 'image' as const },
+    { id: '4', thumbnail: 'https://picsum.photos/400/400?random=4', views: '520', type: 'image' as const },
+    { id: '5', thumbnail: 'https://picsum.photos/400/400?random=5', views: '78k', type: 'video' as const },
+    { id: '6', thumbnail: 'https://picsum.photos/400/400?random=6', views: '1.2k', type: 'image' as const },
+    { id: '7', thumbnail: 'https://picsum.photos/400/400?random=7', views: '45k', type: 'video' as const },
+    { id: '8', thumbnail: 'https://picsum.photos/400/400?random=8', views: '890', type: 'image' as const },
+    { id: '9', thumbnail: 'https://picsum.photos/400/400?random=9', views: '23k', type: 'image' as const },
+  ];
+
+  // Videos data (vertical format - videos only)
   const videos = [
     { id: '1', thumbnail: 'https://picsum.photos/300/500?random=10', views: '12.5k' },
     { id: '2', thumbnail: 'https://picsum.photos/300/500?random=11', views: '8.1k' },
@@ -224,6 +238,16 @@ export default function ProfileScreen() {
     { id: '4', thumbnail: 'https://picsum.photos/300/500?random=13', views: '340' },
     { id: '5', thumbnail: 'https://picsum.photos/300/500?random=14', views: '56k' },
     { id: '6', thumbnail: 'https://picsum.photos/300/500?random=15', views: '900' },
+  ];
+
+  // Tags data (square format - tagged posts)
+  const tags = [
+    { id: '1', thumbnail: 'https://picsum.photos/400/400?random=20', views: '18.7k', type: 'image' as const },
+    { id: '2', thumbnail: 'https://picsum.photos/400/400?random=21', views: '11.2k', type: 'video' as const },
+    { id: '3', thumbnail: 'https://picsum.photos/400/400?random=22', views: '4.8M', type: 'image' as const },
+    { id: '4', thumbnail: 'https://picsum.photos/400/400?random=23', views: '920', type: 'image' as const },
+    { id: '5', thumbnail: 'https://picsum.photos/400/400?random=24', views: '65k', type: 'video' as const },
+    { id: '6', thumbnail: 'https://picsum.photos/400/400?random=25', views: '2.1k', type: 'image' as const },
   ];
 
   const toggleFollow = () => {
@@ -438,8 +462,10 @@ export default function ProfileScreen() {
           {/* Highlights */}
           <HighlightPills highlights={highlights} isDark={isDark} />
 
-          {/* Video Grid */}
-          <VideoGrid videos={videos} isDark={isDark} />
+          {/* Conditional Grid Rendering */}
+          {activeTab === 'posts' && <PostsGrid posts={posts} isDark={isDark} />}
+          {activeTab === 'videos' && <VideoGrid videos={videos} isDark={isDark} />}
+          {activeTab === 'tags' && <PostsGrid posts={tags} isDark={isDark} />}
 
           <View style={{ height: 100 }} />
         </ScrollView>
