@@ -27,6 +27,7 @@ import { MetadataLayer } from '../../src/presentation/components/feed/MetadataLa
 import { DoubleTapLike } from '../../src/presentation/components/feed/DoubleTapLike';
 import { BrightnessController } from '../../src/presentation/components/feed/BrightnessController';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
+import { SideOptionsSheet } from '../../src/presentation/components/feed/SideOptionsSheet';
 import {
     useActiveVideoStore,
     useAppStateSync,
@@ -95,6 +96,7 @@ export default function FeedScreen() {
 
     // Upload State
     const [isUploadModalVisible, setUploadModalVisible] = useState(false);
+    const [isMoreSheetVisible, setMoreSheetVisible] = useState(false);
     // uploadedVideoId already declared above
     const resetUpload = useUploadStore(state => state.reset);
 
@@ -167,6 +169,57 @@ export default function FeedScreen() {
         }
     }, [toggleMute]);
 
+    const handleMorePress = useCallback(() => {
+        setMoreSheetVisible(true);
+    }, []);
+
+    const handleCloseMore = useCallback(() => {
+        setMoreSheetVisible(false);
+    }, []);
+
+    const handleDeletePress = useCallback(() => {
+        if (!activeVideoId) return;
+        Alert.alert(
+            "İçerik Silinecek",
+            "Bu videoyu ve tüm verilerini (R2, Veritabanı) kalıcı olarak silmek istediğinize emin misiniz?",
+            [
+                { text: "Vazgeç", style: "cancel" },
+                {
+                    text: "Evet, Sil",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+
+                            const response = await fetch(`http://192.168.0.138:3000/videos/${activeVideoId}`, {
+                                method: 'DELETE'
+                            });
+
+                            if (response.ok) {
+                                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                                removeVideo(activeVideoId);
+                            } else {
+                                const errText = await response.text();
+                                console.error("Delete failed:", errText);
+                                Alert.alert("Hata", "Silme başarısız: " + errText);
+                                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+                            }
+                        } catch (e: any) {
+                            console.error(e);
+                            Alert.alert("Bağlantı Hatası", e.message || "Sunucuya ulaşılamadı.");
+                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+                        }
+                    }
+                }
+            ]
+        );
+    }, [activeVideoId, removeVideo]);
+
+    const handleSheetDelete = useCallback(() => {
+        handleCloseMore();
+        handleDeletePress();
+    }, [handleCloseMore, handleDeletePress]);
+
     const handleDoubleTapLike = useCallback(
         (videoId: string) => {
             const video = videos.find((v) => v.id === videoId);
@@ -232,7 +285,7 @@ export default function FeedScreen() {
                             onSave={() => toggleSave(item.id)}
                             onShare={() => toggleShare(item.id)}
                             onShop={() => toggleShop(item.id)}
-                            onMore={() => console.log('More Options')}
+                            onMore={handleMorePress}
                             onProfilePress={() => console.log('Profile')}
                         />
 
@@ -348,51 +401,9 @@ export default function FeedScreen() {
                     isMuted={isMuted}
                     onToggleMute={handleToggleMute}
                     onStoryPress={() => router.push('/story/1')}
-                    onMorePress={() => console.log('Open More Options')}
+                    onMorePress={handleMorePress}
                     onUploadPress={() => setUploadModalVisible(true)}
-                    onDeletePress={() => {
-                        if (!activeVideoId) return;
-                        Alert.alert(
-                            "İçerik Silinecek",
-                            "Bu videoyu ve tüm verilerini (R2, Veritabanı) kalıcı olarak silmek istediğinize emin misiniz?",
-                            [
-                                { text: "Vazgeç", style: "cancel" },
-                                {
-                                    text: "Evet, Sil",
-                                    style: "destructive",
-                                    onPress: async () => {
-                                        try {
-                                            // Optimistic Update: Remove locally first?
-                                            // For safety, let's wait for server.
-                                            // Show simple loading indicator? Or just wait.
-                                            // Haptics.
-                                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-
-                                            // Note: In a real app, use a service/repository. Directly fetching here for MVP speed.
-                                            // Using IP from UploadModal for consistency (192.168.0.138)
-                                            const response = await fetch(`http://192.168.0.138:3000/videos/${activeVideoId}`, {
-                                                method: 'DELETE'
-                                            });
-
-                                            if (response.ok) {
-                                                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                                                removeVideo(activeVideoId); // Immediate removal
-                                            } else {
-                                                const errText = await response.text();
-                                                console.error("Delete failed:", errText);
-                                                Alert.alert("Hata", "Silme başarısız: " + errText);
-                                                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-                                            }
-                                        } catch (e: any) {
-                                            console.error(e);
-                                            Alert.alert("Bağlantı Hatası", e.message || "Sunucuya ulaşılamadı.");
-                                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-                                        }
-                                    }
-                                }
-                            ]
-                        );
-                    }}
+                    showBrightnessButton={false}
                     hasUnseenStories={hasUnseenStories}
                     showFullScreen={showFullScreen}
                     onFullScreenPress={async () => {
@@ -421,6 +432,12 @@ export default function FeedScreen() {
             <UploadModal
                 isVisible={isUploadModalVisible}
                 onClose={() => setUploadModalVisible(false)}
+            />
+
+            <SideOptionsSheet
+                visible={isMoreSheetVisible}
+                onClose={handleCloseMore}
+                onDeletePress={handleSheetDelete}
             />
 
             {/* Brightness Controller Overlay - Global for the screen */}

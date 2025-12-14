@@ -88,6 +88,7 @@ interface HeaderOverlayProps {
     onUploadPress?: () => void;
     onDeletePress?: () => void;
     hasUnseenStories?: boolean;
+    showBrightnessButton?: boolean;
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -100,6 +101,7 @@ export function HeaderOverlay({
     onUploadPress,
     onDeletePress,
     hasUnseenStories = false,
+    showBrightnessButton = true,
 }: HeaderOverlayProps) {
     const insets = useSafeAreaInsets();
     const pulseOpacity = useSharedValue(1);
@@ -170,7 +172,7 @@ export function HeaderOverlay({
 
             {/* Right: Brightness + Fullscreen */}
             <View style={styles.rightButtons}>
-                <BrightnessButton />
+                {showBrightnessButton && <BrightnessButton />}
 
 
             </View>
