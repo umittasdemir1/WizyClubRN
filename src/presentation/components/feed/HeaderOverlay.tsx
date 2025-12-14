@@ -147,7 +147,10 @@ export function HeaderOverlay({
             </View>
 
             {/* Center: Stories Pill (absolutely centered) */}
-            <View style={styles.centerOverlay} pointerEvents="box-none">
+            <View
+                style={[styles.centerOverlay, { top: insets.top + 28 }]}
+                pointerEvents="box-none"
+            >
                 <Pressable
                     onPress={onStoryPress}
                     style={styles.storiesPill}
@@ -231,7 +234,6 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.15, // Reduced from 0.2
         shadowRadius: 6, // Softer blur
         elevation: 3, // Reduced
-        marginTop: 4,
     },
     storiesText: {
         color: 'white',
