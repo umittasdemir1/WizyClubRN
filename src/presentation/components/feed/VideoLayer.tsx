@@ -108,10 +108,17 @@ export const VideoLayer = memo(function VideoLayer({
             // STEP 1: Memory cache (synchronous, instant)
             const memoryCached = VideoCacheService.getMemoryCachedPath(video.videoUrl);
             if (memoryCached && !isCancelled) {
-                console.log('[VideoLayer] 🚀 Memory cache HIT:', video.id);
+                // For HLS, memory cache returns the original URL (prefetch marker)
+                const isHLS = video.videoUrl.endsWith('.m3u8');
+                console.log(
+                    isHLS
+                        ? '[VideoLayer] 📺 HLS prefetched (native cache):'
+                        : '[VideoLayer] 🚀 Memory cache HIT:',
+                    video.id
+                );
                 setVideoSource({ uri: memoryCached });
                 setIsSourceReady(true);
-                PerformanceLogger.endTransition(video.id, 'memory-cache');
+                PerformanceLogger.endTransition(video.id, isHLS ? 'network' : 'memory-cache');
                 return;
             }
 

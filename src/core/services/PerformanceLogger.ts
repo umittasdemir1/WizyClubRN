@@ -32,10 +32,14 @@ class PerformanceLoggerService {
      * End tracking a video transition
      */
     endTransition(videoId: string, source: 'memory-cache' | 'disk-cache' | 'network') {
-        const metric = this.metrics.get(videoId);
+        let metric = this.metrics.get(videoId);
+
+        // Auto-create start metric if not found (for pre-rendered videos)
         if (!metric) {
-            console.warn(`[Perf] ⚠️  No start metric found for: ${videoId}`);
-            return;
+            console.log(`[Perf] 🔄 Auto-creating start metric for pre-rendered video: ${videoId}`);
+            this.startTransition(videoId);
+            metric = this.metrics.get(videoId);
+            if (!metric) return; // Safety check
         }
 
         const endTime = Date.now();

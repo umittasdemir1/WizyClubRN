@@ -51,10 +51,13 @@ export class VideoCacheService {
     static async cacheVideo(url: string | number): Promise<string | null> {
         if (typeof url !== 'string') return null;
 
-        // Skip HLS streams - they should stream directly, not be cached
+        // HLS streams: We'll still mark them in memory cache as "prefetched"
+        // react-native-video will handle HLS caching internally
         if (url.endsWith('.m3u8')) {
-            console.log('[VideoCache] Skipping HLS stream (not cacheable):', url);
-            return null;
+            console.log('[VideoCache] 📺 HLS stream - marking as prefetched (native cache):', url);
+            // Mark as prefetched in memory so we know we attempted to load it
+            VideoCacheService.memoryCache.set(url, url);
+            return url; // Return original URL, native player will cache segments
         }
 
         const filename = url.split('/').pop()?.split('?')[0] || `video_${Date.now()}.mp4`;
