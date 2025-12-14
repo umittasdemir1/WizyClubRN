@@ -106,6 +106,7 @@ export const VideoLayer = memo(function VideoLayer({
 
     const videoRef = useRef<VideoRef>(null);
     const loopCount = useRef(0);
+    const memoryCachedRef = useRef(false); // Track if loaded from memory cache
 
     // Cache-First Strategy: Check cache BEFORE setting source
     useEffect(() => {
@@ -129,9 +130,10 @@ export const VideoLayer = memo(function VideoLayer({
                         : '[VideoLayer] 🚀 Memory cache HIT:',
                     video.id
                 );
+                memoryCachedRef.current = !isHLS; // Only true for actual file cache, not HLS
                 setVideoSource({ uri: memoryCached });
                 setIsSourceReady(true);
-                PerformanceLogger.endTransition(video.id, isHLS ? 'network' : 'memory-cache');
+                // Don't call endTransition here - wait for onLoad!
                 return;
             }
 
@@ -139,24 +141,27 @@ export const VideoLayer = memo(function VideoLayer({
             const diskCached = await VideoCacheService.getCachedVideoPath(video.videoUrl);
             if (diskCached && !isCancelled) {
                 console.log('[VideoLayer] ⚡ Disk cache HIT:', video.id);
+                memoryCachedRef.current = false;
                 setVideoSource({ uri: diskCached });
                 setIsSourceReady(true);
-                PerformanceLogger.endTransition(video.id, 'disk-cache');
+                // Don't call endTransition here - wait for onLoad!
                 return;
             }
 
             // STEP 3: Network fallback (slow)
             if (!isCancelled) {
                 console.log('[VideoLayer] 🌐 Network MISS:', video.id);
+                memoryCachedRef.current = false;
                 setVideoSource({ uri: video.videoUrl });
                 setIsSourceReady(true);
-                PerformanceLogger.endTransition(video.id, 'network');
+                // Don't call endTransition here - wait for onLoad!
             }
         };
 
         // Reset states
         setIsSourceReady(false);
         setShowPoster(true);
+        memoryCachedRef.current = false;
 
         // Initialize source with cache-first strategy
         initVideoSource();
@@ -205,6 +210,17 @@ export const VideoLayer = memo(function VideoLayer({
         setHasError(false);
         setShowPoster(false); // Hide poster when video loads
 
+        // Performance: Track actual load time (from mount to first frame ready)
+        const source = videoSource?.uri?.startsWith('file://')
+            ? 'disk-cache'
+            : isHLS
+            ? 'network'
+            : memoryCachedRef.current
+            ? 'memory-cache'
+            : 'network';
+
+        PerformanceLogger.endTransition(video.id, source);
+
         if (data.naturalSize) {
             const { width, height } = data.naturalSize;
             const orientation = width >= height ? 'landscape' : 'portrait';
@@ -213,7 +229,7 @@ export const VideoLayer = memo(function VideoLayer({
             setResizeMode(newMode);
             onResizeModeChange?.(newMode); // Notify parent
         }
-    }, [onResizeModeChange]);
+    }, [onResizeModeChange, video.id, videoSource, isHLS]);
 
     const handleVideoError = useCallback(async (error: OnVideoErrorData) => {
         console.error(`[VideoLayer] Error playing video ${video.id}:`, error);
