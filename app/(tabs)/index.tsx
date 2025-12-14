@@ -12,14 +12,6 @@ import {
 } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-
-// Optional: Screen orientation (for fullscreen feature)
-let ScreenOrientation: any = null;
-try {
-    ScreenOrientation = require('expo-screen-orientation');
-} catch (e) {
-    console.log('[index] expo-screen-orientation not available');
-}
 import { VideoLayer } from '../../src/presentation/components/feed/VideoLayer';
 import { ActionButtons } from '../../src/presentation/components/feed/ActionButtons';
 import { HeaderOverlay } from '../../src/presentation/components/feed/HeaderOverlay';
@@ -124,8 +116,6 @@ export default function FeedScreen() {
     const ITEM_HEIGHT = Dimensions.get('window').height;
 
     const hasUnseenStories = true;
-    const [showFullScreen, setShowFullScreen] = useState(false); // NEW: Track if fullscreen button should show
-    const [isFullScreen, setIsFullScreen] = useState(false); // NEW: Track fullscreen state
 
     // UI Opacity Animation for "Seek to Hide"
     const uiOpacityStyle = useAnimatedStyle(() => {
@@ -266,10 +256,6 @@ export default function FeedScreen() {
                                 isMuted={isMuted}
                                 isScrolling={isScrollingSV}
                                 onSeekReady={isActive ? handleSeekReady : undefined}
-                                onResizeModeChange={(mode) => {
-                                    // Show fullscreen button for landscape videos (contain mode)
-                                    setShowFullScreen(mode === 'contain');
-                                }}
                             />
                         </View>
                     </DoubleTapLike>
@@ -404,28 +390,6 @@ export default function FeedScreen() {
                     onUploadPress={() => setUploadModalVisible(true)}
                     showBrightnessButton={false}
                     hasUnseenStories={hasUnseenStories}
-                    showFullScreen={showFullScreen}
-                    isFullScreen={isFullScreen}
-                    onFullScreenPress={async () => {
-                        if (!ScreenOrientation) {
-                            console.log('[index] Screen orientation requires native build');
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                            return;
-                        }
-
-                        try {
-                            if (isFullScreen) {
-                                await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-                                setIsFullScreen(false);
-                            } else {
-                                await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
-                                setIsFullScreen(true);
-                            }
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                        } catch (error) {
-                            console.error('[index] Orientation error:', error);
-                        }
-                    }}
                 />
             </Animated.View>
 

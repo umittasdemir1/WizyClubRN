@@ -10,7 +10,7 @@ import Animated, {
     Easing,
     cancelAnimation,
 } from 'react-native-reanimated';
-import { Plus, Loader, Trash2, Maximize, Minimize } from 'lucide-react-native';
+import { Plus, Loader, Trash2 } from 'lucide-react-native';
 import { useBrightnessStore } from '../../store/useBrightnessStore';
 import { useUploadStore } from '../../store/useUploadStore';
 
@@ -90,9 +90,6 @@ interface HeaderOverlayProps {
     onDeletePress?: () => void;
     hasUnseenStories?: boolean;
     showBrightnessButton?: boolean;
-    showFullScreen?: boolean;
-    onFullScreenPress?: () => void;
-    isFullScreen?: boolean;
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -106,9 +103,6 @@ export function HeaderOverlay({
     onDeletePress,
     hasUnseenStories = false,
     showBrightnessButton = true,
-    showFullScreen = false,
-    onFullScreenPress,
-    isFullScreen = false,
 }: HeaderOverlayProps) {
     const insets = useSafeAreaInsets();
     const pulseOpacity = useSharedValue(1);
@@ -176,20 +170,6 @@ export function HeaderOverlay({
             {/* Right: Voice + More + Brightness */}
             <View style={styles.rightButtons}>
                 {showBrightnessButton && <BrightnessButton />}
-
-                {showFullScreen && onFullScreenPress && (
-                    <Pressable
-                        style={styles.iconButton}
-                        onPress={onFullScreenPress}
-                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                    >
-                        {isFullScreen ? (
-                            <Minimize width={24} height={24} color="#FFFFFF" />
-                        ) : (
-                            <Maximize width={24} height={24} color="#FFFFFF" />
-                        )}
-                    </Pressable>
-                )}
 
                 <AnimatedPressable
                     onPress={onToggleMute}
