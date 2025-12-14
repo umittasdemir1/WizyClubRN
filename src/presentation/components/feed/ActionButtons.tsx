@@ -1,5 +1,6 @@
 import React, { memo } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -12,7 +13,6 @@ import LikeIcon from '../../../../assets/icons/like.svg';
 import SaveIcon from '../../../../assets/icons/save.svg';
 import ShareIcon from '../../../../assets/icons/share.svg';
 import ShoppingIcon from '../../../../assets/icons/shopping.svg';
-import MoreIcon from '../../../../assets/icons/more.svg';
 
 interface ActionButtonsProps {
     video: Video;
@@ -20,11 +20,11 @@ interface ActionButtonsProps {
     onSave: () => void;
     onShare: () => void;
     onShop: () => void;
-    onMore: () => void;
     onProfilePress: () => void;
 }
 
-const FIXED_BOTTOM_POSITION = 70; // Aligned with commercial tag (MetadataLayer)
+const BASE_BOTTOM_POSITION = 90; // Keep above nav/seek without floating too high
+const SAFE_AREA_OFFSET = 70; // Lift slightly further when home indicator exists
 const ICON_SIZE = 36; // User requested 36px
 
 // Colors
@@ -73,10 +73,12 @@ export const ActionButtons = memo(function ActionButtons({
     onSave,
     onShare,
     onShop,
-    onMore,
 }: ActionButtonsProps) {
+    const insets = useSafeAreaInsets();
+    const bottom = Math.max(BASE_BOTTOM_POSITION, insets.bottom + SAFE_AREA_OFFSET);
+
     return (
-        <View style={[styles.container, { bottom: FIXED_BOTTOM_POSITION }]} pointerEvents="box-none">
+        <View style={[styles.container, { bottom }]} pointerEvents="box-none">
             <ActionButton
                 icon={LikeIcon}
                 count={formatCount(video.likesCount)}
@@ -108,15 +110,6 @@ export const ActionButtons = memo(function ActionButtons({
                 isActive={false}
                 activeColor={WHITE}
             />
-
-            {/* More button - no count */}
-            <Pressable
-                style={styles.moreButton}
-                onPress={onMore}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-                <MoreIcon width={28} height={28} color={WHITE} />
-            </Pressable>
         </View>
     );
 });
@@ -154,10 +147,5 @@ const styles = StyleSheet.create({
         textShadowRadius: 3,
         textAlign: 'center',
         marginTop: -2, // User requested -2 position
-    },
-    moreButton: {
-        padding: 4,
-        alignItems: 'center',
-        justifyContent: 'center',
     },
 });

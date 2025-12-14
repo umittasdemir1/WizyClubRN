@@ -10,13 +10,14 @@ import Animated, {
     Easing,
     cancelAnimation,
 } from 'react-native-reanimated';
-import { Upload, Loader, Trash2 } from 'lucide-react-native';
+import { Plus, Loader, Trash2 } from 'lucide-react-native';
 import { useBrightnessStore } from '../../store/useBrightnessStore';
 import { useUploadStore } from '../../store/useUploadStore';
 
 // Import SVGs
 import VoiceOnIcon from '../../../../assets/icons/voice_on.svg';
 import SunIcon from '../../../../assets/icons/sun.svg';
+import MoreIcon from '../../../../assets/icons/more.svg';
 
 // Brightness Button sub-component
 function BrightnessButton() {
@@ -74,7 +75,7 @@ function UploadButton({ onPress }: { onPress: () => void }) {
                     <Loader width={24} height={24} color="#FFD700" />
                 </Animated.View>
             ) : (
-                <Upload width={24} height={24} color="#FFFFFF" />
+                <Plus width={24} height={24} color="#FFFFFF" />
             )}
         </Pressable>
     );
@@ -88,6 +89,7 @@ interface HeaderOverlayProps {
     onUploadPress?: () => void;
     onDeletePress?: () => void;
     hasUnseenStories?: boolean;
+    showBrightnessButton?: boolean;
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -100,9 +102,11 @@ export function HeaderOverlay({
     onUploadPress,
     onDeletePress,
     hasUnseenStories = false,
+    showBrightnessButton = true,
 }: HeaderOverlayProps) {
     const insets = useSafeAreaInsets();
     const pulseOpacity = useSharedValue(1);
+    const headerTopPadding = insets.top + 12;
 
     // Pulse animation when unmuted
     useEffect(() => {
@@ -126,22 +130,12 @@ export function HeaderOverlay({
     }));
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top + 28 }]} pointerEvents="box-none">
-            {/* Left Column: Voice & Upload */}
+        <View
+            style={[styles.container, { paddingTop: headerTopPadding }]}
+            pointerEvents="box-none"
+        >
+            {/* Left Column: Upload & Delete */}
             <View style={styles.leftColumn}>
-                <AnimatedPressable
-                    onPress={onToggleMute}
-                    style={[styles.iconButton, voiceAnimatedStyle]}
-                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                >
-                    <VoiceOnIcon
-                        width={28}
-                        height={28}
-                        color={isMuted ? "#6B7280" : "#FFFFFF"}
-                    />
-                </AnimatedPressable>
-
-                {/* Upload Button below Voice */}
                 {onUploadPress && <UploadButton onPress={onUploadPress} />}
 
                 {/* Delete Button below Upload (Cleanup Tool) */}
@@ -156,23 +150,46 @@ export function HeaderOverlay({
                 )}
             </View>
 
-            {/* Center: Stories Pill */}
-            <Pressable
-                onPress={onStoryPress}
-                style={styles.storiesPill}
-                hitSlop={{ top: 8, bottom: 8 }}
+            {/* Center: Stories Pill (absolutely centered) */}
+            <View
+                style={[styles.centerOverlay, { top: headerTopPadding }]}
+                pointerEvents="box-none"
             >
-                <Text style={styles.storiesText}>Hikayeler</Text>
-                {hasUnseenStories && (
-                    <View style={styles.badge} />
-                )}
-            </Pressable>
+                <Pressable
+                    onPress={onStoryPress}
+                    style={styles.storiesPill}
+                    hitSlop={{ top: 8, bottom: 8 }}
+                >
+                    <Text style={styles.storiesText}>Hikayeler</Text>
+                    {hasUnseenStories && (
+                        <View style={styles.badge} />
+                    )}
+                </Pressable>
+            </View>
 
-            {/* Right: Brightness + Fullscreen */}
+            {/* Right: Voice + More + Brightness */}
             <View style={styles.rightButtons}>
-                <BrightnessButton />
+                {showBrightnessButton && <BrightnessButton />}
 
+                <AnimatedPressable
+                    onPress={onToggleMute}
+                    style={[styles.iconButton, voiceAnimatedStyle]}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                >
+                    <VoiceOnIcon
+                        width={24}
+                        height={24}
+                        color={isMuted ? "#6B7280" : "#FFFFFF"}
+                    />
+                </AnimatedPressable>
 
+                <Pressable
+                    style={styles.iconButton}
+                    onPress={onMorePress}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                >
+                    <MoreIcon width={24} height={24} color="#FFFFFF" />
+                </Pressable>
             </View>
         </View>
     );
@@ -197,7 +214,13 @@ const styles = StyleSheet.create({
     leftColumn: {
         flexDirection: 'column',
         alignItems: 'center',
-        gap: 8, // Space between Voice and Upload
+        gap: 8, // Space between Upload and Delete
+    },
+    centerOverlay: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        alignItems: 'center',
     },
     storiesPill: {
         flexDirection: 'row',
@@ -215,7 +238,6 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.15, // Reduced from 0.2
         shadowRadius: 6, // Softer blur
         elevation: 3, // Reduced
-        marginTop: 4,
     },
     storiesText: {
         color: 'white',
@@ -235,7 +257,10 @@ const styles = StyleSheet.create({
         backgroundColor: '#FF3B30',
     },
     rightButtons: {
-        flexDirection: 'column', // Changed from row to column for vertical stacking
-        gap: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        minWidth: 120,
+        justifyContent: 'flex-end',
     },
 });

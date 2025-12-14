@@ -7,7 +7,7 @@ import ReplayIcon from '../../../../assets/icons/replay.svg';
 import { useActiveVideoStore } from '../../store/useActiveVideoStore';
 import * as Haptics from 'expo-haptics';
 import { BrightnessOverlay } from './BrightnessOverlay';
-import { RefreshCcw, AlertCircle, Maximize, Minimize } from 'lucide-react-native';
+import { RefreshCcw, AlertCircle } from 'lucide-react-native';
 import { useNetInfo } from '@react-native-community/netinfo';
 import { getBufferConfig } from '../../../core/utils/bufferConfig';
 import { VideoSeekBar } from './VideoSeekBar';
@@ -33,7 +33,6 @@ interface VideoLayerProps {
     onProgressUpdate?: (progress: number, duration: number) => void;
     onSeekReady?: (seekFn: (time: number) => void) => void;
     isScrolling?: SharedValue<boolean>;
-    onFullScreenPress?: () => void; // NEW: Expose fullscreen handler
     onResizeModeChange?: (mode: 'contain' | 'cover') => void; // NEW: Notify parent of resize mode
 }
 
@@ -48,7 +47,6 @@ export const VideoLayer = memo(function VideoLayer({
     onProgressUpdate,
     onSeekReady,
     isScrolling,
-    onFullScreenPress, // NEW
     onResizeModeChange, // NEW
 }: VideoLayerProps) {
     const isAppActive = useActiveVideoStore((state) => state.isAppActive);
@@ -75,7 +73,6 @@ export const VideoLayer = memo(function VideoLayer({
 
     // Poster State (Manual Overlay)
     const [showPoster, setShowPoster] = useState(true);
-    const [isFullScreen, setIsFullScreen] = useState(false);
 
     // Cache-First Strategy: Don't set source until we check cache
     const [videoSource, setVideoSource] = useState<any>(null);

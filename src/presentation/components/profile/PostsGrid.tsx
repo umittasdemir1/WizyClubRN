@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Dimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { Eye, Play } from 'lucide-react-native';
 
@@ -20,9 +20,16 @@ interface PostItem {
 interface PostsGridProps {
   posts: PostItem[];
   isDark: boolean;
+  onPreview?: (post: PostItem) => void;
+  onPreviewEnd?: () => void;
 }
 
-export const PostsGrid: React.FC<PostsGridProps> = ({ posts, isDark }) => {
+export const PostsGrid: React.FC<PostsGridProps> = ({
+  posts,
+  isDark,
+  onPreview,
+  onPreviewEnd,
+}) => {
   const bgColor = isDark ? '#1c1c1e' : '#f0f0f0';
 
   const formatViews = (views: string | number): string => {
@@ -39,7 +46,7 @@ export const PostsGrid: React.FC<PostsGridProps> = ({ posts, isDark }) => {
   return (
     <View style={styles.container}>
       {posts.map((post, index) => (
-        <TouchableOpacity
+        <Pressable
           key={post.id}
           style={[
             styles.postItem,
@@ -48,6 +55,8 @@ export const PostsGrid: React.FC<PostsGridProps> = ({ posts, isDark }) => {
             index % 3 !== 2 && { marginRight: GAP }, // Not the last column
             { marginBottom: GAP }, // Gap between rows
           ]}
+          onLongPress={() => onPreview?.(post)}
+          onPressOut={onPreviewEnd}
         >
           <Image
             source={{ uri: post.thumbnail }}
@@ -65,7 +74,7 @@ export const PostsGrid: React.FC<PostsGridProps> = ({ posts, isDark }) => {
             )}
             <Text style={styles.viewsText}>{formatViews(post.views)}</Text>
           </View>
-        </TouchableOpacity>
+        </Pressable>
       ))}
     </View>
   );

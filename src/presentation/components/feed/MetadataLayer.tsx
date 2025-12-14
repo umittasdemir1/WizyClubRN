@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-// Remove useSafeAreaInsets
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Video } from '../../../domain/entities/Video';
 import { Avatar } from '../shared/Avatar';
 import FollowIcon from '../../../../assets/icons/followbottom.svg';
@@ -13,7 +13,8 @@ interface MetadataLayerProps {
     onCommercialTagPress: () => void;
 }
 
-const FIXED_BOTTOM_POSITION = 70; // Moved up for more space
+const BASE_BOTTOM_POSITION = 50; // Keep commercial tag clear of nav/seek controls
+const SAFE_AREA_OFFSET = 32; // Lift slightly when gesture bar is present
 
 export function MetadataLayer({
     video,
@@ -22,9 +23,11 @@ export function MetadataLayer({
     onReadMorePress,
     onCommercialTagPress,
 }: MetadataLayerProps) {
+    const insets = useSafeAreaInsets();
+    const bottom = Math.max(BASE_BOTTOM_POSITION, insets.bottom + SAFE_AREA_OFFSET);
 
     return (
-        <View style={[styles.container, { bottom: FIXED_BOTTOM_POSITION }]} pointerEvents="box-none">
+        <View style={[styles.container, { bottom }]} pointerEvents="box-none">
             {/* User Row */}
             <View style={styles.userRow}>
                 <Pressable onPress={onAvatarPress} hitSlop={8}>

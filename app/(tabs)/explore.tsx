@@ -14,11 +14,14 @@ export default function ExploreScreen() {
     const { videos } = useVideoFeed();
 
     return (
-        <View style={[styles.container, { paddingTop: 0 }]}>
+        <View style={[styles.container, { paddingTop: 0 }]}> 
             {/* Morphing Discovery Header - Handles top inset internally */}
             <MorphingDiscoveryBar />
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
+            >
                 {/* Categories - Optional: Integrate into tabs or keep as sub-filter? 
                     Design implies DiscoveryBar tabs (Popular/Favorites) ARE the main filter. 
                     Maybe keep chips as sub-categories below? 
