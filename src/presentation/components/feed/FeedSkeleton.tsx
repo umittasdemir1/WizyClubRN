@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
     rightActions: {
         position: 'absolute',
         right: 8,
-        bottom: 70, // Matches FIXED_BOTTOM_POSITION in ActionButtons.tsx
+        bottom: 90, // Matches BASE_BOTTOM_POSITION in ActionButtons.tsx
         alignItems: 'center',
         gap: 5, // Matches ActionButtons.tsx
     },
@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
     bottomContent: {
         position: 'absolute',
         left: 16,
-        bottom: 70, // Matches FIXED_BOTTOM_POSITION in MetadataLayer.tsx
+        bottom: 50, // Matches BASE_BOTTOM_POSITION in MetadataLayer.tsx
         right: 80, // Matches MetadataLayer.tsx
     },
     userInfoRow: {
