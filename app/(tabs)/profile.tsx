@@ -16,7 +16,8 @@ import { HighlightPills } from '../../src/presentation/components/profile/Highli
 import { VideoGrid } from '../../src/presentation/components/profile/VideoGrid';
 import { BioBottomSheet } from '../../src/presentation/components/profile/BioBottomSheet';
 import { ClubsBottomSheet } from '../../src/presentation/components/profile/ClubsBottomSheet';
-import { ChevronLeft, Sun, Moon, MoreHorizontal, Settings } from 'lucide-react-native';
+import { SettingsBottomSheet } from '../../src/presentation/components/profile/SettingsBottomSheet';
+import { ChevronLeft, Sun, Moon, MoreVertical, Settings, Link } from 'lucide-react-native';
 import BottomSheet from '@gorhom/bottom-sheet';
 import Svg, { Path, Circle } from 'react-native-svg';
 import Animated, {
@@ -112,6 +113,7 @@ export default function ProfileScreen() {
   const [isLiked, setIsLiked] = useState(false);
   const bioSheetRef = useRef<BottomSheet>(null);
   const clubsSheetRef = useRef<BottomSheet>(null);
+  const settingsSheetRef = useRef<BottomSheet>(null);
 
   // Theme colors
   const bgBody = isDark ? '#121212' : '#e0e0e0';
@@ -258,14 +260,13 @@ export default function ProfileScreen() {
           <TouchableOpacity style={styles.navIcon}>
             <ChevronLeft size={18} color={iconColor} />
           </TouchableOpacity>
-          <View style={styles.navRight}>
-            <TouchableOpacity style={styles.navIcon} onPress={toggleTheme}>
-              {isDark ? <Sun size={18} color={iconColor} /> : <Moon size={18} color={iconColor} />}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.navIcon}>
-              <MoreHorizontal size={18} color={iconColor} />
-            </TouchableOpacity>
-          </View>
+          <Text style={[styles.headerUsername, { color: textPrimary }]}>@{user.username}</Text>
+          <TouchableOpacity
+            style={styles.navIcon}
+            onPress={() => settingsSheetRef.current?.expand()}
+          >
+            <MoreVertical size={18} color={iconColor} />
+          </TouchableOpacity>
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false}>
@@ -283,9 +284,6 @@ export default function ProfileScreen() {
                 <VerifiedBadge />
               </View>
             </View>
-
-            {/* Username - Separate from name */}
-            <Text style={[styles.userHandle, { color: textSecondary }]}>@{user.username}</Text>
 
             {/* Bio */}
             <TouchableOpacity onPress={openBioSheet} disabled={user.bio.length <= bioLimit}>
@@ -452,6 +450,9 @@ export default function ProfileScreen() {
 
       {/* Clubs Bottom Sheet */}
       <ClubsBottomSheet ref={clubsSheetRef} clubs={clubs} isDark={isDark} />
+
+      {/* Settings Bottom Sheet */}
+      <SettingsBottomSheet ref={settingsSheetRef} isDark={isDark} onThemeToggle={toggleTheme} />
     </View>
   );
 }
@@ -481,9 +482,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 17.5,
   },
-  navRight: {
-    flexDirection: 'row',
-    gap: 5,
+  headerUsername: {
+    fontSize: 16,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'center',
   },
   profileContainer: {
     alignItems: 'center',
@@ -508,14 +511,10 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '800',
     letterSpacing: -0.3,
+    marginBottom: 2,
   },
   verifiedBadge: {
     alignItems: 'center',
-  },
-  userHandle: {
-    fontSize: 14,
-    marginBottom: 15,
-    fontWeight: '400',
   },
   bioText: {
     fontSize: 13,

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Linking } from 'react-native';
-import { Youtube, Instagram, Music2 } from 'lucide-react-native';
+import { Youtube, Instagram, Music2, Link } from 'lucide-react-native';
 import { Image } from 'expo-image';
 import Svg, { Path } from 'react-native-svg';
 
@@ -37,23 +37,33 @@ export const SocialLinks: React.FC<SocialLinksProps> = ({
       <View style={styles.socialLeft}>
         <TouchableOpacity
           style={[styles.socialTag, { backgroundColor: bgColor, borderColor }]}
+          onPress={() => Linking.openURL('https://youtube.com')}
         >
           <Youtube size={14} color={iconColor} />
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.socialTag, { backgroundColor: bgColor, borderColor }]}
+          onPress={() => Linking.openURL('https://instagram.com')}
         >
           <Instagram size={14} color={iconColor} />
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.socialTag, { backgroundColor: bgColor, borderColor }]}
+          onPress={() => Linking.openURL('https://tiktok.com')}
         >
           <Music2 size={14} color={iconColor} />
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.socialTag, { backgroundColor: bgColor, borderColor }]}
+          onPress={() => Linking.openURL('https://twitter.com')}
         >
           <XIcon size={14} color={iconColor} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.socialTag, { backgroundColor: bgColor, borderColor }]}
+          onPress={() => Linking.openURL('https://example.com')}
+        >
+          <Link size={14} color={iconColor} />
         </TouchableOpacity>
       </View>
 
