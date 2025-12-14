@@ -15,6 +15,7 @@ import { useSharedValue, SharedValue } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { VideoCacheService } from '../../../data/services/VideoCacheService';
 import { Image } from 'expo-image';
+import { PerformanceLogger } from '../../../core/services/PerformanceLogger';
 
 // Optional: Screen orientation (requires native build)
 let ScreenOrientation: any = null;
@@ -76,30 +77,17 @@ export const VideoLayer = memo(function VideoLayer({
     const [showPoster, setShowPoster] = useState(true);
     const [isFullScreen, setIsFullScreen] = useState(false);
 
-    // Cache State - Try to get from memory cache synchronously first!
-    const [videoSource, setVideoSource] = useState<any>(() => {
-        try {
-            if (typeof video.videoUrl === 'string') {
-                const cached = VideoCacheService.getMemoryCachedPath(video.videoUrl);
-                if (cached) {
-                    return { uri: cached };
-                }
-                return { uri: video.videoUrl };
-            }
-            return video.videoUrl;
-        } catch (e) {
-            console.warn('[VideoLayer] Error reading memory cache:', e);
-            return typeof video.videoUrl === 'string' ? { uri: video.videoUrl } : video.videoUrl;
-        }
-    });
+    // Cache-First Strategy: Don't set source until we check cache
+    const [videoSource, setVideoSource] = useState<any>(null);
+    const [isSourceReady, setIsSourceReady] = useState(false);
 
-    // Optimize buffer for local files
+    // Optimize buffer for local files (Faz 5: Increased for smoother playback)
     const isLocal = videoSource?.uri?.startsWith('file://');
     const bufferConfig = isLocal ? {
-        minBufferMs: 100, // Increased to match bufferForPlaybackAfterRebufferMs (50 < 100 was causing crash)
-        maxBufferMs: 1000,
-        bufferForPlaybackMs: 50,
-        bufferForPlaybackAfterRebufferMs: 100
+        minBufferMs: 250, // Increased from 100 to 250ms for better disk I/O tolerance
+        maxBufferMs: 2000, // Increased from 1000 to 2000ms
+        bufferForPlaybackMs: 100, // Increased from 50 to 100ms
+        bufferForPlaybackAfterRebufferMs: 250 // Increased from 100 to 250ms
     } : defaultBufferConfig;
 
     // Local SharedValues for SeekBar
@@ -109,40 +97,67 @@ export const VideoLayer = memo(function VideoLayer({
     const videoRef = useRef<VideoRef>(null);
     const loopCount = useRef(0);
 
-    // Check for cached version on mount/video change
+    // Cache-First Strategy: Check cache BEFORE setting source
     useEffect(() => {
         let isCancelled = false;
 
-        const checkCache = async () => {
-            if (typeof video.videoUrl === 'string') {
-                const cachedPath = await VideoCacheService.getCachedVideoPath(video.videoUrl);
-                if (cachedPath && !isCancelled) {
-                    console.log('[VideoLayer] Playing from cache:', cachedPath);
-                    setVideoSource({ uri: cachedPath });
-                    // Also update key to force player reload if we switched source? 
-                    // Usually react-native-video handles prop change, but sometimes it needs a kick.
-                }
+        const initVideoSource = async () => {
+            if (typeof video.videoUrl !== 'string') {
+                setVideoSource(video.videoUrl);
+                setIsSourceReady(true);
+                return;
+            }
+
+            // STEP 1: Memory cache (synchronous, instant)
+            const memoryCached = VideoCacheService.getMemoryCachedPath(video.videoUrl);
+            if (memoryCached && !isCancelled) {
+                console.log('[VideoLayer] 🚀 Memory cache HIT:', video.id);
+                setVideoSource({ uri: memoryCached });
+                setIsSourceReady(true);
+                PerformanceLogger.endTransition(video.id, 'memory-cache');
+                return;
+            }
+
+            // STEP 2: Disk cache (async, fast)
+            const diskCached = await VideoCacheService.getCachedVideoPath(video.videoUrl);
+            if (diskCached && !isCancelled) {
+                console.log('[VideoLayer] ⚡ Disk cache HIT:', video.id);
+                setVideoSource({ uri: diskCached });
+                setIsSourceReady(true);
+                PerformanceLogger.endTransition(video.id, 'disk-cache');
+                return;
+            }
+
+            // STEP 3: Network fallback (slow)
+            if (!isCancelled) {
+                console.log('[VideoLayer] 🌐 Network MISS:', video.id);
+                setVideoSource({ uri: video.videoUrl });
+                setIsSourceReady(true);
+                PerformanceLogger.endTransition(video.id, 'network');
             }
         };
 
-        // Reset to default
-        setVideoSource(typeof video.videoUrl === 'string' ? { uri: video.videoUrl } : video.videoUrl);
+        // Reset states
+        setIsSourceReady(false);
+        setShowPoster(true);
 
-        checkCache();
+        // Initialize source with cache-first strategy
+        initVideoSource();
 
         return () => { isCancelled = true; };
-    }, [video.videoUrl]);
+    }, [video.id]); // Use video.id instead of video.videoUrl for stability
 
 
-    // Reset finished state if video changes
+    // Reset finished state if video changes (NO KEY INCREMENT - Faz 4 optimization)
     useEffect(() => {
         setIsFinished(false);
         setHasError(false);
         setRetryCount(0);
-        setKey(prev => prev + 1);
+        // setKey(prev => prev + 1); // REMOVED: Prevents unnecessary remount
         loopCount.current = 0;
         currentTimeSV.value = 0;
         durationSV.value = 0;
+        videoRef.current?.seek(0); // Use seek instead of remount
     }, [video.id]);
 
     // Unlock orientation when component unmounts
@@ -261,31 +276,34 @@ export const VideoLayer = memo(function VideoLayer({
 
     return (
         <View style={styles.container}>
-            <Video
-                key={key}
-                ref={videoRef}
-                source={videoSource}
-                style={[styles.video, { backgroundColor: '#000' }]} // Black bg to prevent white flash
-                resizeMode={resizeMode}
-                // poster={video.thumbnailUrl} // Removed: Causes glitch (Start -> Thumb -> Start)
-                // posterResizeMode={resizeMode}
-                repeat={false}
-                paused={!shouldPlay}
-                muted={isMuted}
-                bufferConfig={bufferConfig}
-                onLoad={handleLoad} // Triggers fade out of manual poster
-                onLoadStart={() => {
-                    // Hide poster as soon as video starts loading to prevent conflicts
-                    setShowPoster(false);
-                }}
-                onError={handleVideoError}
-                onProgress={handleProgress}
-                onEnd={handleEnd}
-                playInBackground={false}
-                playWhenInactive={false}
-                ignoreSilentSwitch="ignore"
-                progressUpdateInterval={33}
-            />
+            {/* Only render Video component when source is ready */}
+            {isSourceReady && videoSource && (
+                <Video
+                    key={key}
+                    ref={videoRef}
+                    source={videoSource}
+                    style={[styles.video, { backgroundColor: '#000' }]} // Black bg to prevent white flash
+                    resizeMode={resizeMode}
+                    // poster={video.thumbnailUrl} // Removed: Causes glitch (Start -> Thumb -> Start)
+                    // posterResizeMode={resizeMode}
+                    repeat={false}
+                    paused={!shouldPlay}
+                    muted={isMuted}
+                    bufferConfig={bufferConfig}
+                    onLoad={handleLoad} // Triggers fade out of manual poster
+                    onLoadStart={() => {
+                        // Hide poster as soon as video starts loading to prevent conflicts
+                        setShowPoster(false);
+                    }}
+                    onError={handleVideoError}
+                    onProgress={handleProgress}
+                    onEnd={handleEnd}
+                    playInBackground={false}
+                    playWhenInactive={false}
+                    ignoreSilentSwitch="ignore"
+                    progressUpdateInterval={33}
+                />
+            )}
 
             {/* Manual Poster Overlay (Only show before video starts loading) */}
             {showPoster && video.thumbnailUrl && (

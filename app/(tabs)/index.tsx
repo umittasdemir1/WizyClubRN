@@ -39,12 +39,13 @@ import { useRouter } from 'expo-router';
 import { FeedSkeleton } from '../../src/presentation/components/feed/FeedSkeleton';
 import { UploadModal } from '../../src/presentation/components/feed/UploadModal';
 import { useUploadStore } from '../../src/presentation/store/useUploadStore';
+import { PerformanceLogger } from '../../src/core/services/PerformanceLogger';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
 const VIEWABILITY_CONFIG = {
-    itemVisiblePercentThreshold: 60,
-    minimumViewTime: 100,
+    itemVisiblePercentThreshold: 70, // Increased from 60 to 70 for more stable detection
+    minimumViewTime: 150, // Increased from 100 to 150ms to filter fast scrolls
 };
 
 export default function FeedScreen() {
@@ -146,6 +147,8 @@ export default function FeedScreen() {
                 const newId = viewableItems[0].item?.id ?? null;
 
                 if (newId !== activeVideoId) {
+                    // Start performance tracking
+                    PerformanceLogger.startTransition(newId);
                     setActiveVideo(newId, newIndex);
                 }
             }

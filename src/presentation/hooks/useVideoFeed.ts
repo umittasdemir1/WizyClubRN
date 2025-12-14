@@ -48,21 +48,33 @@ export function useVideoFeed(): UseVideoFeedReturn {
         VideoCacheService.initialize();
     }, []);
 
-    // Prefetching Logic
+    // Smart Prefetch: Guarantee next video is cached, prefetch others in background
     useEffect(() => {
         if (!activeVideoId || videos.length === 0) return;
 
         const currentIndex = videos.findIndex(v => v.id === activeVideoId);
         if (currentIndex === -1) return;
 
-        // Prefetch next 3 videos
-        const videosToPrefetch = videos.slice(currentIndex + 1, currentIndex + 4);
+        const prefetchVideos = async () => {
+            const nextVideo = videos[currentIndex + 1];
 
-        videosToPrefetch.forEach(video => {
-            if (typeof video.videoUrl === 'string') {
-                VideoCacheService.cacheVideo(video.videoUrl);
+            // PRIORITY 1: Next video MUST be cached (await!)
+            if (nextVideo && typeof nextVideo.videoUrl === 'string') {
+                await VideoCacheService.cacheVideo(nextVideo.videoUrl);
+                console.log('[Prefetch] ✅ NEXT video guaranteed:', nextVideo.id);
             }
-        });
+
+            // PRIORITY 2: Background prefetch for videos +2 and +3 (no await)
+            const backgroundVideos = videos.slice(currentIndex + 2, currentIndex + 4);
+            backgroundVideos.forEach(video => {
+                if (typeof video.videoUrl === 'string') {
+                    VideoCacheService.cacheVideo(video.videoUrl);
+                    console.log('[Prefetch] 🔄 Background prefetch:', video.id);
+                }
+            });
+        };
+
+        prefetchVideos();
     }, [activeVideoId, videos]);
 
     useEffect(() => {
