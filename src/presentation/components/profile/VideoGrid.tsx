@@ -4,7 +4,9 @@ import { Image } from 'expo-image';
 import { Play } from 'lucide-react-native';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const ITEM_WIDTH = (SCREEN_WIDTH - 6) / 3; // 3 columns with 2px gap
+const GAP = 2;
+const PADDING = 2;
+const ITEM_WIDTH = (SCREEN_WIDTH - (PADDING * 2) - (GAP * 2)) / 3; // 3 columns with 2px gap
 
 interface VideoItem {
   id: string;
@@ -33,10 +35,16 @@ export const VideoGrid: React.FC<VideoGridProps> = ({ videos, isDark }) => {
 
   return (
     <View style={styles.container}>
-      {videos.map((video) => (
+      {videos.map((video, index) => (
         <TouchableOpacity
           key={video.id}
-          style={[styles.videoItem, { backgroundColor: bgColor }]}
+          style={[
+            styles.videoItem,
+            { backgroundColor: bgColor },
+            // Add margin to create gaps between items
+            index % 3 !== 2 && { marginRight: GAP }, // Not the last column
+            { marginBottom: GAP }, // Gap between rows
+          ]}
         >
           <Image
             source={{ uri: video.thumbnail }}
@@ -60,8 +68,7 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 2,
-    paddingHorizontal: 2,
+    paddingHorizontal: PADDING,
     marginTop: 5,
   },
   videoItem: {

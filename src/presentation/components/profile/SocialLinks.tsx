@@ -15,12 +15,14 @@ interface SocialLinksProps {
   clubsCount: number;
   clubLogos: string[];
   isDark: boolean;
+  onClubsPress?: () => void;
 }
 
 export const SocialLinks: React.FC<SocialLinksProps> = ({
   clubsCount,
   clubLogos,
   isDark,
+  onClubsPress,
 }) => {
   const iconColor = isDark ? '#fff' : '#000';
   const bgColor = isDark ? '#1c1c1e' : '#f0f0f0';
@@ -59,7 +61,7 @@ export const SocialLinks: React.FC<SocialLinksProps> = ({
       <View style={[styles.separator, { backgroundColor: separatorColor }]} />
 
       {/* Sağ: Clubs */}
-      <View style={styles.socialRight}>
+      <TouchableOpacity style={styles.socialRight} onPress={onClubsPress} activeOpacity={0.7}>
         <View style={styles.clubsAvatars}>
           {clubLogos.slice(0, 3).map((logo, index) => (
             <View
@@ -89,7 +91,7 @@ export const SocialLinks: React.FC<SocialLinksProps> = ({
             ile işbirliği
           </Text>
         </View>
-      </View>
+      </TouchableOpacity>
     </View>
   );
 };

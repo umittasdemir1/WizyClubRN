@@ -5,15 +5,16 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  useColorScheme,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../../src/presentation/contexts/ThemeContext';
 import { Avatar } from '../../src/presentation/components/shared/Avatar';
 import { ProfileStats } from '../../src/presentation/components/profile/ProfileStats';
 import { SocialLinks } from '../../src/presentation/components/profile/SocialLinks';
 import { HighlightPills } from '../../src/presentation/components/profile/HighlightPills';
 import { VideoGrid } from '../../src/presentation/components/profile/VideoGrid';
 import { BioBottomSheet } from '../../src/presentation/components/profile/BioBottomSheet';
+import { ClubsBottomSheet } from '../../src/presentation/components/profile/ClubsBottomSheet';
 import { ChevronLeft, Sun, Moon, MoreHorizontal, Bell, Heart, Share2, Settings } from 'lucide-react-native';
 import BottomSheet from '@gorhom/bottom-sheet';
 import Svg, { Path, Circle } from 'react-native-svg';
@@ -51,13 +52,11 @@ const TagsIcon = ({ color }: { color: string }) => (
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const systemColorScheme = useColorScheme();
-  const [colorScheme, setColorScheme] = useState<'light' | 'dark'>(systemColorScheme || 'dark');
+  const { colorScheme, toggleTheme, isDark } = useTheme();
   const [isFollowing, setIsFollowing] = useState(false);
   const [activeTab, setActiveTab] = useState<'posts' | 'videos' | 'tags'>('posts');
   const bioSheetRef = useRef<BottomSheet>(null);
-
-  const isDark = colorScheme === 'dark';
+  const clubsSheetRef = useRef<BottomSheet>(null);
 
   // Theme colors
   const bgBody = isDark ? '#121212' : '#e0e0e0';
@@ -94,11 +93,51 @@ export default function ProfileScreen() {
     'https://i.pravatar.cc/100?img=8',
   ];
 
-  // Clubs data
+  // Clubs data - Using reliable CDN hosted brand logos
   const clubLogos = [
-    'https://logo.clearbit.com/amazon.com',
-    'https://logo.clearbit.com/tesla.com',
-    'https://logo.clearbit.com/nike.com',
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Amazon_logo.svg/200px-Amazon_logo.svg.png',
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/Tesla_Motors.svg/200px-Tesla_Motors.svg.png',
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Logo_NIKE.svg/200px-Logo_NIKE.svg.png',
+  ];
+
+  // Full clubs list with collaboration counts
+  const clubs = [
+    {
+      id: '1',
+      name: 'Amazon',
+      logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Amazon_logo.svg/200px-Amazon_logo.svg.png',
+      collaborationCount: 12,
+    },
+    {
+      id: '2',
+      name: 'Tesla',
+      logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/Tesla_Motors.svg/200px-Tesla_Motors.svg.png',
+      collaborationCount: 8,
+    },
+    {
+      id: '3',
+      name: 'Nike',
+      logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Logo_NIKE.svg/200px-Logo_NIKE.svg.png',
+      collaborationCount: 15,
+    },
+    {
+      id: '4',
+      name: 'Apple',
+      logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Apple_logo_black.svg/200px-Apple_logo_black.svg.png',
+      collaborationCount: 10,
+    },
+    {
+      id: '5',
+      name: 'Adidas',
+      logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/20/Adidas_Logo.svg/200px-Adidas_Logo.svg.png',
+      collaborationCount: 7,
+    },
+    {
+      id: '6',
+      name: 'Coca-Cola',
+      logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/Coca-Cola_logo.svg/200px-Coca-Cola_logo.svg.png',
+      collaborationCount: 5,
+    },
   ];
 
   // Highlights data
@@ -130,16 +169,16 @@ export default function ProfileScreen() {
     { id: '6', thumbnail: 'https://picsum.photos/300/500?random=15', views: '900' },
   ];
 
-  const toggleTheme = () => {
-    setColorScheme(colorScheme === 'dark' ? 'light' : 'dark');
-  };
-
   const toggleFollow = () => {
     setIsFollowing(!isFollowing);
   };
 
   const openBioSheet = () => {
     bioSheetRef.current?.expand();
+  };
+
+  const openClubsSheet = () => {
+    clubsSheetRef.current?.expand();
   };
 
   const bioLimit = 110;
@@ -271,7 +310,12 @@ export default function ProfileScreen() {
             />
 
             {/* Social Links */}
-            <SocialLinks clubsCount={26} clubLogos={clubLogos} isDark={isDark} />
+            <SocialLinks
+              clubsCount={clubs.length}
+              clubLogos={clubLogos}
+              isDark={isDark}
+              onClubsPress={openClubsSheet}
+            />
           </View>
 
           {/* Tabs */}
@@ -284,14 +328,6 @@ export default function ProfileScreen() {
               onPress={() => setActiveTab('posts')}
             >
               <GridIcon color={activeTab === 'posts' ? textPrimary : textSecondary} />
-              <Text
-                style={[
-                  styles.tabText,
-                  { color: activeTab === 'posts' ? textPrimary : textSecondary },
-                ]}
-              >
-                Posts
-              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -302,14 +338,6 @@ export default function ProfileScreen() {
               onPress={() => setActiveTab('videos')}
             >
               <VideoIcon color={activeTab === 'videos' ? textPrimary : textSecondary} />
-              <Text
-                style={[
-                  styles.tabText,
-                  { color: activeTab === 'videos' ? textPrimary : textSecondary },
-                ]}
-              >
-                Videos
-              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -320,14 +348,6 @@ export default function ProfileScreen() {
               onPress={() => setActiveTab('tags')}
             >
               <TagsIcon color={activeTab === 'tags' ? textPrimary : textSecondary} />
-              <Text
-                style={[
-                  styles.tabText,
-                  { color: activeTab === 'tags' ? textPrimary : textSecondary },
-                ]}
-              >
-                Tags
-              </Text>
             </TouchableOpacity>
           </View>
 
@@ -343,6 +363,9 @@ export default function ProfileScreen() {
 
       {/* Bio Bottom Sheet */}
       <BioBottomSheet ref={bioSheetRef} bio={user.bio} isDark={isDark} />
+
+      {/* Clubs Bottom Sheet */}
+      <ClubsBottomSheet ref={clubsSheetRef} clubs={clubs} isDark={isDark} />
     </View>
   );
 }
