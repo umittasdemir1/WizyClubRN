@@ -33,6 +33,7 @@ class PerformanceLoggerService {
      */
     endTransition(videoId: string, source: 'memory-cache' | 'disk-cache' | 'network') {
         let metric = this.metrics.get(videoId);
+        let isPreRendered = false;
 
         // Auto-create start metric if not found (for pre-rendered videos)
         if (!metric) {
@@ -40,10 +41,18 @@ class PerformanceLoggerService {
             this.startTransition(videoId);
             metric = this.metrics.get(videoId);
             if (!metric) return; // Safety check
+            isPreRendered = true;
         }
 
         const endTime = Date.now();
         const duration = endTime - metric.startTime;
+
+        // Ignore pre-rendered videos with unrealistic timing (<100ms)
+        if (isPreRendered && duration < 100) {
+            console.log(`[Perf] ⏭️  Ignoring pre-rendered video (${duration}ms): ${videoId}`);
+            this.metrics.delete(videoId);
+            return;
+        }
 
         metric.endTime = endTime;
         metric.duration = duration;
