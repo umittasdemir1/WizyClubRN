@@ -1,6 +1,5 @@
 import React, { memo } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -23,7 +22,7 @@ interface ActionButtonsProps {
     onProfilePress: () => void;
 }
 
-const FIXED_BOTTOM_POSITION = 120; // Lifted 50px to keep actions higher on screen
+const FIXED_BOTTOM_POSITION = 70; // Revert closer to nav/seek bar
 const ICON_SIZE = 36; // User requested 36px
 
 // Colors
@@ -73,13 +72,8 @@ export const ActionButtons = memo(function ActionButtons({
     onShare,
     onShop,
 }: ActionButtonsProps) {
-    const insets = useSafeAreaInsets();
-
     return (
-        <View
-            style={[styles.container, { bottom: FIXED_BOTTOM_POSITION + insets.bottom }]}
-            pointerEvents="box-none"
-        >
+        <View style={[styles.container, { bottom: FIXED_BOTTOM_POSITION }]} pointerEvents="box-none">
             <ActionButton
                 icon={LikeIcon}
                 count={formatCount(video.likesCount)}
