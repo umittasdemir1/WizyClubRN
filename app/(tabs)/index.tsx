@@ -284,16 +284,17 @@ export default function FeedScreen() {
         videoSeekRef.current = seekFn;
     }, []);
 
-    // Snap back when on last video and scrolled past
-    const handleScrollEnd = useCallback((event: any) => {
-        if (videos.length === 0) return;
-        const offsetY = event.nativeEvent.contentOffset.y;
-        const maxOffset = (videos.length - 1) * ITEM_HEIGHT + listPaddingBottom;
-        // If scrolled past spacer beyond the last video, snap back
-        if (offsetY > maxOffset) {
-            listRef.current?.scrollToIndex({ index: videos.length - 1, animated: true });
-        }
-    }, [videos.length, ITEM_HEIGHT, listPaddingBottom]);
+    // Snap back when on last video and scrolled past its start (prevents seekbar lifting)
+    const snapBackToLastVideo = useCallback(
+        (offsetY: number) => {
+            if (videos.length === 0) return;
+            const lastVideoOffset = (videos.length - 1) * ITEM_HEIGHT;
+            if (offsetY > lastVideoOffset) {
+                listRef.current?.scrollToIndex({ index: videos.length - 1, animated: true });
+            }
+        },
+        [videos.length, ITEM_HEIGHT]
+    );
 
     const renderItem = useCallback(
         ({ item }: { item: Video }) => {
@@ -428,10 +429,13 @@ export default function FeedScreen() {
                 bounces={false}
                 overScrollMode="never"
                 onScrollBeginDrag={() => { isScrollingSV.value = true; }}
-                onScrollEndDrag={() => { isScrollingSV.value = false; }}
+                onScrollEndDrag={(e) => {
+                    isScrollingSV.value = false;
+                    snapBackToLastVideo(e.nativeEvent.contentOffset.y);
+                }}
                 onMomentumScrollEnd={(e) => {
                     isScrollingSV.value = false;
-                    handleScrollEnd(e);
+                    snapBackToLastVideo(e.nativeEvent.contentOffset.y);
                 }}
             />
 
