@@ -288,12 +288,12 @@ export default function FeedScreen() {
     const handleScrollEnd = useCallback((event: any) => {
         if (videos.length === 0) return;
         const offsetY = event.nativeEvent.contentOffset.y;
-        const lastVideoOffset = (videos.length - 1) * ITEM_HEIGHT;
-        // If scrolled past last video, snap back
-        if (offsetY > lastVideoOffset) {
+        const maxOffset = (videos.length - 1) * ITEM_HEIGHT + listPaddingBottom;
+        // If scrolled past spacer beyond the last video, snap back
+        if (offsetY > maxOffset) {
             listRef.current?.scrollToIndex({ index: videos.length - 1, animated: true });
         }
-    }, [videos.length, ITEM_HEIGHT]);
+    }, [videos.length, ITEM_HEIGHT, listPaddingBottom]);
 
     const renderItem = useCallback(
         ({ item }: { item: Video }) => {
@@ -386,10 +386,9 @@ export default function FeedScreen() {
     }
 
     const renderFooter = () => {
-        if (!isLoadingMore) return null;
         return (
-            <View style={styles.footerLoader}>
-                <ActivityIndicator size="small" color="#FFF" />
+            <View style={[styles.footerLoader, { height: listPaddingBottom }]}>
+                {isLoadingMore && <ActivityIndicator size="small" color="#FFF" />}
             </View>
         );
     };
@@ -410,7 +409,7 @@ export default function FeedScreen() {
                 snapToAlignment="start"
                 showsVerticalScrollIndicator={false}
                 viewabilityConfigCallbackPairs={viewabilityConfigCallbackPairs.current}
-                contentContainerStyle={{ paddingBottom: listPaddingBottom }}
+                contentContainerStyle={styles.listContent}
                 refreshControl={
                     <RefreshControl
                         refreshing={isRefreshing}
@@ -478,6 +477,9 @@ const styles = StyleSheet.create({
         width: SCREEN_WIDTH,
         position: 'relative',
         justifyContent: 'center', // Center video for equal black bars
+    },
+    listContent: {
+        paddingBottom: 0,
     },
     actionsContainer: {
         position: 'absolute',
