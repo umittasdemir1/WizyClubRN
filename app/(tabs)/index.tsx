@@ -134,11 +134,11 @@ export default function FeedScreen() {
 
     const ITEM_HEIGHT = useMemo(() => {
         if (layoutHeight !== null) {
-            return Math.max(layoutHeight - insets.top, 0);
+            return Math.max(layoutHeight, 0);
         }
 
-        return Math.max(windowHeight - insets.top - tabBarHeight, 0);
-    }, [layoutHeight, windowHeight, insets.top, tabBarHeight]);
+        return Math.max(windowHeight - tabBarHeight, 0);
+    }, [layoutHeight, windowHeight, tabBarHeight]);
     const router = useRouter();
     const listRef = useRef<any>(null);
     const hasUnseenStories = true;
