@@ -35,7 +35,6 @@ import { FeedSkeleton } from '../../src/presentation/components/feed/FeedSkeleto
 import { UploadModal } from '../../src/presentation/components/feed/UploadModal';
 import { useUploadStore } from '../../src/presentation/store/useUploadStore';
 import { PerformanceLogger } from '../../src/core/services/PerformanceLogger';
-import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -61,9 +60,6 @@ export default function FeedScreen() {
         loadMore,
         deleteVideo,
     } = useVideoFeed();
-
-    // Get theme for status bar
-    const isDark = useThemeStore((state) => state.isDark);
 
     // Global Store
     const setActiveVideo = useActiveVideoStore((state) => state.setActiveVideo);
@@ -390,8 +386,8 @@ export default function FeedScreen() {
 
     return (
         <View style={styles.container}>
-            {/* Theme-aware status bar (video background is always dark) */}
-            <StatusBar style={isDark ? 'light' : 'dark'} />
+            {/* Always white status bar text - video background is always dark */}
+            <StatusBar style="light" />
 
             {/* @ts-ignore */}
             <FlashList
