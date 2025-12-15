@@ -55,7 +55,7 @@ export default function FeedScreen() {
         toggleShop,
         refreshFeed,
         loadMore,
-        removeVideo, // Added
+        deleteVideo,
     } = useVideoFeed();
 
     // Global Store
@@ -187,7 +187,7 @@ export default function FeedScreen() {
 
                             if (response.ok) {
                                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                                removeVideo(activeVideoId);
+                                deleteVideo(activeVideoId);
                             } else {
                                 const errText = await response.text();
                                 console.error("Delete failed:", errText);
@@ -203,7 +203,7 @@ export default function FeedScreen() {
                 }
             ]
         );
-    }, [activeVideoId, removeVideo]);
+    }, [activeVideoId, deleteVideo]);
 
     const handleSheetDelete = useCallback(() => {
         handleCloseMore();
