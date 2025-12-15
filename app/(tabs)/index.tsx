@@ -393,9 +393,6 @@ export default function FeedScreen() {
 
     return (
         <View style={styles.container}>
-            {/* Always light (white text) status bar for feed - black background requires white text */}
-            <StatusBar style="light" />
-
             {/* @ts-ignore */}
             <FlashList
                 // @ts-ignore

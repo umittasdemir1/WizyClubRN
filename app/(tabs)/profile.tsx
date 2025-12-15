@@ -289,7 +289,6 @@ export default function ProfileScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: bgBody }]}>
-      <StatusBar style={isDark ? 'light' : 'dark'} />
       {/* Mobile Container */}
       <View
         style={[

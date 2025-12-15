@@ -30,7 +30,6 @@ export default function ExploreScreen() {
 
     return (
         <View style={[styles.container, { paddingTop: 0, backgroundColor: bgBody }]}>
-            <StatusBar style={isDark ? 'light' : 'dark'} />
             {/* Morphing Discovery Header - Handles top inset internally */}
             <MorphingDiscoveryBar />
 
