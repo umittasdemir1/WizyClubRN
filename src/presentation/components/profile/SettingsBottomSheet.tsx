@@ -1,22 +1,29 @@
 import React, { forwardRef, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Switch } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import BottomSheet, { BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { X } from 'lucide-react-native';
+import { useThemeStore } from '../../store/useThemeStore';
 
 interface SettingsBottomSheetProps {
   isDark: boolean;
-  onThemeToggle: () => void;
 }
 
 export const SettingsBottomSheet = forwardRef<BottomSheet, SettingsBottomSheetProps>(
-  ({ isDark, onThemeToggle }, ref) => {
-    const snapPoints = useMemo(() => ['40%'], []);
+  ({ isDark }, ref) => {
+    const snapPoints = useMemo(() => ['50%'], []);
+    const { themeMode, setThemeMode } = useThemeStore();
 
     const bgColor = isDark ? '#1c1c1e' : '#fff';
     const textColor = isDark ? '#fff' : '#000';
     const secondaryColor = isDark ? '#888' : '#555';
     const borderColor = isDark ? '#2c2c2e' : '#e5e5e5';
     const handleColor = isDark ? '#fff' : '#000';
+
+    const RadioButton = ({ selected }: { selected: boolean }) => (
+      <View style={[styles.radioOuter, { borderColor: selected ? '#007AFF' : secondaryColor }]}>
+        {selected && <View style={styles.radioInner} />}
+      </View>
+    );
 
     return (
       <BottomSheet
@@ -50,28 +57,48 @@ export const SettingsBottomSheet = forwardRef<BottomSheet, SettingsBottomSheetPr
             contentContainerStyle={styles.contentContainer}
             showsVerticalScrollIndicator={false}
           >
-            {/* Theme Toggle - Temporarily Disabled
-            <View style={[styles.settingItem, { borderBottomColor: borderColor }]}>
-              <View style={styles.settingInfo}>
-                <Text style={[styles.settingLabel, { color: textColor }]}>Tema</Text>
-                <Text style={[styles.settingValue, { color: secondaryColor }]}>
-                  {isDark ? 'Koyu Tema' : 'Açık Tema'}
-                </Text>
-              </View>
-              <Switch
-                value={isDark}
-                onValueChange={onThemeToggle}
-                trackColor={{ false: '#767577', true: '#81b0ff' }}
-                thumbColor={isDark ? '#f5dd4b' : '#f4f3f4'}
-                ios_backgroundColor="#3e3e3e"
-              />
-            </View>
-            */}
+            {/* Theme Mode Section */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: textColor }]}>Karanlık Modu</Text>
 
-            <View style={{ padding: 20, alignItems: 'center' }}>
-              <Text style={[styles.settingValue, { color: secondaryColor, textAlign: 'center' }]}>
-                Ayarlar yakında eklenecek
-              </Text>
+              {/* Dark Mode Option */}
+              <TouchableOpacity
+                style={[styles.optionItem, { borderBottomColor: borderColor }]}
+                onPress={() => setThemeMode('dark')}
+                activeOpacity={0.7}
+              >
+                <View style={styles.optionContent}>
+                  <Text style={[styles.optionLabel, { color: textColor }]}>Açık</Text>
+                </View>
+                <RadioButton selected={themeMode === 'dark'} />
+              </TouchableOpacity>
+
+              {/* Light Mode Option */}
+              <TouchableOpacity
+                style={[styles.optionItem, { borderBottomColor: borderColor }]}
+                onPress={() => setThemeMode('light')}
+                activeOpacity={0.7}
+              >
+                <View style={styles.optionContent}>
+                  <Text style={[styles.optionLabel, { color: textColor }]}>Kapalı</Text>
+                </View>
+                <RadioButton selected={themeMode === 'light'} />
+              </TouchableOpacity>
+
+              {/* System Mode Option */}
+              <TouchableOpacity
+                style={styles.optionItem}
+                onPress={() => setThemeMode('system')}
+                activeOpacity={0.7}
+              >
+                <View style={styles.optionContent}>
+                  <Text style={[styles.optionLabel, { color: textColor }]}>Sistem Varsayılanı</Text>
+                  <Text style={[styles.optionDescription, { color: secondaryColor }]}>
+                    Cihazınızın sistem ayarlarına göre düzenleyeceğiz.
+                  </Text>
+                </View>
+                <RadioButton selected={themeMode === 'system'} />
+              </TouchableOpacity>
             </View>
           </BottomSheetScrollView>
         </BottomSheetView>
@@ -107,23 +134,50 @@ const styles = StyleSheet.create({
   contentContainer: {
     paddingBottom: 20,
   },
-  settingItem: {
+  section: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  optionItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 14,
     borderBottomWidth: 1,
   },
-  settingInfo: {
+  optionContent: {
     flex: 1,
+    marginRight: 12,
   },
-  settingLabel: {
+  optionLabel: {
     fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
+    fontWeight: '500',
+    marginBottom: 2,
   },
-  settingValue: {
-    fontSize: 14,
+  optionDescription: {
+    fontSize: 12,
     fontWeight: '400',
+    marginTop: 4,
+    lineHeight: 16,
+  },
+  radioOuter: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#007AFF',
   },
 });

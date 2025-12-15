@@ -109,7 +109,7 @@ const AnimatedIconButton = ({
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { isDark, toggleTheme } = useThemeStore();
+  const { isDark } = useThemeStore();
   const colorScheme = isDark ? 'dark' : 'light';
   const [isFollowing, setIsFollowing] = useState(false);
   const [activeTab, setActiveTab] = useState<'posts' | 'videos' | 'tags'>('posts');
@@ -280,7 +280,7 @@ export default function ProfileScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: bgBody }]}>
-      <StatusBar style="light" />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       {/* Mobile Container */}
       <View
         style={[
@@ -505,7 +505,7 @@ export default function ProfileScreen() {
       <ClubsBottomSheet ref={clubsSheetRef} clubs={clubs} isDark={isDark} />
 
       {/* Settings Bottom Sheet */}
-      <SettingsBottomSheet ref={settingsSheetRef} isDark={isDark} onThemeToggle={toggleTheme} />
+      <SettingsBottomSheet ref={settingsSheetRef} isDark={isDark} />
     </View>
   );
 }

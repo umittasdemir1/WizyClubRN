@@ -68,7 +68,7 @@ export default function DealsScreen() {
 
     return (
         <View style={[styles.container, { paddingTop: insets.top, backgroundColor: bgBody }]}>
-            <StatusBar style="light" />
+            <StatusBar style={isDark ? 'light' : 'dark'} />
             <Text style={[styles.title, { color: textColor }]}>Brand Deals</Text>
             {/* @ts-ignore */}
             <FlashList
