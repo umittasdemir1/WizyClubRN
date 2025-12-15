@@ -1,4 +1,6 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, StatusBar as RNStatusBar } from 'react-native';
+import { useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 import { FlashList } from '@shopify/flash-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '../../src/presentation/components/shared/Avatar';
@@ -13,11 +15,17 @@ const MOCK_NOTIFICATIONS = [
 ];
 
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
-import { StatusBar } from 'expo-status-bar';
 
 export default function NotificationsScreen() {
     const insets = useSafeAreaInsets();
     const isDark = useThemeStore((state) => state.isDark);
+
+    useFocusEffect(
+        useCallback(() => {
+            RNStatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
+        }, [isDark])
+    );
+
     const bgBody = isDark ? '#000000' : '#FFFFFF';
     const textColor = isDark ? '#FFFFFF' : '#000000';
     const borderBottomColor = isDark ? '#1a1a1a' : '#eee';
@@ -51,7 +59,7 @@ export default function NotificationsScreen() {
 
     return (
         <View style={[styles.container, { paddingTop: insets.top, backgroundColor: bgBody }]}>
-            <StatusBar style={isDark ? 'light' : 'dark'} />
+
             <Text style={[styles.title, { color: textColor }]}>Notifications</Text>
             <FlashList
                 data={MOCK_NOTIFICATIONS}

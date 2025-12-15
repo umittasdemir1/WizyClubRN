@@ -8,7 +8,8 @@ import {
     Text,
     RefreshControl,
     Platform,
-    Alert, // Added
+    Alert,
+    StatusBar as RNStatusBar, // Imperative API
 } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -28,7 +29,7 @@ import {
 import { Video } from '../../src/domain/entities/Video';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { FeedSkeleton } from '../../src/presentation/components/feed/FeedSkeleton';
 import { UploadModal } from '../../src/presentation/components/feed/UploadModal';
 import { useUploadStore } from '../../src/presentation/store/useUploadStore';
@@ -114,6 +115,13 @@ export default function FeedScreen() {
 
     // Calculate video height - full screen for proper paging
     const ITEM_HEIGHT = Dimensions.get('window').height;
+
+    // Imperative StatusBar Control (Feed is ALWAYS Black -> White Text)
+    useFocusEffect(
+        useCallback(() => {
+            RNStatusBar.setBarStyle('light-content', true);
+        }, [])
+    );
 
     const hasUnseenStories = true;
 

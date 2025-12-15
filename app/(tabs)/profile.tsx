@@ -6,7 +6,10 @@ import {
   TouchableOpacity,
   ScrollView,
   Pressable,
+  StatusBar as RNStatusBar,
 } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router'; // useRouter added if needed, useFocusEffect critical
+import { useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import { Avatar } from '../../src/presentation/components/shared/Avatar';
@@ -108,7 +111,14 @@ const AnimatedIconButton = ({
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
+
   const { isDark, toggleTheme } = useThemeStore();
+
+  useFocusEffect(
+    useCallback(() => {
+      RNStatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
+    }, [isDark])
+  );
   const colorScheme = isDark ? 'dark' : 'light';
   const [isFollowing, setIsFollowing] = useState(false);
   const [activeTab, setActiveTab] = useState<'posts' | 'videos' | 'tags'>('posts');

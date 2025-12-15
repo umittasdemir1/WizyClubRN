@@ -8,8 +8,11 @@ import { DealRepositoryImpl } from '../../src/data/repositories/DealRepositoryIm
 import { Avatar } from '../../src/presentation/components/shared/Avatar';
 import { DollarSign, Calendar, CheckCircle } from 'lucide-react-native';
 import { LoadingIndicator } from '../../src/presentation/components/shared/LoadingIndicator';
+
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
-import { StatusBar } from 'expo-status-bar';
+import { useCallback } from 'react';
+import { StatusBar as RNStatusBar } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 
 export default function DealsScreen() {
     const insets = useSafeAreaInsets();
@@ -19,6 +22,12 @@ export default function DealsScreen() {
     const bgBody = isDark ? '#000000' : '#FFFFFF';
     const textColor = isDark ? '#FFFFFF' : '#000000';
     const cardBg = isDark ? '#1a1a1a' : '#f0f0f0';
+
+    useFocusEffect(
+        useCallback(() => {
+            RNStatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
+        }, [isDark])
+    );
 
     useEffect(() => {
         const fetchDeals = async () => {
@@ -68,7 +77,7 @@ export default function DealsScreen() {
 
     return (
         <View style={[styles.container, { paddingTop: insets.top, backgroundColor: bgBody }]}>
-            <StatusBar style={isDark ? 'light' : 'dark'} />
+
             <Text style={[styles.title, { color: textColor }]}>Brand Deals</Text>
             {/* @ts-ignore */}
             <FlashList

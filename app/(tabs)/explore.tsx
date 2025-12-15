@@ -1,4 +1,6 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, StatusBar as RNStatusBar } from 'react-native';
+import { useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import { Image } from 'expo-image';
@@ -9,7 +11,7 @@ const CATEGORIES = ['For You', 'Trending', 'Food', 'Travel', 'Tech', 'Art', 'Mus
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const ITEM_SIZE = (SCREEN_WIDTH - 40) / 2;
 
-import { StatusBar } from 'expo-status-bar';
+
 
 export default function ExploreScreen() {
     // Insets handled by DiscoveryBar for top, but bottom might need handling
@@ -19,9 +21,15 @@ export default function ExploreScreen() {
     const bgBody = isDark ? '#000000' : '#FFFFFF';
     const textColor = isDark ? '#FFFFFF' : '#000000';
 
+    // Imperative StatusBar Control
+    useFocusEffect(
+        useCallback(() => {
+            RNStatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
+        }, [isDark])
+    );
+
     return (
         <View style={[styles.container, { paddingTop: 0, backgroundColor: bgBody }]}>
-            <StatusBar style={isDark ? 'light' : 'dark'} />
             {/* Morphing Discovery Header - Handles top inset internally */}
             <MorphingDiscoveryBar />
 
