@@ -130,15 +130,11 @@ export default function FeedScreen() {
     const insets = useSafeAreaInsets();
     const tabBarHeight = useBottomTabBarHeight();
     const { width: SCREEN_WIDTH, height: windowHeight } = useWindowDimensions();
-    const [layoutHeight, setLayoutHeight] = useState<number | null>(null);
 
-    const ITEM_HEIGHT = useMemo(() => {
-        if (layoutHeight !== null) {
-            return Math.max(layoutHeight, 0);
-        }
-
-        return Math.max(windowHeight - tabBarHeight, 0);
-    }, [layoutHeight, windowHeight, tabBarHeight]);
+    const ITEM_HEIGHT = useMemo(
+        () => Math.max(windowHeight - insets.top - tabBarHeight, 0),
+        [windowHeight, insets.top, tabBarHeight]
+    );
     const router = useRouter();
     const listRef = useRef<any>(null);
     const hasUnseenStories = true;
@@ -389,7 +385,6 @@ export default function FeedScreen() {
         <SafeAreaView
             style={styles.container}
             edges={['top', 'left', 'right']}
-            onLayout={(event) => setLayoutHeight(event.nativeEvent.layout.height)}
         >
             <StatusBar style="light" backgroundColor="#000000" />
 
