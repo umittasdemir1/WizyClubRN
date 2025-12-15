@@ -37,6 +37,7 @@ import { UploadModal } from '../../src/presentation/components/feed/UploadModal'
 import { useUploadStore } from '../../src/presentation/store/useUploadStore';
 import { PerformanceLogger } from '../../src/core/services/PerformanceLogger';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
+import { LAYOUT } from '../../src/core/constants';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -147,6 +148,7 @@ export default function FeedScreen() {
     const listRef = useRef<any>(null);
 
     const ITEM_HEIGHT = Dimensions.get('window').height;
+    const bottomContentInset = LAYOUT.tabBarHeight + insets.bottom;
     const hasUnseenStories = true;
 
     // UI Opacity
@@ -286,11 +288,12 @@ export default function FeedScreen() {
         if (videos.length === 0) return;
         const offsetY = event.nativeEvent.contentOffset.y;
         const lastVideoOffset = (videos.length - 1) * ITEM_HEIGHT;
-        // If scrolled past last video, snap back
-        if (offsetY > lastVideoOffset) {
+        const maxOffset = lastVideoOffset + bottomContentInset;
+        // If scrolled far past last video (beyond footer padding), snap back
+        if (offsetY > maxOffset) {
             listRef.current?.scrollToIndex({ index: videos.length - 1, animated: true });
         }
-    }, [videos.length, ITEM_HEIGHT]);
+    }, [videos.length, ITEM_HEIGHT, bottomContentInset]);
 
     const renderItem = useCallback(
         ({ item }: { item: Video }) => {
@@ -383,10 +386,9 @@ export default function FeedScreen() {
     }
 
     const renderFooter = () => {
-        if (!isLoadingMore) return null;
         return (
             <View style={styles.footerLoader}>
-                <ActivityIndicator size="small" color="#FFF" />
+                {isLoadingMore && <ActivityIndicator size="small" color="#FFF" />}
             </View>
         );
     };
@@ -407,6 +409,7 @@ export default function FeedScreen() {
                 snapToAlignment="start"
                 showsVerticalScrollIndicator={false}
                 viewabilityConfigCallbackPairs={viewabilityConfigCallbackPairs.current}
+                contentContainerStyle={{ paddingBottom: bottomContentInset }}
                 refreshControl={
                     <RefreshControl
                         refreshing={isRefreshing}
@@ -490,7 +493,6 @@ const styles = StyleSheet.create({
     emptyText: { color: '#FFF' },
     emptySubtext: { color: '#aaa' },
     footerLoader: {
-        height: 50,
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: 'transparent'
