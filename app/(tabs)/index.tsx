@@ -148,7 +148,8 @@ export default function FeedScreen() {
     const listRef = useRef<any>(null);
 
     const tabBarHeight = useBottomTabBarHeight();
-    const ITEM_HEIGHT = Dimensions.get('window').height - tabBarHeight;
+    const ITEM_HEIGHT = Dimensions.get('window').height;
+    const listPaddingBottom = tabBarHeight + insets.bottom;
     const hasUnseenStories = true;
 
     // UI Opacity
@@ -409,6 +410,7 @@ export default function FeedScreen() {
                 snapToAlignment="start"
                 showsVerticalScrollIndicator={false}
                 viewabilityConfigCallbackPairs={viewabilityConfigCallbackPairs.current}
+                contentContainerStyle={{ paddingBottom: listPaddingBottom }}
                 refreshControl={
                     <RefreshControl
                         refreshing={isRefreshing}
