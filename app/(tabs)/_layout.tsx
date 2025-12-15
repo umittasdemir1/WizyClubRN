@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router';
 import { Platform } from 'react-native';
 import { NativeModulesProxy } from 'expo-modules-core';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Import SVGs
 import HomeIcon from '../../assets/icons/home.svg';
@@ -18,6 +19,12 @@ export default function TabLayout() {
     const DEAL_ICON_SIZE = 32;
     const BAR_CONTENT_HEIGHT = 55;
     const barBackgroundColor = useMemo(() => (isDark ? '#000000' : '#FFFFFF'), [isDark]);
+    const insets = useSafeAreaInsets();
+
+    const tabBarHeight = useMemo(
+        () => BAR_CONTENT_HEIGHT + insets.bottom,
+        [BAR_CONTENT_HEIGHT, insets.bottom]
+    );
 
     useEffect(() => {
         if (Platform.OS !== 'android') return;
@@ -34,8 +41,9 @@ export default function TabLayout() {
                 tabBarStyle: {
                     backgroundColor: barBackgroundColor,
                     borderTopWidth: 0, // No border requested, just clean look
-                    height: BAR_CONTENT_HEIGHT,
+                    height: tabBarHeight,
                     paddingTop: 5, // Center icons vertically (55 - 28) / 2 approx or adjusted
+                    paddingBottom: insets.bottom,
                 },
                 tabBarActiveTintColor: isDark ? '#FFFFFF' : '#000000',
                 tabBarInactiveTintColor: isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)',
