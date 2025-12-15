@@ -386,7 +386,8 @@ export default function FeedScreen() {
 
     return (
         <View style={styles.container}>
-            <StatusBar style="light" />
+            {/* Force light status bar for dark video background */}
+            <StatusBar style="light" translucent={false} backgroundColor="#000000" />
 
             {/* @ts-ignore */}
             <FlashList

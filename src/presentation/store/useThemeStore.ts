@@ -14,21 +14,26 @@ interface ThemeState {
 export const useThemeStore = create<ThemeState>()(
     persist(
         (set, get) => ({
-            theme: 'dark', // Default to dark
+            theme: 'dark', // Locked to dark mode
             isDark: true,
 
             toggleTheme: () => {
-                const newTheme = get().theme === 'dark' ? 'light' : 'dark';
+                // Temporarily disabled - always use dark mode
+                console.log('Theme toggle disabled - using dark mode only');
+                // Force dark mode in case it was changed
                 set({
-                    theme: newTheme,
-                    isDark: newTheme === 'dark'
+                    theme: 'dark',
+                    isDark: true
                 });
             },
 
             setTheme: (theme: Theme) => {
+                // Temporarily disabled - always use dark mode
+                console.log('Theme change disabled - using dark mode only');
+                // Force dark mode
                 set({
-                    theme,
-                    isDark: theme === 'dark'
+                    theme: 'dark',
+                    isDark: true
                 });
             },
         }),

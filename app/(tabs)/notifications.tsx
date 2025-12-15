@@ -51,7 +51,7 @@ export default function NotificationsScreen() {
 
     return (
         <View style={[styles.container, { paddingTop: insets.top, backgroundColor: bgBody }]}>
-            <StatusBar style={isDark ? 'light' : 'dark'} />
+            <StatusBar style="light" />
             <Text style={[styles.title, { color: textColor }]}>Notifications</Text>
             <FlashList
                 data={MOCK_NOTIFICATIONS}

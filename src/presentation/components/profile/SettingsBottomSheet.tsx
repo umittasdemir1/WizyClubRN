@@ -50,7 +50,7 @@ export const SettingsBottomSheet = forwardRef<BottomSheet, SettingsBottomSheetPr
             contentContainerStyle={styles.contentContainer}
             showsVerticalScrollIndicator={false}
           >
-            {/* Theme Toggle */}
+            {/* Theme Toggle - Temporarily Disabled
             <View style={[styles.settingItem, { borderBottomColor: borderColor }]}>
               <View style={styles.settingInfo}>
                 <Text style={[styles.settingLabel, { color: textColor }]}>Tema</Text>
@@ -65,6 +65,13 @@ export const SettingsBottomSheet = forwardRef<BottomSheet, SettingsBottomSheetPr
                 thumbColor={isDark ? '#f5dd4b' : '#f4f3f4'}
                 ios_backgroundColor="#3e3e3e"
               />
+            </View>
+            */}
+
+            <View style={{ padding: 20, alignItems: 'center' }}>
+              <Text style={[styles.settingValue, { color: secondaryColor, textAlign: 'center' }]}>
+                Ayarlar yakında eklenecek
+              </Text>
             </View>
           </BottomSheetScrollView>
         </BottomSheetView>
