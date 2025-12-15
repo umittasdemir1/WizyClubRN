@@ -65,6 +65,9 @@ export default function FeedScreen() {
     // Theme
     const isDark = useThemeStore((state) => state.isDark);
 
+    // DEBUG: Log theme state
+    console.log('[FEED] Theme isDark:', isDark);
+
     // Global Store
     const setActiveVideo = useActiveVideoStore((state) => state.setActiveVideo);
     const activeVideoId = useActiveVideoStore((state) => state.activeVideoId);
@@ -392,6 +395,10 @@ export default function FeedScreen() {
         <View style={styles.container}>
             {/* Theme-aware status bar */}
             <StatusBar style={isDark ? 'light' : 'dark'} />
+            {/* DEBUG */}
+            <View style={{ position: 'absolute', top: 50, left: 10, zIndex: 9999, backgroundColor: 'red', padding: 10 }}>
+                <Text style={{ color: 'white' }}>isDark: {isDark ? 'true' : 'false'}</Text>
+            </View>
 
             {/* @ts-ignore */}
             <FlashList
