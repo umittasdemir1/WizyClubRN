@@ -1,6 +1,7 @@
+import { useEffect, useMemo } from 'react';
 import { Tabs } from 'expo-router';
-import { View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Platform } from 'react-native';
+import { NativeModulesProxy } from 'expo-modules-core';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 
 // Import SVGs
@@ -12,26 +13,29 @@ import ProfileIcon from '../../assets/icons/profile.svg';
 
 export default function TabLayout() {
     const isDark = useThemeStore((state) => state.isDark);
-    const insets = useSafeAreaInsets();
 
     const ICON_SIZE = 28;
     const DEAL_ICON_SIZE = 32;
-    const BAR_HEIGHT = 55;
+    const BAR_CONTENT_HEIGHT = 55;
+    const barBackgroundColor = useMemo(() => (isDark ? '#000000' : '#FFFFFF'), [isDark]);
+
+    useEffect(() => {
+        if (Platform.OS !== 'android') return;
+
+        const navigationBarModule = (NativeModulesProxy as any)?.ExpoNavigationBar;
+        navigationBarModule?.setBackgroundColorAsync?.(barBackgroundColor);
+        navigationBarModule?.setButtonStyleAsync?.(isDark ? 'light' : 'dark');
+    }, [barBackgroundColor, isDark]);
 
     return (
         <Tabs
             screenOptions={{
                 headerShown: false,
                 tabBarStyle: {
-                    position: 'absolute',
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    backgroundColor: isDark ? '#000000' : '#FFFFFF',
+                    backgroundColor: barBackgroundColor,
                     borderTopWidth: 0, // No border requested, just clean look
-                    height: BAR_HEIGHT + insets.bottom,
+                    height: BAR_CONTENT_HEIGHT,
                     paddingTop: 5, // Center icons vertically (55 - 28) / 2 approx or adjusted
-                    paddingBottom: insets.bottom,
                 },
                 tabBarActiveTintColor: isDark ? '#FFFFFF' : '#000000',
                 tabBarInactiveTintColor: isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)',

@@ -445,7 +445,6 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#000000',
-        paddingVertical: 25, // 25px top and bottom
     },
     video: {
         flex: 1, // Respects container padding for black bars

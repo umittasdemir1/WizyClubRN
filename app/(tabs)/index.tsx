@@ -1,7 +1,6 @@
 import { FlashList } from '@shopify/flash-list';
 import type { ViewToken } from 'react-native';
 import {
-    Dimensions,
     StyleSheet,
     View,
     ActivityIndicator,
@@ -9,10 +8,11 @@ import {
     RefreshControl,
     Platform,
     Alert,
-    StatusBar as RNStatusBar,
+    useWindowDimensions,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import * as Haptics from 'expo-haptics';
 import { VideoLayer } from '../../src/presentation/components/feed/VideoLayer';
 import { ActionButtons } from '../../src/presentation/components/feed/ActionButtons';
@@ -29,15 +29,13 @@ import {
 } from '../../src/presentation/store/useActiveVideoStore';
 import { VideoCacheService } from '../../src/data/services/VideoCacheService';
 import { Video } from '../../src/domain/entities/Video';
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { FeedSkeleton } from '../../src/presentation/components/feed/FeedSkeleton';
 import { UploadModal } from '../../src/presentation/components/feed/UploadModal';
 import { useUploadStore } from '../../src/presentation/store/useUploadStore';
 import { PerformanceLogger } from '../../src/core/services/PerformanceLogger';
-
-const SCREEN_WIDTH = Dimensions.get('window').width;
 
 const VIEWABILITY_CONFIG = {
     itemVisiblePercentThreshold: 70, // Increased from 60 to 70 for more stable detection
@@ -120,34 +118,24 @@ export default function FeedScreen() {
 
     const setScreenFocused = useActiveVideoStore((state) => state.setScreenFocused);
 
-    useFocusEffect(
-        useCallback(() => {
-            console.log('[FeedScreen] 🟢 Screen FOCUSED');
-            setScreenFocused(true);
-
-            // FIXME: Force white status bar text on Feed (Dark Video Background)
-            // This is required because "Light Mode" defaults to black text, which is invisible here.
-            RNStatusBar.setBarStyle('light-content');
-
-            return () => {
-                console.log('[FeedScreen] 🔴 Screen BLURRED');
-                setScreenFocused(false);
-
-                // Reset to default (let the next screen handle it or system default)
-                RNStatusBar.setBarStyle('default');
-            };
-        }, [setScreenFocused])
-    );
+    useEffect(() => {
+        setScreenFocused(true);
+        return () => setScreenFocused(false);
+    }, [setScreenFocused]);
 
     // Video progress
     const isScrollingSV = useSharedValue(false);
     const videoSeekRef = useRef<((time: number) => void) | null>(null);
 
     const insets = useSafeAreaInsets();
+    const tabBarHeight = useBottomTabBarHeight();
+    const { width: SCREEN_WIDTH, height: windowHeight } = useWindowDimensions();
+    const ITEM_HEIGHT = useMemo(
+        () => Math.max(windowHeight - insets.top - tabBarHeight, 0),
+        [windowHeight, insets.top, tabBarHeight]
+    );
     const router = useRouter();
     const listRef = useRef<any>(null);
-
-    const ITEM_HEIGHT = Dimensions.get('window').height;
     const hasUnseenStories = true;
 
     // UI Opacity
@@ -393,8 +381,8 @@ export default function FeedScreen() {
     };
 
     return (
-        <View style={styles.container}>
-            <StatusBar style="light" />
+        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+            <StatusBar style="light" backgroundColor="#000000" />
 
             {/* @ts-ignore */}
             <FlashList
@@ -464,7 +452,7 @@ export default function FeedScreen() {
 
             {/* Brightness Controller Overlay - Global for the screen */}
             <BrightnessController />
-        </View>
+        </SafeAreaView>
     );
 }
 
@@ -474,7 +462,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#000000',
     },
     itemContainer: {
-        width: SCREEN_WIDTH,
+        width: '100%',
         position: 'relative',
         justifyContent: 'center', // Center video for equal black bars
     },
