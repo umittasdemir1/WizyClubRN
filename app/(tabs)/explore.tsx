@@ -1,9 +1,11 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, StatusBar as RNStatusBar } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import { Image } from 'expo-image';
 import MorphingDiscoveryBar from '../../src/presentation/components/discovery/MorphingDiscoveryBar';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
+import { useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 
 const CATEGORIES = ['For You', 'Trending', 'Food', 'Travel', 'Tech', 'Art', 'Music'];
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -18,6 +20,13 @@ export default function ExploreScreen() {
     const isDark = useThemeStore((state) => state.isDark);
     const bgBody = isDark ? '#000000' : '#FFFFFF';
     const textColor = isDark ? '#FFFFFF' : '#000000';
+
+    // Update status bar when screen is focused
+    useFocusEffect(
+        useCallback(() => {
+            RNStatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
+        }, [isDark])
+    );
 
     return (
         <View style={[styles.container, { paddingTop: 0, backgroundColor: bgBody }]}>

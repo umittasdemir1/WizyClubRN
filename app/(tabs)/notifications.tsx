@@ -1,8 +1,10 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, StatusBar as RNStatusBar } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '../../src/presentation/components/shared/Avatar';
 import { Heart, UserPlus, MessageCircle } from 'lucide-react-native';
+import { useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 
 const MOCK_NOTIFICATIONS = [
     { id: '1', type: 'like', user: 'travel_addict', text: 'liked your video', time: '2m' },
@@ -21,6 +23,13 @@ export default function NotificationsScreen() {
     const bgBody = isDark ? '#000000' : '#FFFFFF';
     const textColor = isDark ? '#FFFFFF' : '#000000';
     const borderBottomColor = isDark ? '#1a1a1a' : '#eee';
+
+    // Update status bar when screen is focused
+    useFocusEffect(
+        useCallback(() => {
+            RNStatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
+        }, [isDark])
+    );
 
     const renderItem = ({ item }: { item: any }) => (
         <View style={[styles.item, { borderBottomColor }]}>

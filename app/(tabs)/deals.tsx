@@ -1,7 +1,7 @@
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, StatusBar as RNStatusBar } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { BrandDeal } from '../../src/domain/entities/BrandDeal';
 import { GetDealsUseCase } from '../../src/domain/usecases/GetDealsUseCase';
 import { DealRepositoryImpl } from '../../src/data/repositories/DealRepositoryImpl';
@@ -10,6 +10,7 @@ import { DollarSign, Calendar, CheckCircle } from 'lucide-react-native';
 import { LoadingIndicator } from '../../src/presentation/components/shared/LoadingIndicator';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import { StatusBar } from 'expo-status-bar';
+import { useFocusEffect } from 'expo-router';
 
 export default function DealsScreen() {
     const insets = useSafeAreaInsets();
@@ -19,6 +20,13 @@ export default function DealsScreen() {
     const bgBody = isDark ? '#000000' : '#FFFFFF';
     const textColor = isDark ? '#FFFFFF' : '#000000';
     const cardBg = isDark ? '#1a1a1a' : '#f0f0f0';
+
+    // Update status bar when screen is focused
+    useFocusEffect(
+        useCallback(() => {
+            RNStatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
+        }, [isDark])
+    );
 
     useEffect(() => {
         const fetchDeals = async () => {

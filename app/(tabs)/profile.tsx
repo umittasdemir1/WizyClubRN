@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,10 +6,12 @@ import {
   TouchableOpacity,
   ScrollView,
   Pressable,
+  StatusBar as RNStatusBar,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
+import { useFocusEffect } from 'expo-router';
 import { Avatar } from '../../src/presentation/components/shared/Avatar';
 import { ProfileStats } from '../../src/presentation/components/profile/ProfileStats';
 import { SocialLinks } from '../../src/presentation/components/profile/SocialLinks';
@@ -119,6 +121,13 @@ export default function ProfileScreen() {
   const bioSheetRef = useRef<BottomSheet>(null);
   const clubsSheetRef = useRef<BottomSheet>(null);
   const settingsSheetRef = useRef<BottomSheet>(null);
+
+  // Update status bar when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      RNStatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
+    }, [isDark])
+  );
 
   // Theme colors
   const bgBody = isDark ? '#121212' : '#e0e0e0';

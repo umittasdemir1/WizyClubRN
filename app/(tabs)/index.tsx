@@ -9,6 +9,7 @@ import {
     RefreshControl,
     Platform,
     Alert,
+    StatusBar as RNStatusBar,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -127,6 +128,8 @@ export default function FeedScreen() {
         useCallback(() => {
             console.log('[FeedScreen] 🟢 Screen FOCUSED');
             setScreenFocused(true);
+            // Force status bar to light (white text) when feed is focused
+            RNStatusBar.setBarStyle('light-content', true);
 
             return () => {
                 console.log('[FeedScreen] 🔴 Screen BLURRED');
