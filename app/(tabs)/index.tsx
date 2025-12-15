@@ -12,7 +12,6 @@ import {
     StatusBar as RNStatusBar,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { VideoLayer } from '../../src/presentation/components/feed/VideoLayer';
@@ -147,9 +146,9 @@ export default function FeedScreen() {
     const router = useRouter();
     const listRef = useRef<any>(null);
 
-    const tabBarHeight = useBottomTabBarHeight();
-    const ITEM_HEIGHT = Dimensions.get('window').height;
-    const listPaddingBottom = tabBarHeight + insets.bottom;
+    const TAB_BAR_HEIGHT = 55 + insets.bottom;
+    const ITEM_HEIGHT = Dimensions.get('window').height - TAB_BAR_HEIGHT;
+    const listPaddingBottom = 0;
     const hasUnseenStories = true;
 
     // UI Opacity

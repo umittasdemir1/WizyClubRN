@@ -85,13 +85,7 @@ export const VideoLayer = memo(function VideoLayer({
 
     const shouldPlay = isActive && isAppActive && isScreenFocused && !isSeeking && !isPausedGlobal && !isFinished && !hasError;
 
-    // Initial resizeMode based on pre-calculated dimensions
-    const [resizeMode, setResizeMode] = useState<'cover' | 'contain' | 'stretch'>(() => {
-        if (video.width && video.height) {
-            return 'contain'; // Always contain if dimensions known
-        }
-        return 'contain'; // Default to contain
-    });
+    const resizeMode: 'contain' = 'contain';
 
     // Poster State (Manual Overlay)
     const [showPoster, setShowPoster] = useState(true);
@@ -445,10 +439,10 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#000000',
-        paddingVertical: 25, // 25px top and bottom
     },
     video: {
-        flex: 1, // Respects container padding for black bars
+        flex: 1,
+        width: '100%', // Yan boşlukları kaldırmak için tam genişlik
     },
     touchArea: {
         ...StyleSheet.absoluteFillObject,
