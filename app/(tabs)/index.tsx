@@ -29,7 +29,7 @@ import {
 } from '../../src/presentation/store/useActiveVideoStore';
 import { VideoCacheService } from '../../src/data/services/VideoCacheService';
 import { Video } from '../../src/domain/entities/Video';
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { FeedSkeleton } from '../../src/presentation/components/feed/FeedSkeleton';
@@ -148,7 +148,13 @@ export default function FeedScreen() {
     const listRef = useRef<any>(null);
 
     const TAB_BAR_CONTENT_HEIGHT = 55;
-    const ITEM_HEIGHT = Dimensions.get('window').height - TAB_BAR_CONTENT_HEIGHT - insets.bottom;
+
+    // Memoize ITEM_HEIGHT to prevent recalculation during renders
+    const ITEM_HEIGHT = useMemo(
+        () => Dimensions.get('window').height - TAB_BAR_CONTENT_HEIGHT - insets.bottom,
+        [insets.bottom]
+    );
+
     const hasUnseenStories = true;
 
     // UI Opacity
@@ -358,6 +364,12 @@ export default function FeedScreen() {
 
     const keyExtractor = useCallback((item: Video) => item.id, []);
 
+    // Generate snap offsets for precise paging (especially for last item)
+    const snapToOffsets = useMemo(
+        () => videos.map((_, index) => index * ITEM_HEIGHT),
+        [videos.length, ITEM_HEIGHT]
+    );
+
     // Loading State
     if (isLoading && videos.length === 0) {
         return (
@@ -405,9 +417,8 @@ export default function FeedScreen() {
                 renderItem={renderItem}
                 estimatedItemSize={ITEM_HEIGHT}
                 keyExtractor={keyExtractor}
-                pagingEnabled
                 decelerationRate="fast"
-                snapToInterval={ITEM_HEIGHT}
+                snapToOffsets={snapToOffsets}
                 snapToAlignment="start"
                 showsVerticalScrollIndicator={false}
                 viewabilityConfigCallbackPairs={viewabilityConfigCallbackPairs.current}
