@@ -107,7 +107,7 @@ export const VideoLayer = memo(function VideoLayer({
     const bufferConfig = isLocal
         ? {
             // Local files: smaller buffer for disk I/O
-            minBufferMs: 250,
+            minBufferMs: 500,
             maxBufferMs: 2000,
             bufferForPlaybackMs: 100,
             bufferForPlaybackAfterRebufferMs: 250
