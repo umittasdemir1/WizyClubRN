@@ -243,7 +243,6 @@ export const VideoLayer = memo(function VideoLayer({
             const orientation = width >= height ? 'landscape' : 'portrait';
             console.log(`[VideoLayer] Video loaded: ${width}x${height} (${orientation})`);
             const newMode = 'contain'; // Always contain to prevent cropping
-            setResizeMode(newMode);
             onResizeModeChange?.(newMode); // Notify parent
         }
     }, [onResizeModeChange, video.id, videoSource, isHLS]);
