@@ -147,7 +147,8 @@ export default function FeedScreen() {
     const router = useRouter();
     const listRef = useRef<any>(null);
 
-    const ITEM_HEIGHT = Dimensions.get('window').height;
+    const TAB_BAR_CONTENT_HEIGHT = 55;
+    const ITEM_HEIGHT = Dimensions.get('window').height - TAB_BAR_CONTENT_HEIGHT - insets.bottom;
     const hasUnseenStories = true;
 
     // UI Opacity

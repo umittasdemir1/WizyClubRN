@@ -23,15 +23,10 @@ export default function TabLayout() {
             screenOptions={{
                 headerShown: false,
                 tabBarStyle: {
-                    position: 'absolute',
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
                     backgroundColor: isDark ? '#000000' : '#FFFFFF',
-                    borderTopWidth: 0, // No border requested, just clean look
-                    height: BAR_HEIGHT + insets.bottom,
-                    paddingTop: 5, // Center icons vertically (55 - 28) / 2 approx or adjusted
-                    paddingBottom: insets.bottom,
+                    borderTopWidth: 0,
+                    height: BAR_HEIGHT,
+                    paddingTop: 5,
                 },
                 tabBarActiveTintColor: isDark ? '#FFFFFF' : '#000000',
                 tabBarInactiveTintColor: isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)',

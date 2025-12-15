@@ -66,13 +66,13 @@ export function VideoSeekBar({
     const CUSTOM_OFFSET = -22;
 
     const insets = useSafeAreaInsets();
-    const TAB_BAR_HEIGHT = -45; // Reverted to original
+    const TAB_BAR_CONTENT_HEIGHT = 55;
     const MARGIN_BOTTOM = 0;
 
     const finalBottomPosition = useDerivedValue(() => {
         if (bottomOffset !== undefined) return bottomOffset;
         if (POSITION_MODE === 'hidden') return CUSTOM_OFFSET;
-        if (POSITION_MODE === 'safe') return insets.bottom + TAB_BAR_HEIGHT + MARGIN_BOTTOM;
+        if (POSITION_MODE === 'safe') return insets.bottom + TAB_BAR_CONTENT_HEIGHT + MARGIN_BOTTOM;
         return CUSTOM_OFFSET;
     }, [insets.bottom, bottomOffset]);
 
