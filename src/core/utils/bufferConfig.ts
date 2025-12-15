@@ -13,14 +13,14 @@ export const getBufferConfig = (type: NetInfoStateType | null): BufferConfig => 
         case NetInfoStateType.wifi:
         case NetInfoStateType.ethernet:
             return {
-                minBufferMs: 100, // Instant start (TikTok style)
+                minBufferMs: 1000, // Instant start (TikTok style)
                 maxBufferMs: 50000,
                 bufferForPlaybackMs: 100, // Minimal buffer before resume
                 bufferForPlaybackAfterRebufferMs: 500,
             };
         case NetInfoStateType.cellular:
             return {
-                minBufferMs: 100,
+                minBufferMs: 1000,
                 maxBufferMs: 10000,
                 bufferForPlaybackMs: 100,
                 bufferForPlaybackAfterRebufferMs: 500,
@@ -29,7 +29,7 @@ export const getBufferConfig = (type: NetInfoStateType | null): BufferConfig => 
         case NetInfoStateType.unknown:
         default:
             return {
-                minBufferMs: 100,
+                minBufferMs: 1000,
                 maxBufferMs: 10000,
                 bufferForPlaybackMs: 100,
                 bufferForPlaybackAfterRebufferMs: 500,
