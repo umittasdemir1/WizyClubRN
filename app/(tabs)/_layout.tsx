@@ -1,7 +1,9 @@
 import { Tabs } from 'expo-router';
-import { View } from 'react-native';
+import { View, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
+import { useEffect } from 'react';
+import * as NavigationBar from 'expo-navigation-bar';
 
 // Import SVGs
 import HomeIcon from '../../assets/icons/home.svg';
@@ -17,6 +19,17 @@ export default function TabLayout() {
     const ICON_SIZE = 28;
     const DEAL_ICON_SIZE = 32;
     const BAR_HEIGHT = 55;
+
+    // Set navigation bar color based on theme (Android only)
+    useEffect(() => {
+        if (Platform.OS === 'android') {
+            const backgroundColor = isDark ? '#000000' : '#FFFFFF';
+            const buttonStyle = isDark ? 'light' : 'dark';
+
+            NavigationBar.setBackgroundColorAsync(backgroundColor);
+            NavigationBar.setButtonStyleAsync(buttonStyle);
+        }
+    }, [isDark]);
 
     return (
         <Tabs

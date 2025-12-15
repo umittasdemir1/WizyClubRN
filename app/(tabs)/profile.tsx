@@ -7,6 +7,7 @@ import {
   ScrollView,
   Pressable,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import { Avatar } from '../../src/presentation/components/shared/Avatar';
@@ -279,6 +280,7 @@ export default function ProfileScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: bgBody }]}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       {/* Mobile Container */}
       <View
         style={[

@@ -9,7 +9,6 @@ import {
     RefreshControl,
     Platform,
     Alert,
-    StatusBar as RNStatusBar,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -125,16 +124,9 @@ export default function FeedScreen() {
             console.log('[FeedScreen] 🟢 Screen FOCUSED');
             setScreenFocused(true);
 
-            // FIXME: Force white status bar text on Feed (Dark Video Background)
-            // This is required because "Light Mode" defaults to black text, which is invisible here.
-            RNStatusBar.setBarStyle('light-content');
-
             return () => {
                 console.log('[FeedScreen] 🔴 Screen BLURRED');
                 setScreenFocused(false);
-
-                // Reset to default (let the next screen handle it or system default)
-                RNStatusBar.setBarStyle('default');
             };
         }, [setScreenFocused])
     );
