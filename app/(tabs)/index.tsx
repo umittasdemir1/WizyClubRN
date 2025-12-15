@@ -390,12 +390,8 @@ export default function FeedScreen() {
 
     return (
         <View style={styles.container}>
-            {/* Theme-aware status bar */}
-            <StatusBar
-                style={isDark ? 'light' : 'dark'}
-                backgroundColor={isDark ? '#000000' : '#FFFFFF'}
-                translucent={false}
-            />
+            {/* Always light (white text) status bar for feed - black background requires white text */}
+            <StatusBar style="light" />
 
             {/* @ts-ignore */}
             <FlashList
