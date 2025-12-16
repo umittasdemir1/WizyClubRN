@@ -22,8 +22,8 @@ export default function TabLayout() {
                     // Normal flow - not absolute positioned
                     backgroundColor: isDark ? '#000000' : '#FFFFFF',
                     borderTopWidth: 0,
-                    paddingBottom: insets.bottom + 3.5,
-                    height: 55 + insets.bottom,
+                    paddingBottom: insets.bottom + 2,
+                    height: 50 + insets.bottom,
                 },
                 tabBarActiveTintColor: isDark ? 'white' : 'black',
                 tabBarInactiveTintColor: isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)',
