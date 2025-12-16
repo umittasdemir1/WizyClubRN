@@ -65,6 +65,7 @@ export default function FeedScreen() {
     const isAppActive = useActiveVideoStore((state) => state.isAppActive);
     const isSeeking = useActiveVideoStore((state) => state.isSeeking);
     const togglePause = useActiveVideoStore((state) => state.togglePause);
+    const setScreenFocused = useActiveVideoStore((state) => state.setScreenFocused);
     // Upload Success -> Auto Scroll to Top
     const uploadStatus = useUploadStore(state => state.status);
     const uploadedVideoId = useUploadStore(state => state.uploadedVideoId);
@@ -121,6 +122,16 @@ export default function FeedScreen() {
         useCallback(() => {
             RNStatusBar.setBarStyle('light-content', true);
         }, [])
+    );
+
+    // Screen Focus Control (Pause videos when navigating away)
+    useFocusEffect(
+        useCallback(() => {
+            setScreenFocused(true);
+            return () => {
+                setScreenFocused(false);
+            };
+        }, [setScreenFocused])
     );
 
     const hasUnseenStories = true;
