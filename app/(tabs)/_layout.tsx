@@ -22,6 +22,7 @@ export default function TabLayout() {
                     // Normal flow - not absolute positioned
                     backgroundColor: isDark ? '#000000' : '#FFFFFF',
                     borderTopWidth: 0,
+                    paddingTop: 8,
                     paddingBottom: insets.bottom + 2,
                     height: 50 + insets.bottom,
                 },
