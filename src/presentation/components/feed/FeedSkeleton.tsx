@@ -26,16 +26,26 @@ export const FeedSkeleton = () => {
             </MotiView>
 
             <View style={styles.contentOverlay}>
-                {/* Header Skeleton (Voice - Stories - Sun) */}
-                <View style={[styles.headerContainer, { paddingTop: insets.top + 16 }]}>
-                    {/* Voice Icon */}
-                    <Skeleton colorMode="dark" radius="round" height={32} width={32} />
+                {/* Header Skeleton (Matches HeaderOverlay structure) */}
+                <View style={[styles.headerContainer, { paddingTop: insets.top + 12 }]}>
+                    {/* Left Column: Upload & Delete */}
+                    <View style={styles.leftColumn}>
+                        <Skeleton colorMode="dark" radius="round" height={32} width={32} />
+                        <View style={{ height: 8 }} />
+                        <Skeleton colorMode="dark" radius="round" height={32} width={32} />
+                    </View>
 
-                    {/* Stories Pill */}
-                    <Skeleton colorMode="dark" radius={24} height={44} width={120} />
+                    {/* Center: Stories Pill */}
+                    <View style={[styles.centerOverlay, { top: insets.top + 12 }]}>
+                        <Skeleton colorMode="dark" radius={20} height={36} width={100} />
+                    </View>
 
-                    {/* Sun Icon */}
-                    <Skeleton colorMode="dark" radius="round" height={32} width={32} />
+                    {/* Right: Icon Group */}
+                    <View style={styles.rightButtons}>
+                        <Skeleton colorMode="dark" radius="round" height={32} width={32} />
+                        <Skeleton colorMode="dark" radius="round" height={32} width={32} />
+                        <Skeleton colorMode="dark" radius="round" height={32} width={32} />
+                    </View>
                 </View>
 
                 {/* Right Side Actions - Matching ActionButtons.tsx */}
@@ -58,10 +68,13 @@ export const FeedSkeleton = () => {
                     {/* User Info Row */}
                     <View style={styles.userInfoRow}>
                         <Skeleton colorMode="dark" radius="round" height={40} width={40} />
-                        <View style={{ width: 10 }} />
-                        <Skeleton colorMode="dark" width={100} height={20} />
-                        <View style={{ width: 10 }} />
-                        <Skeleton colorMode="dark" width={60} height={24} radius={4} />
+                        <View style={{ width: 12 }} />
+                        <View style={{ flex: 1 }}>
+                            <Skeleton colorMode="dark" width={100} height={16} />
+                            <View style={{ height: 4 }} />
+                            <Skeleton colorMode="dark" width={80} height={12} />
+                        </View>
+                        <Skeleton colorMode="dark" width={80} height={32} radius={20} />
                     </View>
 
                     <View style={{ height: 12 }} />
@@ -97,24 +110,39 @@ const styles = StyleSheet.create({
     headerContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         paddingHorizontal: 16,
+    },
+    leftColumn: {
+        flexDirection: 'column',
+        alignItems: 'center',
+    },
+    centerOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        alignItems: 'center',
+    },
+    rightButtons: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
     },
     rightActions: {
         position: 'absolute',
-        right: 8,
-        bottom: 90, // Matches BASE_BOTTOM_POSITION in ActionButtons.tsx
+        right: 12,
+        bottom: 120, // Matches refined BASE_BOTTOM_POSITION in ActionButtons.tsx
         alignItems: 'center',
         gap: 5, // Matches ActionButtons.tsx
     },
     actionItem: {
         alignItems: 'center',
-        // marginBottom removed as gap handles it
     },
     bottomContent: {
         position: 'absolute',
         left: 16,
-        bottom: 50, // Matches BASE_BOTTOM_POSITION in MetadataLayer.tsx
+        bottom: 40, // Matches refined BASE_BOTTOM_POSITION in MetadataLayer.tsx
         right: 80, // Matches MetadataLayer.tsx
     },
     userInfoRow: {

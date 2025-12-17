@@ -48,7 +48,7 @@ export function UploadModal({ isVisible, onClose }: UploadModalProps) {
     const [brandUrl, setBrandUrl] = useState('');
     const [isNoUrl, setIsNoUrl] = useState(false);
 
-    const [userId, setUserId] = useState('user_' + Math.floor(Math.random() * 1000));
+    const [userId, setUserId] = useState('wizyclub-official');
 
     const { startUpload, setProgress, setStatus, setSuccess, setError } = useUploadStore();
 
@@ -123,7 +123,8 @@ export function UploadModal({ isVisible, onClose }: UploadModalProps) {
                 if (xhr.status === 200) {
                     const response = JSON.parse(xhr.responseText);
                     console.log('Upload success:', response);
-                    setSuccess(response.videoId || 'new-video');
+                    // Backend returns { success: true, data: { id, ... } }
+                    setSuccess(response.data?.id || 'new-video');
                     // Reset
                     setSelectedVideo(null);
                     setDescription('');

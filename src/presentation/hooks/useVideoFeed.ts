@@ -114,6 +114,8 @@ export function useVideoFeed(): UseVideoFeedReturn {
         try {
             setIsRefreshing(true);
             setError(null);
+            // Clear cache on refresh to resolve any persistence issues with same-named files
+            await VideoCacheService.clearCache();
             // Reset to page 1
             const fetchedVideos = await getVideoFeedUseCase.execute(1, 10);
 

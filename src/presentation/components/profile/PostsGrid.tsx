@@ -4,8 +4,8 @@ import { Image } from 'expo-image';
 import { Eye, Play } from 'lucide-react-native';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const GAP = 2;
-const PADDING = 2;
+const GAP = 1;
+const PADDING = 1;
 // Calculate item width: Total width minus padding and gaps, divided by 3
 // For 3 columns: we need 2 gaps between columns
 const ITEM_WIDTH = Math.floor((SCREEN_WIDTH - (PADDING * 2) - (GAP * 2)) / 3);
@@ -91,7 +91,9 @@ const styles = StyleSheet.create({
     width: ITEM_WIDTH,
     aspectRatio: 1, // Square format (1:1)
     position: 'relative',
+    borderRadius: 4,
     overflow: 'hidden',
+    backgroundColor: '#1a1a1a',
   },
   thumbnail: {
     width: '100%',

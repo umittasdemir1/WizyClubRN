@@ -1,25 +1,31 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, StatusBar as RNStatusBar } from 'react-native';
-import { useFocusEffect } from 'expo-router';
-import { useCallback } from 'react';
+import { View, StyleSheet, ScrollView, StatusBar as RNStatusBar, RefreshControl } from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
-import { Image } from 'expo-image';
-import MorphingDiscoveryBar from '../../src/presentation/components/discovery/MorphingDiscoveryBar';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 
-const CATEGORIES = ['For You', 'Trending', 'Food', 'Travel', 'Tech', 'Art', 'Music'];
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const ITEM_SIZE = (SCREEN_WIDTH - 40) / 2;
+// New Components
+import { TrendingHeader } from '../../src/presentation/components/explore/TrendingHeader';
+import { FilterBar } from '../../src/presentation/components/explore/FilterBar';
+import { StoryRail } from '../../src/presentation/components/explore/StoryRail';
+import { TrendingCarousel } from '../../src/presentation/components/explore/TrendingCarousel';
+import { MasonryFeed } from '../../src/presentation/components/explore/MasonryFeed';
+import { useActiveVideoStore } from '../../src/presentation/store/useActiveVideoStore';
+import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
 
-
+const CATEGORIES = ['Senin İçin', 'Takip Edilen', 'Popüler'];
 
 export default function ExploreScreen() {
-    // Insets handled by DiscoveryBar for top, but bottom might need handling
     const insets = useSafeAreaInsets();
-    const { videos } = useVideoFeed();
+    const router = useRouter();
+    const { videos, refreshFeed } = useVideoFeed();
     const isDark = useThemeStore((state) => state.isDark);
-    const bgBody = isDark ? '#000000' : '#FFFFFF';
-    const textColor = isDark ? '#FFFFFF' : '#000000';
+    const bgBody = isDark ? '#08080A' : '#F5F5F7';
+    const setActiveVideo = useActiveVideoStore((state) => state.setActiveVideo);
+
+    const [selectedCategory, setSelectedCategory] = useState('Senin İçin');
+    const [refreshing, setRefreshing] = useState(false);
 
     // Imperative StatusBar Control
     useFocusEffect(
@@ -28,95 +34,105 @@ export default function ExploreScreen() {
         }, [isDark])
     );
 
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        await refreshFeed();
+        setRefreshing(false);
+    }, [refreshFeed]);
+
+    const handleVideoPress = (id: string) => {
+        // Encontra o index do vídeo no feed
+        const index = videos.findIndex(v => v.id === id);
+        if (index !== -1) {
+            setActiveVideo(id, index);
+        }
+        router.push('/');
+    };
+
+    const handleStoryPress = (id: string) => {
+        router.push(`/story/${id}`);
+    };
+
+    const trendingData = videos.slice(0, 5).map(v => ({
+        id: v.id,
+        title: v.description || "Video Başlığı",
+        username: v.user.username,
+        avatarUrl: v.user.avatarUrl,
+        thumbnailUrl: v.thumbnailUrl,
+        views: '1.6k',
+        comments: '1.1k'
+    }));
+
+    const creators = videos.slice(0, 10).map(v => ({
+        id: v.id,
+        username: v.user.username,
+        avatarUrl: v.user.avatarUrl,
+        hasUnseen: Math.random() > 0.5
+    }));
+
+    const discoveryItems = videos.map((v, i) => ({
+        id: v.id,
+        thumbnailUrl: v.thumbnailUrl,
+        views: '1.2k',
+        isLarge: i % 3 === 0
+    }));
+
     return (
-        <View style={[styles.container, { paddingTop: 0, backgroundColor: bgBody }]}>
-            {/* Morphing Discovery Header - Handles top inset internally */}
-            <MorphingDiscoveryBar />
+        <SwipeWrapper
+            onSwipeLeft={() => router.push('/deals')}
+            onSwipeRight={() => router.push('/')}
+            edgeOnly={true}
+        >
+            <View style={[styles.container, { backgroundColor: bgBody }]}>
+                <TrendingHeader
+                    isDark={isDark}
+                    onSearchPress={() => console.log('Search')}
+                    onAddPress={() => console.log('Add')}
+                />
 
-            <ScrollView
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
-            >
-                {/* Categories - Optional: Integrate into tabs or keep as sub-filter? 
-                    Design implies DiscoveryBar tabs (Popular/Favorites) ARE the main filter. 
-                    Maybe keep chips as sub-categories below? 
-                */}
-                <View style={styles.categoriesContainer}>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesContent}>
-                        {CATEGORIES.map((cat, index) => (
-                            <TouchableOpacity key={index} style={[styles.categoryChip, index === 0 && styles.activeChip]}>
-                                <Text style={[styles.categoryText, index === 0 && styles.activeCategoryText]}>{cat}</Text>
-                            </TouchableOpacity>
-                        ))}
-                    </ScrollView>
-                </View>
+                <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
+                    refreshControl={
+                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={isDark ? "#fff" : "#000"} />
+                    }
+                >
+                    {/* 1. Featured Carousel */}
+                    <TrendingCarousel
+                        data={trendingData}
+                        onItemPress={handleVideoPress}
+                        isDark={isDark}
+                    />
 
-                {/* Simple Grid */}
-                <View style={styles.videoGrid}>
-                    {videos.map((video) => (
-                        <TouchableOpacity key={video.id} style={styles.videoItem}>
-                            <Image
-                                source={{ uri: video.thumbnailUrl }}
-                                style={styles.videoThumbnail}
-                                contentFit="cover"
-                            />
-                        </TouchableOpacity>
-                    ))}
-                </View>
-            </ScrollView>
-        </View>
+                    {/* 2. Filter Bar */}
+                    <FilterBar
+                        categories={CATEGORIES}
+                        selectedCategory={selectedCategory}
+                        onSelect={setSelectedCategory}
+                        isDark={isDark}
+                    />
+
+                    {/* 3. Stories Row */}
+                    <StoryRail
+                        creators={creators}
+                        onCreatorPress={handleStoryPress}
+                        isDark={isDark}
+                    />
+
+                    {/* 4. Masonry Grid */}
+                    <MasonryFeed
+                        data={discoveryItems}
+                        onItemPress={handleVideoPress}
+                        isDark={isDark}
+                    />
+                </ScrollView>
+            </View>
+        </SwipeWrapper>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        // backgroundColor: 'black', // Handled dynamically
-    },
-    categoriesContainer: {
-        height: 50,
-        marginVertical: 10,
-    },
-    categoriesContent: {
-        paddingHorizontal: 16,
-        alignItems: 'center', // Center vertically in container
-        gap: 12,
-    },
-    categoryChip: {
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 20,
-        backgroundColor: '#1a1a1a',
-        borderWidth: 1,
-        borderColor: '#333',
-    },
-    activeChip: {
-        backgroundColor: 'white',
-        borderColor: 'white',
-    },
-    categoryText: {
-        color: 'white',
-        fontWeight: '600',
-    },
-    activeCategoryText: {
-        color: 'black',
-    },
-    videoGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        paddingHorizontal: 16,
-        paddingTop: 8,
-    },
-    videoItem: {
-        width: ITEM_SIZE,
-        height: ITEM_SIZE * 1.4,
-        margin: 4,
-        borderRadius: 8,
-        overflow: 'hidden',
-        backgroundColor: '#222',
-    },
-    videoThumbnail: {
-        width: '100%',
-        height: '100%',
     },
 });

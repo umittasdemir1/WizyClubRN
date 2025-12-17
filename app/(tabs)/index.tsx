@@ -9,7 +9,8 @@ import {
     RefreshControl,
     Platform,
     Alert,
-    StatusBar as RNStatusBar, // Imperative API
+    StatusBar as RNStatusBar,
+    ScrollView,
 } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -21,6 +22,8 @@ import { DoubleTapLike } from '../../src/presentation/components/feed/DoubleTapL
 import { BrightnessController } from '../../src/presentation/components/feed/BrightnessController';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import { SideOptionsSheet } from '../../src/presentation/components/feed/SideOptionsSheet';
+import { DeleteConfirmationModal } from '../../src/presentation/components/feed/DeleteConfirmationModal';
+import { DescriptionSheet } from '../../src/presentation/components/feed/DescriptionSheet';
 import {
     useActiveVideoStore,
     useAppStateSync,
@@ -33,6 +36,8 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { FeedSkeleton } from '../../src/presentation/components/feed/FeedSkeleton';
 import { UploadModal } from '../../src/presentation/components/feed/UploadModal';
 import { useUploadStore } from '../../src/presentation/store/useUploadStore';
+
+import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -69,39 +74,62 @@ export default function FeedScreen() {
     // Upload Success -> Auto Scroll to Top
     const uploadStatus = useUploadStore(state => state.status);
     const uploadedVideoId = useUploadStore(state => state.uploadedVideoId);
+    const resetUpload = useUploadStore(state => state.reset);
+
+    // 1. Watch for upload success -> Trigger Refresh
+    useEffect(() => {
+        if (uploadedVideoId && uploadStatus === 'success') {
+            console.log('🎉 Upload success detected, refreshing feed...');
+            refreshFeed();
+        }
+    }, [uploadedVideoId, uploadStatus]);
 
     useEffect(() => {
-        if (uploadStatus === 'success' && videos.length > 0) {
-            // 1. Scroll to Top (Instant)
+        console.log(`[FeedScreen] Feed ready with ${videos.length} videos`);
+    }, [videos]);
+
+    // 2. Watch for video list update AFTER successful upload -> Scroll to top
+    // We use a ref to track if a refresh was triggered by an upload
+    const isUploadRefreshRef = useRef(false);
+    useEffect(() => {
+        if (uploadStatus === 'success') {
+            isUploadRefreshRef.current = true;
+        }
+    }, [uploadStatus]);
+
+    useEffect(() => {
+        if (isUploadRefreshRef.current && !isRefreshing && videos.length > 0) {
+            console.log('📊 Feed refreshed after upload. Scrolling to top...');
+
+            // Check if the first video is indeed the one we just uploaded
+            const isMatch = uploadedVideoId && videos[0].id === uploadedVideoId;
+
+            // Scroll to top
             listRef.current?.scrollToIndex({ index: 0, animated: false });
 
-            // 2. Force Active Video to the New One (if ID matches or just first)
-            if (uploadedVideoId && videos[0].id === uploadedVideoId) {
-                setActiveVideo(uploadedVideoId, 0);
+            // Play it
+            if (isMatch) {
+                setActiveVideo(uploadedVideoId!, 0);
             } else {
-                // Fallback: Just play first
                 setActiveVideo(videos[0].id, 0);
             }
+
+            // Cleanup
+            isUploadRefreshRef.current = false;
+            resetUpload();
         }
-    }, [uploadStatus, videos, uploadedVideoId, setActiveVideo]);
+    }, [isRefreshing, videos, uploadedVideoId, setActiveVideo, resetUpload]);
 
     // Mute controls
     const { isMuted, toggleMute } = useMuteControls();
 
     // Upload State
     const [isUploadModalVisible, setUploadModalVisible] = useState(false);
+    const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
     const [isMoreSheetVisible, setMoreSheetVisible] = useState(false);
+    const [isDescriptionSheetVisible, setDescriptionSheetVisible] = useState(false);
     // uploadedVideoId already declared above
-    const resetUpload = useUploadStore(state => state.reset);
 
-    // Watch for successful upload
-    useEffect(() => {
-        if (uploadedVideoId) {
-            console.log('🎉 Upload completed! Refreshing feed...');
-            refreshFeed();
-            resetUpload();
-        }
-    }, [uploadedVideoId]);
 
     // App State Sync
     useAppStateSync();
@@ -142,6 +170,23 @@ export default function FeedScreen() {
         };
     }, [isSeeking]);
 
+    const activeIndex = useActiveVideoStore((state) => state.activeIndex);
+
+    // Track if scroll was initiated by the list itself to avoid loops
+    const lastInternalIndex = useRef(activeIndex);
+
+    // Effect to scroll to active video when it changes from "outside" (e.g. Explore/Profile)
+    useEffect(() => {
+        if (videos.length > 0 && activeIndex !== lastInternalIndex.current) {
+            console.log(`🎯 External jump detected: Scroll to index ${activeIndex}`);
+            listRef.current?.scrollToIndex({
+                index: activeIndex,
+                animated: false, // Instant jump for better UX when opening from grid
+            });
+            lastInternalIndex.current = activeIndex;
+        }
+    }, [activeIndex, videos.length]);
+
     // Set initial active
     useEffect(() => {
         if (videos.length > 0 && !activeVideoId) {
@@ -156,6 +201,7 @@ export default function FeedScreen() {
                 const newId = viewableItems[0].item?.id ?? null;
 
                 if (newId !== activeVideoId) {
+                    lastInternalIndex.current = newIndex; // Mark as internal
                     setActiveVideo(newId, newIndex);
                 }
             }
@@ -185,43 +231,26 @@ export default function FeedScreen() {
         setMoreSheetVisible(false);
     }, []);
 
+    const handleOpenDescription = useCallback(() => {
+        setDescriptionSheetVisible(true);
+        // User requested video to pause when reading description
+        if (!useActiveVideoStore.getState().isPaused) {
+            togglePause();
+        }
+    }, [togglePause]);
+
+    const handleCloseDescription = useCallback(() => {
+        setDescriptionSheetVisible(false);
+        // User requested video to resume when closed
+        if (useActiveVideoStore.getState().isPaused) {
+            togglePause();
+        }
+    }, [togglePause]);
+
     const handleDeletePress = useCallback(() => {
         if (!activeVideoId) return;
-        Alert.alert(
-            "İçerik Silinecek",
-            "Bu videoyu ve tüm verilerini (R2, Veritabanı) kalıcı olarak silmek istediğinize emin misiniz?",
-            [
-                { text: "Vazgeç", style: "cancel" },
-                {
-                    text: "Evet, Sil",
-                    style: "destructive",
-                    onPress: async () => {
-                        try {
-                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-
-                            const response = await fetch(`http://192.168.0.138:3000/videos/${activeVideoId}`, {
-                                method: 'DELETE'
-                            });
-
-                            if (response.ok) {
-                                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                                deleteVideo(activeVideoId);
-                            } else {
-                                const errText = await response.text();
-                                console.error("Delete failed:", errText);
-                                Alert.alert("Hata", "Silme başarısız: " + errText);
-                                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-                            }
-                        } catch (e: any) {
-                            console.error(e);
-                            Alert.alert("Bağlantı Hatası", e.message || "Sunucuya ulaşılamadı.");
-                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-                        }
-                    }
-                }
-            ]
-        );
-    }, [activeVideoId, deleteVideo]);
+        setDeleteModalVisible(true);
+    }, [activeVideoId]);
 
     const handleSheetDelete = useCallback(() => {
         handleCloseMore();
@@ -274,6 +303,10 @@ export default function FeedScreen() {
                                 isMuted={isMuted}
                                 isScrolling={isScrollingSV}
                                 onSeekReady={isActive ? handleSeekReady : undefined}
+                                onRemoveVideo={() => {
+                                    console.log(`[FeedScreen] Auto-removing dead video: ${item.id}`);
+                                    deleteVideo(item.id);
+                                }}
                             />
                         </View>
                     </DoubleTapLike>
@@ -296,7 +329,7 @@ export default function FeedScreen() {
                             video={item}
                             onAvatarPress={() => console.log('Open Story/Profile')}
                             onFollowPress={() => toggleFollow(item.id)}
-                            onReadMorePress={() => console.log('Open Description')}
+                            onReadMorePress={handleOpenDescription}
                             onCommercialTagPress={() => console.log('Open Commercial Info')}
                         />
                     </Animated.View>
@@ -339,8 +372,49 @@ export default function FeedScreen() {
 
     if (!isLoading && videos.length === 0) {
         return (
-            <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>Henüz video yok</Text>
+            <View style={styles.container}>
+                <ScrollView
+                    contentContainerStyle={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={isRefreshing}
+                            onRefresh={refreshFeed}
+                            tintColor="#FFFFFF"
+                        />
+                    }
+                >
+                    <View style={styles.emptyContainer}>
+                        <Text style={styles.emptyText}>Henüz video yok</Text>
+                        <Text style={[styles.emptySubtext, { marginTop: 10 }]}>İlk videoyu sen yükle! 🚀</Text>
+                    </View>
+                </ScrollView>
+
+                {/* Header Overlay - Accessible even when empty */}
+                <Animated.View
+                    style={[StyleSheet.absoluteFill, { zIndex: 50 }]}
+                    pointerEvents="box-none"
+                >
+                    <HeaderOverlay
+                        isMuted={isMuted}
+                        onToggleMute={handleToggleMute}
+                        onStoryPress={() => router.push('/story/1')}
+                        onMorePress={handleMorePress}
+                        onUploadPress={() => setUploadModalVisible(true)}
+                        showBrightnessButton={false}
+                        hasUnseenStories={hasUnseenStories}
+                    />
+                </Animated.View>
+
+                <UploadModal
+                    isVisible={isUploadModalVisible}
+                    onClose={() => setUploadModalVisible(false)}
+                />
+
+                <SideOptionsSheet
+                    visible={isMoreSheetVisible}
+                    onClose={handleCloseMore}
+                    onDeletePress={handleSheetDelete}
+                />
             </View>
         );
     }
@@ -355,76 +429,99 @@ export default function FeedScreen() {
     };
 
     return (
-        <View style={styles.container}>
-            {/* @ts-ignore */}
-            <FlashList
-                // @ts-ignore
-                ref={listRef}
-                data={videos}
-                renderItem={renderItem}
-                estimatedItemSize={ITEM_HEIGHT}
-                keyExtractor={keyExtractor}
-                pagingEnabled
-                decelerationRate="fast"
-                snapToInterval={ITEM_HEIGHT}
-                snapToAlignment="start"
-                showsVerticalScrollIndicator={false}
-                viewabilityConfigCallbackPairs={viewabilityConfigCallbackPairs.current}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={isRefreshing}
-                        onRefresh={refreshFeed}
-                        tintColor="#FFFFFF"
-                        progressViewOffset={insets.top}
-                    />
-                }
-                onEndReached={hasMore ? loadMore : null}
-                onEndReachedThreshold={0.5}
-                ListFooterComponent={renderFooter}
-                removeClippedSubviews={true}
-                maxToRenderPerBatch={3}
-                windowSize={5}
-                initialNumToRender={1}
-                bounces={false}
-                overScrollMode="never"
-                onScrollBeginDrag={() => { isScrollingSV.value = true; }}
-                onScrollEndDrag={() => { isScrollingSV.value = false; }}
-                onMomentumScrollEnd={(e) => {
-                    isScrollingSV.value = false;
-                    handleScrollEnd(e);
-                }}
-            />
-
-            {/* Fixed Header Overlay - stays on screen during scroll - Animate Opacity */}
-            <Animated.View
-                style={[StyleSheet.absoluteFill, { zIndex: 50 }, uiOpacityStyle]}
-                pointerEvents={isSeeking ? 'none' : 'box-none'}
-            >
-                <HeaderOverlay
-                    isMuted={isMuted}
-                    onToggleMute={handleToggleMute}
-                    onStoryPress={() => router.push('/story/1')}
-                    onMorePress={handleMorePress}
-                    onUploadPress={() => setUploadModalVisible(true)}
-                    showBrightnessButton={false}
-                    hasUnseenStories={hasUnseenStories}
+        <SwipeWrapper
+            onSwipeLeft={() => router.push('/explore')}
+            onSwipeRight={() => setUploadModalVisible(true)}
+        >
+            <View style={styles.container}>
+                {/* @ts-ignore */}
+                <FlashList
+                    // @ts-ignore
+                    ref={listRef}
+                    data={videos}
+                    renderItem={renderItem}
+                    estimatedItemSize={ITEM_HEIGHT}
+                    keyExtractor={keyExtractor}
+                    pagingEnabled
+                    decelerationRate="fast"
+                    snapToInterval={ITEM_HEIGHT}
+                    snapToAlignment="start"
+                    showsVerticalScrollIndicator={false}
+                    viewabilityConfigCallbackPairs={viewabilityConfigCallbackPairs.current}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={isRefreshing}
+                            onRefresh={refreshFeed}
+                            tintColor="#FFFFFF"
+                            progressViewOffset={insets.top}
+                        />
+                    }
+                    onEndReached={hasMore ? loadMore : null}
+                    onEndReachedThreshold={0.5}
+                    ListFooterComponent={renderFooter}
+                    removeClippedSubviews={true}
+                    maxToRenderPerBatch={3}
+                    windowSize={5}
+                    initialNumToRender={1}
+                    bounces={false}
+                    overScrollMode="never"
+                    onScrollBeginDrag={() => { isScrollingSV.value = true; }}
+                    onScrollEndDrag={() => { isScrollingSV.value = false; }}
+                    onMomentumScrollEnd={(e) => {
+                        isScrollingSV.value = false;
+                        handleScrollEnd(e);
+                    }}
                 />
-            </Animated.View>
 
-            <UploadModal
-                isVisible={isUploadModalVisible}
-                onClose={() => setUploadModalVisible(false)}
-            />
+                {/* Fixed Header Overlay - stays on screen during scroll - Animate Opacity */}
+                <Animated.View
+                    style={[StyleSheet.absoluteFill, { zIndex: 50 }, uiOpacityStyle]}
+                    pointerEvents={isSeeking ? 'none' : 'box-none'}
+                >
+                    <HeaderOverlay
+                        isMuted={isMuted}
+                        onToggleMute={handleToggleMute}
+                        onStoryPress={() => router.push('/story/1')}
+                        onMorePress={handleMorePress}
+                        onUploadPress={() => setUploadModalVisible(true)}
+                        showBrightnessButton={false}
+                        hasUnseenStories={hasUnseenStories}
+                    />
+                </Animated.View>
 
-            <SideOptionsSheet
-                visible={isMoreSheetVisible}
-                onClose={handleCloseMore}
-                onDeletePress={handleSheetDelete}
-            />
+                <UploadModal
+                    isVisible={isUploadModalVisible}
+                    onClose={() => setUploadModalVisible(false)}
+                />
 
-            {/* Brightness Controller Overlay - Global for the screen */}
-            <BrightnessController />
-        </View>
+                <SideOptionsSheet
+                    visible={isMoreSheetVisible}
+                    onClose={handleCloseMore}
+                    onDeletePress={handleSheetDelete}
+                />
+
+                <DescriptionSheet
+                    visible={isDescriptionSheetVisible}
+                    onClose={handleCloseDescription}
+                    video={videos.find(v => v.id === activeVideoId) || null}
+                    onFollowPress={() => activeVideoId && toggleFollow(activeVideoId)}
+                />
+
+                {/* Brightness Controller Overlay - Global for the screen */}
+                <BrightnessController />
+
+                <DeleteConfirmationModal
+                    visible={isDeleteModalVisible}
+                    onCancel={() => setDeleteModalVisible(false)}
+                    onConfirm={() => {
+                        if (activeVideoId) {
+                            deleteVideo(activeVideoId);
+                        }
+                        setDeleteModalVisible(false);
+                    }}
+                />
+            </View>
+        </SwipeWrapper>
     );
 }
 
@@ -436,7 +533,6 @@ const styles = StyleSheet.create({
     itemContainer: {
         width: SCREEN_WIDTH,
         position: 'relative',
-        justifyContent: 'center', // Center video for equal black bars
     },
     actionsContainer: {
         position: 'absolute',

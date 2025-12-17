@@ -23,8 +23,8 @@ interface ActionButtonsProps {
     onProfilePress: () => void;
 }
 
-const BASE_BOTTOM_POSITION = 90; // Keep above nav/seek without floating too high
-const SAFE_AREA_OFFSET = 70; // Lift slightly further when home indicator exists
+const BASE_BOTTOM_POSITION = 120; // Restored to old place (90 + 30)
+const SAFE_AREA_OFFSET = 100; // Restored to old place (70 + 30)
 const ICON_SIZE = 36; // User requested 36px
 
 // Colors

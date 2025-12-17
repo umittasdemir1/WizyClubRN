@@ -6,6 +6,19 @@ const MAX_CACHE_SIZE_BYTES = 500 * 1024 * 1024; // 500 MB limit
 export class VideoCacheService {
     private static memoryCache = new Map<string, string>();
 
+    private static getFilename(url: string): string {
+        // Simple hash to avoid collisions for same filenames in different folders (e.g. video.mp4)
+        let hash = 0;
+        for (let i = 0; i < url.length; i++) {
+            const char = url.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32bit integer
+        }
+        const ext = url.split('.').pop()?.split('?')[0] || 'mp4';
+        const safeExt = ext.length > 4 ? 'mp4' : ext;
+        return `v_${Math.abs(hash)}.${safeExt}`;
+    }
+
     static async initialize() {
         try {
             const folderInfo = await FileSystem.getInfoAsync(CACHE_FOLDER);
@@ -18,28 +31,26 @@ export class VideoCacheService {
         }
     }
 
-    // Synchronous access for instant playback start
     static getMemoryCachedPath(url: string | number): string | null {
         if (typeof url !== 'string') return null;
-        if (!VideoCacheService.memoryCache) return null; // Safety check
+        if (!VideoCacheService.memoryCache) return null;
         return VideoCacheService.memoryCache.get(url) || null;
     }
 
     static async getCachedVideoPath(url: string | number): Promise<string | null> {
         if (typeof url !== 'string') return null;
 
-        // check memory first
         if (VideoCacheService.memoryCache.has(url)) {
             return VideoCacheService.memoryCache.get(url) || null;
         }
 
-        const filename = url.split('/').pop()?.split('?')[0] || `video_${Date.now()}.mp4`;
+        const filename = VideoCacheService.getFilename(url);
         const path = `${CACHE_FOLDER}${filename}`;
 
         try {
             const fileInfo = await FileSystem.getInfoAsync(path);
             if (fileInfo.exists && !fileInfo.isDirectory && fileInfo.size > 0) {
-                VideoCacheService.memoryCache.set(url, path); // Populate memory
+                VideoCacheService.memoryCache.set(url, path);
                 return path;
             }
         } catch (error) {
@@ -51,42 +62,23 @@ export class VideoCacheService {
     static async cacheVideo(url: string | number): Promise<string | null> {
         if (typeof url !== 'string') return null;
 
-        // HLS streams: We'll still mark them in memory cache as "prefetched"
-        // react-native-video will handle HLS caching internally
         if (url.endsWith('.m3u8')) {
-            console.log('[VideoCache] 📺 HLS stream - marking as prefetched (native cache):', url);
-            // Mark as prefetched in memory so we know we attempted to load it
             VideoCacheService.memoryCache.set(url, url);
-            return url; // Return original URL, native player will cache segments
+            return url;
         }
 
-        const filename = url.split('/').pop()?.split('?')[0] || `video_${Date.now()}.mp4`;
+        const filename = VideoCacheService.getFilename(url);
         const path = `${CACHE_FOLDER}${filename}`;
 
         try {
-            // 1. Check if already exists
             const fileInfo = await FileSystem.getInfoAsync(path);
-            if (fileInfo.exists) {
-                if (fileInfo.size > 0) {
-                    VideoCacheService.memoryCache.set(url, path);
-                    return path;
-                }
-                // If exists but empty, we should arguably re-download or return null. 
-                // For now, let's treat as 'not found' effectively if we fall through or delete it?
-                // But the previous code just returned path. Let's stick to safe logic:
-                // If it exists, trust it, but we added size check in getCachedVideoPath.
-                // Let's rely on the overwrite behavior of downloadAsync if we want to fix it, 
-                // but here we just return.
+            if (fileInfo.exists && fileInfo.size > 0) {
+                VideoCacheService.memoryCache.set(url, path);
                 return path;
             }
 
-            // 2. Download
-            // console.log(`[VideoCache] Downloading ${url} to ${path}`);
             await FileSystem.downloadAsync(url, path);
-
-            // 3. Prune if needed (simple check occasionally)
-            // Ideally we check size here, but for now we trust the limit cleanup to run occasionally
-
+            VideoCacheService.memoryCache.set(url, path);
             return path;
         } catch (error) {
             console.error(`[VideoCache] Failed to download video: ${url}`, error);
@@ -97,20 +89,14 @@ export class VideoCacheService {
     static async deleteCachedVideo(url: string | number): Promise<void> {
         if (typeof url !== 'string') return;
 
-        const filename = url.split('/').pop()?.split('?')[0] || '';
-        if (!filename) return;
-
+        const filename = VideoCacheService.getFilename(url);
         const path = `${CACHE_FOLDER}${filename}`;
 
         try {
-            // Remove from memory cache
             VideoCacheService.memoryCache.delete(url);
-
-            // Delete file if exists
             const fileInfo = await FileSystem.getInfoAsync(path);
             if (fileInfo.exists) {
                 await FileSystem.deleteAsync(path, { idempotent: true });
-                console.log(`[VideoCache] Deleted corrupt cache file: ${filename}`);
             }
         } catch (error) {
             console.error(`[VideoCache] Error deleting cached video:`, error);
@@ -136,25 +122,29 @@ export class VideoCacheService {
             }
 
             if (totalSize > MAX_CACHE_SIZE_BYTES) {
-                console.log(`[VideoCache] Pruning cache (Current: ${totalSize / 1024 / 1024} MB)`);
-                // Use modificationTime if available, or just delete random/all. 
-                // expo-file-system info might not always have modificationTime accurately on all Android versions.
-                // Simple strategy: Delete all if over limit to start fresh, or delete oldest half.
-
-                // Sort by modification time (ascending = oldest first)
                 fileStats.sort((a, b) => (a.modificationTime || 0) - (b.modificationTime || 0));
-
                 let freedSpace = 0;
                 for (const file of fileStats) {
                     if (totalSize - freedSpace <= MAX_CACHE_SIZE_BYTES) break;
-
                     await FileSystem.deleteAsync(file.path, { idempotent: true });
                     freedSpace += file.size;
                 }
-                console.log(`[VideoCache] Pruned ${freedSpace / 1024 / 1024} MB`);
             }
         } catch (error) {
             console.error('[VideoCache] Error pruning cache:', error);
+        }
+    }
+
+    static async clearCache() {
+        try {
+            const folderInfo = await FileSystem.getInfoAsync(CACHE_FOLDER);
+            if (folderInfo.exists) {
+                await FileSystem.deleteAsync(CACHE_FOLDER, { idempotent: true });
+                await FileSystem.makeDirectoryAsync(CACHE_FOLDER, { intermediates: true });
+                VideoCacheService.memoryCache.clear();
+            }
+        } catch (error) {
+            console.error('[VideoCache] Error clearing cache:', error);
         }
     }
 }

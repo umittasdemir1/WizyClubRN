@@ -34,6 +34,7 @@ interface VideoLayerProps {
     onSeekReady?: (seekFn: (time: number) => void) => void;
     isScrolling?: SharedValue<boolean>;
     onResizeModeChange?: (mode: 'contain' | 'cover') => void; // NEW: Notify parent of resize mode
+    onRemoveVideo?: () => void; // NEW: Callback to remove video on critical error
 }
 
 const MAX_LOOPS = 2;
@@ -48,6 +49,7 @@ export const VideoLayer = memo(function VideoLayer({
     onSeekReady,
     isScrolling,
     onResizeModeChange, // NEW
+    onRemoveVideo, // NEW
 }: VideoLayerProps) {
     const isAppActive = useActiveVideoStore((state) => state.isAppActive);
     const isScreenFocused = useActiveVideoStore((state) => state.isScreenFocused);
@@ -88,9 +90,9 @@ export const VideoLayer = memo(function VideoLayer({
     // Initial resizeMode based on pre-calculated dimensions
     const [resizeMode, setResizeMode] = useState<'cover' | 'contain' | 'stretch'>(() => {
         if (video.width && video.height) {
-            return 'contain'; // Always contain if dimensions known
+            return 'cover'; // Use cover for full-screen status bar alignment
         }
-        return 'contain'; // Default to contain
+        return 'cover'; // Default to cover
     });
 
     // Poster State (Manual Overlay)
@@ -208,7 +210,11 @@ export const VideoLayer = memo(function VideoLayer({
     useEffect(() => {
         return () => {
             if (ScreenOrientation) {
-                ScreenOrientation.unlockAsync?.();
+                ScreenOrientation.unlockAsync?.().catch((e: any) => {
+                    // This error "The current activity is no longer available" is common during unmount
+                    // and can be safely ignored as we're cleaning up anyway.
+                    console.log('[VideoLayer] Orientation unlock skipped:', e.message);
+                });
             }
         };
     }, []);
@@ -246,16 +252,31 @@ export const VideoLayer = memo(function VideoLayer({
 
         if (data.naturalSize) {
             const { width, height } = data.naturalSize;
-            const orientation = width >= height ? 'landscape' : 'portrait';
-            console.log(`[VideoLayer] Video loaded: ${width}x${height} (${orientation})`);
-            const newMode = 'contain'; // Always contain to prevent cropping
+            const aspectRatio = width / height;
+
+            // Logic: Vertical videos (aspectRatio < 1) should use 'cover' to fill and align with status bar.
+            // Horizontal or Square (aspectRatio >= 1) should use 'contain' to avoid heavy cropping.
+            const newMode = aspectRatio < 0.8 ? 'cover' : 'contain';
+
+            console.log(`[VideoLayer] Aspect Ratio: ${aspectRatio.toFixed(2)} -> Mode: ${newMode}`);
             setResizeMode(newMode);
-            onResizeModeChange?.(newMode); // Notify parent
+            onResizeModeChange?.(newMode);
         }
     }, [onResizeModeChange, video.id, videoSource, isHLS]);
 
     const handleVideoError = useCallback(async (error: OnVideoErrorData) => {
         console.error(`[VideoLayer] Error playing video ${video.id}:`, error);
+
+        // Auto-Remove Logic: If 404 or max retries
+        // Note: react-native-video error structure varies. Check payload.
+        // If it's a 404 or access denied, no point retrying.
+        // For now, let's rely on MAX_RETRIES + 1 or specific error codes if available.
+
+        if (retryCount >= MAX_RETRIES) {
+            console.log(`[VideoLayer] Max retries (${MAX_RETRIES}) reached for ${video.id}. Removing from feed.`);
+            onRemoveVideo?.();
+            return;
+        }
 
         // Fallback Logic: Cache -> Network
         if (videoSource?.uri?.startsWith('file://')) {
@@ -275,10 +296,9 @@ export const VideoLayer = memo(function VideoLayer({
         console.error(`[VideoLayer] Current Source:`, videoSource);
         setHasError(true);
 
-        if (retryCount >= MAX_RETRIES) {
-            console.log(`[VideoLayer] Max retries (${MAX_RETRIES}) reached.`);
-        }
-    }, [video.id, video.videoUrl, videoSource, retryCount]);
+        // Auto-retry via handleRetry (which user usually presses, but we can also auto-trigger if needed,
+        // but let's stick to manual retry for UI feedback, UNLESS it's a critical 'Not Found' error)
+    }, [video.id, video.videoUrl, videoSource, retryCount, onRemoveVideo]);
 
     const handleRetry = useCallback(() => {
         setRetryCount(prev => prev + 1);
@@ -445,7 +465,8 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#000000',
-        paddingVertical: 25, // 25px top and bottom
+        paddingTop: 0,
+        paddingBottom: 25,
     },
     video: {
         flex: 1, // Respects container padding for black bars

@@ -235,122 +235,139 @@ app.post('/upload-hls', upload.single('video'), async (req, res) => {
     }
 });
 
-// Endpoint: DELETE Video (Cleanup)
+// Endpoint: DELETE Video (Soft Delete by default)
 app.delete('/videos/:id', async (req, res) => {
     const videoId = req.params.id;
-    console.log(`🗑️ [DELETE] Request for video: ${videoId}`);
+    const force = req.query.force === 'true'; // ?force=true for permanent delete
+
+    console.log(`\n\n🗑️ [DELETE REQUEST START]`);
+    console.log(`   📝 Video ID: ${videoId}`);
+    console.log(`   ❓ Force Query Param: "${req.query.force}"`);
+    console.log(`   🛡️ Parsed Force Mode: ${force}`);
+    console.log(`   👉 Decision: ${force ? 'HARD DELETE (Permanent)' : 'SOFT DELETE (Trash)'}`);
 
     try {
-        // 1. Get video info from Supabase
-        const { data: video, error: fetchError } = await supabase
-            .from('videos')
-            .select('*')
-            .eq('id', videoId)
-            .single();
+        if (force) {
+            // ============================================
+            // HARD DELETE (Permanent)
+            // ============================================
 
-        if (fetchError || !video) {
-            return res.status(404).json({ error: 'Video not found' });
-        }
+            // 1. Get video info
+            const { data: video, error: fetchError } = await supabase
+                .from('videos')
+                .select('*')
+                .eq('id', videoId)
+                .single();
 
-        // 2. Extract Timestamp from URL for R2 Cleanup
-        // We need the timestamp folder (e.g. 1765387...) NOT the UUID.
-        let timestampId = null;
-        try {
-            // URL: .../videos/1765387197168/master.m3u8
-            // Matches /videos/Digits/
-            const match = video.video_url.match(/videos\/(\d+)/);
-            if (match && match[1]) {
-                timestampId = match[1];
+            if (fetchError || !video) {
+                console.warn(`   ⚠️ Video not found during HARD delete search. Error: ${fetchError?.message}`);
+                return res.status(404).json({ error: 'Video not found' });
             }
-        } catch (e) {
-            console.error('Error parsing video URL:', e);
-        }
 
-        console.log(`🗑️ [DELETE] UUID: ${videoId} | TimestampID: ${timestampId || 'NOT_FOUND'}`);
-
-        // 3. Delete from R2 (Correct Prefix Logic)
-        if (timestampId) {
+            // 2. R2 Cleanup
+            let timestampId = null;
             try {
-                // User Recommendation: Remove trailing slash for broader matching
-                const folderPrefix = `videos/${timestampId}`;
-                console.log(`   👉 R2 Target Prefix: ${folderPrefix}`);
-
-                const listCmd = new ListObjectsV2Command({
-                    Bucket: process.env.R2_BUCKET_NAME,
-                    Prefix: folderPrefix
-                });
-                const listRes = await r2.send(listCmd);
-
-                if (listRes.Contents && listRes.Contents.length > 0) {
-                    console.log(`   found ${listRes.Contents.length} objects. Deleting...`);
-                    const deleteParams = {
-                        Bucket: process.env.R2_BUCKET_NAME,
-                        Delete: {
-                            Objects: listRes.Contents.map(obj => ({ Key: obj.Key }))
-                        }
-                    };
-                    await r2.send(new DeleteObjectsCommand(deleteParams));
-                    console.log('   ✅ R2 Folder Deleted.');
-                } else {
-                    console.log('   ℹ️ R2 Folder not found or empty.');
-                }
-
-                // Delete Thumbnail
-                let thumbKey = `thumbs/${timestampId}.jpg`;
-
-                // Fallback: Try to extract from thumbnail_url if it exists
-                if (video.thumbnail_url) {
-                    try {
-                        // Example: https://.../thumbs/1765...jpg
-                        const urlParts = video.thumbnail_url.split('/thumbs/');
-                        if (urlParts.length > 1) {
-                            thumbKey = `thumbs/${urlParts[1]}`;
-                            console.log(`   👉 Using thumbnail_url key: ${thumbKey}`);
-                        }
-                    } catch (e) {
-                        console.warn('Error parsing thumbnail_url, using timestampId default');
-                    }
-                }
-
-                try {
-                    await r2.send(new DeleteObjectCommand({
-                        Bucket: process.env.R2_BUCKET_NAME,
-                        Key: thumbKey
-                    }));
-                    console.log(`   ✅ R2 Thumbnail Deleted: ${thumbKey}`);
-                } catch (e) {
-                    console.error(`   ❌ Thumbnail delete failed for ${thumbKey}:`, e.message);
-                }
-
-            } catch (r2Error) {
-                console.error('   ⚠️ R2 Cleanup Error:', r2Error.message);
+                const match = video.video_url.match(/videos\/(\d+)/);
+                if (match && match[1]) timestampId = match[1];
+            } catch (e) {
+                console.error('Error parsing video URL:', e);
             }
-        } else {
-            console.warn('   ⚠️ Skipping R2 delete: Could not extract timestamp from URL.');
-        }
 
-        // 4. Delete from Supabase (Via RPC if available, else standard)
-        // Try RPC first for "Force Delete" (Bypass RLS)
-        const { error: rpcError } = await supabase.rpc('force_delete_video', { vid: videoId });
+            if (timestampId) {
+                try {
+                    const folderPrefix = `videos/${timestampId}`;
+                    console.log(`   👉 [HARD] Cleaning R2 Folder: ${folderPrefix}`);
 
-        if (rpcError) {
-            console.warn('   ⚠️ RPC force_delete_video failed (maybe not created?). Falling back to standard delete.', rpcError.message);
+                    const listCmd = new ListObjectsV2Command({
+                        Bucket: process.env.R2_BUCKET_NAME,
+                        Prefix: folderPrefix
+                    });
+                    const listRes = await r2.send(listCmd);
+
+                    if (listRes.Contents && listRes.Contents.length > 0) {
+                        const deleteParams = {
+                            Bucket: process.env.R2_BUCKET_NAME,
+                            Delete: {
+                                Objects: listRes.Contents.map(obj => ({ Key: obj.Key }))
+                            }
+                        };
+                        await r2.send(new DeleteObjectsCommand(deleteParams));
+                        console.log('   ✅ R2 Folder Deleted.');
+                    }
+
+                    // Delete Thumbnail
+                    let thumbKey = `thumbs/${timestampId}.jpg`;
+                    try {
+                        await r2.send(new DeleteObjectCommand({
+                            Bucket: process.env.R2_BUCKET_NAME,
+                            Key: thumbKey
+                        }));
+                        console.log(`   ✅ R2 Thumbnail Deleted.`);
+                    } catch (e) { }
+
+                } catch (r2Error) {
+                    console.error('   ⚠️ R2 Cleanup Error:', r2Error.message);
+                }
+            }
+
+            // 3. DB Delete
             const { error: deleteError } = await supabase
                 .from('videos')
                 .delete()
                 .eq('id', videoId);
 
-            if (deleteError) {
-                console.error('   ❌ DB Delete Failed:', deleteError);
-                return res.status(500).json({ error: 'Failed to delete video record' });
+            if (deleteError) throw deleteError;
+
+            console.log('✅ [HARD DELETE] Completed.');
+            return res.json({ success: true, message: 'Video permanently deleted' });
+
+        } else {
+            // ============================================
+            // SOFT DELETE
+            // ============================================
+            console.log(`   👉 Attempting Soft Delete via RPC for ${videoId}`);
+            const { error } = await supabase.rpc('soft_delete_video', { video_id: videoId });
+
+            if (error) {
+                console.error('   ❌ Soft Delete RPC Error:', error);
+                throw error;
             }
+
+            // Verify if it was actually deleted (optional but good for feedback)
+            // Just assume success if no error, as RPC handles it.
+            // If the ID didn't exist, the update inside RPC just does nothing.
+            // We can check if we want to return 404, but for now Success is fine.
+
+            console.log('✅ [SOFT DELETE] Video marked as deleted.');
+            return res.json({ success: true, message: 'Video moved to trash' });
         }
 
-        console.log('✅ [DELETE] Process Completed.');
-        res.json({ success: true, message: 'Video deleted successfully' });
     } catch (error) {
         console.error('❌ [DELETE] Unexpected Error:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ error: error.message || 'Internal server error' });
+    }
+});
+
+// Endpoint: RESTORE Video
+app.post('/videos/:id/restore', async (req, res) => {
+    const videoId = req.params.id;
+    console.log(`♻️ [RESTORE] Request for video: ${videoId}`);
+
+    try {
+        console.log(`   👉 Attempting Restore via RPC for ${videoId}`);
+        const { error } = await supabase.rpc('restore_video', { video_id: videoId });
+
+        if (error) {
+            console.error('   ❌ Restore RPC Error:', error);
+            throw error;
+        }
+
+        console.log('✅ [RESTORE] Video restored successfully.');
+        res.json({ success: true, message: 'Video restored' });
+
+    } catch (error) {
+        console.error('❌ [RESTORE] Error:', error);
+        res.status(500).json({ error: error.message });
     }
 });
 

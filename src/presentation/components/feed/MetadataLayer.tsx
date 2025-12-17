@@ -2,8 +2,6 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Video } from '../../../domain/entities/Video';
 import { Avatar } from '../shared/Avatar';
-import FollowIcon from '../../../../assets/icons/followbottom.svg';
-import ReadMoreIcon from '../../../../assets/icons/read_more.svg';
 
 interface MetadataLayerProps {
     video: Video;
@@ -13,8 +11,8 @@ interface MetadataLayerProps {
     onCommercialTagPress: () => void;
 }
 
-const BASE_BOTTOM_POSITION = 50; // Keep commercial tag clear of nav/seek controls
-const SAFE_AREA_OFFSET = 32; // Lift slightly when gesture bar is present
+const BASE_BOTTOM_POSITION = 40; // Aligned exactly with seekbar center (80px touch area / 2)
+const SAFE_AREA_OFFSET = 0; // No extra offset needed as seekbar is also at 0
 
 export function MetadataLayer({
     video,
@@ -40,37 +38,41 @@ export function MetadataLayer({
                     hitSlop={8}
                 >
                     <Text style={styles.nameText}>
-                        {video.user.username}
+                        {video.user.fullName || video.user.username}
+                    </Text>
+                    <Text style={styles.handleText}>
+                        @{video.user.username.replace(/\s+/g, '_').toLowerCase()}
                     </Text>
                 </Pressable>
 
                 {!video.user.isFollowing && (
                     <Pressable
                         onPress={onFollowPress}
-                        style={styles.followButton}
+                        style={styles.followPill}
                         hitSlop={12}
                     >
-                        <FollowIcon width={20} height={20} color="white" />
+                        <Text style={styles.followText}>Takip Et</Text>
                     </Pressable>
                 )}
             </View>
 
             {/* Description Row - inline text with read more */}
-            <View style={styles.descriptionRow}>
+            <Pressable
+                style={styles.descriptionRow}
+                onPress={onReadMorePress}
+                hitSlop={{ top: 10, bottom: 10, left: 0, right: 0 }}
+            >
                 <Text style={styles.descriptionText}>
                     {video.description.length > 70
                         ? video.description.substring(0, 70)
                         : video.description}
                     {video.description.length > 70 && (
-                        <Text onPress={onReadMorePress} style={styles.readMoreInline}>
-                            {'... '}
-                            <View style={styles.readMoreIconWrapper}>
-                                <ReadMoreIcon width={14} height={14} color="white" />
-                            </View>
+                        <Text style={styles.readMoreInline}>
+                            {'...Daha fazla'}
                         </Text>
                     )}
                 </Text>
-            </View>
+            </Pressable>
 
             {/* Commercial Tag */}
             {video.isCommercial && (
@@ -104,18 +106,38 @@ const styles = StyleSheet.create({
     },
     nameContainer: {
         marginLeft: 12,
-        marginRight: 8,
+        marginRight: 12,
+        justifyContent: 'center',
     },
     nameText: {
         color: 'white',
-        fontWeight: 'bold',
-        fontSize: 16,
+        fontWeight: '700',
+        fontSize: 15,
         textShadowColor: 'rgba(0, 0, 0, 0.5)',
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 2,
     },
-    followButton: {
-        padding: 4,
+    handleText: {
+        color: 'rgba(255, 255, 255, 0.7)',
+        fontSize: 12,
+        textShadowColor: 'rgba(0, 0, 0, 0.5)',
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
+        marginTop: -2,
+    },
+    followPill: {
+        backgroundColor: 'rgba(255, 255, 255, 0.15)', // Glass effect
+        paddingHorizontal: 12,
+        paddingVertical: 5,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.25)',
+        alignSelf: 'center',
+    },
+    followText: {
+        color: 'white',
+        fontSize: 13,
+        fontWeight: '600',
     },
     descriptionRow: {
         flexDirection: 'row',

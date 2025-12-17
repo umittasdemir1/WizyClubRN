@@ -16,10 +16,10 @@ export default function TabLayout() {
 
     return (
         <Tabs
+            backBehavior="history"
             screenOptions={{
                 headerShown: false,
                 tabBarStyle: {
-                    // Normal flow - not absolute positioned
                     backgroundColor: isDark ? '#000000' : '#FFFFFF',
                     borderTopWidth: 0,
                     paddingTop: 8,

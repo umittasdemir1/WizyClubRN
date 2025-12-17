@@ -6,10 +6,11 @@ import { X } from 'lucide-react-native';
 interface SettingsBottomSheetProps {
   isDark: boolean;
   onThemeToggle: () => void;
+  onDeletedContentPress: () => void;
 }
 
 export const SettingsBottomSheet = forwardRef<BottomSheet, SettingsBottomSheetProps>(
-  ({ isDark, onThemeToggle }, ref) => {
+  ({ isDark, onThemeToggle, onDeletedContentPress }, ref) => {
     const snapPoints = useMemo(() => ['40%'], []);
 
     const bgColor = isDark ? '#1c1c1e' : '#fff';
@@ -66,6 +67,28 @@ export const SettingsBottomSheet = forwardRef<BottomSheet, SettingsBottomSheetPr
                 ios_backgroundColor="#3e3e3e"
               />
             </View>
+
+            {/* Recently Deleted */}
+            <TouchableOpacity
+              style={[styles.settingItem, { borderBottomColor: borderColor }]}
+              onPress={() => {
+                // Close settings then open deleted content
+                if (ref && typeof ref !== 'function' && ref.current) {
+                  ref.current.close();
+                }
+                setTimeout(onDeletedContentPress, 300); // Small delay for smooth transition
+              }}
+            >
+              <View style={styles.settingInfo}>
+                <Text style={[styles.settingLabel, { color: textColor }]}>Yakınlarda Silinenler</Text>
+                <Text style={[styles.settingValue, { color: secondaryColor }]}>
+                  Son 15 gün içinde silinenleri geri yükle
+                </Text>
+              </View>
+              {/* Chevron or icon */}
+              <Text style={{ color: secondaryColor, fontSize: 18 }}>›</Text>
+            </TouchableOpacity>
+
           </BottomSheetScrollView>
         </BottomSheetView>
       </BottomSheet>

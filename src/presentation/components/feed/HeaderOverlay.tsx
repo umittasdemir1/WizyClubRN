@@ -87,7 +87,6 @@ interface HeaderOverlayProps {
     onStoryPress: () => void;
     onMorePress: () => void;
     onUploadPress?: () => void;
-    onDeletePress?: () => void;
     hasUnseenStories?: boolean;
     showBrightnessButton?: boolean;
 }
@@ -100,7 +99,6 @@ export function HeaderOverlay({
     onStoryPress,
     onMorePress,
     onUploadPress,
-    onDeletePress,
     hasUnseenStories = false,
     showBrightnessButton = true,
 }: HeaderOverlayProps) {
@@ -138,16 +136,6 @@ export function HeaderOverlay({
             <View style={styles.leftColumn}>
                 {onUploadPress && <UploadButton onPress={onUploadPress} />}
 
-                {/* Delete Button below Upload (Cleanup Tool) */}
-                {onDeletePress && (
-                    <Pressable
-                        style={styles.iconButton}
-                        onPress={onDeletePress}
-                        hitSlop={12}
-                    >
-                        <Trash2 width={24} height={24} color="#FFFFFF" />
-                    </Pressable>
-                )}
             </View>
 
             {/* Center: Stories Pill (absolutely centered) */}

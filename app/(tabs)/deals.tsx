@@ -1,7 +1,7 @@
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { BrandDeal } from '../../src/domain/entities/BrandDeal';
 import { GetDealsUseCase } from '../../src/domain/usecases/GetDealsUseCase';
 import { DealRepositoryImpl } from '../../src/data/repositories/DealRepositoryImpl';
@@ -10,35 +10,49 @@ import { DollarSign, Calendar, CheckCircle } from 'lucide-react-native';
 import { LoadingIndicator } from '../../src/presentation/components/shared/LoadingIndicator';
 
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
-import { useCallback } from 'react';
 import { StatusBar as RNStatusBar } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
 
 export default function DealsScreen() {
     const insets = useSafeAreaInsets();
+    const router = useRouter();
     const [deals, setDeals] = useState<BrandDeal[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+
     const isDark = useThemeStore((state) => state.isDark);
     const bgBody = isDark ? '#000000' : '#FFFFFF';
     const textColor = isDark ? '#FFFFFF' : '#000000';
     const cardBg = isDark ? '#1a1a1a' : '#f0f0f0';
 
+    const fetchDeals = useCallback(async () => {
+        const repository = new DealRepositoryImpl();
+        const useCase = new GetDealsUseCase(repository);
+        const data = await useCase.execute();
+        setDeals(data);
+        setIsLoading(false);
+    }, []);
+
     useFocusEffect(
         useCallback(() => {
             RNStatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
-        }, [isDark])
+            // Optional: Auto-refresh on focus? Maybe just fetch if empty.
+            if (deals.length === 0) {
+                fetchDeals();
+            }
+        }, [isDark, fetchDeals, deals.length])
     );
 
     useEffect(() => {
-        const fetchDeals = async () => {
-            const repository = new DealRepositoryImpl();
-            const useCase = new GetDealsUseCase(repository);
-            const data = await useCase.execute();
-            setDeals(data);
-            setIsLoading(false);
-        };
         fetchDeals();
-    }, []);
+    }, [fetchDeals]);
+
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        await fetchDeals();
+        setRefreshing(false);
+    }, [fetchDeals]);
 
     const renderItem = ({ item }: { item: BrandDeal }) => (
         <View style={[styles.card, { backgroundColor: cardBg }]}>
@@ -76,17 +90,29 @@ export default function DealsScreen() {
     );
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top, backgroundColor: bgBody }]}>
+        <SwipeWrapper
+            onSwipeLeft={() => router.push('/notifications')}
+            onSwipeRight={() => router.push('/explore')}
+        >
+            <View style={[styles.container, { paddingTop: insets.top, backgroundColor: bgBody }]}>
 
-            <Text style={[styles.title, { color: textColor }]}>Brand Deals</Text>
-            {/* @ts-ignore */}
-            <FlashList
-                data={deals}
-                renderItem={renderItem}
-                estimatedItemSize={200}
-                contentContainerStyle={styles.listContent}
-            />
-        </View>
+                <Text style={[styles.title, { color: textColor }]}>Brand Deals</Text>
+                {/* @ts-ignore */}
+                <FlashList
+                    data={deals}
+                    renderItem={renderItem}
+                    estimatedItemSize={200}
+                    contentContainerStyle={styles.listContent}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                            tintColor={isDark ? "#fff" : "#000"}
+                        />
+                    }
+                />
+            </View>
+        </SwipeWrapper>
     );
 }
 

@@ -23,11 +23,12 @@ import { SpritePreview } from './SpritePreview';
 import { useWindowDimensions } from 'react-native';
 
 // Usage Configuration
-const HORIZONTAL_PADDING = 16;
+const HORIZONTAL_PADDING = 0;
 const TOUCH_AREA_HEIGHT = 80;
-const THUMB_SIZE = 14;
+const THUMB_SIZE = 12; // Height of the vertical bar
+const THUMB_WIDTH = 2; // Width of the vertical bar
 const TRACK_HEIGHT = 2;
-const TRACK_HEIGHT_EXPANDED = 12;
+const TRACK_HEIGHT_EXPANDED = 4; // Slimmer track expansion
 const TOOLTIP_WIDTH = 100;
 const TOOLTIP_HALF_WIDTH = TOOLTIP_WIDTH / 2;
 const TOOLTIP_SCREEN_MARGIN = 16;
@@ -66,15 +67,15 @@ export function VideoSeekBar({
     const CUSTOM_OFFSET = -22;
 
     const insets = useSafeAreaInsets();
-    const TAB_BAR_HEIGHT = -45; // Reverted to original
+    const TAB_BAR_HEIGHT = 0; // Resetting to 0 to find the true baseline
     const MARGIN_BOTTOM = 0;
 
     const finalBottomPosition = useDerivedValue(() => {
         if (bottomOffset !== undefined) return bottomOffset;
         if (POSITION_MODE === 'hidden') return CUSTOM_OFFSET;
-        if (POSITION_MODE === 'safe') return insets.bottom + TAB_BAR_HEIGHT + MARGIN_BOTTOM;
+        if (POSITION_MODE === 'safe') return TAB_BAR_HEIGHT + MARGIN_BOTTOM; // Strictly bottom: 0
         return CUSTOM_OFFSET;
-    }, [insets.bottom, bottomOffset]);
+    }, [bottomOffset]);
 
     const animatedProgress = useSharedValue(0);
 
@@ -246,8 +247,8 @@ export function VideoSeekBar({
     const animatedThumbStyle = useAnimatedStyle(() => ({
         opacity: thumbOpacity.value,
         transform: [
-            { translateX: animatedProgress.value * BAR_WIDTH - THUMB_SIZE / 2 },
-            { scale: thumbScale.value },
+            { translateX: animatedProgress.value * BAR_WIDTH - THUMB_WIDTH / 2 },
+            { scaleY: thumbScale.value },
         ],
     }));
 
@@ -331,15 +332,11 @@ const styles = StyleSheet.create({
     thumb: {
         position: 'absolute',
         left: 0,
-        width: THUMB_SIZE,
+        width: THUMB_WIDTH,
         height: THUMB_SIZE,
-        borderRadius: THUMB_SIZE / 2,
+        borderRadius: THUMB_WIDTH / 2,
         backgroundColor: '#FFFFFF',
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
-        elevation: 5,
+        // No shadows for the line indicator for a cleaner look
     },
     tooltipContainer: {
         position: 'absolute',
