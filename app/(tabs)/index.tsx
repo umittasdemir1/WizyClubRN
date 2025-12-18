@@ -34,7 +34,6 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { FeedSkeleton } from '../../src/presentation/components/feed/FeedSkeleton';
-import { UploadModal } from '../../src/presentation/components/feed/UploadModal';
 import { useUploadStore } from '../../src/presentation/store/useUploadStore';
 
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
@@ -124,7 +123,6 @@ export default function FeedScreen() {
     const { isMuted, toggleMute } = useMuteControls();
 
     // Upload State
-    const [isUploadModalVisible, setUploadModalVisible] = useState(false);
     const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
     const [isMoreSheetVisible, setMoreSheetVisible] = useState(false);
     const [isDescriptionSheetVisible, setDescriptionSheetVisible] = useState(false);
@@ -399,16 +397,11 @@ export default function FeedScreen() {
                         onToggleMute={handleToggleMute}
                         onStoryPress={() => router.push('/story/1')}
                         onMorePress={handleMorePress}
-                        onUploadPress={() => setUploadModalVisible(true)}
+                        onUploadPress={() => router.push('/upload-media')}
                         showBrightnessButton={false}
                         hasUnseenStories={hasUnseenStories}
                     />
                 </Animated.View>
-
-                <UploadModal
-                    isVisible={isUploadModalVisible}
-                    onClose={() => setUploadModalVisible(false)}
-                />
 
                 <SideOptionsSheet
                     visible={isMoreSheetVisible}
@@ -431,7 +424,7 @@ export default function FeedScreen() {
     return (
         <SwipeWrapper
             onSwipeLeft={() => router.push('/explore')}
-            onSwipeRight={() => setUploadModalVisible(true)}
+            onSwipeRight={() => router.push('/upload-media')}
         >
             <View style={styles.container}>
                 {/* @ts-ignore */}
@@ -483,16 +476,11 @@ export default function FeedScreen() {
                         onToggleMute={handleToggleMute}
                         onStoryPress={() => router.push('/story/1')}
                         onMorePress={handleMorePress}
-                        onUploadPress={() => setUploadModalVisible(true)}
+                        onUploadPress={() => router.push('/upload-media')}
                         showBrightnessButton={false}
                         hasUnseenStories={hasUnseenStories}
                     />
                 </Animated.View>
-
-                <UploadModal
-                    isVisible={isUploadModalVisible}
-                    onClose={() => setUploadModalVisible(false)}
-                />
 
                 <SideOptionsSheet
                     visible={isMoreSheetVisible}
