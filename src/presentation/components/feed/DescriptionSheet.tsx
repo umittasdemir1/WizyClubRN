@@ -129,7 +129,7 @@ export function DescriptionSheet({
                     {/* Drag Handle Indicator */}
                     <GestureDetector gesture={panGesture}>
                         <View style={styles.handleContainer}>
-                            <View style={styles.handle} />
+                            <View style={[styles.handle, { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)' }]} />
                         </View>
                     </GestureDetector>
 
