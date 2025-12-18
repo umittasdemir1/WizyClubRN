@@ -84,10 +84,7 @@ export const FeedSkeleton = () => {
                     <View style={{ height: 6 }} />
                     <Skeleton colorMode="dark" width={width * 0.5} height={16} />
 
-                    {/* Commercial Tag */}
-                    <View style={{ height: 12 }} />
-                    <Skeleton colorMode="dark" width={140} height={20} radius={4} />
-                </View>
+                            </View>
             </View>
         </View>
     );
