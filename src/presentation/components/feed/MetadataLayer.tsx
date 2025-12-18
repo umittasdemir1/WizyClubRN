@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
         paddingVertical: 2,
         borderRadius: 2,
-        marginTop: 8,
+        marginTop: 2,
     },
     commercialText: {
         color: 'black',
