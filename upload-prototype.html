@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Flow Prototype</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000;
+            color: #fff;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        /* Page 1: Camera + Gallery */
+        #page1 {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        #page1.hidden {
+            display: none;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            position: relative;
+            z-index: 10;
+        }
+
+        .header-left {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .btn-icon {
+            width: 40px;
+            height: 40px;
+            border: none;
+            background: none;
+            color: #fff;
+            font-size: 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.2s;
+        }
+
+        .btn-icon:active {
+            opacity: 0.6;
+        }
+
+        .btn-next {
+            padding: 8px 20px;
+            background: #e60023;
+            border: none;
+            border-radius: 24px;
+            color: #fff;
+            font-weight: 600;
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-next:disabled {
+            background: #555;
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-next:not(:disabled):active {
+            transform: scale(0.96);
+        }
+
+        /* Camera Preview */
+        .camera-preview {
+            flex: 1;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .camera-placeholder {
+            font-size: 18px;
+            color: rgba(255, 255, 255, 0.8);
+            text-align: center;
+        }
+
+        .flip-camera-btn {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: #fff;
+            font-size: 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .flip-camera-btn:active {
+            transform: scale(0.9);
+            background: rgba(0, 0, 0, 0.7);
+        }
+
+        /* Gallery Grid */
+        .gallery-section {
+            background: #000;
+            padding: 12px;
+            max-height: 35vh;
+            overflow-y: auto;
+        }
+
+        .gallery-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding: 0 4px;
+        }
+
+        .album-select {
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .multi-select-badge {
+            padding: 6px 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            font-size: 13px;
+            color: #fff;
+            cursor: pointer;
+        }
+
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2px;
+        }
+
+        .gallery-item {
+            aspect-ratio: 1;
+            background: #333;
+            position: relative;
+            cursor: pointer;
+            overflow: hidden;
+        }
+
+        .gallery-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .gallery-item.selected::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.4);
+            border: 3px solid #e60023;
+        }
+
+        .selection-number {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: #e60023;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+            z-index: 1;
+        }
+
+        .video-duration {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        /* Page 2: Create Pin */
+        #page2 {
+            display: none;
+            flex-direction: column;
+            height: 100vh;
+            background: #121212;
+        }
+
+        #page2.active {
+            display: flex;
+        }
+
+        .page2-header {
+            display: flex;
+            align-items: center;
+            padding: 16px;
+            background: #000;
+            gap: 16px;
+        }
+
+        .page2-header h1 {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .form-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .preview-card {
+            width: 200px;
+            margin: 0 auto 24px;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .preview-image {
+            width: 100%;
+            aspect-ratio: 3/4;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .duration-badge {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .form-group {
+            background: #1f1f1f;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: block;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .form-input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-size: 16px;
+            padding: 0;
+            outline: none;
+            resize: none;
+        }
+
+        .form-input::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .char-counter {
+            text-align: right;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.5);
+            margin-top: 8px;
+        }
+
+        .form-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 0;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .form-row:last-child {
+            border-bottom: none;
+        }
+
+        .form-row-label {
+            font-size: 15px;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .form-row-value {
+            font-size: 15px;
+            color: rgba(255, 255, 255, 0.5);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .chevron {
+            font-size: 18px;
+        }
+
+        /* Bottom Action Bar */
+        .bottom-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            background: #000;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .folder-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: #fff;
+            font-size: 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .create-btn {
+            flex: 1;
+            margin-left: 12px;
+            padding: 14px;
+            background: #e60023;
+            border: none;
+            border-radius: 24px;
+            color: #fff;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .create-btn:active {
+            transform: scale(0.98);
+            background: #c50015;
+        }
+
+        /* Selected items indicator */
+        .selected-count {
+            position: fixed;
+            bottom: 36vh;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #e60023;
+            padding: 12px 24px;
+            border-radius: 24px;
+            font-weight: 700;
+            font-size: 15px;
+            z-index: 20;
+            box-shadow: 0 4px 12px rgba(230, 0, 35, 0.4);
+            transition: all 0.3s;
+        }
+
+        .selected-count.hidden {
+            opacity: 0;
+            transform: translateX(-50%) translateY(20px);
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+<!-- PAGE 1: Camera + Gallery Selection -->
+<div id="page1">
+    <!-- Header -->
+    <div class="header">
+        <div class="header-left">
+            <button class="btn-icon" onclick="closePage()">✕</button>
+            <button class="btn-icon">❓</button>
+        </div>
+        <button class="btn-next" id="nextBtn" disabled onclick="goToPage2()">İleri</button>
+    </div>
+
+    <!-- Camera Preview -->
+    <div class="camera-preview">
+        <div class="camera-placeholder">📷 Ön Kamera</div>
+        <button class="flip-camera-btn" onclick="flipCamera()">🔄</button>
+    </div>
+
+    <!-- Gallery Grid -->
+    <div class="gallery-section">
+        <div class="gallery-header">
+            <select class="album-select">
+                <option>Yakınlardakiler</option>
+                <option>Kamera</option>
+                <option>Ekran Görüntüleri</option>
+            </select>
+            <div class="multi-select-badge">Birden Fazla Seç</div>
+        </div>
+
+        <div class="gallery-grid" id="galleryGrid">
+            <!-- Gallery items will be generated by JS -->
+        </div>
+    </div>
+
+    <!-- Selected Count Indicator -->
+    <div class="selected-count hidden" id="selectedCount">0 seçildi</div>
+</div>
+
+<!-- PAGE 2: Create Pin -->
+<div id="page2">
+    <!-- Header -->
+    <div class="page2-header">
+        <button class="btn-icon" onclick="goBackToPage1()">←</button>
+        <h1>Pin Oluştur</h1>
+    </div>
+
+    <!-- Form -->
+    <div class="form-container">
+        <!-- Preview -->
+        <div class="preview-card">
+            <div class="preview-image">
+                <div class="duration-badge">0:10</div>
+                Önizleme
+            </div>
+        </div>
+
+        <!-- Title Input -->
+        <div class="form-group">
+            <label class="form-label">Başlık</label>
+            <input
+                type="text"
+                class="form-input"
+                placeholder="Pininizin ne hakkında olduğunu herkese söyleyin"
+                maxlength="100"
+                oninput="updateCounter('titleCounter', this.value.length, 100)"
+            />
+            <div class="char-counter" id="titleCounter">0/100</div>
+        </div>
+
+        <!-- Description Input -->
+        <div class="form-group">
+            <label class="form-label">Açıklama</label>
+            <textarea
+                class="form-input"
+                placeholder="Pin'inize bir açıklama, bahsetme veya konu etiketi ekleyin"
+                rows="3"
+                maxlength="800"
+                oninput="updateCounter('descCounter', this.value.length, 800)"
+            ></textarea>
+            <div class="char-counter" id="descCounter">0/800</div>
+        </div>
+
+        <!-- Options -->
+        <div class="form-group">
+            <div class="form-row">
+                <div class="form-row-label">Bağlantı</div>
+                <div class="form-row-value">
+                    Bağlantınızı buraya ekleyin
+                    <span class="chevron">›</span>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-row-label">Bir pano seçin</div>
+                <div class="form-row-value">
+                    Profil
+                    <span class="chevron">›</span>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-row-label">Konuları etiketle</div>
+                <div class="form-row-value">
+                    <span class="chevron">›</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Action Bar -->
+    <div class="bottom-bar">
+        <button class="folder-btn">📁</button>
+        <button class="create-btn" onclick="createPost()">Oluştur</button>
+    </div>
+</div>
+
+<script>
+    let selectedItems = [];
+    let cameraMode = 'front';
+
+    // Generate sample gallery items
+    function generateGallery() {
+        const grid = document.getElementById('galleryGrid');
+        const items = [
+            { type: 'video', duration: '0:10' },
+            { type: 'image' },
+            { type: 'image' },
+            { type: 'video', duration: '0:15' },
+            { type: 'image' },
+            { type: 'image' },
+            { type: 'video', duration: '0:08' },
+            { type: 'image' },
+            { type: 'image' },
+        ];
+
+        items.forEach((item, index) => {
+            const div = document.createElement('div');
+            div.className = 'gallery-item';
+            div.onclick = () => toggleSelect(index);
+
+            if (item.type === 'video') {
+                div.innerHTML = `
+                    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect fill='%23667eea' width='100' height='100'/%3E%3C/svg%3E" />
+                    <div class="video-duration">${item.duration}</div>
+                `;
+            } else {
+                div.innerHTML = `<img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect fill='%23764ba2' width='100' height='100'/%3E%3C/svg%3E" />`;
+            }
+
+            grid.appendChild(div);
+        });
+    }
+
+    function toggleSelect(index) {
+        const items = document.querySelectorAll('.gallery-item');
+        const item = items[index];
+
+        if (selectedItems.includes(index)) {
+            // Deselect
+            selectedItems = selectedItems.filter(i => i !== index);
+            item.classList.remove('selected');
+            const numberBadge = item.querySelector('.selection-number');
+            if (numberBadge) numberBadge.remove();
+        } else {
+            // Select
+            selectedItems.push(index);
+            item.classList.add('selected');
+            const badge = document.createElement('div');
+            badge.className = 'selection-number';
+            badge.textContent = selectedItems.length;
+            item.appendChild(badge);
+        }
+
+        // Update all selection numbers
+        selectedItems.forEach((selectedIndex, position) => {
+            const selectedItem = items[selectedIndex];
+            const badge = selectedItem.querySelector('.selection-number');
+            if (badge) badge.textContent = position + 1;
+        });
+
+        updateUI();
+    }
+
+    function updateUI() {
+        const nextBtn = document.getElementById('nextBtn');
+        const countIndicator = document.getElementById('selectedCount');
+
+        nextBtn.disabled = selectedItems.length === 0;
+
+        if (selectedItems.length > 0) {
+            countIndicator.textContent = `${selectedItems.length} seçildi`;
+            countIndicator.classList.remove('hidden');
+        } else {
+            countIndicator.classList.add('hidden');
+        }
+    }
+
+    function flipCamera() {
+        cameraMode = cameraMode === 'front' ? 'back' : 'front';
+        const placeholder = document.querySelector('.camera-placeholder');
+        placeholder.textContent = cameraMode === 'front' ? '📷 Ön Kamera' : '📷 Arka Kamera';
+    }
+
+    function goToPage2() {
+        document.getElementById('page1').classList.add('hidden');
+        document.getElementById('page2').classList.add('active');
+    }
+
+    function goBackToPage1() {
+        document.getElementById('page2').classList.remove('active');
+        document.getElementById('page1').classList.remove('hidden');
+    }
+
+    function closePage() {
+        alert('Sayfa kapatılıyor...');
+    }
+
+    function updateCounter(counterId, current, max) {
+        document.getElementById(counterId).textContent = `${current}/${max}`;
+    }
+
+    function createPost() {
+        alert(`Post oluşturuluyor!\n${selectedItems.length} medya seçildi.`);
+    }
+
+    // Initialize
+    generateGallery();
+</script>
+
+</body>
+</html>
