@@ -68,11 +68,20 @@ export function DescriptionSheet({
         .onEnd((event) => {
             const velocity = event.velocityY;
             const currentPosition = translateY.value;
-            const threshold = SCREEN_HEIGHT - (SHEET_HEIGHT * 0.7);
+            const midPoint = SCREEN_HEIGHT / 2;
 
-            if (velocity > 500 || currentPosition > threshold) {
+            // Yukarı hızlı çekildi veya ekranın üst yarısında
+            if (velocity < -500 || currentPosition < midPoint) {
+                // Tam ekran yap
+                translateY.value = withTiming(0, { duration: 250 });
+                overlayOpacity.value = withTiming(0.7, { duration: 250 });
+            }
+            // Aşağı hızlı çekildi veya ekranın alt kısmında
+            else if (velocity > 500 || currentPosition > SCREEN_HEIGHT - (SHEET_HEIGHT * 0.3)) {
                 runOnJS(closeSheet)();
-            } else {
+            }
+            // Orta pozisyonda - normal açık pozisyona dön
+            else {
                 runOnJS(openSheet)();
             }
         });
