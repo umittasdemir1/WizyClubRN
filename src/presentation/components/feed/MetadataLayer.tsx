@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'flex-end',
         flexWrap: 'wrap',
-        marginBottom: 12,
+        marginBottom: 6,
     },
     descriptionText: {
         color: 'white',
