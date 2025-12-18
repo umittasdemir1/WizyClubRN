@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instagram Upload Flow - 3 Screens</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        .screen {
+            width: 360px;
+            height: 740px;
+            background: #000;
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* SCREEN 1: Gallery + Camera */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            background: rgba(0,0,0,0.9);
+        }
+
+        .header h1 {
+            color: #fff;
+            font-size: 18px;
+            font-weight: 600;
+            flex: 1;
+            text-align: center;
+        }
+
+        .btn-close {
+            width: 32px;
+            height: 32px;
+            color: #fff;
+            font-size: 24px;
+            background: none;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-next {
+            background: #e60023;
+            color: #fff;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .preview-section {
+            background: linear-gradient(135deg, #FF6B6B 0%, #FF4757 100%);
+            height: 320px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .preview-placeholder {
+            color: rgba(255,255,255,0.8);
+            font-size: 16px;
+        }
+
+        .right-controls {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .control-btn {
+            width: 44px;
+            height: 44px;
+            background: rgba(0,0,0,0.5);
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            color: #fff;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .bottom-controls {
+            position: absolute;
+            bottom: 16px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-around;
+            padding: 0 20px;
+        }
+
+        .camera-btn {
+            width: 56px;
+            height: 56px;
+            background: rgba(255,255,255,0.2);
+            border: 3px solid #fff;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .mode-tabs {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .mode-tab {
+            color: rgba(255,255,255,0.6);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            padding: 4px 8px;
+        }
+
+        .mode-tab.active {
+            color: #fff;
+            background: rgba(255,255,255,0.2);
+            border-radius: 12px;
+        }
+
+        .gallery-section {
+            flex: 1;
+            background: #000;
+            padding: 12px;
+            overflow-y: auto;
+        }
+
+        .gallery-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding: 0 4px;
+        }
+
+        .album-dropdown {
+            color: #fff;
+            font-size: 15px;
+            font-weight: 600;
+            background: none;
+            border: none;
+            cursor: pointer;
+        }
+
+        .album-dropdown::after {
+            content: ' ▼';
+            font-size: 10px;
+        }
+
+        .copy-icon {
+            width: 32px;
+            height: 32px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 18px;
+        }
+
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2px;
+        }
+
+        .gallery-item {
+            aspect-ratio: 1;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            position: relative;
+            cursor: pointer;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .gallery-item.selected {
+            border: 3px solid #e60023;
+        }
+
+        .duration {
+            position: absolute;
+            bottom: 6px;
+            right: 6px;
+            background: rgba(0,0,0,0.7);
+            padding: 3px 6px;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .bottom-tabs {
+            background: #000;
+            display: flex;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .bottom-tab {
+            flex: 1;
+            padding: 14px;
+            color: rgba(255,255,255,0.5);
+            font-size: 13px;
+            font-weight: 600;
+            text-align: center;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+
+        .bottom-tab.active {
+            color: #fff;
+            border-bottom-color: #e60023;
+        }
+
+        /* SCREEN 2: Edit */
+        .edit-preview {
+            flex: 1;
+            background: linear-gradient(135deg, #4158D0 0%, #C850C0 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .edit-tabs {
+            display: flex;
+            background: rgba(0,0,0,0.8);
+            padding: 8px;
+            gap: 4px;
+        }
+
+        .edit-tab {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 12px 8px;
+            color: rgba(255,255,255,0.6);
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 8px;
+        }
+
+        .edit-tab.active {
+            background: rgba(255,255,255,0.15);
+            color: #fff;
+        }
+
+        .edit-tab-icon {
+            font-size: 22px;
+        }
+
+        /* SCREEN 3: Create Post */
+        .screen3 {
+            background: #fff;
+        }
+
+        .header3 {
+            display: flex;
+            align-items: center;
+            padding: 16px;
+            background: #fff;
+            border-bottom: 1px solid #e0e0e0;
+            gap: 12px;
+        }
+
+        .header3 h1 {
+            color: #000;
+            font-size: 18px;
+            font-weight: 700;
+            flex: 1;
+        }
+
+        .theme-toggle {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 2px solid #e0e0e0;
+            background: none;
+            font-size: 18px;
+            cursor: pointer;
+        }
+
+        .form-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .preview-card {
+            width: 180px;
+            margin: 0 auto 24px;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .preview-img {
+            width: 100%;
+            aspect-ratio: 3/4;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .badge {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.8);
+            padding: 5px 10px;
+            border-radius: 16px;
+            color: #fff;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .caption {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            right: 10px;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .form-box {
+            background: #f5f5f5;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            color: #000;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .form-input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            color: #000;
+            font-size: 15px;
+            padding: 4px 0;
+            outline: none;
+            resize: none;
+        }
+
+        .form-input::placeholder {
+            color: #999;
+        }
+
+        .char-count {
+            text-align: right;
+            font-size: 11px;
+            color: #999;
+            margin-top: 6px;
+        }
+
+        .form-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .form-row:last-child {
+            border-bottom: none;
+        }
+
+        .form-row-label {
+            color: #000;
+            font-size: 14px;
+        }
+
+        .form-row-value {
+            color: #999;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .chevron {
+            color: #ccc;
+        }
+
+        .action-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 20px;
+            background: #fff;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .folder-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: #f5f5f5;
+            border: none;
+            font-size: 22px;
+            cursor: pointer;
+        }
+
+        .create-btn {
+            flex: 1;
+            padding: 14px;
+            background: #e60023;
+            border: none;
+            border-radius: 24px;
+            color: #fff;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .create-btn:active {
+            background: #c50015;
+        }
+    </style>
+</head>
+<body>
+
+<!-- SCREEN 1: Gallery + Camera -->
+<div class="screen">
+    <div class="header">
+        <button class="btn-close">✕</button>
+        <h1>Yeni gönderi</h1>
+        <button class="btn-next">İleri</button>
+    </div>
+
+    <div class="preview-section">
+        <div class="preview-placeholder">Seçili Medya Önizleme</div>
+
+        <!-- Right side controls -->
+        <div class="right-controls">
+            <div class="control-btn">⊞</div>
+            <div class="control-btn">⤢</div>
+            <div class="control-btn">+2</div>
+            <div class="control-btn">˅</div>
+        </div>
+
+        <!-- Bottom camera controls -->
+        <div class="bottom-controls">
+            <div class="mode-tabs">
+                <div class="mode-tab">🎥</div>
+                <div class="mode-tab active">60s</div>
+                <div class="mode-tab">15 sn</div>
+                <div class="mode-tab">FOTOĞRAF</div>
+                <div class="mode-tab">METİN</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="gallery-section">
+        <div class="gallery-header">
+            <button class="album-dropdown">Yakınlardakiler</button>
+            <div class="copy-icon">📋</div>
+        </div>
+
+        <div class="gallery-grid">
+            <div class="gallery-item">
+                <div style="width:100%;height:100%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:28px;">📷</div>
+            </div>
+            <div class="gallery-item"></div>
+            <div class="gallery-item"></div>
+            <div class="gallery-item selected">
+                <div class="duration">0:10</div>
+            </div>
+            <div class="gallery-item"></div>
+            <div class="gallery-item">
+                <div class="duration">0:15</div>
+            </div>
+            <div class="gallery-item"></div>
+            <div class="gallery-item"></div>
+            <div class="gallery-item"></div>
+        </div>
+    </div>
+
+    <div class="bottom-tabs">
+        <div class="bottom-tab active">GÖNDERİ</div>
+        <div class="bottom-tab">HİKAYE</div>
+        <div class="bottom-tab">REELS Vİ...</div>
+    </div>
+</div>
+
+<!-- SCREEN 2: Edit -->
+<div class="screen">
+    <div class="header">
+        <button class="btn-close">←</button>
+        <h1>Yeni gönderi</h1>
+        <button class="btn-next">İleri</button>
+    </div>
+
+    <div class="edit-preview">
+        <div class="preview-placeholder" style="color:#fff;font-size:18px;">Düzenleme Önizleme</div>
+    </div>
+
+    <div class="edit-tabs">
+        <div class="edit-tab active">
+            <div class="edit-tab-icon">📏</div>
+            Boyut
+        </div>
+        <div class="edit-tab">
+            <div class="edit-tab-icon">🖼️</div>
+            Medya
+        </div>
+        <div class="edit-tab">
+            <div class="edit-tab-icon">A</div>
+            Metin
+        </div>
+        <div class="edit-tab">
+            <div class="edit-tab-icon">😀</div>
+            Çıkartma
+        </div>
+        <div class="edit-tab">
+            <div class="edit-tab-icon">✏️</div>
+            Çizim
+        </div>
+        <div class="edit-tab">
+            <div class="edit-tab-icon">⚪</div>
+            Renk
+        </div>
+    </div>
+</div>
+
+<!-- SCREEN 3: Create Post -->
+<div class="screen screen3">
+    <div class="header3">
+        <button class="btn-close" style="color:#000;">←</button>
+        <h1>Pin Oluştur</h1>
+        <button class="theme-toggle">☀️</button>
+    </div>
+
+    <div class="form-content">
+        <!-- Preview -->
+        <div class="preview-card">
+            <div class="preview-img">
+                <div class="badge">0:10</div>
+                <div class="caption">🔒 Kapak seç</div>
+            </div>
+        </div>
+
+        <!-- Title -->
+        <div class="form-box">
+            <label class="form-label">Başlık</label>
+            <input type="text" class="form-input" placeholder="Pininizin ne hakkında olduğunu herkese söyleyin" maxlength="100">
+            <div class="char-count">0/100</div>
+        </div>
+
+        <!-- Description -->
+        <div class="form-box">
+            <label class="form-label">Açıklama</label>
+            <textarea class="form-input" rows="3" placeholder="Pin'inize bir açıklama, bahsetme veya konu etiketi ekleyin" maxlength="800"></textarea>
+            <div class="char-count">0/800</div>
+        </div>
+
+        <!-- Options -->
+        <div class="form-box">
+            <div class="form-row">
+                <div class="form-row-label">Bağlantı</div>
+                <div class="form-row-value">
+                    Bağlantınızı buraya ekleyin
+                    <span class="chevron">›</span>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-row-label">Bir pano seçin</div>
+                <div class="form-row-value">
+                    Profil
+                    <span class="chevron">›</span>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-row-label">Konuları etiketle</div>
+                <div class="form-row-value">
+                    <span class="chevron">›</span>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-row-label">Ürünleri etiketleyin</div>
+                <div class="form-row-value">
+                    <span class="chevron">›</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="action-bar">
+        <button class="folder-btn">📁</button>
+        <button class="create-btn">Oluştur</button>
+    </div>
+</div>
+
+</body>
+</html>
