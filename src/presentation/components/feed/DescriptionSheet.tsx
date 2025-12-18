@@ -1,5 +1,4 @@
 import React, { useEffect } from 'react';
-import { useThemeStore } from '../../store/useThemeStore';
 import { Pressable, StyleSheet, Text, View, Dimensions, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -15,6 +14,7 @@ import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { ChevronLeft, MoreVertical } from 'lucide-react-native';
 import { Avatar } from '../shared/Avatar';
 import { Video } from '../../../domain/entities/Video';
+import { useThemeStore } from '../../store/useThemeStore';  // 👈 BUNU EKLE
 
 interface DescriptionSheetProps {
     visible: boolean;
@@ -193,8 +193,6 @@ export function DescriptionSheet({
                     >
                         <View style={styles.divider} />
                         <Text style={[styles.fullDescription, { color: isDark ? 'white' : 'black' }]}>
-                            {video?.description}
-                        </Text>
                             {video?.description}
                         </Text>
                     </ScrollView>
