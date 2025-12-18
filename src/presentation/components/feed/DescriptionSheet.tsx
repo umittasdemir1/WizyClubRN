@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useThemeStore } from '../../store/useThemeStore';
 import { Pressable, StyleSheet, Text, View, Dimensions, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -32,6 +33,7 @@ export function DescriptionSheet({
     onFollowPress,
 }: DescriptionSheetProps) {
     const insets = useSafeAreaInsets();
+    const isDark = useThemeStore(state => state.isDark);  // 👈 Bunu ekle
     const translateY = useSharedValue(SCREEN_HEIGHT);
     const overlayOpacity = useSharedValue(0);
 
@@ -115,7 +117,11 @@ export function DescriptionSheet({
             <Animated.View
                 style={[
                     styles.sheet,
-                    { height: SHEET_HEIGHT, paddingBottom: insets.bottom + 16 },
+                    { 
+                    height: SHEET_HEIGHT, 
+                    paddingBottom: insets.bottom + 16,
+                    backgroundColor: isDark ? '#121212' : '#FFFFFF',  // 👈 Bunu ekle
+                    },
                     sheetStyle,
                 ]}
                 pointerEvents={visible ? 'auto' : 'none'}
@@ -135,15 +141,19 @@ export function DescriptionSheet({
                                 style={styles.backButton}
                                 hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                             >
-                                <ChevronLeft size={28} color="white" />
+                                <ChevronLeft size={28} color={isDark ? 'white' : 'black'} />
                             </Pressable>
 
                             {video && (
                                 <>
                                     <Avatar url={video.user.avatarUrl} size={44} hasBorder={true} />
                                     <View style={styles.userInfo}>
-                                        <Text style={styles.fullName}>{video.user.username}</Text>
-                                        <Text style={styles.username}>@{video.user.id.toLowerCase().replace(/\s+/g, '_')}</Text>
+                                        <Text style={[styles.fullName, { color: isDark ? 'white' : 'black' }]}>
+                                            {video.user.username}
+                                        </Text>
+                                        <Text style={[styles.username, { color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)' }]}>
+                                            @{video.user.id.toLowerCase().replace(/\s+/g, '_')}
+                                        </Text>
                                     </View>
                                 </>
                             )}
@@ -152,11 +162,17 @@ export function DescriptionSheet({
                         <View style={styles.headerRight}>
                             {!video?.user.isFollowing && (
                                 <Pressable
-                                    style={styles.followPill}
+                                    style={[
+                                        styles.followPill,
+                                        { 
+                                            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+                                            borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)',
+                                        }
+                                    ]}
                                     onPress={onFollowPress}
                                     hitSlop={8}
                                 >
-                                    <Text style={styles.followText}>Takip Et</Text>
+                                    <Text style={[styles.followText, { color: isDark ? 'white' : 'black' }]}>Takip Et</Text>
                                 </Pressable>
                             )}
                             <Pressable
@@ -164,7 +180,7 @@ export function DescriptionSheet({
                                 style={styles.moreButton}
                                 hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                             >
-                                <MoreVertical size={24} color="white" />
+                                <MoreVertical size={24} color={isDark ? 'white' : 'black'} />
                             </Pressable>
                         </View>
                     </View>
@@ -176,7 +192,9 @@ export function DescriptionSheet({
                         contentContainerStyle={styles.scrollContent}
                     >
                         <View style={styles.divider} />
-                        <Text style={styles.fullDescription}>
+                        <Text style={[styles.fullDescription, { color: isDark ? 'white' : 'black' }]}>
+                            {video?.description}
+                        </Text>
                             {video?.description}
                         </Text>
                     </ScrollView>
@@ -196,7 +214,6 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: '#121212',
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
         zIndex: 101,
@@ -233,12 +250,10 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     fullName: {
-        color: 'white',
         fontSize: 15,
         fontWeight: '700',
     },
     username: {
-        color: 'rgba(255,255,255,0.6)',
         fontSize: 12,
         marginTop: 1,
     },
@@ -250,12 +265,10 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
     },
     followPill: {
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
         paddingHorizontal: 16,
         paddingVertical: 6,
         borderRadius: 20,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.2)',
     },
     followText: {
         color: 'white',
@@ -276,7 +289,6 @@ const styles = StyleSheet.create({
         height: 16,
     },
     fullDescription: {
-        color: 'white',
         fontSize: 15,
         lineHeight: 22,
         fontWeight: '400',
