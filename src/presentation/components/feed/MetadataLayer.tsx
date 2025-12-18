@@ -160,12 +160,14 @@ const styles = StyleSheet.create({
         marginLeft: 2,
     },
     commercialTag: {
-        backgroundColor: 'rgba(255, 255, 255, 0.9)',
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 2,
-        marginTop: -8,
-    },
+    position: 'absolute',  // 👈 Bunu ekle
+    bottom: -30,           // 👈 Negatif = aşağı, Pozitif = yukarı
+    left: 0,               // 👈 Bunu ekle
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 2,
+},
     commercialText: {
         color: 'black',
         fontSize: 10,
