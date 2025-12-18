@@ -103,19 +103,20 @@ export function DescriptionSheet({
             </Animated.View>
 
             {/* Bottom Sheet */}
-            <GestureDetector gesture={panGesture}>
-                <Animated.View
-                    style={[
-                        styles.sheet,
-                        { height: SHEET_HEIGHT, paddingBottom: insets.bottom + 16 },
-                        sheetStyle,
-                    ]}
-                    pointerEvents={visible ? 'auto' : 'none'}
-                >
+            <Animated.View
+                style={[
+                    styles.sheet,
+                    { height: SHEET_HEIGHT, paddingBottom: insets.bottom + 16 },
+                    sheetStyle,
+                ]}
+                pointerEvents={visible ? 'auto' : 'none'}
+            >
                     {/* Drag Handle Indicator */}
-                    <View style={styles.handleContainer}>
-                        <View style={styles.handle} />
-                    </View>
+                    <GestureDetector gesture={panGesture}>
+                        <View style={styles.handleContainer}>
+                            <View style={styles.handle} />
+                        </View>
+                    </GestureDetector>
 
                     {/* Header Section */}
                     <View style={[styles.header, { paddingTop: 8 }]}>
@@ -171,7 +172,6 @@ export function DescriptionSheet({
                         </Text>
                     </ScrollView>
                 </Animated.View>
-            </GestureDetector>
         </View>
     );
 }
