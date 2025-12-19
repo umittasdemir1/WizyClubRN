@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Coupons</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: white;
+            padding: 0;
+            margin: 0;
+        }
+
+        .page-container {
+            max-width: 428px;
+            margin: 0 auto;
+            background: white;
+            min-height: 100vh;
+        }
+
+        /* Top Section - Carousel & Grid */
+        .top-section {
+            display: flex;
+            height: 400px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        /* Left Carousel */
+        .carousel-section {
+            flex: 1;
+            padding: 20px;
+            background: #f8f9fa;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .carousel-section::-webkit-scrollbar {
+            display: none;
+        }
+
+        .coupon-card-large {
+            border-radius: 20px;
+            padding: 24px;
+            margin-bottom: 16px;
+            position: relative;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            min-height: 160px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .card-green { background: linear-gradient(135deg, #00704A 0%, #008556 100%); }
+        .card-red { background: linear-gradient(135deg, #E50914 0%, #FF1F2F 100%); }
+        .card-blue { background: linear-gradient(135deg, #1E88E5 0%, #42A5F5 100%); }
+
+        .card-dots {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            width: 32px;
+            height: 32px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+        }
+
+        .card-dots-right {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            width: 32px;
+            height: 32px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+        }
+
+        .card-brand {
+            font-size: 16px;
+            font-weight: 700;
+            color: white;
+            letter-spacing: 2px;
+            margin-bottom: 8px;
+        }
+
+        .card-discount {
+            font-size: 42px;
+            font-weight: 900;
+            color: white;
+            margin-bottom: 4px;
+        }
+
+        .card-off {
+            font-size: 18px;
+            font-weight: 600;
+            color: rgba(255,255,255,0.9);
+            margin-bottom: 16px;
+        }
+
+        .card-divider {
+            height: 1px;
+            background: rgba(255,255,255,0.3);
+            margin: 12px 0;
+        }
+
+        .redeem-btn {
+            background: white;
+            color: #333;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+            width: fit-content;
+        }
+
+        .redeem-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Carousel Indicators */
+        .carousel-indicators {
+            display: flex;
+            gap: 6px;
+            justify-content: center;
+            padding: 12px 0;
+        }
+
+        .indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ddd;
+            transition: all 0.3s;
+        }
+
+        .indicator.active {
+            width: 24px;
+            border-radius: 4px;
+            background: #666;
+        }
+
+        /* Right Grid */
+        .grid-section {
+            width: 260px;
+            padding: 20px 16px;
+            overflow-y: auto;
+        }
+
+        .grid-section::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .grid-section::-webkit-scrollbar-thumb {
+            background: #ddd;
+            border-radius: 2px;
+        }
+
+        /* Category Filters */
+        .category-filters {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .filter-chip {
+            padding: 8px 16px;
+            border-radius: 20px;
+            background: white;
+            border: 1px solid #e0e0e0;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .filter-chip.active {
+            background: black;
+            color: white;
+            border-color: black;
+        }
+
+        .filter-chip:active {
+            transform: scale(0.95);
+        }
+
+        /* Grid Coupons */
+        .grid-coupons {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .coupon-card-small {
+            border-radius: 16px;
+            padding: 16px;
+            min-height: 120px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .coupon-card-small:active {
+            transform: scale(0.95);
+        }
+
+        .small-brand {
+            font-size: 12px;
+            font-weight: 700;
+            color: white;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+
+        .small-discount {
+            font-size: 28px;
+            font-weight: 900;
+            color: white;
+        }
+
+        .small-off {
+            font-size: 13px;
+            font-weight: 600;
+            color: rgba(255,255,255,0.9);
+        }
+
+        .small-redeem {
+            background: white;
+            color: #333;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+
+        /* Bottom Section - Popular Now */
+        .bottom-section {
+            padding: 24px 20px;
+            background: white;
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: #000;
+        }
+
+        .popular-items {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .popular-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px;
+            background: #f8f9fa;
+            border-radius: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .popular-item:active {
+            background: #e9ecef;
+        }
+
+        .popular-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .popular-logo {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            font-size: 24px;
+        }
+
+        .netflix-bg { background: #E50914; color: white; }
+        .nike-bg { background: black; color: white; }
+        .mcdonalds-bg { background: #FFC72C; color: #DA291C; }
+
+        .popular-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .popular-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #000;
+            margin-bottom: 2px;
+        }
+
+        .popular-desc {
+            font-size: 13px;
+            color: #666;
+        }
+
+        .popular-right {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+
+        .popular-price {
+            font-size: 18px;
+            font-weight: 700;
+            color: #000;
+        }
+
+        .popular-date {
+            font-size: 12px;
+            color: #999;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* Color variations */
+        .card-orange { background: linear-gradient(135deg, #FF9800 0%, #FFB74D 100%); }
+        .card-pink { background: linear-gradient(135deg, #E91E63 0%, #F48FB1 100%); }
+        .card-black { background: linear-gradient(135deg, #212121 0%, #424242 100%); }
+    </style>
+</head>
+<body>
+    <div class="page-container">
+        <!-- Top Split Section -->
+        <div class="top-section">
+            <!-- Left: Carousel -->
+            <div class="carousel-section">
+                <div class="coupon-card-large card-green">
+                    <div class="card-dots"></div>
+                    <div class="card-dots-right"></div>
+                    <div>
+                        <div class="card-brand">STARBUCKS</div>
+                        <div class="card-discount">25%</div>
+                        <div class="card-off">OFF</div>
+                    </div>
+                    <div class="card-divider"></div>
+                    <button class="redeem-btn">Redeem</button>
+                </div>
+
+                <div class="coupon-card-large card-red">
+                    <div class="card-dots"></div>
+                    <div class="card-dots-right"></div>
+                    <div>
+                        <div class="card-brand">NETFLIX</div>
+                        <div class="card-discount">25%</div>
+                        <div class="card-off">OFF</div>
+                    </div>
+                    <div class="card-divider"></div>
+                    <button class="redeem-btn">Redeem</button>
+                </div>
+
+                <div class="coupon-card-large card-blue">
+                    <div class="card-dots"></div>
+                    <div class="card-dots-right"></div>
+                    <div>
+                        <div class="card-brand">STARBUCKS</div>
+                        <div class="card-discount">25%</div>
+                        <div class="card-off">OFF</div>
+                    </div>
+                    <div class="card-divider"></div>
+                    <button class="redeem-btn">Redeem</button>
+                </div>
+
+                <div class="carousel-indicators">
+                    <div class="indicator active"></div>
+                    <div class="indicator"></div>
+                    <div class="indicator"></div>
+                </div>
+            </div>
+
+            <!-- Right: Grid -->
+            <div class="grid-section">
+                <div class="category-filters">
+                    <div class="filter-chip active">All</div>
+                    <div class="filter-chip">Food</div>
+                    <div class="filter-chip">Shopping</div>
+                    <div class="filter-chip">Sports Ticket</div>
+                </div>
+
+                <div class="grid-coupons">
+                    <div class="coupon-card-small card-red">
+                        <div>
+                            <div class="small-brand">NETFLIX</div>
+                            <div class="small-discount">25%</div>
+                            <div class="small-off">OFF</div>
+                        </div>
+                        <button class="small-redeem">Redeem</button>
+                    </div>
+
+                    <div class="coupon-card-small card-blue">
+                        <div>
+                            <div class="small-brand">STARBUCKS</div>
+                            <div class="small-discount">25%</div>
+                            <div class="small-off">OFF</div>
+                        </div>
+                        <button class="small-redeem">Redeem</button>
+                    </div>
+
+                    <div class="coupon-card-small card-orange">
+                        <div>
+                            <div class="small-brand">STARBUCKS</div>
+                            <div class="small-discount">25%</div>
+                            <div class="small-off">OFF</div>
+                        </div>
+                        <button class="small-redeem">Redeem</button>
+                    </div>
+
+                    <div class="coupon-card-small card-green">
+                        <div>
+                            <div class="small-brand">STARBUCKS</div>
+                            <div class="small-discount">25%</div>
+                            <div class="small-off">OFF</div>
+                        </div>
+                        <button class="small-redeem">Redeem</button>
+                    </div>
+
+                    <div class="coupon-card-small card-black">
+                        <div>
+                            <div class="small-brand">STARBUCKS</div>
+                            <div class="small-discount">25%</div>
+                            <div class="small-off">OFF</div>
+                        </div>
+                        <button class="small-redeem">Redeem</button>
+                    </div>
+
+                    <div class="coupon-card-small card-pink">
+                        <div>
+                            <div class="small-brand">STARBUCKS</div>
+                            <div class="small-discount">25%</div>
+                            <div class="small-off">OFF</div>
+                        </div>
+                        <button class="small-redeem">Redeem</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Section - Popular Now -->
+        <div class="bottom-section">
+            <h2 class="section-title">Popular Now</h2>
+            <div class="popular-items">
+                <div class="popular-item">
+                    <div class="popular-left">
+                        <div class="popular-logo netflix-bg">N</div>
+                        <div class="popular-info">
+                            <div class="popular-name">Netflix Pro</div>
+                            <div class="popular-desc">All movies included</div>
+                        </div>
+                    </div>
+                    <div class="popular-right">
+                        <div class="popular-price">$19.99</div>
+                        <div class="popular-date">
+                            <svg width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z"/>
+                            </svg>
+                            27 Mar
+                        </div>
+                    </div>
+                </div>
+
+                <div class="popular-item">
+                    <div class="popular-left">
+                        <div class="popular-logo nike-bg">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+                                <path d="M24 7.8L6.442 15.276c-1.456.616-2.679.925-3.668.925-1.12 0-1.933-.392-2.437-1.177-.317-.504-.41-1.143-.28-1.918.13-.775.476-1.6 1.036-2.478.467-.71 1.078-1.398 1.833-2.065L24 7.8z"/>
+                            </svg>
+                        </div>
+                        <div class="popular-info">
+                            <div class="popular-name">Nike</div>
+                            <div class="popular-desc">of any footwear</div>
+                        </div>
+                    </div>
+                    <div class="popular-right">
+                        <div class="popular-price">30%</div>
+                        <div class="popular-date">
+                            <svg width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z"/>
+                            </svg>
+                            1 Mar
+                        </div>
+                    </div>
+                </div>
+
+                <div class="popular-item">
+                    <div class="popular-left">
+                        <div class="popular-logo mcdonalds-bg">M</div>
+                        <div class="popular-info">
+                            <div class="popular-name">Mcdonalds</div>
+                            <div class="popular-desc">Day 1 get 1</div>
+                        </div>
+                    </div>
+                    <div class="popular-right">
+                        <div class="popular-price">$1</div>
+                        <div class="popular-date">
+                            <svg width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z"/>
+                            </svg>
+                            1 Mar
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Carousel scroll sync with indicators
+        const carouselSection = document.querySelector('.carousel-section');
+        const indicators = document.querySelectorAll('.indicator');
+
+        carouselSection.addEventListener('scroll', () => {
+            const scrollPercentage = carouselSection.scrollTop / (carouselSection.scrollHeight - carouselSection.clientHeight);
+            const activeIndex = Math.round(scrollPercentage * (indicators.length - 1));
+
+            indicators.forEach((ind, idx) => {
+                ind.classList.toggle('active', idx === activeIndex);
+            });
+        });
+
+        // Filter chips interaction
+        document.querySelectorAll('.filter-chip').forEach(chip => {
+            chip.addEventListener('click', function() {
+                document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html>
