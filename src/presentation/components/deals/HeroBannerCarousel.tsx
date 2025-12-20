@@ -12,63 +12,52 @@ import Animated, {
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// --- HASSAS AYARLAR ---
-const CARD_WIDTH = SCREEN_WIDTH * 0.8; // Kart Genişliği (%80 - Daha garantidir)
+// --- SENİN İSTEDİĞİN AYARLAR ---
+const CARD_WIDTH = SCREEN_WIDTH * 0.92; // KARTLARI ÇOK BÜYÜTTÜK (%92)
 const ASPECT_RATIO = 16 / 9;
 const CARD_HEIGHT = CARD_WIDTH / ASPECT_RATIO;
-const SPACING = 15; // Kartlar arası boşluk
+const GAP = 10; // Kartlar arası boşluk (Azalttık ki kopuk durmasın)
 
-// --- SİHİRLİ MATEMATİK (SPACER TEKNİĞİ) ---
-// Bu genişlikteki boş kutuyu en başa koyacağız.
-// Böylece ilk kart tam ortaya itilecek. Padding hesabı yok.
-const SPACER_WIDTH = (SCREEN_WIDTH - CARD_WIDTH) / 2;
+// --- KRİTİK HİZALAMA AYARI ---
+// Burası ilk kartın solundaki boşluktur.
+// Kart %92 olduğu için kalan boşluk %8'dir. Bunun yarısı %4 sağa, %4 sola düşer.
+const SIDE_OFFSET = (SCREEN_WIDTH - CARD_WIDTH) / 2;
 
-interface AdBanner {
-  id: string;
-  imageUrl: string;
-  onPress?: () => void;
-}
-
-interface HeroBannerCarouselProps {
-  banners: AdBanner[];
-}
-
-export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
+export function HeroBannerCarousel({ banners }: { banners: any[] }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const scrollX = useSharedValue(0);
 
-  // Scroll Handler
+  // Scroll İşleyici
   const onScroll = useAnimatedScrollHandler((event) => {
     scrollX.value = event.contentOffset.x;
-    // Index hesabı: Spacer'ı düştükten sonra bölüyoruz
-    const index = Math.round(event.contentOffset.x / (CARD_WIDTH + SPACING));
+    // Matematik: (Offset) / (Kart + Boşluk)
+    const index = Math.round(event.contentOffset.x / (CARD_WIDTH + GAP));
     runOnJS(setActiveIndex)(index);
   });
 
-  // Animasyonlu Kart Bileşeni
-  const AnimatedCard = ({ item, index }: { item: AdBanner; index: number }) => {
+  // Animasyonlu Kart
+  const AnimatedCard = ({ item, index }: { item: any; index: number }) => {
     const animatedStyle = useAnimatedStyle(() => {
-      // Bu kartın scroll üzerindeki konumu
-      // (Index * Bir Kart Boyu)
-      const itemOffset = index * (CARD_WIDTH + SPACING);
-
+      // Bu kartın pozisyonu
+      const itemOffset = index * (CARD_WIDTH + GAP);
+      
       const inputRange = [
-        itemOffset - (CARD_WIDTH + SPACING),
+        itemOffset - (CARD_WIDTH + GAP),
         itemOffset,
-        itemOffset + (CARD_WIDTH + SPACING),
+        itemOffset + (CARD_WIDTH + GAP),
       ];
 
       const scale = interpolate(
         scrollX.value,
         inputRange,
-        [0.9, 1, 0.9], // Yanlar %90, Orta %100
+        [0.9, 1, 0.9], // Aktif olmayanlar %10 küçülsün
         Extrapolation.CLAMP
       );
 
       const opacity = interpolate(
         scrollX.value,
         inputRange,
-        [0.5, 1, 0.5], // Yanlar silik
+        [0.5, 1, 0.5], // Aktif olmayanlar silikleşsin
         Extrapolation.CLAMP
       );
 
@@ -81,7 +70,7 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
     return (
       <Animated.View style={[styles.cardWrapper, animatedStyle]}>
         <TouchableOpacity
-          activeOpacity={0.9}
+          activeOpacity={0.95}
           onPress={item.onPress}
           style={styles.cardInner}
         >
@@ -91,8 +80,6 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
             contentFit="cover"
             transition={200}
           />
-          {/* Siyah Gradient efekt (yazı gelirse diye hazır) */}
-          <View style={styles.overlay} />
         </TouchableOpacity>
       </Animated.View>
     );
@@ -106,26 +93,26 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
         horizontal
         showsHorizontalScrollIndicator={false}
         decelerationRate="fast"
-        // Snap aralığı: Kart + Boşluk
-        snapToInterval={CARD_WIDTH + SPACING}
+        // Snap aralığı: Kart + Boşluk kadar
+        snapToInterval={CARD_WIDTH + GAP}
         // Başlangıca hizala (Çünkü Spacer ile biz itiyoruz)
         snapToAlignment="start"
         scrollEventThrottle={16}
         onScroll={onScroll}
-        // ÖNEMLİ: Padding YOK! Spacer var.
-        contentContainerStyle={styles.scrollContent}
+        // Padding YOK, Margin YOK. Sadece Spacer var.
+        contentContainerStyle={{ alignItems: 'center' }}
       >
-        {/* 1. SOL SPACER (KÖR NOKTA) - İLK KARTI İTER */}
-        <View style={{ width: SPACER_WIDTH - (SPACING / 2) }} />
+        {/* SOLDAKİ BAŞLANGIÇ BOŞLUĞU (İLK KARTI ORTALAR) */}
+        <View style={{ width: SIDE_OFFSET }} />
 
         {banners.map((item, index) => (
-          <View key={item.id} style={{ marginRight: SPACING }}>
-             <AnimatedCard item={item} index={index} />
+          <View key={item.id} style={{ marginRight: index === banners.length - 1 ? 0 : GAP }}>
+            <AnimatedCard item={item} index={index} />
           </View>
         ))}
 
-        {/* 2. SAĞ SPACER - SON KARTI ORTADA TUTAR */}
-        <View style={{ width: SPACER_WIDTH - SPACING - (SPACING / 2) }} />
+        {/* SAĞDAKİ BİTİŞ BOŞLUĞU (SON KARTI ORTALAR) */}
+        <View style={{ width: SIDE_OFFSET }} />
       </Animated.ScrollView>
 
       {/* DOTS (SABİT) */}
@@ -146,43 +133,34 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
 
 const styles = StyleSheet.create({
   container: {
-    height: CARD_HEIGHT + 40,
+    height: CARD_HEIGHT + 30, // Yükseklik tam yetsin
     marginTop: 10,
     marginBottom: 20,
-  },
-  scrollContent: {
-    alignItems: 'center', // Dikey ortalama
-    // paddingHorizontal YOK!
   },
   cardWrapper: {
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
-    // Margin BURADA YOK, yukarıdaki View wrapper'da var
   },
   cardInner: {
     flex: 1,
-    borderRadius: 20,
-    backgroundColor: '#222',
+    borderRadius: 18,
+    backgroundColor: '#111',
     overflow: 'hidden',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 5 },
+        shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
-        shadowRadius: 10,
+        shadowRadius: 8,
       },
       android: {
-        elevation: 8,
+        elevation: 6,
       },
     }),
   },
   image: {
     width: '100%',
     height: '100%',
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.1)',
   },
   dotsContainer: {
     position: 'absolute',
@@ -192,18 +170,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 8,
-    height: 20,
+    height: 10,
   },
   dot: {
     height: 6,
     borderRadius: 3,
   },
   activeDot: {
-    width: 20,
+    width: 24,
     backgroundColor: '#fff',
   },
   inactiveDot: {
     width: 6,
-    backgroundColor: '#555',
+    backgroundColor: '#444',
   },
 });
