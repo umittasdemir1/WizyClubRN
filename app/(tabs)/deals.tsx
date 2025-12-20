@@ -1,93 +1,76 @@
-import { View, Text, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
-import { FlashList } from '@shopify/flash-list';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useEffect, useState, useCallback } from 'react';
-import { BrandDeal } from '../../src/domain/entities/BrandDeal';
-import { GetDealsUseCase } from '../../src/domain/usecases/GetDealsUseCase';
-import { DealRepositoryImpl } from '../../src/data/repositories/DealRepositoryImpl';
-import { Avatar } from '../../src/presentation/components/shared/Avatar';
-import { DollarSign, Calendar, CheckCircle } from 'lucide-react-native';
-import { LoadingIndicator } from '../../src/presentation/components/shared/LoadingIndicator';
-
+import { useCallback, useState } from 'react';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import { StatusBar as RNStatusBar } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
+import { Search, ShoppingBag, Coffee, Apple } from 'lucide-react-native';
+import {
+    HeroBanner,
+    CategoryCard,
+    BrandAvatar,
+    TicketCard,
+    StackedCouponCards,
+    PopularDealCard,
+    PromoBanner,
+} from '../../src/presentation/components/deals';
 
 export default function DealsScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
-    const [deals, setDeals] = useState<BrandDeal[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
     const isDark = useThemeStore((state) => state.isDark);
-    const bgBody = isDark ? '#000000' : '#FFFFFF';
-    const textColor = isDark ? '#FFFFFF' : '#000000';
-    const cardBg = isDark ? '#1a1a1a' : '#f0f0f0';
-
-    const fetchDeals = useCallback(async () => {
-        const repository = new DealRepositoryImpl();
-        const useCase = new GetDealsUseCase(repository);
-        const data = await useCase.execute();
-        setDeals(data);
-        setIsLoading(false);
-    }, []);
+    const bgBody = isDark ? '#08080A' : '#FFFFFF';
+    const textColor = isDark ? '#FFFFFF' : '#111827';
 
     useFocusEffect(
         useCallback(() => {
             RNStatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
-            // Optional: Auto-refresh on focus? Maybe just fetch if empty.
-            if (deals.length === 0) {
-                fetchDeals();
-            }
-        }, [isDark, fetchDeals, deals.length])
+        }, [isDark])
     );
-
-    useEffect(() => {
-        fetchDeals();
-    }, [fetchDeals]);
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
-        await fetchDeals();
+        // Simulate refresh
+        await new Promise((resolve) => setTimeout(resolve, 1000));
         setRefreshing(false);
-    }, [fetchDeals]);
+    }, []);
 
-    const renderItem = ({ item }: { item: BrandDeal }) => (
-        <View style={[styles.card, { backgroundColor: cardBg }]}>
-            <View style={styles.cardHeader}>
-                <Avatar url={item.logoUrl} size={48} />
-                <View style={styles.headerText}>
-                    <Text style={[styles.brandName, { color: textColor }]}>{item.brandName}</Text>
-                    <Text style={styles.payout}>{item.payout}</Text>
-                </View>
-            </View>
+    // Mock Data
+    const categories = [
+        { id: '1', title: 'Tüm\nKategoriler', iconType: 'dots', backgroundColor: isDark ? '#2d1a2e' : '#fce7f3' },
+        { id: '2', title: 'Sağlık', icon: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDAHsXlDcuqCaV56LBr0ZEHD0e3yXJvoUZ9tr3aN73IE2sBHTu0ldNU5nrt3FKdudK6ZTPNIODnxWQZIm-9DWkcn_XbvPrFNOm12lwby0rObgWviqD463CNwy0MMBHCvfgy7-fzfscCIg1HRC-aBOn0AyD1VmFjgqFYmY5VnXSXCKWRgfEcngDhTdl_wPs6SFijjDTfFKuyZaItKyHsfMN1HAUWubXp0dSZPSFAzxaTfoEGyeRMmEcLk7aNAyN0oUA90yo6p9IQag', backgroundColor: isDark ? '#1a2e1f' : '#f0fdf4' },
+        { id: '3', title: 'Spor', icon: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCyEpBHh095eRgZsW9P9WizrTz1vwNJb2P4MGcW0sdq2u6VLCGRsjkmRniGYzO2MB5dcEDi6_e8dzzCiQO_uArOU1Zrnkz7ui8ybnjTHJWS_YGy7ORzJ9dMd6D3kRCKUYWyfjwEWBamZjUDJRMb_iSoATU-m5Zbs8wic6Ol62Kd05H_9agfYRyD2ZjRSZcGBY1DtkN3_R5Uxzxueh-G7RIPbh1zOJy_xDhyL6sJLseOWG-w3aozTz6HGiwRd1AOFkTXnwUqLNcBlg', backgroundColor: isDark ? '#2e2419' : '#fff7ed' },
+        { id: '4', title: 'Evcil\nDostlar', icon: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCW1CH7kUNb0bTdUlsuaScchM4OY5PV0h8NPE8Qg18ZueSh8CWMSSPh1ZeFdCJycCxTehBRiIWS2JSmBnscw8Vg0b7ZTWZtTwH_GFY9KzYmaYD06Haj-8ueuW_ePr3fnVXfkOC_sbxaCHodB4YFJMAzUCzvfNIq7fBsYXGXTtoDE3L08V9dnhYoRxom1cx2BepQ-BDo3SiFa-0fUe4mAfUv8qjwVux_XPiIJhR7LRk_Of79RZ02W_FXuDZ4Fi3LmSxnqdDG8qM5GA', backgroundColor: isDark ? '#1a2e28' : '#ecfdf5' },
+        { id: '5', title: 'Bebek', icon: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA62O9LjD2T6zk37_BrZJku1w6SJMAT2O9BjxcTGSGSSV11MApIgmGnJrLyCpJ3xG21tWchdOWURlL3NPlEpsZ46rg3QF1n-qsqzEgM4RfX5rr2665Em6vSjTaOhAKK8bp6CY0YoESppyxHOraBcBkkXfj0HH3aO0dToZqAEQPFYrebgfXfQ28bICuxC6-lDckezryz9PDIYJcRI4Pjb5tDbd71yuotldZlEXeXJbkA0dyB9zvL_K7CRknQAjJR8wB9RXhYWWbW1A', backgroundColor: isDark ? '#2a1f2e' : '#faf5ff' },
+    ];
 
-            <Text style={[styles.description, { color: isDark ? '#ccc' : '#666' }]}>{item.description}</Text>
+    const brands = [
+        { id: '1', name: 'Nike', discount: '25%', backgroundColor: '#000000', icon: ShoppingBag },
+        { id: '2', name: 'Amazon', discount: '10%', backgroundColor: '#FFFFFF', icon: ShoppingBag },
+        { id: '3', name: 'Starbucks', discount: '50%', backgroundColor: '#00704A', icon: Coffee },
+        { id: '4', name: 'Apple', discount: '30%', backgroundColor: '#FFFFFF', icon: Apple },
+        { id: '5', name: 'Samsung', discount: '18%', backgroundColor: '#1428a0', icon: ShoppingBag },
+    ];
 
-            <View style={styles.requirements}>
-                {item.requirements.map((req, index) => (
-                    <View key={index} style={styles.reqItem}>
-                        {/* @ts-ignore */}
-                        <CheckCircle size={14} color="#4CAF50" />
-                        <Text style={styles.reqText}>{req}</Text>
-                    </View>
-                ))}
-            </View>
+    const trendingDeals = [
+        { id: '1', brand: 'Starbucks', discount: '25%', bg: '#d4edda', accent: '#00704A' },
+        { id: '2', brand: 'Amazon', discount: '10%', bg: '#ffedd5', accent: '#f97316' },
+        { id: '3', brand: 'Nike', discount: '25%', bg: '#fee2e2', accent: '#ef4444' },
+    ];
 
-            <View style={styles.footer}>
-                <View style={styles.deadline}>
-                    {/* @ts-ignore */}
-                    <Calendar size={16} color="#888" />
-                    <Text style={styles.deadlineText}>Due {item.deadline}</Text>
-                </View>
-                <TouchableOpacity style={styles.applyButton}>
-                    <Text style={styles.applyButtonText}>Apply Now</Text>
-                </TouchableOpacity>
-            </View>
-        </View>
-    );
+    const stackedCoupons = [
+        { brandName: 'Store', discount: '10%', backgroundColor: '#2563eb' },
+        { brandName: 'Starbucks', discount: '25%', backgroundColor: '#00704A', icon: <Coffee size={16} color="white" /> },
+        { brandName: 'Store', discount: '15%', backgroundColor: '#dc2626' },
+    ] as [any, any, any];
+
+    const popularDeals = [
+        { id: '1', brand: 'Netflix Pro', value: '19.99$', desc: 'buy membership', day: '27', month: 'MAY', icon: <Text style={{ fontSize: 24, fontWeight: '800', color: '#dc2626' }}>N</Text> },
+        { id: '2', brand: 'Nike', value: '30%', desc: 'on any footware', day: '1', month: 'MAY', icon: <ShoppingBag size={20} color="#111827" /> },
+    ];
 
     return (
         <SwipeWrapper
@@ -95,22 +78,139 @@ export default function DealsScreen() {
             onSwipeRight={() => router.push('/explore')}
         >
             <View style={[styles.container, { paddingTop: insets.top, backgroundColor: bgBody }]}>
+                {/* Header */}
+                <View style={styles.header}>
+                    <View style={{ width: 24 }} />
+                    <Text style={[styles.headerTitle, { color: textColor }]}>Fırsatlar</Text>
+                    <TouchableOpacity style={styles.searchButton}>
+                        <Search size={20} color={textColor} />
+                    </TouchableOpacity>
+                </View>
 
-                <Text style={[styles.title, { color: textColor }]}>Brand Deals</Text>
-                {/* @ts-ignore */}
-                <FlashList
-                    data={deals}
-                    renderItem={renderItem}
-                    estimatedItemSize={200}
-                    contentContainerStyle={styles.listContent}
+                <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={styles.scrollContent}
                     refreshControl={
                         <RefreshControl
                             refreshing={refreshing}
                             onRefresh={onRefresh}
-                            tintColor={isDark ? "#fff" : "#000"}
+                            tintColor={isDark ? '#fff' : '#000'}
                         />
                     }
-                />
+                >
+                    {/* Hero Banner */}
+                    <View style={styles.section}>
+                        <HeroBanner
+                            title="MOVE WITH\nMEANING"
+                            subtitle="UP TO 40% OFF"
+                            imageUrl="https://lh3.googleusercontent.com/aida-public/AB6AXuDzwWrZBTLii7ZmBZRZtoLxADJ61kjuyrMmg9YExo3zVEBKLpfJGDYZao4e4HVUkO6Urkyb8jOpkAW7dQ11BdnqqJYR38w3wiu_hoDOvy__KKhZa78FZRDOULvZtGeMfnCOmy2of7Wy6aTy1ANuYNetyJ-4JAbgfSX2beMj76qUO1QvKpb2kIJqheALkcn5vlgGEvhd3VryaK58NlMNW6rwD0zzaOd7FbvNNs4ult0GLQ652uaADXUBWJzPR-n6-wN6JEu_ktZjTQ"
+                        />
+                    </View>
+
+                    {/* Categories */}
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <Text style={[styles.sectionTitle, { color: textColor }]}>Kategoriler</Text>
+                            <View style={styles.progressDots}>
+                                <View style={[styles.progressDot, styles.progressDotActive]} />
+                                <View style={[styles.progressDot, styles.progressDotInactive]} />
+                            </View>
+                        </View>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+                            {categories.map((cat) => (
+                                <CategoryCard
+                                    key={cat.id}
+                                    title={cat.title}
+                                    icon={cat.icon}
+                                    iconType={cat.iconType as any}
+                                    backgroundColor={cat.backgroundColor}
+                                    isDark={isDark}
+                                />
+                            ))}
+                        </ScrollView>
+                    </View>
+
+                    {/* Featured Brands */}
+                    <View style={styles.section}>
+                        <Text style={[styles.sectionTitle, { color: textColor }]}>Öne Çıkan Markalar</Text>
+                        <View style={styles.brandsRow}>
+                            {brands.map((brand) => (
+                                <BrandAvatar
+                                    key={brand.id}
+                                    brandName={brand.name}
+                                    discount={brand.discount}
+                                    backgroundColor={brand.backgroundColor}
+                                    icon={brand.icon}
+                                    iconColor={brand.backgroundColor === '#FFFFFF' ? '#111827' : 'white'}
+                                />
+                            ))}
+                        </View>
+                    </View>
+
+                    {/* Trending Deals */}
+                    <View style={styles.section}>
+                        <Text style={[styles.sectionTitle, { color: textColor }]}>Trend Fırsatlar</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+                            {trendingDeals.map((deal) => (
+                                <View key={deal.id} style={{ marginRight: 12 }}>
+                                    <TicketCard
+                                        brandName={deal.brand}
+                                        discount={deal.discount}
+                                        backgroundColor={deal.bg}
+                                        accentColor={deal.accent}
+                                    />
+                                </View>
+                            ))}
+                        </ScrollView>
+                    </View>
+
+                    {/* Coupons */}
+                    <View style={styles.section}>
+                        <Text style={[styles.sectionTitle, { color: textColor }]}>Kuponlar</Text>
+                        <StackedCouponCards coupons={stackedCoupons} />
+                        <View style={styles.dotsIndicator}>
+                            <View style={[styles.indicatorDot, styles.indicatorDotActive]} />
+                            <View style={[styles.indicatorDot, styles.indicatorDotInactive]} />
+                            <View style={[styles.indicatorDot, styles.indicatorDotInactive]} />
+                        </View>
+                    </View>
+
+                    {/* Popular Now */}
+                    <View style={styles.section}>
+                        <Text style={[styles.sectionTitle, { color: textColor }]}>Popüler Olanlar</Text>
+                        {popularDeals.map((deal) => (
+                            <PopularDealCard
+                                key={deal.id}
+                                icon={deal.icon}
+                                brandName={deal.brand}
+                                value={deal.value}
+                                description={deal.desc}
+                                expiryDay={deal.day}
+                                expiryMonth={deal.month}
+                                isDark={isDark}
+                            />
+                        ))}
+                    </View>
+
+                    {/* Promo Banners */}
+                    <View style={styles.section}>
+                        <PromoBanner
+                            title="Bebek\nÜrünleri"
+                            subtitle="UP TO 50% OFF"
+                            imageUrl="https://lh3.googleusercontent.com/aida-public/AB6AXuBa7RyWjSsLrX0erTuhvaQnGnskrpQGjaSmCJ-l4uAPTMLaXoIKdxY6aW_gF9Z_SwYrurrRbrk6O-0QWhIkQAHuVZcPC43Q6kT-Ar3s_wuifi3x95z7lxjcqWBIRZxtsMlYtJDtXi1beKL96pDk2odw05loc_EeBey4BuV17i0hx3AG4KSedPuQc3ensEPfqJS4Y_IJoiGTgHT6Is1wzera-FwPJKWG9_UJOSQTckKvRxDAVbCtZ0STX9ozlMUCnBsShlJdXo-Ifw"
+                            backgroundColor="#e68a7c"
+                            imagePosition="right"
+                        />
+                        <PromoBanner
+                            title="Elektronik"
+                            imageUrl="https://lh3.googleusercontent.com/aida-public/AB6AXuCRmV11Igi8mucWeAL4cH23lJFXUrP76_JgSmHEcn8_eG9lT35ds1aOcMwJnd-VSDnvNQRTYDiIGsIPGqYKBT7EI_avxIV-8QOO5Y-fz6hIG-DccCV_fZ1ozUvVGBVEa8S---g2hhUNKXhcFaG60Jh0psR033gS0lU6BoD96YJT53I3AspB1SJWeC9b7W4pnifJ3erxV6WJdd_rjfzeMc6ob2iEbhrbWtcXp9cK0Ny6HOwGUB8ae7jWAMqdV4eI4vZNosfqP7bNog"
+                            backgroundColor="#3b6672"
+                            imagePosition="left"
+                        />
+                    </View>
+
+                    <View style={{ height: insets.bottom + 80 }} />
+                </ScrollView>
             </View>
         </SwipeWrapper>
     );
@@ -119,92 +219,81 @@ export default function DealsScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        // backgroundColor: 'black', // Dynamic
     },
-    title: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        padding: 16,
-    },
-    listContent: {
-        padding: 16,
-    },
-    card: {
-        borderRadius: 16,
-        padding: 16,
-        marginBottom: 16,
-        // backgroundColor: '#111', // Dynamic
-    },
-    cardHeader: {
+    header: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 12,
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
     },
-    headerText: {
-        marginLeft: 12,
-        flex: 1,
-    },
-    brandName: {
+    headerTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        // color: 'white', // Dynamic
+        letterSpacing: 1,
     },
-    payout: {
-        color: '#4CAF50',
-        fontWeight: 'bold',
-        fontSize: 16,
-    },
-    description: {
-        // color: '#ccc', // Dynamic
-        marginBottom: 16,
-        lineHeight: 20,
-    },
-    requirements: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8,
-        marginBottom: 16,
-    },
-    reqItem: {
-        flexDirection: 'row',
+    searchButton: {
+        width: 24,
+        height: 24,
         alignItems: 'center',
-        backgroundColor: 'rgba(76, 175, 80, 0.1)',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-        gap: 4,
+        justifyContent: 'center',
     },
-    reqText: {
-        color: '#4CAF50',
-        fontSize: 12,
-        fontWeight: '600',
+    scrollContent: {
+        paddingHorizontal: 16,
     },
-    footer: {
+    section: {
+        marginBottom: 24,
+    },
+    sectionHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        borderTopWidth: 1,
-        borderTopColor: '#222',
-        paddingTop: 12,
+        marginBottom: 12,
     },
-    deadline: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-    },
-    deadlineText: {
-        color: '#888',
-        fontSize: 12,
-    },
-    applyButton: {
-        backgroundColor: 'white',
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 20,
-    },
-    applyButtonText: {
-        color: 'black',
+    sectionTitle: {
+        fontSize: 16,
         fontWeight: 'bold',
-        fontSize: 14,
+    },
+    progressDots: {
+        flexDirection: 'row',
+        gap: 4,
+    },
+    progressDot: {
+        height: 4,
+        borderRadius: 2,
+    },
+    progressDotActive: {
+        width: 16,
+        backgroundColor: '#1f2937',
+    },
+    progressDotInactive: {
+        width: 6,
+        backgroundColor: '#d1d5db',
+    },
+    horizontalScroll: {
+        gap: 10,
+    },
+    brandsRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingHorizontal: 4,
+    },
+    dotsIndicator: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 6,
+        marginTop: 16,
+    },
+    indicatorDot: {
+        height: 6,
+        borderRadius: 3,
+    },
+    indicatorDotActive: {
+        width: 24,
+        backgroundColor: '#1f2937',
+    },
+    indicatorDotInactive: {
+        width: 12,
+        backgroundColor: '#d1d5db',
     },
 });
