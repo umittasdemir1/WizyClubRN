@@ -28,7 +28,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // --- SENİN İSTEDİĞİN AYARLAR ---
 
-const CARD_WIDTH = SCREEN_WIDTH * 0.95; // KARTLARI ÇOK BÜYÜTTÜK (%95)
+const CARD_WIDTH = SCREEN_WIDTH * 0.95; // KARTLARI ÇOK BÜYÜTTÜK (%92)
 
 const ASPECT_RATIO = 16 / 9;
 
@@ -42,9 +42,9 @@ const GAP = 5; // Kartlar arası boşluk (Azalttık ki kopuk durmasın)
 
 // Burası ilk kartın solundaki boşluktur.
 
-// Kart %95 olduğu için kalan boşluk %10'dir. Bunun yarısı %5 sağa, %5 sola düşer.
+// Kart %92 olduğu için kalan boşluk %8'dir. Bunun yarısı %4 sağa, %4 sola düşer.
 
-const SIDE_OFFSET = (SCREEN_WIDTH - CARD_WIDTH) / 7.5;
+const SIDE_OFFSET = (SCREEN_WIDTH - CARD_WIDTH) / 5;
 
 
 
@@ -214,7 +214,7 @@ export function HeroBannerCarousel({ banners }: { banners: any[] }) {
 
         {banners.map((item, index) => (
 
-          <View key={item.id} style={{ marginRight: index === banners.length -1 ? 0 : GAP }}>
+          <View key={item.id} style={{ marginRight: index === banners.length - 1 ? 0 : GAP }}>
 
             <AnimatedCard item={item} index={index} />
 
