@@ -7,23 +7,25 @@ import Animated, {
   useAnimatedStyle,
   interpolate,
   runOnJS,
-  Extrapolation, // SharedValue tipini ve Extrapolation'ı ekledik
+  Extrapolation,
 } from 'react-native-reanimated';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // --- AYARLAR ---
-const ITEM_WIDTH = SCREEN_WIDTH * 0.85; // Kart Genişliği
-const ASPECT_RATIO = 16 / 9;            // 16:9 Sinematik Oran
+const ITEM_WIDTH = SCREEN_WIDTH * 0.85; // Kart Genişliği (%85)
+const ASPECT_RATIO = 16 / 9;            // Yatay Format
 const ITEM_HEIGHT = ITEM_WIDTH / ASPECT_RATIO;
 const ITEM_SPACING = 15;                // Kartlar arası boşluk
 
-// --- MATEMATİKSEL HİZALAMA ---
-// Snap aralığı (Bir kart + bir boşluk)
+// --- HESAPLAMALAR (DÜZELTİLDİ) ---
+// Snap (Kaydırma) Aralığı: Kart + Boşluk
 const SNAP_INTERVAL = ITEM_WIDTH + ITEM_SPACING;
 
-// Ekranda tam ortalamak için gereken kenar boşluğu
-// Formül: (Ekran - Kart) / 2 - (Kartın yan boşluğu)
+// EKRAN ORTALAMA FORMÜLÜ:
+// (Ekran - Kart) / 2 formülü bize kenar boşluğunu verir.
+// Ancak kartın içinde de "margin" olduğu için, onu padding'den DÜŞÜYORUZ.
+// Bu işlem "sağa kayma" sorununu çözer.
 const CONTENT_PADDING = (SCREEN_WIDTH - ITEM_WIDTH) / 2 - (ITEM_SPACING / 2);
 
 interface AdBanner {
@@ -36,7 +38,7 @@ interface HeroBannerCarouselProps {
   banners: AdBanner[];
 }
 
-// --- ALT BİLEŞEN: TEKİL KART (ANIMASYON BURADA) ---
+// --- TEKİL KART BİLEŞENİ ---
 const BannerItem = ({ 
   item, 
   index, 
@@ -49,16 +51,14 @@ const BannerItem = ({
   onPress?: () => void 
 }) => {
   
-  // Reanimated Stili: Pozisyona göre büyüme/küçülme ve opaklık
   const animatedStyle = useAnimatedStyle(() => {
-    // Bu kartın aktif olduğu aralıklar
     const inputRange = [
       (index - 1) * SNAP_INTERVAL,
       index * SNAP_INTERVAL,
       (index + 1) * SNAP_INTERVAL,
     ];
 
-    // Scale (Büyüklük): Ortadaysa 1, kenardaysa 0.92
+    // Animasyon: Ortadaki %100, yanlardakiler %92 boyutunda
     const scale = interpolate(
       scrollX.value,
       inputRange,
@@ -66,11 +66,11 @@ const BannerItem = ({
       Extrapolation.CLAMP
     );
 
-    // Opacity (Netlik): Ortadaysa 1, kenardaysa 0.7
+    // Opaklık: Yanlardakiler hafif silik
     const opacity = interpolate(
       scrollX.value,
       inputRange,
-      [0.7, 1, 0.7],
+      [0.6, 1, 0.6],
       Extrapolation.CLAMP
     );
 
@@ -92,8 +92,9 @@ const BannerItem = ({
           style={styles.image}
           contentFit="cover"
           transition={200}
-          cachePolicy="memory-disk"
         />
+        {/* Hafif karartma gradienti (Görselin daha şık durması için opsiyonel) */}
+        <View style={styles.overlay} />
       </TouchableOpacity>
     </Animated.View>
   );
@@ -106,7 +107,6 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
 
   const onScroll = useAnimatedScrollHandler((event) => {
     scrollX.value = event.contentOffset.x;
-    // Aktif indexi hesapla
     const index = Math.round(event.contentOffset.x / SNAP_INTERVAL);
     runOnJS(setActiveIndex)(index);
   });
@@ -119,12 +119,12 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
         horizontal
         showsHorizontalScrollIndicator={false}
         decelerationRate="fast"
-        snapToInterval={SNAP_INTERVAL} // Mıknatıs gibi yapışma aralığı
-        snapToAlignment="start"        // Padding başlangıcına göre hizala
-        scrollEventThrottle={16}       // 16ms (60fps) yenileme
+        snapToInterval={SNAP_INTERVAL}
+        snapToAlignment="start" // Hesapladığımız padding ile tam eşleşir
+        scrollEventThrottle={16}
         onScroll={onScroll}
         contentContainerStyle={{
-          paddingHorizontal: CONTENT_PADDING,
+          paddingHorizontal: CONTENT_PADDING, // Düzeltilmiş padding
           alignItems: 'center',
         }}
       >
@@ -139,8 +139,8 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
         ))}
       </Animated.ScrollView>
 
-      {/* NOKTALAR (DOTS) */}
-      <View style={styles.dotsRow}>
+      {/* NOKTALAR (DOTS) - Absolute ile en alta çakıldı */}
+      <View style={styles.dotsContainer}>
         {banners.map((_, index) => (
           <View
             key={index}
@@ -157,33 +157,30 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
 
 const styles = StyleSheet.create({
   container: {
-    height: ITEM_HEIGHT + 40, // Kart + Dots boşluğu
-    justifyContent: 'center',
+    // Toplam yükseklik = Kart boyu + Alt boşluk (dots için)
+    height: ITEM_HEIGHT + 40,
     marginBottom: 20,
+    position: 'relative', // Dots'un absolute konumlanması için gerekli
   },
   cardContainer: {
     width: ITEM_WIDTH,
     height: ITEM_HEIGHT,
-    // Her kartın sağında ve solunda eşit boşluk bırakıyoruz
-    marginHorizontal: ITEM_SPACING / 2, 
-    justifyContent: 'center',
-    alignItems: 'center',
+    marginHorizontal: ITEM_SPACING / 2, // Sağ ve sol boşluk
   },
   cardInner: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 16,
+    flex: 1,
+    borderRadius: 20,
     overflow: 'hidden',
-    backgroundColor: '#1a1a1a', // Yüklenirken arka plan koyu olsun
+    backgroundColor: '#1a1a1a',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.25,
-        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
       },
       android: {
-        elevation: 6,
+        elevation: 8,
       },
     }),
   },
@@ -191,23 +188,31 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  dotsRow: {
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.1)', // Çok hafif karartma
+  },
+  dotsContainer: {
+    position: 'absolute', // ScrollView'dan bağımsız
+    bottom: 0,            // En alta yapışık
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 15,
-    gap: 6,
+    height: 20,           // Dots alanı yüksekliği
+    gap: 8,
   },
   dot: {
-    height: 6,
-    borderRadius: 3,
+    height: 8,
+    borderRadius: 4,
   },
   activeDot: {
-    width: 20,
-    backgroundColor: '#fff', // WizyClub temasına uygun beyaz/koyu
+    width: 24, // Aktifken uzayan çubuk
+    backgroundColor: '#FFFFFF',
   },
   inactiveDot: {
-    width: 6,
+    width: 8,  // Pasifken yuvarlak
     backgroundColor: 'rgba(255,255,255,0.3)',
   },
 });
