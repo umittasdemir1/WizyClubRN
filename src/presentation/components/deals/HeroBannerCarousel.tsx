@@ -9,7 +9,7 @@ import Animated, {
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BANNER_WIDTH = SCREEN_WIDTH - 32; // 16px padding each side
-const BANNER_SPACING = 0;
+const BANNER_SPACING = 12;
 
 interface AdBanner {
     id: string;
@@ -31,7 +31,7 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
 
     const onScroll = useAnimatedScrollHandler((event) => {
         scrollX.value = event.contentOffset.x;
-        const index = Math.round(event.contentOffset.x / BANNER_WIDTH);
+        const index = Math.round(event.contentOffset.x / (BANNER_WIDTH + BANNER_SPACING));
         runOnJS(updateActiveIndex)(index);
     });
 
@@ -40,8 +40,9 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
             <Animated.ScrollView
                 horizontal
                 pagingEnabled={false}
-                decelerationRate="fast"
-                snapToInterval={BANNER_WIDTH}
+                decelerationRate="normal"
+                snapToInterval={BANNER_WIDTH + BANNER_SPACING}
+                snapToAlignment="start"
                 showsHorizontalScrollIndicator={false}
                 onScroll={onScroll}
                 scrollEventThrottle={16}
@@ -57,7 +58,7 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
                         <Image
                             source={{ uri: banner.imageUrl }}
                             style={styles.banner}
-                            contentFit="cover"
+                            contentFit="contain"
                             cachePolicy="memory-disk"
                         />
                     </TouchableOpacity>
@@ -86,15 +87,15 @@ const styles = StyleSheet.create({
     container: {
         height: 224,
         marginBottom: 24,
+        marginHorizontal: -16,
     },
     scrollContent: {
-        paddingHorizontal: (SCREEN_WIDTH - BANNER_WIDTH) / 2,
-        alignItems: 'center',
+        paddingHorizontal: 16,
     },
     bannerContainer: {
         width: BANNER_WIDTH,
         height: 224,
-        borderRadius: 24,
+        borderRadius: 12,
         overflow: 'hidden',
         backgroundColor: '#f0f0f0',
         marginRight: BANNER_SPACING,
