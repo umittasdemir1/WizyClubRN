@@ -41,15 +41,15 @@ export function BrandAvatar({
 const styles = StyleSheet.create({
     container: {
         alignItems: 'center',
-        width: 60,
+        width: 70,
     },
     avatarWrapper: {
         position: 'relative',
         marginBottom: 6,
     },
     avatar: {
-        width: 48,
-        height: 48,
+        width: 60,
+        height: 60,
         borderRadius: 24,
         alignItems: 'center',
         justifyContent: 'center',
@@ -60,8 +60,8 @@ const styles = StyleSheet.create({
         elevation: 1,
     },
     icon: {
-        width: 24,
-        height: 24,
+        width: 48,
+        height: 48,
     },
     badge: {
         position: 'absolute',
