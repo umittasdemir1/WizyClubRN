@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, StyleSheet, Dimensions, TouchableOpacity, ScrollView, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import { Image } from 'expo-image';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const BANNER_WIDTH = SCREEN_WIDTH - 32; // 16px padding on each side
+const BANNER_PADDING = 16;
+const BANNER_WIDTH = SCREEN_WIDTH - (BANNER_PADDING * 2);
 
 interface AdBanner {
     id: string;
@@ -17,6 +18,7 @@ interface HeroBannerCarouselProps {
 
 export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
     const [activeIndex, setActiveIndex] = useState(0);
+    const scrollViewRef = useRef<ScrollView>(null);
 
     const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
         const scrollPosition = event.nativeEvent.contentOffset.x;
@@ -27,8 +29,8 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
     return (
         <View style={styles.container}>
             <ScrollView
+                ref={scrollViewRef}
                 horizontal
-                pagingEnabled
                 showsHorizontalScrollIndicator={false}
                 onScroll={handleScroll}
                 scrollEventThrottle={16}
@@ -36,17 +38,21 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
                 decelerationRate="fast"
                 contentContainerStyle={styles.scrollContent}
             >
-                {banners.map((banner) => (
+                {banners.map((banner, index) => (
                     <TouchableOpacity
                         key={banner.id}
                         activeOpacity={0.9}
                         onPress={banner.onPress}
-                        style={styles.bannerContainer}
+                        style={[
+                            styles.bannerContainer,
+                            index === 0 && styles.firstBanner,
+                        ]}
                     >
                         <Image
                             source={{ uri: banner.imageUrl }}
                             style={styles.banner}
                             contentFit="cover"
+                            cachePolicy="memory-disk"
                         />
                     </TouchableOpacity>
                 ))}
@@ -76,14 +82,17 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     scrollContent: {
-        paddingHorizontal: 16,
-        gap: 0,
+        paddingRight: BANNER_PADDING,
     },
     bannerContainer: {
         width: BANNER_WIDTH,
         height: 224,
         borderRadius: 24,
         overflow: 'hidden',
+        backgroundColor: '#f0f0f0',
+    },
+    firstBanner: {
+        marginLeft: BANNER_PADDING,
     },
     banner: {
         width: '100%',
