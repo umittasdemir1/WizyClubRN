@@ -50,8 +50,8 @@ export function CategoryCard({
 
 const styles = StyleSheet.create({
     container: {
-        width: 64,
-        height: 80,
+        width: 72,
+        height: 90,
         borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
@@ -67,18 +67,18 @@ const styles = StyleSheet.create({
     dotsGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        width: 24,
-        height: 24,
+        width: 28,
+        height: 28,
         gap: 2,
     },
     dot: {
-        width: 10,
-        height: 10,
+        width: 12,
+        height: 12,
         borderRadius: 5,
     },
     icon: {
-        width: 32,
-        height: 32,
+        width: 48,
+        height: 48,
     },
     title: {
         fontSize: 10,
