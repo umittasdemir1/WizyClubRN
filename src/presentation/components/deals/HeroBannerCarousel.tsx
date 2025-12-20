@@ -7,25 +7,20 @@ import Animated, {
     runOnJS,
 } from 'react-native-reanimated';
 
+// --- EKRAN AYARLARI ---
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // --- HASSAS AYARLAR ---
-const BANNER_WIDTH_RATIO = 0.85; 
-const ASPECT_RATIO = 16 / 9; 
-const BANNER_SPACING = 15; // Kartlar arasındaki toplam boşluk
+const CARD_WIDTH = SCREEN_WIDTH * 0.85; // Kartın çıplak genişliği
+const SPACING = 15; // Kartlar arası boşluk
+const ASPECT_RATIO = 16 / 9; // Yatay format
 
-// --- MATEMATİKSEL HESAPLAMALAR ---
-const BANNER_WIDTH = SCREEN_WIDTH * BANNER_WIDTH_RATIO;
-const BANNER_HEIGHT = BANNER_WIDTH / ASPECT_RATIO;
-
-// Kartın kapladığı toplam alan (Görsel + Sol Boşluk + Sağ Boşluk)
-const ITEM_SIZE = BANNER_WIDTH + BANNER_SPACING;
-
-// --- KRİTİK ORTALAMA FORMÜLÜ ---
-// Ekranın solunda kalması gereken net boşluk (Görselin başlaması gereken yer)
-const VISUAL_SIDE_OFFSET = (SCREEN_WIDTH - BANNER_WIDTH) / 2;
-// ScrollView'a vereceğimiz padding (Görselin margin'ini bundan düşüyoruz)
-const CONTAINER_PADDING = VISUAL_SIDE_OFFSET - (BANNER_SPACING / 2);
+// --- OTOMATİK HESAPLAMALAR ---
+const CARD_HEIGHT = CARD_WIDTH / ASPECT_RATIO;
+// Bir kartın kapladığı TOPLAM ALAN (Kart + Boşluk)
+const ITEM_SIZE = CARD_WIDTH + SPACING; 
+// Kenar Boşluğu (Padding): Ekranın ortası ile Kartın ortasını eşitleyen formül
+const SPACER = (SCREEN_WIDTH - ITEM_SIZE) / 2;
 
 interface AdBanner {
     id: string;
@@ -47,6 +42,7 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
 
     const onScroll = useAnimatedScrollHandler((event) => {
         scrollX.value = event.contentOffset.x;
+        // İndex hesabı
         const index = Math.round(event.contentOffset.x / ITEM_SIZE);
         runOnJS(updateActiveIndex)(index);
     });
@@ -59,15 +55,16 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
                 horizontal
                 pagingEnabled={false} 
                 decelerationRate="fast"
-                snapToInterval={ITEM_SIZE} // Her kaydırmada bir kart atla
-                // snapToAlignment="center" <-- BU SATIRI SİLDİK! (Kaymayı yapan buydu)
+                // Her bir adımda ne kadar kayacağını belirler (Kart + Boşluk kadar)
+                snapToInterval={ITEM_SIZE} 
+                // Durduğu zaman öğeyi merkeze kilitler
+                snapToAlignment="start" 
                 showsHorizontalScrollIndicator={false}
                 onScroll={onScroll}
                 scrollEventThrottle={16}
+                // Kenarlardaki boşluk ayarı
                 contentContainerStyle={{
-                    // Matematiksel olarak hesaplanmış simetrik padding
-                    paddingHorizontal: CONTAINER_PADDING,
-                    alignItems: 'center',
+                    paddingHorizontal: SPACER,
                 }}
                 overScrollMode="never"
             >
@@ -76,20 +73,19 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
                         key={banner.id}
                         activeOpacity={0.9}
                         onPress={banner.onPress}
-                        style={styles.bannerContainer}
+                        style={styles.cardContainer}
                     >
                         <Image
                             source={{ uri: banner.imageUrl }}
-                            style={styles.banner}
+                            style={styles.image}
                             contentFit="cover"
                             transition={200}
-                            cachePolicy="memory-disk"
                         />
                     </TouchableOpacity>
                 ))}
             </Animated.ScrollView>
 
-            {/* Dots Indicator */}
+            {/* Nokta Göstergeleri */}
             {banners.length > 1 && (
                 <View style={styles.dotsContainer}>
                     {banners.map((_, index) => (
@@ -109,17 +105,17 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
 
 const styles = StyleSheet.create({
     container: {
-        height: BANNER_HEIGHT + 40,
+        height: CARD_HEIGHT + 40, // Dots için yer açıyoruz
         marginBottom: 24,
         justifyContent: 'center',
     },
-    bannerContainer: {
-        width: BANNER_WIDTH,
-        height: BANNER_HEIGHT,
+    cardContainer: {
+        width: CARD_WIDTH,
+        height: CARD_HEIGHT,
         borderRadius: 16,
         overflow: 'hidden',
-        // Hem sağa hem sola eşit boşluk veriyoruz (Simetri için şart)
-        marginHorizontal: BANNER_SPACING / 2,
+        // Her kartın sağına boşluk ekliyoruz
+        marginRight: SPACING,
         
         backgroundColor: '#f0f0f0',
         ...Platform.select({
@@ -134,7 +130,7 @@ const styles = StyleSheet.create({
             },
         }),
     },
-    banner: {
+    image: {
         width: '100%',
         height: '100%',
     },
