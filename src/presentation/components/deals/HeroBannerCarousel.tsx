@@ -40,9 +40,8 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
             <Animated.ScrollView
                 horizontal
                 pagingEnabled={false}
-                decelerationRate="normal"
+                decelerationRate="fast"
                 snapToInterval={BANNER_WIDTH + BANNER_SPACING}
-                snapToAlignment="start"
                 showsHorizontalScrollIndicator={false}
                 onScroll={onScroll}
                 scrollEventThrottle={16}
@@ -58,7 +57,7 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
                         <Image
                             source={{ uri: banner.imageUrl }}
                             style={styles.banner}
-                            contentFit="contain"
+                            contentFit="cover"
                             cachePolicy="memory-disk"
                         />
                     </TouchableOpacity>
@@ -87,17 +86,16 @@ const styles = StyleSheet.create({
     container: {
         height: 224,
         marginBottom: 24,
-        marginHorizontal: -16,
     },
     scrollContent: {
-        paddingHorizontal: 16,
+        paddingHorizontal: (SCREEN_WIDTH - BANNER_WIDTH) / 2,
+        alignItems: 'center',
     },
     bannerContainer: {
         width: BANNER_WIDTH,
         height: 224,
         borderRadius: 12,
         overflow: 'hidden',
-        backgroundColor: '#f0f0f0',
         marginRight: BANNER_SPACING,
     },
     banner: {
