@@ -28,7 +28,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // --- SENİN İSTEDİĞİN AYARLAR ---
 
-const CARD_WIDTH = SCREEN_WIDTH * 1; // KARTLARI ÇOK BÜYÜTTÜK (%92)
+const CARD_WIDTH = SCREEN_WIDTH * 0.90; // KARTLARI ÇOK BÜYÜTTÜK (%92)
 
 const ASPECT_RATIO = 16 / 9;
 
