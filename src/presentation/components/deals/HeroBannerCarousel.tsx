@@ -44,7 +44,7 @@ const GAP = 8; // Kartlar arası boşluk (Azalttık ki kopuk durmasın)
 
 // Kart %92 olduğu için kalan boşluk %8'dir. Bunun yarısı %4 sağa, %4 sola düşer.
 
-const SIDE_OFFSET = (SCREEN_WIDTH - CARD_WIDTH) / 8;
+const SIDE_OFFSET = (SCREEN_WIDTH - CARD_WIDTH) / 4;
 
 
 
