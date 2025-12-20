@@ -1,16 +1,12 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { FontAwesome, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
-
-type IconSet = 'FontAwesome' | 'FontAwesome5' | 'MaterialCommunityIcons';
+import { Image } from 'expo-image';
 
 interface BrandAvatarProps {
     brandName: string;
     discount: string;
     backgroundColor: string;
-    iconName: string;
-    iconSet?: IconSet;
-    iconColor?: string;
+    iconUrl: string;
     onPress?: () => void;
 }
 
@@ -18,30 +14,18 @@ export function BrandAvatar({
     brandName,
     discount,
     backgroundColor,
-    iconName,
-    iconSet = 'FontAwesome',
-    iconColor = 'white',
+    iconUrl,
     onPress,
 }: BrandAvatarProps) {
-    const renderIcon = () => {
-        const iconProps = { name: iconName as any, size: 24, color: iconColor };
-
-        switch (iconSet) {
-            case 'FontAwesome5':
-                return <FontAwesome5 {...iconProps} />;
-            case 'MaterialCommunityIcons':
-                return <MaterialCommunityIcons {...iconProps} />;
-            case 'FontAwesome':
-            default:
-                return <FontAwesome {...iconProps} />;
-        }
-    };
-
     return (
         <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
             <View style={styles.avatarWrapper}>
                 <View style={[styles.avatar, { backgroundColor }]}>
-                    {renderIcon()}
+                    <Image
+                        source={{ uri: iconUrl }}
+                        style={styles.icon}
+                        contentFit="contain"
+                    />
                 </View>
                 <View style={styles.badge}>
                     <Text style={styles.badgeText}>{discount}</Text>
@@ -74,6 +58,10 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.05,
         shadowRadius: 2,
         elevation: 1,
+    },
+    icon: {
+        width: 24,
+        height: 24,
     },
     badge: {
         position: 'absolute',

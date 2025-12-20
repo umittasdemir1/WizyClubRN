@@ -6,7 +6,7 @@ import { StatusBar as RNStatusBar } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
 import { Search } from 'lucide-react-native';
-import { FontAwesome, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
+import { FontAwesome5 } from '@expo/vector-icons';
 import {
     HeroBanner,
     CategoryCard,
@@ -49,11 +49,11 @@ export default function DealsScreen() {
     ];
 
     const brands = [
-        { id: '1', name: 'Nike', discount: '25%', backgroundColor: '#000000', iconName: 'running', iconSet: 'FontAwesome5' as const, iconColor: 'white' },
-        { id: '2', name: 'Amazon', discount: '10%', backgroundColor: '#FFFFFF', iconName: 'amazon', iconSet: 'FontAwesome' as const, iconColor: '#FF9900' },
-        { id: '3', name: 'Starbucks', discount: '50%', backgroundColor: '#00704A', iconName: 'coffee', iconSet: 'FontAwesome5' as const, iconColor: 'white' },
-        { id: '4', name: 'Apple', discount: '30%', backgroundColor: '#FFFFFF', iconName: 'apple', iconSet: 'FontAwesome' as const, iconColor: '#000000' },
-        { id: '5', name: 'Samsung', discount: '18%', backgroundColor: '#1428a0', iconName: 'cellphone', iconSet: 'MaterialCommunityIcons' as const, iconColor: 'white' },
+        { id: '1', name: 'Nike', discount: '25%', backgroundColor: '#000000', iconUrl: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/icons/nike.svg' },
+        { id: '2', name: 'Amazon', discount: '10%', backgroundColor: '#FFFFFF', iconUrl: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/icons/amazon.svg' },
+        { id: '3', name: 'Starbucks', discount: '50%', backgroundColor: '#00704A', iconUrl: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/icons/starbucks.svg' },
+        { id: '4', name: 'Apple', discount: '30%', backgroundColor: '#FFFFFF', iconUrl: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/icons/apple.svg' },
+        { id: '5', name: 'Samsung', discount: '18%', backgroundColor: '#1428a0', iconUrl: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/icons/samsung.svg' },
     ];
 
     const trendingDeals = [
@@ -141,9 +141,7 @@ export default function DealsScreen() {
                                     brandName={brand.name}
                                     discount={brand.discount}
                                     backgroundColor={brand.backgroundColor}
-                                    iconName={brand.iconName}
-                                    iconSet={brand.iconSet}
-                                    iconColor={brand.iconColor}
+                                    iconUrl={brand.iconUrl}
                                 />
                             ))}
                         </View>
