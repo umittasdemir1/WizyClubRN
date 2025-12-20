@@ -214,7 +214,7 @@ export function HeroBannerCarousel({ banners }: { banners: any[] }) {
 
         {banners.map((item, index) => (
 
-          <View key={item.id} style={{ marginRight: index === banners.length - 2 ? 0 : GAP }}>
+          <View key={item.id} style={{ marginRight: index === banners.length 0 ? 0 : GAP }}>
 
             <AnimatedCard item={item} index={index} />
 
