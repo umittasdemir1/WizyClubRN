@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import Animated, {
     useSharedValue,
     useAnimatedScrollHandler,
+    runOnJS,
 } from 'react-native-reanimated';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -24,10 +25,14 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
     const [activeIndex, setActiveIndex] = useState(0);
     const scrollX = useSharedValue(0);
 
+    const updateActiveIndex = (index: number) => {
+        setActiveIndex(index);
+    };
+
     const onScroll = useAnimatedScrollHandler((event) => {
         scrollX.value = event.contentOffset.x;
         const index = Math.round(event.contentOffset.x / BANNER_WIDTH);
-        setActiveIndex(index);
+        runOnJS(updateActiveIndex)(index);
     });
 
     return (
@@ -83,7 +88,8 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     scrollContent: {
-        paddingHorizontal: 16,
+        paddingHorizontal: (SCREEN_WIDTH - BANNER_WIDTH) / 2,
+        alignItems: 'center',
     },
     bannerContainer: {
         width: BANNER_WIDTH,
