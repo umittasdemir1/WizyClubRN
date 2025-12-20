@@ -1,168 +1,119 @@
 import React, { useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  Dimensions,
-  TouchableOpacity,
-  Platform,
-} from 'react-native';
+import { View, StyleSheet, Dimensions, TouchableOpacity, Platform, ScrollView } from 'react-native';
 import { Image } from 'expo-image';
-import Animated, {
-  useSharedValue,
-  useAnimatedScrollHandler,
-  runOnJS,
-} from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedScrollHandler, runOnJS } from 'react-native-reanimated';
 
-/* ------------------- AYARLAR ------------------- */
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const BANNER_WIDTH_RATIO = 0.85; // Ekranın %85'i
-const ASPECT_RATIO = 16 / 9;    // Tam yatay (sinematik) format
-const BANNER_SPACING = 15;      // Kartlar arası toplam boşluk
 
-/* ---------------- MATEMATİKSEL HESAP ------------------- */
-const BANNER_WIDTH = SCREEN_WIDTH * BANNER_WIDTH_RATIO;
+// AYARLAR
+const BANNER_WIDTH = SCREEN_WIDTH * 0.85; 
+const ASPECT_RATIO = 16 / 9;
 const BANNER_HEIGHT = BANNER_WIDTH / ASPECT_RATIO;
+const GAP = 12; // Kartlar arası boşluk
 
-// Snap aralığı: Bir kartın genişliği + arasındaki boşluk
-const ITEM_SIZE = BANNER_WIDTH + BANNER_SPACING;
+// Görseli ortalamak için gereken yan boşluk miktarı
+const SIDE_SPACER = (SCREEN_WIDTH - BANNER_WIDTH) / 2;
 
-// Milimetrik Ortalama Formülü:
-// Ekranın yarısından kartın yarısını çıkarıyoruz, margin payını dengeliyoruz.
-const CONTAINER_PADDING = (SCREEN_WIDTH - BANNER_WIDTH) / 2 - (BANNER_SPACING / 2);
-
-/* ------------------ INTERFACES --------------------- */
-interface AdBanner {
-  id: string;
-  imageUrl: string;
-  onPress?: () => void;
-}
-
-interface HeroBannerCarouselProps {
-  banners: AdBanner[];
-}
-
-/* ---------------- COMPONENT ------------------- */
-export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
+export function HeroBannerCarousel({ banners }: { banners: any[] }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const scrollX = useSharedValue(0);
 
-  const updateActiveIndex = (index: number) => {
-    setActiveIndex(index);
-  };
-
   const onScroll = useAnimatedScrollHandler((event) => {
     scrollX.value = event.contentOffset.x;
-
-    // Index hesabı: Kaydırma miktarını bir tam kart boyutuna bölüyoruz
-    const index = Math.round(event.contentOffset.x / ITEM_SIZE);
-    runOnJS(updateActiveIndex)(index);
+    // Ortadaki kartı bulmak için kaydırma miktarını kart + boşluk genişliğine bölüyoruz
+    const index = Math.round(event.contentOffset.x / (BANNER_WIDTH + GAP));
+    runOnJS(setActiveIndex)(index);
   });
 
   if (!banners || banners.length === 0) return null;
 
   return (
-    <View style={styles.container}>
+    <View style={styles.outerContainer}>
       <Animated.ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         decelerationRate="fast"
-        snapToInterval={ITEM_SIZE}      // Her kaydırmada bir ITEM_SIZE kadar ilerler
-        snapToAlignment="start"         // Padding başlangıcına göre hizalar (Ortalamayı sağlar)
+        snapToInterval={BANNER_WIDTH + GAP} // Tam olarak bir kart ve bir boşluk kadar kayar
+        snapToAlignment="start"
         scrollEventThrottle={16}
         onScroll={onScroll}
-        overScrollMode="never"
-        contentContainerStyle={{
-          paddingHorizontal: CONTAINER_PADDING,
-          alignItems: 'center',
-        }}
       >
-        {banners.map((banner) => (
+        {/* SOL BOŞLUK (Ortalamayı bu sağlar) */}
+        <View style={{ width: SIDE_SPACER }} />
+
+        {banners.map((banner, index) => (
           <TouchableOpacity
             key={banner.id}
             activeOpacity={0.9}
             onPress={banner.onPress}
-            style={styles.bannerContainer}
+            style={[
+              styles.card,
+              { marginRight: index === banners.length - 1 ? 0 : GAP }
+            ]}
           >
             <Image
               source={{ uri: banner.imageUrl }}
-              style={styles.banner}
-              contentFit="cover" // Görselin alanı tam kaplamasını sağlar
-              transition={200}
-              cachePolicy="memory-disk"
+              style={styles.image}
+              contentFit="cover"
             />
           </TouchableOpacity>
         ))}
+
+        {/* SAĞ BOŞLUK (Son kartın ortada kalması için) */}
+        <View style={{ width: SIDE_SPACER }} />
       </Animated.ScrollView>
 
-      {/* ---------- DOTS (GÖSTERGELER) ---------- */}
-      {banners.length > 1 && (
-        <View style={styles.dotsContainer}>
-          {banners.map((_, index) => (
-            <View
-              key={index}
-              style={[
-                styles.dot,
-                index === activeIndex ? styles.dotActive : styles.dotInactive,
-              ]}
-            />
-          ))}
-        </View>
-      )}
+      {/* DOTS */}
+      <View style={styles.dotsRow}>
+        {banners.map((_, i) => (
+          <View key={i} style={[styles.dot, i === activeIndex ? styles.activeDot : styles.inactiveDot]} />
+        ))}
+      </View>
     </View>
   );
 }
 
-/* ------------------ STYLES -------------------- */
 const styles = StyleSheet.create({
-  container: {
-    // Görsel yüksekliği + altındaki noktalar için gereken alan
-    height: BANNER_HEIGHT + 40,
-    marginBottom: 24,
-    justifyContent: 'center',
+  outerContainer: {
+    // Yüksekliği tam olarak görsel + noktalar kadar sınırlıyoruz (Aşağı kaymayı önler)
+    height: BANNER_HEIGHT + 30, 
+    marginVertical: 10,
   },
-  bannerContainer: {
+  card: {
     width: BANNER_WIDTH,
     height: BANNER_HEIGHT,
-    borderRadius: 16,
+    borderRadius: 12,
     overflow: 'hidden',
-    // Kartlar arasına eşit boşluk dağıtarak simetriyi korur
-    marginHorizontal: BANNER_SPACING / 2,
-    backgroundColor: '#f3f4f6',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
+    backgroundColor: '#eee',
+    // Android gölge
+    elevation: 5,
+    // iOS gölge
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
-  banner: {
+  image: {
     width: '100%',
     height: '100%',
   },
-  dotsContainer: {
-    position: 'absolute',
-    bottom: 12,
-    left: 0,
-    right: 0,
+  dotsRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 6,
+    alignItems: 'center',
+    marginTop: 10,
+    gap: 5,
   },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    height: 6,
+    borderRadius: 3,
   },
-  dotActive: {
-    width: 18, // Aktif nokta daha uzun görünür
-    backgroundColor: '#1f2937',
+  activeDot: {
+    width: 15,
+    backgroundColor: '#333',
   },
-  dotInactive: {
-    backgroundColor: '#d1d5db',
+  inactiveDot: {
+    width: 6,
+    backgroundColor: '#ccc',
   },
 });
