@@ -5,7 +5,8 @@ import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import { StatusBar as RNStatusBar } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
-import { Search, ShoppingBag, Coffee, Apple } from 'lucide-react-native';
+import { Search } from 'lucide-react-native';
+import { FontAwesome, FontAwesome5 } from '@expo/vector-icons';
 import {
     HeroBanner,
     CategoryCard,
@@ -48,11 +49,11 @@ export default function DealsScreen() {
     ];
 
     const brands = [
-        { id: '1', name: 'Nike', discount: '25%', backgroundColor: '#000000', icon: ShoppingBag },
-        { id: '2', name: 'Amazon', discount: '10%', backgroundColor: '#FFFFFF', icon: ShoppingBag },
-        { id: '3', name: 'Starbucks', discount: '50%', backgroundColor: '#00704A', icon: Coffee },
-        { id: '4', name: 'Apple', discount: '30%', backgroundColor: '#FFFFFF', icon: Apple },
-        { id: '5', name: 'Samsung', discount: '18%', backgroundColor: '#1428a0', icon: ShoppingBag },
+        { id: '1', name: 'Nike', discount: '25%', backgroundColor: '#000000', iconName: 'nike', iconSet: 'FontAwesome5' as const, iconColor: 'white' },
+        { id: '2', name: 'Amazon', discount: '10%', backgroundColor: '#FFFFFF', iconName: 'amazon', iconSet: 'FontAwesome' as const, iconColor: '#FF9900' },
+        { id: '3', name: 'Starbucks', discount: '50%', backgroundColor: '#00704A', iconName: 'starbucks', iconSet: 'FontAwesome5' as const, iconColor: 'white' },
+        { id: '4', name: 'Apple', discount: '30%', backgroundColor: '#FFFFFF', iconName: 'apple', iconSet: 'FontAwesome' as const, iconColor: '#000000' },
+        { id: '5', name: 'Samsung', discount: '18%', backgroundColor: '#1428a0', iconName: 'samsung', iconSet: 'MaterialCommunityIcons' as const, iconColor: 'white' },
     ];
 
     const trendingDeals = [
@@ -63,13 +64,13 @@ export default function DealsScreen() {
 
     const stackedCoupons = [
         { brandName: 'Store', discount: '10%', backgroundColor: '#2563eb' },
-        { brandName: 'Starbucks', discount: '25%', backgroundColor: '#00704A', icon: <Coffee size={16} color="white" /> },
+        { brandName: 'Starbucks', discount: '25%', backgroundColor: '#00704A', icon: <FontAwesome5 name="mug-hot" size={16} color="white" /> },
         { brandName: 'Store', discount: '15%', backgroundColor: '#dc2626' },
     ] as [any, any, any];
 
     const popularDeals = [
         { id: '1', brand: 'Netflix Pro', value: '19.99$', desc: 'buy membership', day: '27', month: 'MAY', icon: <Text style={{ fontSize: 24, fontWeight: '800', color: '#dc2626' }}>N</Text> },
-        { id: '2', brand: 'Nike', value: '30%', desc: 'on any footware', day: '1', month: 'MAY', icon: <ShoppingBag size={20} color="#111827" /> },
+        { id: '2', brand: 'Nike', value: '30%', desc: 'on any footware', day: '1', month: 'MAY', icon: <FontAwesome5 name="nike" size={20} color="#111827" /> },
     ];
 
     return (
@@ -140,8 +141,9 @@ export default function DealsScreen() {
                                     brandName={brand.name}
                                     discount={brand.discount}
                                     backgroundColor={brand.backgroundColor}
-                                    icon={brand.icon}
-                                    iconColor={brand.backgroundColor === '#FFFFFF' ? '#111827' : 'white'}
+                                    iconName={brand.iconName}
+                                    iconSet={brand.iconSet}
+                                    iconColor={brand.iconColor}
                                 />
                             ))}
                         </View>
@@ -277,6 +279,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         paddingHorizontal: 4,
+        marginTop: 12,
     },
     dotsIndicator: {
         flexDirection: 'row',
