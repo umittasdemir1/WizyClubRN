@@ -49,11 +49,11 @@ export default function DealsScreen() {
     ];
 
     const brands = [
-        { id: '1', name: 'Nike', discount: '25%', backgroundColor: '#000000', iconUrl: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/icons/nike.svg' },
+        { id: '1', name: 'Nike', discount: '25%', backgroundColor: '#FFFFFF', iconUrl: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/icons/nike.svg' },
         { id: '2', name: 'Amazon', discount: '10%', backgroundColor: '#FFFFFF', iconUrl: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/icons/amazon.svg' },
-        { id: '3', name: 'Starbucks', discount: '50%', backgroundColor: '#00704A', iconUrl: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/icons/starbucks.svg' },
+        { id: '3', name: 'Starbucks', discount: '50%', backgroundColor: '#FFFFFF', iconUrl: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/icons/starbucks.svg' },
         { id: '4', name: 'Apple', discount: '30%', backgroundColor: '#FFFFFF', iconUrl: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/icons/apple.svg' },
-        { id: '5', name: 'Samsung', discount: '18%', backgroundColor: '#1428a0', iconUrl: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/icons/samsung.svg' },
+        { id: '5', name: 'Samsung', discount: '18%', backgroundColor: '#FFFFFF', iconUrl: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/icons/samsung.svg' },
     ];
 
     const trendingDeals = [
