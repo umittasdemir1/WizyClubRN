@@ -28,13 +28,13 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // --- SENİN İSTEDİĞİN AYARLAR ---
 
-const CARD_WIDTH = SCREEN_WIDTH * 0.92; // KARTLARI ÇOK BÜYÜTTÜK (%92)
+const CARD_WIDTH = SCREEN_WIDTH * 0.90; // KARTLARI ÇOK BÜYÜTTÜK (%92)
 
 const ASPECT_RATIO = 16 / 9;
 
 const CARD_HEIGHT = CARD_WIDTH / ASPECT_RATIO;
 
-const GAP = 8; // Kartlar arası boşluk (Azalttık ki kopuk durmasın)
+const GAP = 10; // Kartlar arası boşluk (Azalttık ki kopuk durmasın)
 
 
 
@@ -44,7 +44,7 @@ const GAP = 8; // Kartlar arası boşluk (Azalttık ki kopuk durmasın)
 
 // Kart %92 olduğu için kalan boşluk %8'dir. Bunun yarısı %4 sağa, %4 sola düşer.
 
-const SIDE_OFFSET = (SCREEN_WIDTH - CARD_WIDTH) / 4;
+const SIDE_OFFSET = (SCREEN_WIDTH - CARD_WIDTH) / 5;
 
 
 
