@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     scrollContent: {
-        paddingHorizontal: (SCREEN_WIDTH - BANNER_WIDTH) / 2,
+        paddingHorizontal: (SCREEN_WIDTH - BANNER_WIDTH - BANNER_SPACING) / 2,
         alignItems: 'center',
     },
     bannerContainer: {
