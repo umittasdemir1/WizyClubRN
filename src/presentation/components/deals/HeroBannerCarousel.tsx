@@ -57,7 +57,7 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
                         <Image
                             source={{ uri: banner.imageUrl }}
                             style={styles.banner}
-                            contentFit="cover"
+                            contentFit="contain"
                             cachePolicy="memory-disk"
                         />
                     </TouchableOpacity>
@@ -96,7 +96,8 @@ const styles = StyleSheet.create({
         height: 224,
         borderRadius: 12,
         overflow: 'hidden',
-        marginRight: BANNER_SPACING,
+        marginHorizontal: BANNER_SPACING / 2,
+        backgroundColor: '#FFFFFF',
     },
     banner: {
         width: '100%',
