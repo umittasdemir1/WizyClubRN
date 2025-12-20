@@ -13,30 +13,24 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
 /* ------------------- AYARLAR ------------------- */
-const BANNER_WIDTH_RATIO = 0.85;
-const ASPECT_RATIO = 16 / 9;
-const BANNER_SPACING = 15;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const BANNER_WIDTH_RATIO = 0.85; // Ekranın %85'i
+const ASPECT_RATIO = 16 / 9;    // Tam yatay (sinematik) format
+const BANNER_SPACING = 15;      // Kartlar arası toplam boşluk
 
-/* ---------------- MATEMATİK ------------------- */
+/* ---------------- MATEMATİKSEL HESAP ------------------- */
 const BANNER_WIDTH = SCREEN_WIDTH * BANNER_WIDTH_RATIO;
 const BANNER_HEIGHT = BANNER_WIDTH / ASPECT_RATIO;
 
-/**
- * ScrollView’in snap aldığı gerçek grid
- * (kart + sağ/sol spacing)
- */
+// Snap aralığı: Bir kartın genişliği + arasındaki boşluk
 const ITEM_SIZE = BANNER_WIDTH + BANNER_SPACING;
 
-/**
- * ScrollView merkezini ITEM_SIZE’a göre ortalar
- * (kritik nokta)
- */
-const CONTAINER_PADDING = (SCREEN_WIDTH - ITEM_SIZE) / 2;
+// Milimetrik Ortalama Formülü:
+// Ekranın yarısından kartın yarısını çıkarıyoruz, margin payını dengeliyoruz.
+const CONTAINER_PADDING = (SCREEN_WIDTH - BANNER_WIDTH) / 2 - (BANNER_SPACING / 2);
 
-/* ------------------ TYPES --------------------- */
+/* ------------------ INTERFACES --------------------- */
 interface AdBanner {
   id: string;
   imageUrl: string;
@@ -59,14 +53,8 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
   const onScroll = useAnimatedScrollHandler((event) => {
     scrollX.value = event.contentOffset.x;
 
-    /**
-     * Padding’i hesaba katarak index hesaplanır
-     * (aksi halde dot + merkez kayar)
-     */
-    const index = Math.round(
-      (event.contentOffset.x + CONTAINER_PADDING) / ITEM_SIZE
-    );
-
+    // Index hesabı: Kaydırma miktarını bir tam kart boyutuna bölüyoruz
+    const index = Math.round(event.contentOffset.x / ITEM_SIZE);
     runOnJS(updateActiveIndex)(index);
   });
 
@@ -78,7 +66,8 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
         horizontal
         showsHorizontalScrollIndicator={false}
         decelerationRate="fast"
-        snapToInterval={ITEM_SIZE}
+        snapToInterval={ITEM_SIZE}      // Her kaydırmada bir ITEM_SIZE kadar ilerler
+        snapToAlignment="start"         // Padding başlangıcına göre hizalar (Ortalamayı sağlar)
         scrollEventThrottle={16}
         onScroll={onScroll}
         overScrollMode="never"
@@ -97,7 +86,7 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
             <Image
               source={{ uri: banner.imageUrl }}
               style={styles.banner}
-              contentFit="cover"
+              contentFit="cover" // Görselin alanı tam kaplamasını sağlar
               transition={200}
               cachePolicy="memory-disk"
             />
@@ -105,7 +94,7 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
         ))}
       </Animated.ScrollView>
 
-      {/* ---------- DOTS ---------- */}
+      {/* ---------- DOTS (GÖSTERGELER) ---------- */}
       {banners.length > 1 && (
         <View style={styles.dotsContainer}>
           {banners.map((_, index) => (
@@ -113,9 +102,7 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
               key={index}
               style={[
                 styles.dot,
-                index === activeIndex
-                  ? styles.dotActive
-                  : styles.dotInactive,
+                index === activeIndex ? styles.dotActive : styles.dotInactive,
               ]}
             />
           ))}
@@ -128,6 +115,7 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
 /* ------------------ STYLES -------------------- */
 const styles = StyleSheet.create({
   container: {
+    // Görsel yüksekliği + altındaki noktalar için gereken alan
     height: BANNER_HEIGHT + 40,
     marginBottom: 24,
     justifyContent: 'center',
@@ -137,17 +125,18 @@ const styles = StyleSheet.create({
     height: BANNER_HEIGHT,
     borderRadius: 16,
     overflow: 'hidden',
+    // Kartlar arasına eşit boşluk dağıtarak simetriyi korur
     marginHorizontal: BANNER_SPACING / 2,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#f3f4f6',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
       },
       android: {
-        elevation: 5,
+        elevation: 4,
       },
     }),
   },
@@ -170,7 +159,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   dotActive: {
-    width: 16,
+    width: 18, // Aktif nokta daha uzun görünür
     backgroundColor: '#1f2937',
   },
   dotInactive: {
