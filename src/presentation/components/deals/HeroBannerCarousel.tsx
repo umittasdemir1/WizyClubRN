@@ -12,21 +12,16 @@ import Animated, {
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// --- AYARLAR ---
-const ITEM_WIDTH = SCREEN_WIDTH * 0.90; // Kart Genişliği (%85)
-const ASPECT_RATIO = 16 / 9;            // Yatay Format
-const ITEM_HEIGHT = ITEM_WIDTH / ASPECT_RATIO;
-const ITEM_SPACING = 10;                // Kartlar arası boşluk
+// --- HASSAS AYARLAR ---
+const CARD_WIDTH = SCREEN_WIDTH * 0.8; // Kart Genişliği (%80 - Daha garantidir)
+const ASPECT_RATIO = 16 / 9;
+const CARD_HEIGHT = CARD_WIDTH / ASPECT_RATIO;
+const SPACING = 15; // Kartlar arası boşluk
 
-// --- HESAPLAMALAR (DÜZELTİLDİ) ---
-// Snap (Kaydırma) Aralığı: Kart + Boşluk
-const SNAP_INTERVAL = ITEM_WIDTH + ITEM_SPACING;
-
-// EKRAN ORTALAMA FORMÜLÜ:
-// (Ekran - Kart) / 2 formülü bize kenar boşluğunu verir.
-// Ancak kartın içinde de "margin" olduğu için, onu padding'den DÜŞÜYORUZ.
-// Bu işlem "sağa kayma" sorununu çözer.
-const CONTENT_PADDING = (SCREEN_WIDTH - ITEM_WIDTH) / 2 - (ITEM_SPACING / 2);
+// --- SİHİRLİ MATEMATİK (SPACER TEKNİĞİ) ---
+// Bu genişlikteki boş kutuyu en başa koyacağız.
+// Böylece ilk kart tam ortaya itilecek. Padding hesabı yok.
+const SPACER_WIDTH = (SCREEN_WIDTH - CARD_WIDTH) / 2;
 
 interface AdBanner {
   id: string;
@@ -38,78 +33,70 @@ interface HeroBannerCarouselProps {
   banners: AdBanner[];
 }
 
-// --- TEKİL KART BİLEŞENİ ---
-const BannerItem = ({ 
-  item, 
-  index, 
-  scrollX, 
-  onPress 
-}: { 
-  item: AdBanner; 
-  index: number; 
-  scrollX: Animated.SharedValue<number>; 
-  onPress?: () => void 
-}) => {
-  
-  const animatedStyle = useAnimatedStyle(() => {
-    const inputRange = [
-      (index - 1) * SNAP_INTERVAL,
-      index * SNAP_INTERVAL,
-      (index + 1) * SNAP_INTERVAL,
-    ];
-
-    // Animasyon: Ortadaki %100, yanlardakiler %92 boyutunda
-    const scale = interpolate(
-      scrollX.value,
-      inputRange,
-      [0.92, 1, 0.92],
-      Extrapolation.CLAMP
-    );
-
-    // Opaklık: Yanlardakiler hafif silik
-    const opacity = interpolate(
-      scrollX.value,
-      inputRange,
-      [0.6, 1, 0.6],
-      Extrapolation.CLAMP
-    );
-
-    return {
-      transform: [{ scale }],
-      opacity,
-    };
-  });
-
-  return (
-    <Animated.View style={[styles.cardContainer, animatedStyle]}>
-      <TouchableOpacity
-        activeOpacity={0.95}
-        onPress={onPress}
-        style={styles.cardInner}
-      >
-        <Image
-          source={{ uri: item.imageUrl }}
-          style={styles.image}
-          contentFit="cover"
-          transition={200}
-        />
-        {/* Hafif karartma gradienti (Görselin daha şık durması için opsiyonel) */}
-        <View style={styles.overlay} />
-      </TouchableOpacity>
-    </Animated.View>
-  );
-};
-
-// --- ANA BİLEŞEN ---
 export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const scrollX = useSharedValue(0);
 
+  // Scroll Handler
   const onScroll = useAnimatedScrollHandler((event) => {
     scrollX.value = event.contentOffset.x;
-    const index = Math.round(event.contentOffset.x / SNAP_INTERVAL);
+    // Index hesabı: Spacer'ı düştükten sonra bölüyoruz
+    const index = Math.round(event.contentOffset.x / (CARD_WIDTH + SPACING));
     runOnJS(setActiveIndex)(index);
   });
+
+  // Animasyonlu Kart Bileşeni
+  const AnimatedCard = ({ item, index }: { item: AdBanner; index: number }) => {
+    const animatedStyle = useAnimatedStyle(() => {
+      // Bu kartın scroll üzerindeki konumu
+      // (Index * Bir Kart Boyu)
+      const itemOffset = index * (CARD_WIDTH + SPACING);
+
+      const inputRange = [
+        itemOffset - (CARD_WIDTH + SPACING),
+        itemOffset,
+        itemOffset + (CARD_WIDTH + SPACING),
+      ];
+
+      const scale = interpolate(
+        scrollX.value,
+        inputRange,
+        [0.9, 1, 0.9], // Yanlar %90, Orta %100
+        Extrapolation.CLAMP
+      );
+
+      const opacity = interpolate(
+        scrollX.value,
+        inputRange,
+        [0.5, 1, 0.5], // Yanlar silik
+        Extrapolation.CLAMP
+      );
+
+      return {
+        transform: [{ scale }],
+        opacity,
+      };
+    });
+
+    return (
+      <Animated.View style={[styles.cardWrapper, animatedStyle]}>
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={item.onPress}
+          style={styles.cardInner}
+        >
+          <Image
+            source={{ uri: item.imageUrl }}
+            style={styles.image}
+            contentFit="cover"
+            transition={200}
+          />
+          {/* Siyah Gradient efekt (yazı gelirse diye hazır) */}
+          <View style={styles.overlay} />
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
 
   if (!banners || banners.length === 0) return null;
 
@@ -119,27 +106,29 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
         horizontal
         showsHorizontalScrollIndicator={false}
         decelerationRate="fast"
-        snapToInterval={SNAP_INTERVAL}
-        snapToAlignment="start" // Hesapladığımız padding ile tam eşleşir
+        // Snap aralığı: Kart + Boşluk
+        snapToInterval={CARD_WIDTH + SPACING}
+        // Başlangıca hizala (Çünkü Spacer ile biz itiyoruz)
+        snapToAlignment="start"
         scrollEventThrottle={16}
         onScroll={onScroll}
-        contentContainerStyle={{
-          paddingHorizontal: CONTENT_PADDING, // Düzeltilmiş padding
-          alignItems: 'center',
-        }}
+        // ÖNEMLİ: Padding YOK! Spacer var.
+        contentContainerStyle={styles.scrollContent}
       >
-        {banners.map((banner, index) => (
-          <BannerItem
-            key={banner.id}
-            index={index}
-            item={banner}
-            scrollX={scrollX}
-            onPress={banner.onPress}
-          />
+        {/* 1. SOL SPACER (KÖR NOKTA) - İLK KARTI İTER */}
+        <View style={{ width: SPACER_WIDTH - (SPACING / 2) }} />
+
+        {banners.map((item, index) => (
+          <View key={item.id} style={{ marginRight: SPACING }}>
+             <AnimatedCard item={item} index={index} />
+          </View>
         ))}
+
+        {/* 2. SAĞ SPACER - SON KARTI ORTADA TUTAR */}
+        <View style={{ width: SPACER_WIDTH - SPACING - (SPACING / 2) }} />
       </Animated.ScrollView>
 
-      {/* NOKTALAR (DOTS) - Absolute ile en alta çakıldı */}
+      {/* DOTS (SABİT) */}
       <View style={styles.dotsContainer}>
         {banners.map((_, index) => (
           <View
@@ -157,25 +146,28 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
 
 const styles = StyleSheet.create({
   container: {
-    // Toplam yükseklik = Kart boyu + Alt boşluk (dots için)
-    height: ITEM_HEIGHT + 40,
+    height: CARD_HEIGHT + 40,
+    marginTop: 10,
     marginBottom: 20,
-    position: 'relative', // Dots'un absolute konumlanması için gerekli
   },
-  cardContainer: {
-    width: ITEM_WIDTH,
-    height: ITEM_HEIGHT,
-    marginHorizontal: ITEM_SPACING / 2, // Sağ ve sol boşluk
+  scrollContent: {
+    alignItems: 'center', // Dikey ortalama
+    // paddingHorizontal YOK!
+  },
+  cardWrapper: {
+    width: CARD_WIDTH,
+    height: CARD_HEIGHT,
+    // Margin BURADA YOK, yukarıdaki View wrapper'da var
   },
   cardInner: {
     flex: 1,
     borderRadius: 20,
+    backgroundColor: '#222',
     overflow: 'hidden',
-    backgroundColor: '#1a1a1a',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
+        shadowOffset: { width: 0, height: 5 },
         shadowOpacity: 0.3,
         shadowRadius: 10,
       },
@@ -190,29 +182,28 @@ const styles = StyleSheet.create({
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.1)', // Çok hafif karartma
+    backgroundColor: 'rgba(0,0,0,0.1)',
   },
   dotsContainer: {
-    position: 'absolute', // ScrollView'dan bağımsız
-    bottom: 0,            // En alta yapışık
+    position: 'absolute',
+    bottom: 0,
     left: 0,
     right: 0,
     flexDirection: 'row',
     justifyContent: 'center',
-    alignItems: 'center',
-    height: 20,           // Dots alanı yüksekliği
     gap: 8,
+    height: 20,
   },
   dot: {
-    height: 8,
-    borderRadius: 4,
+    height: 6,
+    borderRadius: 3,
   },
   activeDot: {
-    width: 24, // Aktifken uzayan çubuk
-    backgroundColor: '#FFFFFF',
+    width: 20,
+    backgroundColor: '#fff',
   },
   inactiveDot: {
-    width: 8,  // Pasifken yuvarlak
-    backgroundColor: 'rgba(255,255,255,0.3)',
+    width: 6,
+    backgroundColor: '#555',
   },
 });
