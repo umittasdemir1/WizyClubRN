@@ -8,8 +8,8 @@ import Animated, {
 } from 'react-native-reanimated';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const BANNER_WIDTH = SCREEN_WIDTH * 0.85;
-const BANNER_SPACING = 15;
+const BANNER_WIDTH = SCREEN_WIDTH * 0.80;
+const BANNER_SPACING = 20;
 
 interface AdBanner {
     id: string;
