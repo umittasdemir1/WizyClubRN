@@ -8,8 +8,8 @@ import Animated, {
 } from 'react-native-reanimated';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const BANNER_WIDTH = SCREEN_WIDTH - 32; // 16px padding each side
-const BANNER_SPACING = 12;
+const BANNER_WIDTH = SCREEN_WIDTH * 0.88;
+const BANNER_SPACING = 15;
 
 interface AdBanner {
     id: string;
@@ -57,7 +57,7 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
                         <Image
                             source={{ uri: banner.imageUrl }}
                             style={styles.banner}
-                            contentFit="contain"
+                            contentFit="cover"
                             cachePolicy="memory-disk"
                         />
                     </TouchableOpacity>
@@ -94,10 +94,9 @@ const styles = StyleSheet.create({
     bannerContainer: {
         width: BANNER_WIDTH,
         height: 224,
-        borderRadius: 12,
+        borderRadius: 16,
         overflow: 'hidden',
         marginHorizontal: BANNER_SPACING / 2,
-        backgroundColor: '#FFFFFF',
     },
     banner: {
         width: '100%',
