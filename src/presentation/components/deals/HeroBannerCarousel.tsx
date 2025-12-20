@@ -21,7 +21,7 @@ const GAP = 15; // Kartlar arası boşluk (Azalttık ki kopuk durmasın)
 // --- KRİTİK HİZALAMA AYARI ---
 // Burası ilk kartın solundaki boşluktur.
 // Kart %92 olduğu için kalan boşluk %8'dir. Bunun yarısı %4 sağa, %4 sola düşer.
-const SIDE_OFFSET = (SCREEN_WIDTH - CARD_WIDTH) / 2;
+const SIDE_OFFSET = (SCREEN_WIDTH - CARD_WIDTH) / 4;
 
 export function HeroBannerCarousel({ banners }: { banners: any[] }) {
   const [activeIndex, setActiveIndex] = useState(0);
