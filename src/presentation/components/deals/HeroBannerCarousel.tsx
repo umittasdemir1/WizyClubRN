@@ -34,7 +34,7 @@ const ASPECT_RATIO = 16 / 9;
 
 const CARD_HEIGHT = CARD_WIDTH / ASPECT_RATIO;
 
-const GAP = 10; // Kartlar arası boşluk (Azalttık ki kopuk durmasın)
+const GAP = 12.5; // Kartlar arası boşluk (Azalttık ki kopuk durmasın)
 
 
 
