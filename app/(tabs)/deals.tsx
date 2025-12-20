@@ -6,7 +6,7 @@ import { StatusBar as RNStatusBar } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
 import { Search } from 'lucide-react-native';
-import { FontAwesome, FontAwesome5 } from '@expo/vector-icons';
+import { FontAwesome, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
 import {
     HeroBanner,
     CategoryCard,
@@ -49,11 +49,11 @@ export default function DealsScreen() {
     ];
 
     const brands = [
-        { id: '1', name: 'Nike', discount: '25%', backgroundColor: '#000000', iconName: 'nike', iconSet: 'FontAwesome5' as const, iconColor: 'white' },
+        { id: '1', name: 'Nike', discount: '25%', backgroundColor: '#000000', iconName: 'running', iconSet: 'FontAwesome5' as const, iconColor: 'white' },
         { id: '2', name: 'Amazon', discount: '10%', backgroundColor: '#FFFFFF', iconName: 'amazon', iconSet: 'FontAwesome' as const, iconColor: '#FF9900' },
-        { id: '3', name: 'Starbucks', discount: '50%', backgroundColor: '#00704A', iconName: 'starbucks', iconSet: 'FontAwesome5' as const, iconColor: 'white' },
+        { id: '3', name: 'Starbucks', discount: '50%', backgroundColor: '#00704A', iconName: 'coffee', iconSet: 'FontAwesome5' as const, iconColor: 'white' },
         { id: '4', name: 'Apple', discount: '30%', backgroundColor: '#FFFFFF', iconName: 'apple', iconSet: 'FontAwesome' as const, iconColor: '#000000' },
-        { id: '5', name: 'Samsung', discount: '18%', backgroundColor: '#1428a0', iconName: 'samsung', iconSet: 'MaterialCommunityIcons' as const, iconColor: 'white' },
+        { id: '5', name: 'Samsung', discount: '18%', backgroundColor: '#1428a0', iconName: 'cellphone', iconSet: 'MaterialCommunityIcons' as const, iconColor: 'white' },
     ];
 
     const trendingDeals = [
@@ -70,7 +70,7 @@ export default function DealsScreen() {
 
     const popularDeals = [
         { id: '1', brand: 'Netflix Pro', value: '19.99$', desc: 'buy membership', day: '27', month: 'MAY', icon: <Text style={{ fontSize: 24, fontWeight: '800', color: '#dc2626' }}>N</Text> },
-        { id: '2', brand: 'Nike', value: '30%', desc: 'on any footware', day: '1', month: 'MAY', icon: <FontAwesome5 name="nike" size={20} color="#111827" /> },
+        { id: '2', brand: 'Nike', value: '30%', desc: 'on any footware', day: '1', month: 'MAY', icon: <FontAwesome5 name="running" size={20} color="#111827" /> },
     ];
 
     return (
