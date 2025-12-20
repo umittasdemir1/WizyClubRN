@@ -41,9 +41,9 @@ export default function DealsScreen() {
 
     // Mock Data
     const adBanners = [
-        { id: '1', imageUrl: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/1_50.png' },
-        { id: '2', imageUrl: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/2_50.png' },
-        { id: '3', imageUrl: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/3_50.png' },
+        { id: '1', imageUrl: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=800&h=400&fit=crop' },
+        { id: '2', imageUrl: 'https://images.unsplash.com/photo-1607082349566-187342175e2f?w=800&h=400&fit=crop' },
+        { id: '3', imageUrl: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800&h=400&fit=crop' },
     ];
 
     const categories = [
