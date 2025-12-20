@@ -42,10 +42,10 @@ export default function DealsScreen() {
     // Mock Data
     const categories = [
         { id: '1', title: 'Tüm\nKategoriler', iconType: 'dots', backgroundColor: isDark ? '#2d1a2e' : '#fce7f3' },
-        { id: '2', title: 'Sağlık', icon: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDAHsXlDcuqCaV56LBr0ZEHD0e3yXJvoUZ9tr3aN73IE2sBHTu0ldNU5nrt3FKdudK6ZTPNIODnxWQZIm-9DWkcn_XbvPrFNOm12lwby0rObgWviqD463CNwy0MMBHCvfgy7-fzfscCIg1HRC-aBOn0AyD1VmFjgqFYmY5VnXSXCKWRgfEcngDhTdl_wPs6SFijjDTfFKuyZaItKyHsfMN1HAUWubXp0dSZPSFAzxaTfoEGyeRMmEcLk7aNAyN0oUA90yo6p9IQag', backgroundColor: isDark ? '#1a2e1f' : '#f0fdf4' },
-        { id: '3', title: 'Spor', icon: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCyEpBHh095eRgZsW9P9WizrTz1vwNJb2P4MGcW0sdq2u6VLCGRsjkmRniGYzO2MB5dcEDi6_e8dzzCiQO_uArOU1Zrnkz7ui8ybnjTHJWS_YGy7ORzJ9dMd6D3kRCKUYWyfjwEWBamZjUDJRMb_iSoATU-m5Zbs8wic6Ol62Kd05H_9agfYRyD2ZjRSZcGBY1DtkN3_R5Uxzxueh-G7RIPbh1zOJy_xDhyL6sJLseOWG-w3aozTz6HGiwRd1AOFkTXnwUqLNcBlg', backgroundColor: isDark ? '#2e2419' : '#fff7ed' },
-        { id: '4', title: 'Evcil\nDostlar', icon: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCW1CH7kUNb0bTdUlsuaScchM4OY5PV0h8NPE8Qg18ZueSh8CWMSSPh1ZeFdCJycCxTehBRiIWS2JSmBnscw8Vg0b7ZTWZtTwH_GFY9KzYmaYD06Haj-8ueuW_ePr3fnVXfkOC_sbxaCHodB4YFJMAzUCzvfNIq7fBsYXGXTtoDE3L08V9dnhYoRxom1cx2BepQ-BDo3SiFa-0fUe4mAfUv8qjwVux_XPiIJhR7LRk_Of79RZ02W_FXuDZ4Fi3LmSxnqdDG8qM5GA', backgroundColor: isDark ? '#1a2e28' : '#ecfdf5' },
-        { id: '5', title: 'Bebek', icon: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA62O9LjD2T6zk37_BrZJku1w6SJMAT2O9BjxcTGSGSSV11MApIgmGnJrLyCpJ3xG21tWchdOWURlL3NPlEpsZ46rg3QF1n-qsqzEgM4RfX5rr2665Em6vSjTaOhAKK8bp6CY0YoESppyxHOraBcBkkXfj0HH3aO0dToZqAEQPFYrebgfXfQ28bICuxC6-lDckezryz9PDIYJcRI4Pjb5tDbd71yuotldZlEXeXJbkA0dyB9zvL_K7CRknQAjJR8wB9RXhYWWbW1A', backgroundColor: isDark ? '#2a1f2e' : '#faf5ff' },
+        { id: '2', title: 'Sağlık', icon: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/icons/health.svg', backgroundColor: isDark ? '#1a2e1f' : '#f0fdf4' },
+        { id: '3', title: 'Spor', icon: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/icons/sports.svg', backgroundColor: isDark ? '#2e2419' : '#fff7ed' },
+        { id: '4', title: 'Evcil\nDostlar', icon: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/icons/pet.svg', backgroundColor: isDark ? '#1a2e28' : '#ecfdf5' },
+        { id: '5', title: 'Bebek', icon: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/icons/baby.svg', backgroundColor: isDark ? '#2a1f2e' : '#faf5ff' },
     ];
 
     const brands = [
