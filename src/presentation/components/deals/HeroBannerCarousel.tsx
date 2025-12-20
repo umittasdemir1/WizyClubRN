@@ -13,10 +13,10 @@ import Animated, {
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // --- AYARLAR ---
-const ITEM_WIDTH = SCREEN_WIDTH * 0.85; // Kart Genişliği (%85)
+const ITEM_WIDTH = SCREEN_WIDTH * 0.90; // Kart Genişliği (%85)
 const ASPECT_RATIO = 16 / 9;            // Yatay Format
 const ITEM_HEIGHT = ITEM_WIDTH / ASPECT_RATIO;
-const ITEM_SPACING = 15;                // Kartlar arası boşluk
+const ITEM_SPACING = 10;                // Kartlar arası boşluk
 
 // --- HESAPLAMALAR (DÜZELTİLDİ) ---
 // Snap (Kaydırma) Aralığı: Kart + Boşluk
