@@ -13,10 +13,10 @@ import Animated, {
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // --- SENİN İSTEDİĞİN AYARLAR ---
-const CARD_WIDTH = SCREEN_WIDTH * 0.92; // KARTLARI ÇOK BÜYÜTTÜK (%92)
+const CARD_WIDTH = SCREEN_WIDTH * 0.85; // KARTLARI ÇOK BÜYÜTTÜK (%92)
 const ASPECT_RATIO = 16 / 9;
 const CARD_HEIGHT = CARD_WIDTH / ASPECT_RATIO;
-const GAP = 8; // Kartlar arası boşluk (Azalttık ki kopuk durmasın)
+const GAP = 15; // Kartlar arası boşluk (Azalttık ki kopuk durmasın)
 
 // --- KRİTİK HİZALAMA AYARI ---
 // Burası ilk kartın solundaki boşluktur.
