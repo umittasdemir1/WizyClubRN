@@ -1,4 +1,5 @@
 export { HeroBanner } from './HeroBanner';
+export { HeroBannerCarousel } from './HeroBannerCarousel';
 export { CategoryCard } from './CategoryCard';
 export { BrandAvatar } from './BrandAvatar';
 export { TicketCard } from './TicketCard';

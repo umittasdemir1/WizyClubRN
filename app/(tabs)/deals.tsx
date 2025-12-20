@@ -8,7 +8,7 @@ import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrap
 import { Search } from 'lucide-react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import {
-    HeroBanner,
+    HeroBannerCarousel,
     CategoryCard,
     BrandAvatar,
     TicketCard,
@@ -40,6 +40,12 @@ export default function DealsScreen() {
     }, []);
 
     // Mock Data
+    const adBanners = [
+        { id: '1', imageUrl: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/1_50.png' },
+        { id: '2', imageUrl: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/2_50.png' },
+        { id: '3', imageUrl: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/3_50.png' },
+    ];
+
     const categories = [
         { id: '1', title: 'Tüm\nKategoriler', iconType: 'dots', backgroundColor: isDark ? '#2d1a2e' : '#fce7f3' },
         { id: '2', title: 'Sağlık', icon: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/icons/health.svg', backgroundColor: isDark ? '#1a2e1f' : '#f0fdf4' },
@@ -99,14 +105,8 @@ export default function DealsScreen() {
                         />
                     }
                 >
-                    {/* Hero Banner */}
-                    <View style={styles.section}>
-                        <HeroBanner
-                            title="MOVE WITH\nMEANING"
-                            subtitle="UP TO 40% OFF"
-                            imageUrl="https://lh3.googleusercontent.com/aida-public/AB6AXuDzwWrZBTLii7ZmBZRZtoLxADJ61kjuyrMmg9YExo3zVEBKLpfJGDYZao4e4HVUkO6Urkyb8jOpkAW7dQ11BdnqqJYR38w3wiu_hoDOvy__KKhZa78FZRDOULvZtGeMfnCOmy2of7Wy6aTy1ANuYNetyJ-4JAbgfSX2beMj76qUO1QvKpb2kIJqheALkcn5vlgGEvhd3VryaK58NlMNW6rwD0zzaOd7FbvNNs4ult0GLQ652uaADXUBWJzPR-n6-wN6JEu_ktZjTQ"
-                        />
-                    </View>
+                    {/* Ad Banner Carousel */}
+                    <HeroBannerCarousel banners={adBanners} />
 
                     {/* Categories */}
                     <View style={styles.section}>
