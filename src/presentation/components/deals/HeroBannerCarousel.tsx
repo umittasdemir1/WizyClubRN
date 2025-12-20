@@ -1,10 +1,14 @@
-import React, { useState, useRef } from 'react';
-import { View, StyleSheet, Dimensions, TouchableOpacity, ScrollView, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
+import Animated, {
+    useSharedValue,
+    useAnimatedScrollHandler,
+} from 'react-native-reanimated';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const BANNER_PADDING = 16;
-const BANNER_WIDTH = SCREEN_WIDTH - (BANNER_PADDING * 2);
+const BANNER_WIDTH = SCREEN_WIDTH - 32; // 16px padding each side
+const BANNER_SPACING = 0;
 
 interface AdBanner {
     id: string;
@@ -18,24 +22,24 @@ interface HeroBannerCarouselProps {
 
 export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
     const [activeIndex, setActiveIndex] = useState(0);
-    const scrollViewRef = useRef<ScrollView>(null);
+    const scrollX = useSharedValue(0);
 
-    const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-        const scrollPosition = event.nativeEvent.contentOffset.x;
-        const index = Math.round(scrollPosition / BANNER_WIDTH);
+    const onScroll = useAnimatedScrollHandler((event) => {
+        scrollX.value = event.contentOffset.x;
+        const index = Math.round(event.contentOffset.x / BANNER_WIDTH);
         setActiveIndex(index);
-    };
+    });
 
     return (
         <View style={styles.container}>
-            <ScrollView
-                ref={scrollViewRef}
+            <Animated.ScrollView
                 horizontal
-                showsHorizontalScrollIndicator={false}
-                onScroll={handleScroll}
-                scrollEventThrottle={16}
-                snapToInterval={BANNER_WIDTH}
+                pagingEnabled={false}
                 decelerationRate="fast"
+                snapToInterval={BANNER_WIDTH}
+                showsHorizontalScrollIndicator={false}
+                onScroll={onScroll}
+                scrollEventThrottle={16}
                 contentContainerStyle={styles.scrollContent}
             >
                 {banners.map((banner, index) => (
@@ -43,10 +47,7 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
                         key={banner.id}
                         activeOpacity={0.9}
                         onPress={banner.onPress}
-                        style={[
-                            styles.bannerContainer,
-                            index === 0 && styles.firstBanner,
-                        ]}
+                        style={styles.bannerContainer}
                     >
                         <Image
                             source={{ uri: banner.imageUrl }}
@@ -56,7 +57,7 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
                         />
                     </TouchableOpacity>
                 ))}
-            </ScrollView>
+            </Animated.ScrollView>
 
             {/* Dots Indicator */}
             {banners.length > 1 && (
@@ -82,7 +83,7 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     scrollContent: {
-        paddingRight: BANNER_PADDING,
+        paddingHorizontal: 16,
     },
     bannerContainer: {
         width: BANNER_WIDTH,
@@ -90,9 +91,7 @@ const styles = StyleSheet.create({
         borderRadius: 24,
         overflow: 'hidden',
         backgroundColor: '#f0f0f0',
-    },
-    firstBanner: {
-        marginLeft: BANNER_PADDING,
+        marginRight: BANNER_SPACING,
     },
     banner: {
         width: '100%',
