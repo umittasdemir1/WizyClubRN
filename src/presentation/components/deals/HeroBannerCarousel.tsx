@@ -12,19 +12,20 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // --- HASSAS AYARLAR ---
 const BANNER_WIDTH_RATIO = 0.85; 
 const ASPECT_RATIO = 16 / 9; 
-const BANNER_SPACING = 15; // Kartlar arasındaki toplam mesafe
+const BANNER_SPACING = 15; // Kartlar arasındaki toplam boşluk
 
-// --- MATEMATİKSEL DÜZELTME ---
+// --- MATEMATİKSEL HESAPLAMALAR ---
 const BANNER_WIDTH = SCREEN_WIDTH * BANNER_WIDTH_RATIO;
 const BANNER_HEIGHT = BANNER_WIDTH / ASPECT_RATIO;
 
-// 1. Kart başına düşen toplam alan (Snap aralığı için)
+// Kartın kapladığı toplam alan (Görsel + Sol Boşluk + Sağ Boşluk)
 const ITEM_SIZE = BANNER_WIDTH + BANNER_SPACING;
 
-// 2. Kenar Boşluğu Hesabı (KRİTİK DÜZELTME BURADA)
-// Formül: (Ekran - Kart Genişliği) / 2 - (Kartın Yan Boşluğu)
-// Bu formül, marginHorizontal kullandığımız için değişti.
-const SPACER = (SCREEN_WIDTH - BANNER_WIDTH) / 2;
+// --- KRİTİK ORTALAMA FORMÜLÜ ---
+// Ekranın solunda kalması gereken net boşluk (Görselin başlaması gereken yer)
+const VISUAL_SIDE_OFFSET = (SCREEN_WIDTH - BANNER_WIDTH) / 2;
+// ScrollView'a vereceğimiz padding (Görselin margin'ini bundan düşüyoruz)
+const CONTAINER_PADDING = VISUAL_SIDE_OFFSET - (BANNER_SPACING / 2);
 
 interface AdBanner {
     id: string;
@@ -39,7 +40,6 @@ interface HeroBannerCarouselProps {
 export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
     const [activeIndex, setActiveIndex] = useState(0);
     const scrollX = useSharedValue(0);
-    const scrollViewRef = useRef<Animated.ScrollView>(null);
 
     const updateActiveIndex = (index: number) => {
         setActiveIndex(index);
@@ -56,20 +56,17 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
     return (
         <View style={styles.container}>
             <Animated.ScrollView
-                ref={scrollViewRef}
                 horizontal
                 pagingEnabled={false} 
                 decelerationRate="fast"
-                snapToInterval={ITEM_SIZE} // Tam bir kart + boşluk kadar atla
-                snapToAlignment="center"   // Mutlaka center olmalı
+                snapToInterval={ITEM_SIZE} // Her kaydırmada bir kart atla
+                // snapToAlignment="center" <-- BU SATIRI SİLDİK! (Kaymayı yapan buydu)
                 showsHorizontalScrollIndicator={false}
                 onScroll={onScroll}
                 scrollEventThrottle={16}
-                // contentContainerStyle içindeki padding hesabı aşağıda değiştirildi
                 contentContainerStyle={{
-                    // Sol ve Sağ baştaki boşluğu ayarlıyoruz.
-                    // Kartın kendi margin'ini (BANNER_SPACING / 2) toplam boşluktan çıkarıyoruz.
-                    paddingHorizontal: SPACER - (BANNER_SPACING / 2),
+                    // Matematiksel olarak hesaplanmış simetrik padding
+                    paddingHorizontal: CONTAINER_PADDING,
                     alignItems: 'center',
                 }}
                 overScrollMode="never"
@@ -116,17 +113,13 @@ const styles = StyleSheet.create({
         marginBottom: 24,
         justifyContent: 'center',
     },
-    // Not: scrollContent stilini yukarıda inline olarak hesapladık ki karışıklık olmasın.
     bannerContainer: {
         width: BANNER_WIDTH,
         height: BANNER_HEIGHT,
         borderRadius: 16,
         overflow: 'hidden',
-        
-        // --- KRİTİK DEĞİŞİKLİK ---
-        // Sadece sağa değil, her iki yana eşit paylaştırıyoruz.
-        // Böylece kartın merkezi ile kutunun merkezi aynı oluyor.
-        marginHorizontal: BANNER_SPACING / 2, 
+        // Hem sağa hem sola eşit boşluk veriyoruz (Simetri için şart)
+        marginHorizontal: BANNER_SPACING / 2,
         
         backgroundColor: '#f0f0f0',
         ...Platform.select({
