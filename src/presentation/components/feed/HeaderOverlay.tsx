@@ -213,6 +213,7 @@ const styles = StyleSheet.create({
     storiesPill: {
         flexDirection: 'row',
         alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.12)', // Lighter for better glass effect
         paddingHorizontal: 16, // Reduced from 20
         paddingVertical: 8, // Reduced from 10
         borderRadius: 20, // Slightly smaller
