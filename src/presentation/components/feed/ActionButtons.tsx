@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
     },
     count: {
         color: 'white',
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: '600',
         textShadowColor: 'rgba(0,0,0,0.8)',
         textShadowOffset: { width: 1, height: 1 },
