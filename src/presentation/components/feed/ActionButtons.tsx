@@ -25,7 +25,7 @@ interface ActionButtonsProps {
 
 const BASE_BOTTOM_POSITION = 120; // Restored to old place (90 + 30)
 const SAFE_AREA_OFFSET = 100; // Restored to old place (70 + 30)
-const ICON_SIZE = 36; // User requested 36px
+const ICON_SIZE = 40; // User requested 40px
 
 // Colors
 const LIKE_COLOR = '#FF2146';
