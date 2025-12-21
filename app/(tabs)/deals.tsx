@@ -227,8 +227,8 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
     },
     headerTitle: {
-        fontSize: 28,
-        fontWeight: '700',
+        fontSize: 24,
+        fontWeight: '500',
         letterSpacing: 0.3,
     },
     searchButton: {
