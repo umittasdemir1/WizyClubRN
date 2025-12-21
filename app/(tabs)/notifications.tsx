@@ -176,8 +176,9 @@ const styles = StyleSheet.create({
         marginTop: 12,
     },
     headerTitle: {
-        fontSize: 24,
-        fontWeight: 'bold',
+        fontSize: 28,
+        fontWeight: '700',
+        letterSpacing: 0.3,
     },
     badge: {
         backgroundColor: '#dc2626',

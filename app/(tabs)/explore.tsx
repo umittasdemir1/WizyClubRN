@@ -87,7 +87,6 @@ export default function ExploreScreen() {
                 <TrendingHeader
                     isDark={isDark}
                     onSearchPress={() => console.log('Search')}
-                    onAddPress={() => console.log('Add')}
                 />
 
                 <ScrollView
