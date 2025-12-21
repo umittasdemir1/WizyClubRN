@@ -43,8 +43,8 @@ const styles = StyleSheet.create({
         backgroundColor: 'transparent',
     },
     title: {
-        fontSize: 28,
-        fontWeight: '700',
+        fontSize: 24,
+        fontWeight: '500',
         letterSpacing: 0.3,
     },
     iconButton: {
