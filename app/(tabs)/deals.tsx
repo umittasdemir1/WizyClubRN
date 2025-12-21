@@ -89,7 +89,7 @@ export default function DealsScreen() {
                 <View style={styles.header}>
                     <Text style={[styles.headerTitle, { color: textColor }]}>Fırsatlar</Text>
                     <TouchableOpacity style={styles.searchButton}>
-                        <Search size={16} color={textColor} />
+                        <Search size={20} color={textColor} />
                     </TouchableOpacity>
                 </View>
 
