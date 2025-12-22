@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
-        minWidth: 120,
+        minWidth: 140,
         justifyContent: 'flex-end',
     },
 });
