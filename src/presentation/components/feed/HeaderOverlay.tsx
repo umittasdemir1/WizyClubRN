@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 8,
-        paddingVertical: 4,
+        paddingVertical: 8,
         gap: 4,
         position: 'relative',
     },
