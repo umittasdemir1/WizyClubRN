@@ -162,7 +162,7 @@ export function HeaderOverlay({
                         ]}>
                             Hikayeler
                         </Text>
-                        {hasUnseenStories && activeTab === 'stories' && (
+                        {hasUnseenStories && (
                             <View style={styles.badge} />
                         )}
                     </Pressable>
@@ -242,24 +242,21 @@ const styles = StyleSheet.create({
     tabContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.3)',
-        paddingHorizontal: 4,
-        paddingVertical: 4,
-        borderRadius: 20,
         gap: 8,
     },
     tabButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 6,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
         gap: 4,
+        position: 'relative',
     },
     tabText: {
         color: 'rgba(255, 255, 255, 0.6)',
-        fontSize: 15,
+        fontSize: 16,
         fontWeight: '600',
-        letterSpacing: 0.2,
+        letterSpacing: 0.3,
     },
     tabTextActive: {
         color: '#FFFFFF',
@@ -270,10 +267,13 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255, 255, 255, 0.2)',
     },
     badge: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
+        width: 6,
+        height: 6,
+        borderRadius: 3,
         backgroundColor: '#FF3B30',
+        position: 'absolute',
+        top: 0,
+        right: -2,
     },
     rightButtons: {
         flexDirection: 'row',
