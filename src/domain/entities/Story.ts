@@ -8,4 +8,13 @@ export interface Story {
     expiresAt: string;
     isViewed: boolean;
     user: User;
+    brandName?: string | null;
+    brandUrl?: string | null;
+    isCommercial?: boolean;
+    commercialType?: string | null;
+    width?: number;
+    height?: number;
+    likesCount?: number;
+    isLiked?: boolean;
+    isSaved?: boolean;
 }
