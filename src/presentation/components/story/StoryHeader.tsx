@@ -4,7 +4,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X } from 'lucide-react-native';
 import { Story } from '../../../domain/entities/Story';
 import { Avatar } from '../shared/Avatar';
-import { formatDistanceToNow } from 'date-fns';
 
 interface StoryHeaderProps {
     story: Story;
@@ -15,6 +14,25 @@ interface StoryHeaderProps {
     onCommercialPress?: () => void;
 }
 
+const getTimeAgo = (dateString: string): string => {
+    try {
+        const now = new Date();
+        const past = new Date(dateString);
+        const diffMs = now.getTime() - past.getTime();
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMins / 60);
+        const diffDays = Math.floor(diffHours / 24);
+
+        if (diffMins < 1) return '1dk';
+        if (diffMins < 60) return `${diffMins}dk`;
+        if (diffHours < 24) return `${diffHours}s`;
+        if (diffDays === 1) return '1g';
+        return `${diffDays}g`;
+    } catch {
+        return '2s';
+    }
+};
+
 export function StoryHeader({
     story,
     progress,
@@ -24,14 +42,6 @@ export function StoryHeader({
     onCommercialPress,
 }: StoryHeaderProps) {
     const insets = useSafeAreaInsets();
-
-    const getTimeAgo = () => {
-        try {
-            return formatDistanceToNow(new Date(story.createdAt), { addSuffix: false });
-        } catch {
-            return '2h';
-        }
-    };
 
     return (
         <View style={[styles.container, { paddingTop: insets.top + 10 }]} pointerEvents="box-none">
@@ -73,7 +83,7 @@ export function StoryHeader({
                             </Pressable>
                         )}
                     </View>
-                    <Text style={styles.time}>{getTimeAgo()}</Text>
+                    <Text style={styles.time}>{getTimeAgo(story.createdAt)}</Text>
                 </View>
 
                 <Pressable onPress={onClose} style={styles.closeButton} hitSlop={12}>
