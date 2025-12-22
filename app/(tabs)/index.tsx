@@ -123,6 +123,9 @@ export default function FeedScreen() {
     // Mute controls
     const { isMuted, toggleMute } = useMuteControls();
 
+    // Tab State
+    const [activeTab, setActiveTab] = useState<'stories' | 'foryou'>('foryou');
+
     // Upload State
     const [isUploadModalVisible, setUploadModalVisible] = useState(false);
     const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
@@ -155,6 +158,7 @@ export default function FeedScreen() {
     useFocusEffect(
         useCallback(() => {
             setScreenFocused(true);
+            setActiveTab('foryou'); // Reset to 'Sana Özel' when returning to feed
             return () => {
                 setScreenFocused(false);
             };
@@ -230,6 +234,17 @@ export default function FeedScreen() {
     const handleCloseMore = useCallback(() => {
         setMoreSheetVisible(false);
     }, []);
+
+    const handleStoryPress = useCallback(() => {
+        router.push('/story/1');
+    }, [router]);
+
+    const handleTabChange = useCallback((tab: 'stories' | 'foryou') => {
+        setActiveTab(tab);
+        if (tab === 'stories') {
+            router.push('/story/1');
+        }
+    }, [router]);
 
     const handleOpenDescription = useCallback(() => {
         setDescriptionSheetVisible(true);
@@ -397,9 +412,11 @@ export default function FeedScreen() {
                     <HeaderOverlay
                         isMuted={isMuted}
                         onToggleMute={handleToggleMute}
-                        onStoryPress={() => router.push('/story/1')}
+                        onStoryPress={handleStoryPress}
                         onMorePress={handleMorePress}
                         onUploadPress={() => setUploadModalVisible(true)}
+                        activeTab={activeTab}
+                        onTabChange={handleTabChange}
                         showBrightnessButton={false}
                         hasUnseenStories={hasUnseenStories}
                     />
@@ -481,9 +498,11 @@ export default function FeedScreen() {
                     <HeaderOverlay
                         isMuted={isMuted}
                         onToggleMute={handleToggleMute}
-                        onStoryPress={() => router.push('/story/1')}
+                        onStoryPress={handleStoryPress}
                         onMorePress={handleMorePress}
                         onUploadPress={() => setUploadModalVisible(true)}
+                        activeTab={activeTab}
+                        onTabChange={handleTabChange}
                         showBrightnessButton={false}
                         hasUnseenStories={hasUnseenStories}
                     />

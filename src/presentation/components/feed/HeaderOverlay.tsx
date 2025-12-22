@@ -89,6 +89,8 @@ interface HeaderOverlayProps {
     onUploadPress?: () => void;
     hasUnseenStories?: boolean;
     showBrightnessButton?: boolean;
+    activeTab?: 'stories' | 'foryou';
+    onTabChange?: (tab: 'stories' | 'foryou') => void;
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -101,6 +103,8 @@ export function HeaderOverlay({
     onUploadPress,
     hasUnseenStories = false,
     showBrightnessButton = true,
+    activeTab = 'foryou',
+    onTabChange,
 }: HeaderOverlayProps) {
     const insets = useSafeAreaInsets();
     const pulseOpacity = useSharedValue(1);
@@ -138,21 +142,46 @@ export function HeaderOverlay({
 
             </View>
 
-            {/* Center: Stories Pill (absolutely centered) */}
+            {/* Center: Tab Switcher (absolutely centered) */}
             <View
                 style={[styles.centerOverlay, { top: headerTopPadding }]}
                 pointerEvents="box-none"
             >
-                <Pressable
-                    onPress={onStoryPress}
-                    style={styles.storiesPill}
-                    hitSlop={{ top: 8, bottom: 8 }}
-                >
-                    <Text style={styles.storiesText}>Hikayeler</Text>
-                    {hasUnseenStories && (
-                        <View style={styles.badge} />
-                    )}
-                </Pressable>
+                <View style={styles.tabContainer}>
+                    <Pressable
+                        onPress={() => {
+                            onTabChange?.('stories');
+                            onStoryPress();
+                        }}
+                        style={styles.tabButton}
+                        hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                    >
+                        <Text style={[
+                            styles.tabText,
+                            activeTab === 'stories' && styles.tabTextActive
+                        ]}>
+                            Hikayeler
+                        </Text>
+                        {hasUnseenStories && activeTab === 'stories' && (
+                            <View style={styles.badge} />
+                        )}
+                    </Pressable>
+
+                    <View style={styles.tabDivider} />
+
+                    <Pressable
+                        onPress={() => onTabChange?.('foryou')}
+                        style={styles.tabButton}
+                        hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                    >
+                        <Text style={[
+                            styles.tabText,
+                            activeTab === 'foryou' && styles.tabTextActive
+                        ]}>
+                            Sana Özel
+                        </Text>
+                    </Pressable>
+                </View>
             </View>
 
             {/* Right: Voice + More + Brightness */}
@@ -210,33 +239,35 @@ const styles = StyleSheet.create({
         right: 0,
         alignItems: 'center',
     },
-    storiesPill: {
+    tabContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.12)', // Lighter for better glass effect
-        paddingHorizontal: 16, // Reduced from 20
-        paddingVertical: 8, // Reduced from 10
-        borderRadius: 20, // Slightly smaller
-        gap: 6, // Reduced from 8
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.25)', // Lighter border for glass effect
-        // Glass shadow
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 }, // Softer shadow
-        shadowOpacity: 0.15, // Reduced from 0.2
-        shadowRadius: 6, // Softer blur
-        elevation: 3, // Reduced
+        backgroundColor: 'rgba(0, 0, 0, 0.3)',
+        paddingHorizontal: 4,
+        paddingVertical: 4,
+        borderRadius: 20,
+        gap: 8,
     },
-    storiesText: {
-        color: 'white',
-        fontSize: 14, // Same as description text
-        fontWeight: '400', // Regular weight like description
+    tabButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 6,
+        gap: 4,
+    },
+    tabText: {
+        color: 'rgba(255, 255, 255, 0.6)',
+        fontSize: 15,
+        fontWeight: '600',
         letterSpacing: 0.2,
     },
-    chevron: {
-        color: 'rgba(255, 255, 255, 0.8)',
-        fontSize: 8,
-        marginTop: 1,
+    tabTextActive: {
+        color: '#FFFFFF',
+    },
+    tabDivider: {
+        width: 1,
+        height: 12,
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
     },
     badge: {
         width: 8,
