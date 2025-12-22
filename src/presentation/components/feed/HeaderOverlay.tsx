@@ -232,6 +232,8 @@ const styles = StyleSheet.create({
         flexDirection: 'column',
         alignItems: 'center',
         gap: 8, // Space between Upload and Delete
+        minWidth: 120,
+        justifyContent: 'flex-start',
     },
     centerOverlay: {
         position: 'absolute',
