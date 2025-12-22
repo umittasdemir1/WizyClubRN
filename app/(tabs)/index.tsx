@@ -18,7 +18,7 @@ import { VideoLayer } from '../../src/presentation/components/feed/VideoLayer';
 import { ActionButtons } from '../../src/presentation/components/feed/ActionButtons';
 import { HeaderOverlay } from '../../src/presentation/components/feed/HeaderOverlay';
 import { MetadataLayer } from '../../src/presentation/components/feed/MetadataLayer';
-import { DoubleTapLike } from '../../src/presentation/components/feed/DoubleTapLike';
+import { DoubleTapLike, DoubleTapLikeRef } from '../../src/presentation/components/feed/DoubleTapLike';
 import { BrightnessController } from '../../src/presentation/components/feed/BrightnessController';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import { SideOptionsSheet } from '../../src/presentation/components/feed/SideOptionsSheet';
@@ -30,7 +30,7 @@ import {
     useMuteControls,
 } from '../../src/presentation/store/useActiveVideoStore';
 import { Video } from '../../src/domain/entities/Video';
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, memo } from 'react';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { FeedSkeleton } from '../../src/presentation/components/feed/FeedSkeleton';
@@ -300,69 +300,76 @@ export default function FeedScreen() {
         }
     }, [videos.length, ITEM_HEIGHT]);
 
+    // FeedItem - Memo bileşeni (Performance için)
+    const FeedItem = memo(({ video, isActive }: { video: Video; isActive: boolean }) => {
+        const doubleTapRef = useRef<DoubleTapLikeRef>(null);
+
+        const handleLikePress = useCallback(() => {
+            // Eğer video henüz beğenilmemişse, animasyonu tetikle
+            if (!video.isLiked) {
+                doubleTapRef.current?.animateLike();
+                if (Platform.OS !== 'web') {
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                }
+            }
+            toggleLike(video.id);
+        }, [video.isLiked, video.id]);
+
+        return (
+            <View style={[styles.itemContainer, { height: ITEM_HEIGHT }]}>
+                {/* Layer 1: Content & Gestures (Background) */}
+                <DoubleTapLike
+                    ref={doubleTapRef}
+                    onDoubleTap={() => handleDoubleTapLike(video.id)}
+                    onSingleTap={togglePause}
+                >
+                    <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]}>
+                        <VideoLayer
+                            video={video}
+                            isActive={isActive}
+                            isMuted={isMuted}
+                            isScrolling={isScrollingSV}
+                            onSeekReady={isActive ? handleSeekReady : undefined}
+                            onRemoveVideo={() => {
+                                console.log(`[FeedScreen] Auto-removing dead video: ${video.id}`);
+                                deleteVideo(video.id);
+                            }}
+                        />
+                    </View>
+                </DoubleTapLike>
+
+                {/* Layer 2: UI Overlays (Foreground) - Animate Opacity */}
+                <Animated.View
+                    style={[StyleSheet.absoluteFill, { zIndex: 50 }, uiOpacityStyle]}
+                    pointerEvents={isSeeking ? 'none' : 'box-none'}
+                >
+                    <ActionButtons
+                        video={video}
+                        onLike={handleLikePress}
+                        onSave={() => toggleSave(video.id)}
+                        onShare={() => toggleShare(video.id)}
+                        onShop={() => toggleShop(video.id)}
+                        onProfilePress={() => console.log('Profile')}
+                    />
+
+                    <MetadataLayer
+                        video={video}
+                        onAvatarPress={() => console.log('Open Story/Profile')}
+                        onFollowPress={() => toggleFollow(video.id)}
+                        onReadMorePress={handleOpenDescription}
+                        onCommercialTagPress={() => console.log('Open Commercial Info')}
+                    />
+                </Animated.View>
+            </View>
+        );
+    });
+
     const renderItem = useCallback(
         ({ item }: { item: Video }) => {
             const isActive = item.id === activeVideoId && isAppActive;
-
-            return (
-                <View style={[styles.itemContainer, { height: ITEM_HEIGHT }]}>
-                    {/* Layer 1: Content & Gestures (Background) */}
-                    <DoubleTapLike
-                        onDoubleTap={() => handleDoubleTapLike(item.id)}
-                        onSingleTap={togglePause}
-                    >
-                        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]}>
-                            <VideoLayer
-                                video={item}
-                                isActive={isActive}
-                                isMuted={isMuted}
-                                isScrolling={isScrollingSV}
-                                onSeekReady={isActive ? handleSeekReady : undefined}
-                                onRemoveVideo={() => {
-                                    console.log(`[FeedScreen] Auto-removing dead video: ${item.id}`);
-                                    deleteVideo(item.id);
-                                }}
-                            />
-                        </View>
-                    </DoubleTapLike>
-
-                    {/* Layer 2: UI Overlays (Foreground) - Animate Opacity */}
-                    <Animated.View
-                        style={[StyleSheet.absoluteFill, { zIndex: 50 }, uiOpacityStyle]}
-                        pointerEvents={isSeeking ? 'none' : 'box-none'}
-                    >
-                        <ActionButtons
-                            video={item}
-                            onLike={() => toggleLike(item.id)}
-                            onSave={() => toggleSave(item.id)}
-                            onShare={() => toggleShare(item.id)}
-                            onShop={() => toggleShop(item.id)}
-                            onProfilePress={() => console.log('Profile')}
-                        />
-
-                        <MetadataLayer
-                            video={item}
-                            onAvatarPress={() => console.log('Open Story/Profile')}
-                            onFollowPress={() => toggleFollow(item.id)}
-                            onReadMorePress={handleOpenDescription}
-                            onCommercialTagPress={() => console.log('Open Commercial Info')}
-                        />
-                    </Animated.View>
-                </View>
-            );
+            return <FeedItem video={item} isActive={isActive} />;
         },
-        [
-            activeVideoId,
-            isAppActive,
-            isMuted,
-            handleToggleMute,
-            handleDoubleTapLike,
-            toggleLike,
-            toggleSave,
-            router,
-            ITEM_HEIGHT,
-            isSeeking
-        ]
+        [activeVideoId, isAppActive]
     );
 
     const keyExtractor = useCallback((item: Video) => item.id, []);
