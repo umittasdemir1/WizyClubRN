@@ -278,7 +278,7 @@ const styles = StyleSheet.create({
     rightButtons: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
+        gap: 2,
         minWidth: 120,
         justifyContent: 'flex-end',
     },
