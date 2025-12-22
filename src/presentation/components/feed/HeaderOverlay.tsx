@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
         borderRadius: 3,
         backgroundColor: '#FF3B30',
         position: 'absolute',
-        top: 3,
+        top: 4,
         right: -2,
     },
     rightButtons: {
