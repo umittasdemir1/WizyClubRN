@@ -272,14 +272,14 @@ const styles = StyleSheet.create({
         borderRadius: 3,
         backgroundColor: '#FF3B30',
         position: 'absolute',
-        top: 0,
+        top: 3,
         right: -2,
     },
     rightButtons: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
-        minWidth: 140,
+        gap: 4,
+        minWidth: 120,
         justifyContent: 'flex-end',
     },
 });
