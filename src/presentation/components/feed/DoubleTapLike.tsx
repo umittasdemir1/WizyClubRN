@@ -22,7 +22,7 @@ export interface DoubleTapLikeRef {
 const HEART_COLOR = '#FF2146';
 const DOUBLE_TAP_DELAY = 250; // 250ms window for double tap
 
-export const DoubleTapLike = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
+const DoubleTapLikeComponent = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
     ({ children, onDoubleTap, onSingleTap }, ref) => {
         const scale = useSharedValue(0);
         const opacity = useSharedValue(0);
@@ -117,6 +117,10 @@ export const DoubleTapLike = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
         );
     }
 );
+
+DoubleTapLikeComponent.displayName = 'DoubleTapLike';
+
+export const DoubleTapLike = DoubleTapLikeComponent;
 
 const styles = StyleSheet.create({
     container: {
