@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useMemo } from 'react';
+import React, { memo, useEffect, useMemo, useState } from 'react';
 import { View, StyleSheet, ScrollView, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -34,10 +34,12 @@ export const StoryBar = memo(function StoryBar({
     const insets = useSafeAreaInsets();
     const translateY = useSharedValue(-BAR_HEIGHT);
     const opacity = useSharedValue(0);
+    const [shouldRender, setShouldRender] = useState(false);
 
     // Slide down/up animasyonu
     useEffect(() => {
         if (isVisible) {
+            setShouldRender(true);
             translateY.value = withSpring(0, {
                 damping: 20,
                 stiffness: 120,
@@ -46,6 +48,8 @@ export const StoryBar = memo(function StoryBar({
         } else {
             translateY.value = withTiming(-BAR_HEIGHT, { duration: 250 });
             opacity.value = withTiming(0, { duration: 200 });
+            // Delay unmount until animation completes
+            setTimeout(() => setShouldRender(false), 250);
         }
     }, [isVisible]);
 
@@ -63,7 +67,7 @@ export const StoryBar = memo(function StoryBar({
         });
     }, [storyUsers]);
 
-    if (!isVisible && translateY.value === -BAR_HEIGHT) {
+    if (!shouldRender) {
         return null; // Performans için unmount
     }
 
