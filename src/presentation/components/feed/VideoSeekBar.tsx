@@ -63,8 +63,8 @@ export function VideoSeekBar({
     const trackHeight = useSharedValue(TRACK_HEIGHT);
     const tooltipOpacity = useSharedValue(0);
 
-    const POSITION_MODE = 'safe' as 'safe' | 'hidden' | 'custom';
-    const CUSTOM_OFFSET = -22;
+    const POSITION_MODE = 'custom' as 'safe' | 'hidden' | 'custom';
+    const CUSTOM_OFFSET = -14;
 
     const insets = useSafeAreaInsets();
     const TAB_BAR_HEIGHT = 0; // Resetting to 0 to find the true baseline
