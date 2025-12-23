@@ -52,19 +52,20 @@ export const StoryAvatar = memo(function StoryAvatar({
         <Pressable onPress={onPress} style={styles.container}>
             <View style={styles.avatarContainer}>
                 {hasUnseenStory ? (
-                    // Renkli gradient ring (Instagram benzeri)
-                    <Animated.View style={[styles.ring, animatedRingStyle]}>
-                        <LinearGradient
-                            colors={['#F58529', '#DD2A7B', '#8134AF', '#515BD4']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={styles.gradient}
-                        >
-                            <View style={styles.innerWhiteRing}>
-                                <Avatar url={avatarUrl} size={AVATAR_SIZE} />
-                            </View>
-                        </LinearGradient>
-                    </Animated.View>
+                    // Renkli gradient ring (Instagram benzeri) - SADECE HALKA DÖNER
+                    <View style={styles.ring}>
+                        <Animated.View style={[styles.gradientRotate, animatedRingStyle]}>
+                            <LinearGradient
+                                colors={['#F58529', '#DD2A7B', '#8134AF', '#515BD4']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={styles.gradient}
+                            />
+                        </Animated.View>
+                        <View style={styles.innerWhiteRing}>
+                            <Avatar url={avatarUrl} size={AVATAR_SIZE} />
+                        </View>
+                    </View>
                 ) : (
                     // Gri ring (izlenmiş hikayeler)
                     <View style={styles.ring}>
@@ -97,6 +98,13 @@ const styles = StyleSheet.create({
         borderRadius: RING_SIZE / 2,
         justifyContent: 'center',
         alignItems: 'center',
+        position: 'relative',
+    },
+    gradientRotate: {
+        position: 'absolute',
+        width: RING_SIZE,
+        height: RING_SIZE,
+        borderRadius: RING_SIZE / 2,
     },
     gradient: {
         width: RING_SIZE,
@@ -116,6 +124,8 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         padding: 2,
+        position: 'relative',
+        zIndex: 1,
     },
     username: {
         color: 'white',
