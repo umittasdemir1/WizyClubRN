@@ -8,7 +8,10 @@ import Animated, {
     useSharedValue,
     withTiming,
     runOnJS,
+    cancelAnimation,
+    Easing,
 } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Story } from '../../../domain/entities/Story';
 import { StoryHeader } from './StoryHeader';
 import { StoryActions } from './StoryActions';
@@ -16,7 +19,7 @@ import { FlyingEmoji } from './FlyingEmoji';
 
 const STORY_DURATION = 5000; // 5 seconds
 const HOLD_PAUSE_DELAY = 200; // 200ms like Instagram
-const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
+const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('screen');
 
 interface StoryPageProps {
     story: Story;
@@ -48,6 +51,7 @@ export function StoryPage({
     totalStories,
     currentStoryIndex,
 }: StoryPageProps) {
+    const insets = useSafeAreaInsets();
     const videoRef = useRef<ComponentRef<typeof Video>>(null);
     const [isLiked, setIsLiked] = useState(story.isLiked || false);
     const [flyingEmojis, setFlyingEmojis] = useState<FlyingEmojiData[]>([]);
@@ -59,43 +63,34 @@ export function StoryPage({
     // SharedValue for smooth 60fps progress (no re-renders)
     const progress = useSharedValue(0);
 
-    // Progress tracking - smooth 60fps using SharedValue (feed seekbar pattern)
+    // Progress tracking - smooth 60fps using Reanimated
     useEffect(() => {
-        if (!isActive || isPaused) {
+        if (!isActive) {
+            cancelAnimation(progress);
+            progress.value = 0;
             return;
         }
 
-        progress.value = 0;
-        const startTime = Date.now();
-        let animationFrame: number;
+        if (isPaused) {
+            cancelAnimation(progress);
+            return;
+        }
 
-        const updateProgress = () => {
-            const elapsed = Date.now() - startTime;
-            const newProgress = Math.min(elapsed / STORY_DURATION, 1);
-            progress.value = newProgress;
+        const duration = STORY_DURATION * (1 - progress.value);
 
-            if (newProgress >= 1) {
+        progress.value = withTiming(1, {
+            duration: duration,
+            easing: Easing.linear
+        }, (finished) => {
+            if (finished) {
                 runOnJS(onNext)();
-            } else {
-                animationFrame = requestAnimationFrame(updateProgress);
             }
-        };
-
-        animationFrame = requestAnimationFrame(updateProgress);
+        });
 
         return () => {
-            if (animationFrame) {
-                cancelAnimationFrame(animationFrame);
-            }
+            cancelAnimation(progress);
         };
     }, [isActive, isPaused, onNext, progress]);
-
-    // Reset state when story changes
-    useEffect(() => {
-        if (isActive) {
-            progress.value = 0;
-        }
-    }, [story.id, isActive, progress]);
 
     // Video dimensions for aspect ratio
     const handleLoad = useCallback((data: any) => {
@@ -206,7 +201,10 @@ export function StoryPage({
                     <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
                 </ImageBackground>
 
-                {/* Video - Centered with proper aspect ratio */}
+                {/* Top Spacer for Safe Area (simulating 8mm gap) */}
+                <View style={{ height: insets.top + 30, backgroundColor: '#262730', width: '100%' }} />
+
+                {/* Video Container - Fills available space above the bar */}
                 <View style={styles.videoContainer}>
                     <Video
                         ref={videoRef}
@@ -218,9 +216,25 @@ export function StoryPage({
                         muted={false}
                         onLoad={handleLoad}
                     />
+                    
+                    {/* Tap Zones inside video container */}
+                    <View style={styles.tapZones} pointerEvents="box-none">
+                        <Pressable
+                            style={styles.leftZone}
+                            onPress={handleTapLeft}
+                            onPressIn={handleHoldStart}
+                            onPressOut={handleHoldEnd}
+                        />
+                        <Pressable
+                            style={styles.rightZone}
+                            onPress={handleTapRight}
+                            onPressIn={handleHoldStart}
+                            onPressOut={handleHoldEnd}
+                        />
+                    </View>
                 </View>
 
-                {/* Header with progress bars */}
+                {/* Header with progress bars (Absolute) */}
                 <StoryHeader
                     story={story}
                     progress={progress}
@@ -230,23 +244,7 @@ export function StoryPage({
                     onCommercialPress={story.isCommercial ? handleCommercialPress : undefined}
                 />
 
-                {/* Tap Zones with Hold */}
-                <View style={styles.tapZones} pointerEvents="box-none">
-                    <Pressable
-                        style={styles.leftZone}
-                        onPress={handleTapLeft}
-                        onPressIn={handleHoldStart}
-                        onPressOut={handleHoldEnd}
-                    />
-                    <Pressable
-                        style={styles.rightZone}
-                        onPress={handleTapRight}
-                        onPressIn={handleHoldStart}
-                        onPressOut={handleHoldEnd}
-                    />
-                </View>
-
-                {/* Bottom Actions */}
+                {/* Bottom Actions (Relative - Pushes video up) */}
                 <StoryActions
                     isLiked={isLiked}
                     onLike={handleLike}
@@ -271,28 +269,31 @@ export function StoryPage({
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: 'black',
+        backgroundColor: '#262730',
     },
     videoContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+        width: '100%',
+        overflow: 'hidden',
     },
     videoCover: {
         width: SCREEN_WIDTH,
-        height: SCREEN_HEIGHT,
+        height: '100%',
     },
     videoContain: {
         width: SCREEN_WIDTH,
-        height: SCREEN_HEIGHT,
+        height: '100%',
     },
     tapZones: {
         position: 'absolute',
-        top: 100,
-        bottom: 120,
+        top: 0,
+        bottom: 0,
         left: 0,
         right: 0,
         flexDirection: 'row',
+        zIndex: 10,
     },
     leftZone: {
         flex: 0.3,

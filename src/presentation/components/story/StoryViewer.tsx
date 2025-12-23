@@ -5,7 +5,7 @@ import { StoryPage } from './StoryPage';
 import { useRouter } from 'expo-router';
 import PagerView from 'react-native-pager-view';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('screen');
 
 interface StoryViewerProps {
     stories: Story[];
@@ -79,7 +79,7 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: 'black',
+        backgroundColor: '#262730',
     },
     pager: {
         flex: 1,

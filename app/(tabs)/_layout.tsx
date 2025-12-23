@@ -20,7 +20,7 @@ export default function TabLayout() {
             screenOptions={{
                 headerShown: false,
                 tabBarStyle: {
-                    backgroundColor: isDark ? '#000000' : '#FFFFFF',
+                    backgroundColor: isDark ? '#262730' : '#fefefe',
                     borderTopWidth: 0,
                     paddingTop: 8,
                     paddingBottom: insets.bottom + 2,

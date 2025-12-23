@@ -27,6 +27,11 @@ module.exports = {
         // Sheets
         'sheet-dark': '#18181B',
         'sheet-dark-lighter': '#121212',
+        
+        // Theme Colors
+        'theme-dark': '#262730',
+        'theme-light': '#fefefe',
+
         primary: '#FF3B30',
         accent: '#7C3AED',
         muted: '#94A3B8',

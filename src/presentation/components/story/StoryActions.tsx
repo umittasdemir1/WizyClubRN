@@ -22,9 +22,9 @@ export function StoryActions({
     const insets = useSafeAreaInsets();
 
     return (
-        <View style={[styles.container, { paddingBottom: insets.bottom + 12 }]} pointerEvents="box-none">
+        <View style={[styles.container, { paddingBottom: insets.bottom }]} pointerEvents="box-none">
             <View style={styles.actionBar}>
-                {/* Emoji Scroll Area */}
+                {/* Emoji Pill Area */}
                 <View style={styles.emojiContainer}>
                     <ScrollView
                         horizontal
@@ -47,18 +47,18 @@ export function StoryActions({
                 <View style={styles.buttons}>
                     <Pressable
                         onPress={onLike}
-                        style={[styles.actionButton, isLiked && styles.likedButton]}
+                        style={styles.actionButton}
                         hitSlop={12}
                     >
                         <LikeIcon
-                            width={24}
-                            height={24}
+                            width={32}
+                            height={32}
                             color={isLiked ? '#FF3B30' : '#FFFFFF'}
                         />
                     </Pressable>
 
                     <Pressable onPress={onShare} style={styles.actionButton} hitSlop={12}>
-                        <ShareIcon width={24} height={24} color="#FFFFFF" />
+                        <ShareIcon width={32} height={32} color="#FFFFFF" />
                     </Pressable>
                 </View>
             </View>
@@ -68,63 +68,49 @@ export function StoryActions({
 
 const styles = StyleSheet.create({
     container: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        zIndex: 100,
+        width: '100%',
+        backgroundColor: '#262730',
+        paddingTop: 16,
     },
     actionBar: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
-        backgroundColor: 'rgba(0, 0, 0, 0.95)',
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        paddingVertical: 12,
+        gap: 12,
         paddingHorizontal: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 8,
+        height: 80,
     },
     emojiContainer: {
         flex: 1,
-        height: 48,
+        height: 44,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.8)',
+        borderRadius: 22,
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        justifyContent: 'center',
+        paddingHorizontal: 4,
     },
     emojiScrollContent: {
         alignItems: 'center',
-        paddingHorizontal: 4,
         gap: 2,
     },
     emojiButton: {
-        width: 44,
-        height: 44,
+        width: 40,
+        height: 40,
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 22,
     },
     emoji: {
-        fontSize: 28,
+        fontSize: 24,
     },
     buttons: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
-        paddingLeft: 8,
-        borderLeftWidth: 1,
-        borderLeftColor: 'rgba(255, 255, 255, 0.2)',
+        gap: 12,
     },
     actionButton: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        width: 44,
+        height: 44,
         alignItems: 'center',
         justifyContent: 'center',
-    },
-    likedButton: {
-        backgroundColor: 'rgba(255, 59, 48, 0.2)',
     },
 });
