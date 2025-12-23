@@ -220,6 +220,8 @@ export default function FeedScreen() {
                 if (newId !== activeVideoId) {
                     lastInternalIndex.current = newIndex; // Mark as internal
                     setActiveVideo(newId, newIndex);
+                    // Video değişince story bar'ı kapat
+                    setActiveTab('foryou');
                 }
             }
         },
@@ -511,7 +513,11 @@ export default function FeedScreen() {
                     initialNumToRender={1}
                     bounces={false}
                     overScrollMode="never"
-                    onScrollBeginDrag={() => { isScrollingSV.value = true; }}
+                    onScrollBeginDrag={() => {
+                        isScrollingSV.value = true;
+                        // Scroll başladığında story bar'ı kapat
+                        setActiveTab('foryou');
+                    }}
                     onScrollEndDrag={() => { isScrollingSV.value = false; }}
                     onMomentumScrollEnd={(e) => {
                         isScrollingSV.value = false;
