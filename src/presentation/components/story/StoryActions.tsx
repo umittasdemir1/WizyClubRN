@@ -1,55 +1,39 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Heart, Bookmark, Share2, ShoppingBag, Smile } from 'lucide-react-native';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import LikeIcon from '../../../../assets/icons/like.svg';
+import ShareIcon from '../../../../assets/icons/share.svg';
 
 interface StoryActionsProps {
     isLiked: boolean;
-    isSaved: boolean;
-    showEmojiPicker: boolean;
-    hasShop: boolean;
     onLike: () => void;
-    onSave: () => void;
     onShare: () => void;
-    onShop: () => void;
-    onEmojiPickerToggle: () => void;
     onEmojiSelect: (emoji: string) => void;
 }
 
-const EMOJIS = ['❤️', '🔥', '👏', '😂', '😍', '🎉', '👍', '💯'];
+const EMOJIS = ['❤️', '🔥', '👏', '😂', '😍', '🎉', '👍', '💯', '😮', '🤩', '😎', '🥰', '😘', '🙌', '💪', '✨'];
 
 export function StoryActions({
     isLiked,
-    isSaved,
-    showEmojiPicker,
-    hasShop,
     onLike,
-    onSave,
     onShare,
-    onShop,
-    onEmojiPickerToggle,
     onEmojiSelect,
 }: StoryActionsProps) {
     const insets = useSafeAreaInsets();
 
     return (
-        <View style={[styles.container, { paddingBottom: insets.bottom + 16 }]} pointerEvents="box-none">
-            {/* Emoji Picker */}
-            {showEmojiPicker && (
-                <Animated.View
-                    entering={FadeIn.duration(200)}
-                    exiting={FadeOut.duration(200)}
-                    style={styles.emojiPicker}
-                >
+        <View style={[styles.container, { paddingBottom: insets.bottom + 12 }]} pointerEvents="box-none">
+            <View style={styles.actionBar}>
+                {/* Emoji Scroll Area */}
+                <View style={styles.emojiContainer}>
                     <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.emojiScrollContent}
                     >
-                        {EMOJIS.map((emoji) => (
+                        {EMOJIS.map((emoji, index) => (
                             <Pressable
-                                key={emoji}
+                                key={`${emoji}-${index}`}
                                 onPress={() => onEmojiSelect(emoji)}
                                 style={styles.emojiButton}
                             >
@@ -57,41 +41,26 @@ export function StoryActions({
                             </Pressable>
                         ))}
                     </ScrollView>
-                </Animated.View>
-            )}
+                </View>
 
-            {/* Action Buttons */}
-            <View style={styles.actions}>
-                <Pressable onPress={onLike} style={styles.actionButton} hitSlop={12}>
-                    <Heart
-                        size={28}
-                        color={isLiked ? '#FF3B30' : 'white'}
-                        fill={isLiked ? '#FF3B30' : 'transparent'}
-                    />
-                </Pressable>
-
-                <Pressable onPress={onSave} style={styles.actionButton} hitSlop={12}>
-                    <Bookmark
-                        size={28}
-                        color={isSaved ? '#FFD700' : 'white'}
-                        fill={isSaved ? '#FFD700' : 'transparent'}
-                    />
-                </Pressable>
-
-                <Pressable onPress={onEmojiPickerToggle} style={styles.actionButton} hitSlop={12}>
-                    <Smile size={28} color={showEmojiPicker ? '#FFD700' : 'white'} />
-                </Pressable>
-
-                <Pressable onPress={onShare} style={styles.actionButton} hitSlop={12}>
-                    <Share2 size={28} color="white" />
-                </Pressable>
-
-                {hasShop && (
-                    <Pressable onPress={onShop} style={styles.shopButton} hitSlop={12}>
-                        <ShoppingBag size={20} color="white" />
-                        <Text style={styles.shopText}>Mağaza</Text>
+                {/* Action Buttons */}
+                <View style={styles.buttons}>
+                    <Pressable
+                        onPress={onLike}
+                        style={[styles.actionButton, isLiked && styles.likedButton]}
+                        hitSlop={12}
+                    >
+                        <LikeIcon
+                            width={24}
+                            height={24}
+                            color={isLiked ? '#FF3B30' : '#000000'}
+                        />
                     </Pressable>
-                )}
+
+                    <Pressable onPress={onShare} style={styles.actionButton} hitSlop={12}>
+                        <ShareIcon width={24} height={24} color="#000000" />
+                    </Pressable>
+                </View>
             </View>
         </View>
     );
@@ -104,49 +73,63 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         zIndex: 100,
+        paddingHorizontal: 12,
     },
-    emojiPicker: {
-        backgroundColor: 'rgba(0, 0, 0, 0.6)',
-        borderRadius: 24,
-        marginHorizontal: 16,
-        marginBottom: 12,
+    actionBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        borderRadius: 30,
         paddingVertical: 8,
+        paddingHorizontal: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    emojiContainer: {
+        flex: 1,
+        height: 48,
     },
     emojiScrollContent: {
-        paddingHorizontal: 12,
-        gap: 8,
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        gap: 4,
     },
     emojiButton: {
-        width: 48,
-        height: 48,
+        width: 44,
+        height: 44,
         alignItems: 'center',
         justifyContent: 'center',
+        borderRadius: 22,
     },
     emoji: {
-        fontSize: 32,
+        fontSize: 28,
     },
-    actions: {
+    buttons: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        gap: 24,
-        paddingHorizontal: 16,
+        gap: 8,
+        paddingLeft: 8,
+        borderLeftWidth: 1,
+        borderLeftColor: 'rgba(0, 0, 0, 0.1)',
     },
     actionButton: {
-        padding: 8,
-    },
-    shopButton: {
-        flexDirection: 'row',
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: '#FFFFFF',
         alignItems: 'center',
-        gap: 6,
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 20,
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
     },
-    shopText: {
-        color: 'white',
-        fontSize: 14,
-        fontWeight: '600',
+    likedButton: {
+        backgroundColor: '#FFE5E5',
     },
 });
