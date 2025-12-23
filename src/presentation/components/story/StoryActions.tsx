@@ -53,12 +53,12 @@ export function StoryActions({
                         <LikeIcon
                             width={24}
                             height={24}
-                            color={isLiked ? '#FF3B30' : '#000000'}
+                            color={isLiked ? '#FF3B30' : '#FFFFFF'}
                         />
                     </Pressable>
 
                     <Pressable onPress={onShare} style={styles.actionButton} hitSlop={12}>
-                        <ShareIcon width={24} height={24} color="#000000" />
+                        <ShareIcon width={24} height={24} color="#FFFFFF" />
                     </Pressable>
                 </View>
             </View>
@@ -73,21 +73,21 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         zIndex: 100,
-        paddingHorizontal: 12,
     },
     actionBar: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        borderRadius: 30,
-        paddingVertical: 8,
-        paddingHorizontal: 12,
+        backgroundColor: 'rgba(0, 0, 0, 0.95)',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.2,
         shadowRadius: 8,
-        elevation: 4,
+        elevation: 8,
     },
     emojiContainer: {
         flex: 1,
@@ -95,8 +95,8 @@ const styles = StyleSheet.create({
     },
     emojiScrollContent: {
         alignItems: 'center',
-        paddingHorizontal: 8,
-        gap: 4,
+        paddingHorizontal: 4,
+        gap: 2,
     },
     emojiButton: {
         width: 44,
@@ -114,22 +114,17 @@ const styles = StyleSheet.create({
         gap: 8,
         paddingLeft: 8,
         borderLeftWidth: 1,
-        borderLeftColor: 'rgba(0, 0, 0, 0.1)',
+        borderLeftColor: 'rgba(255, 255, 255, 0.2)',
     },
     actionButton: {
         width: 48,
         height: 48,
         borderRadius: 24,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
     },
     likedButton: {
-        backgroundColor: '#FFE5E5',
+        backgroundColor: 'rgba(255, 59, 48, 0.2)',
     },
 });
