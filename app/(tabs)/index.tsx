@@ -307,12 +307,17 @@ export default function FeedScreen() {
         const handleLikePress = useCallback(() => {
             // Eğer video henüz beğenilmemişse, animasyonu tetikle
             if (!video.isLiked) {
+                // Önce state update (senkron olsun)
+                toggleLike(video.id);
+                // Hemen ardından animasyonu tetikle (aynı frame'de)
                 doubleTapRef.current?.animateLike();
                 if (Platform.OS !== 'web') {
                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 }
+            } else {
+                // Unlike - sadece state update, animasyon yok
+                toggleLike(video.id);
             }
-            toggleLike(video.id);
         }, [video.isLiked, video.id]);
 
         return (

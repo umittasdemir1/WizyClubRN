@@ -1,11 +1,14 @@
-import React, { memo } from 'react';
+import React, { memo, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
+    useAnimatedProps,
     withSequence,
     withTiming,
+    withSpring,
+    interpolateColor,
     Easing,
 } from 'react-native-reanimated';
 import { Video } from '../../../domain/entities/Video';
@@ -13,6 +16,12 @@ import LikeIcon from '../../../../assets/icons/like.svg';
 import SaveIcon from '../../../../assets/icons/save.svg';
 import ShareIcon from '../../../../assets/icons/share.svg';
 import ShoppingIcon from '../../../../assets/icons/shopping.svg';
+
+// Animated SVG components
+const AnimatedLikeIcon = Animated.createAnimatedComponent(LikeIcon);
+const AnimatedSaveIcon = Animated.createAnimatedComponent(SaveIcon);
+const AnimatedShareIcon = Animated.createAnimatedComponent(ShareIcon);
+const AnimatedShoppingIcon = Animated.createAnimatedComponent(ShoppingIcon);
 
 interface ActionButtonsProps {
     video: Video;
@@ -38,10 +47,28 @@ const HEARTBEAT_DURATION = 100;
 // Reusable Animated Button with Heartbeat (NO shadows)
 const ActionButton = memo(({ onPress, icon: Icon, count, isActive, activeColor }: any) => {
     const scale = useSharedValue(1);
+    const colorProgress = useSharedValue(isActive ? 1 : 0);
+
+    // Renk değişimini smooth yap (senkron)
+    useEffect(() => {
+        colorProgress.value = withSpring(isActive ? 1 : 0, {
+            damping: 15,
+            stiffness: 150,
+        });
+    }, [isActive]);
 
     const animatedStyle = useAnimatedStyle(() => ({
         transform: [{ scale: scale.value }],
     }));
+
+    const animatedProps = useAnimatedProps(() => {
+        const color = interpolateColor(
+            colorProgress.value,
+            [0, 1],
+            [WHITE, activeColor]
+        );
+        return { color };
+    });
 
     const handlePress = () => {
         scale.value = withSequence(
@@ -60,7 +87,7 @@ const ActionButton = memo(({ onPress, icon: Icon, count, isActive, activeColor }
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
             <Animated.View style={[styles.iconWrapper, animatedStyle]}>
-                <Icon width={ICON_SIZE} height={ICON_SIZE} color={isActive ? activeColor : WHITE} />
+                <Icon width={ICON_SIZE} height={ICON_SIZE} animatedProps={animatedProps} />
             </Animated.View>
             <Text style={styles.count}>{count}</Text>
         </Pressable>
@@ -80,7 +107,7 @@ export const ActionButtons = memo(function ActionButtons({
     return (
         <View style={[styles.container, { bottom }]} pointerEvents="box-none">
             <ActionButton
-                icon={LikeIcon}
+                icon={AnimatedLikeIcon}
                 count={formatCount(video.likesCount)}
                 onPress={onLike}
                 isActive={video.isLiked}
@@ -88,7 +115,7 @@ export const ActionButtons = memo(function ActionButtons({
             />
 
             <ActionButton
-                icon={SaveIcon}
+                icon={AnimatedSaveIcon}
                 count={formatCount(video.savesCount || 0)}
                 onPress={onSave}
                 isActive={video.isSaved}
@@ -96,7 +123,7 @@ export const ActionButtons = memo(function ActionButtons({
             />
 
             <ActionButton
-                icon={ShareIcon}
+                icon={AnimatedShareIcon}
                 count={formatCount(video.sharesCount)}
                 onPress={onShare}
                 isActive={false}
@@ -104,7 +131,7 @@ export const ActionButtons = memo(function ActionButtons({
             />
 
             <ActionButton
-                icon={ShoppingIcon}
+                icon={AnimatedShoppingIcon}
                 count={formatCount(video.shopsCount || 0)}
                 onPress={onShop}
                 isActive={false}

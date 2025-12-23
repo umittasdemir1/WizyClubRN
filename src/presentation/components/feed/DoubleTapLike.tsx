@@ -49,9 +49,9 @@ const DoubleTapLikeComponent = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
                 },
                 (finished) => {
                     if (finished) {
-                        // Animasyon bitince yavaşça kaybol
-                        scale.value = withDelay(100, withTiming(0, { duration: 150 }));
-                        opacity.value = withDelay(100, withTiming(0, { duration: 150 }));
+                        // Animasyon bitince HIZLI kaybol
+                        scale.value = withTiming(0, { duration: 80 });
+                        opacity.value = withTiming(0, { duration: 80 });
                     }
                 }
             );
