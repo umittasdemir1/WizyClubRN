@@ -38,8 +38,21 @@ import { UploadModal } from '../../src/presentation/components/feed/UploadModal'
 import { useUploadStore } from '../../src/presentation/store/useUploadStore';
 
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
+import { StoryBar } from '../../src/presentation/components/feed/StoryBar';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
+
+// Mock story users data
+const MOCK_STORY_USERS = [
+    { id: '1', username: 'zeynep.k', avatarUrl: 'https://i.pravatar.cc/150?img=1', hasUnseenStory: true },
+    { id: '2', username: 'ahmet_y', avatarUrl: 'https://i.pravatar.cc/150?img=2', hasUnseenStory: true },
+    { id: '3', username: 'elif.oz', avatarUrl: 'https://i.pravatar.cc/150?img=3', hasUnseenStory: false },
+    { id: '4', username: 'mehmet.a', avatarUrl: 'https://i.pravatar.cc/150?img=4', hasUnseenStory: true },
+    { id: '5', username: 'ayse_m', avatarUrl: 'https://i.pravatar.cc/150?img=5', hasUnseenStory: false },
+    { id: '6', username: 'can.demir', avatarUrl: 'https://i.pravatar.cc/150?img=6', hasUnseenStory: true },
+    { id: '7', username: 'selin.y', avatarUrl: 'https://i.pravatar.cc/150?img=7', hasUnseenStory: false },
+    { id: '8', username: 'burak_k', avatarUrl: 'https://i.pravatar.cc/150?img=8', hasUnseenStory: true },
+];
 
 const VIEWABILITY_CONFIG = {
     itemVisiblePercentThreshold: 60,
@@ -236,14 +249,18 @@ export default function FeedScreen() {
     }, []);
 
     const handleStoryPress = useCallback(() => {
-        router.push('/story/1');
-    }, [router]);
+        // Hikayeler tab'ına geç - bar açılır
+        setActiveTab('stories');
+    }, []);
 
     const handleTabChange = useCallback((tab: 'stories' | 'foryou') => {
         setActiveTab(tab);
-        if (tab === 'stories') {
-            router.push('/story/1');
-        }
+        // Story bar açılır/kapanır, route push yok artık
+    }, []);
+
+    const handleStoryAvatarPress = useCallback((userId: string) => {
+        // Belirli bir kullanıcının hikayesini aç
+        router.push(`/story/${userId}`);
     }, [router]);
 
     const handleOpenDescription = useCallback(() => {
@@ -519,6 +536,13 @@ export default function FeedScreen() {
                         hasUnseenStories={hasUnseenStories}
                     />
                 </Animated.View>
+
+                {/* Story Bar - Yukarıdan Slide Down */}
+                <StoryBar
+                    isVisible={activeTab === 'stories'}
+                    storyUsers={MOCK_STORY_USERS}
+                    onAvatarPress={handleStoryAvatarPress}
+                />
 
                 <UploadModal
                     isVisible={isUploadModalVisible}
