@@ -1,16 +1,24 @@
 import React, { useState, useRef, useEffect, useCallback, ComponentRef } from 'react';
-import { View, StyleSheet, Pressable, Dimensions } from 'react-native';
+import { View, StyleSheet, Pressable, Dimensions, ImageBackground } from 'react-native';
+import { BlurView } from 'expo-blur';
 import Video from 'react-native-video';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming, runOnJS } from 'react-native-reanimated';
+import Animated, {
+    useAnimatedStyle,
+    useSharedValue,
+    withTiming,
+    runOnJS,
+    useAnimatedReaction,
+} from 'react-native-reanimated';
 import { Story } from '../../../domain/entities/Story';
 import { StoryHeader } from './StoryHeader';
 import { StoryActions } from './StoryActions';
 import { FlyingEmoji } from './FlyingEmoji';
+import { VideoSeekBar } from '../feed/VideoSeekBar';
 
 const STORY_DURATION = 5000; // 5 seconds
 const HOLD_PAUSE_DELAY = 200; // 200ms like Instagram
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface StoryPageProps {
     story: Story;
@@ -43,52 +51,48 @@ export function StoryPage({
     currentStoryIndex,
 }: StoryPageProps) {
     const videoRef = useRef<ComponentRef<typeof Video>>(null);
-    const [progress, setProgress] = useState(0);
     const [isLiked, setIsLiked] = useState(story.isLiked || false);
     const [isSaved, setIsSaved] = useState(story.isSaved || false);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [flyingEmojis, setFlyingEmojis] = useState<FlyingEmojiData[]>([]);
-    const [resizeMode, setResizeMode] = useState<'cover' | 'contain'>('cover');
+    const [videoDimensions, setVideoDimensions] = useState({ width: 0, height: 0 });
 
     const holdTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const translateY = useSharedValue(0);
-    const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Detect aspect ratio for video sizing (like Instagram/TikTok)
-    useEffect(() => {
-        if (story.width && story.height) {
-            const aspectRatio = story.width / story.height;
-            // Vertical videos (< 0.8 aspect ratio) use cover, horizontal use contain
-            setResizeMode(aspectRatio < 0.8 ? 'cover' : 'contain');
-        }
-    }, [story.width, story.height]);
+    // Seekbar için shared values
+    const currentTime = useSharedValue(0);
+    const duration = useSharedValue(STORY_DURATION / 1000); // Convert to seconds
+    const progress = useSharedValue(0);
 
-    // Progress tracking
+    // Progress tracking - smooth 60fps
     useEffect(() => {
         if (!isActive || isPaused) {
-            if (progressIntervalRef.current) {
-                clearInterval(progressIntervalRef.current);
-            }
             return;
         }
 
-        setProgress(0);
+        progress.value = 0;
         const startTime = Date.now();
+        let animationFrame: number;
 
-        progressIntervalRef.current = setInterval(() => {
+        const updateProgress = () => {
             const elapsed = Date.now() - startTime;
             const newProgress = Math.min(elapsed / STORY_DURATION, 1);
-            setProgress(newProgress);
+            progress.value = newProgress;
+            currentTime.value = newProgress * (STORY_DURATION / 1000);
 
             if (newProgress >= 1) {
-                clearInterval(progressIntervalRef.current!);
                 onNext();
+            } else {
+                animationFrame = requestAnimationFrame(updateProgress);
             }
-        }, 16); // ~60fps
+        };
+
+        animationFrame = requestAnimationFrame(updateProgress);
 
         return () => {
-            if (progressIntervalRef.current) {
-                clearInterval(progressIntervalRef.current);
+            if (animationFrame) {
+                cancelAnimationFrame(animationFrame);
             }
         };
     }, [isActive, isPaused, onNext]);
@@ -96,10 +100,39 @@ export function StoryPage({
     // Reset state when story changes
     useEffect(() => {
         if (isActive) {
-            setProgress(0);
+            progress.value = 0;
+            currentTime.value = 0;
             setShowEmojiPicker(false);
         }
     }, [story.id, isActive]);
+
+    // Video dimensions for aspect ratio
+    const handleLoad = useCallback((data: any) => {
+        if (data.naturalSize) {
+            setVideoDimensions({
+                width: data.naturalSize.width,
+                height: data.naturalSize.height,
+            });
+        }
+    }, []);
+
+    // Calculate video style based on aspect ratio
+    const getVideoStyle = () => {
+        if (!videoDimensions.width || !videoDimensions.height) {
+            return styles.videoContain; // Default until loaded
+        }
+
+        const videoAspect = videoDimensions.width / videoDimensions.height;
+        const screenAspect = SCREEN_WIDTH / SCREEN_HEIGHT;
+
+        // Yatay video veya kare -> contain (alt üst siyah)
+        if (videoAspect >= 1 || Math.abs(videoAspect - 1) < 0.1) {
+            return styles.videoContain;
+        }
+
+        // Dikey video -> cover
+        return styles.videoCover;
+    };
 
     const handleHoldStart = useCallback(() => {
         holdTimeoutRef.current = setTimeout(() => {
@@ -131,35 +164,29 @@ export function StoryPage({
 
     const handleLike = useCallback(() => {
         setIsLiked(prev => !prev);
-        // TODO: Call API to like/unlike
     }, []);
 
     const handleSave = useCallback(() => {
         setIsSaved(prev => !prev);
-        // TODO: Call API to save/unsave
     }, []);
 
     const handleShare = useCallback(() => {
-        // TODO: Implement share functionality
         console.log('Share story');
     }, []);
 
     const handleShop = useCallback(() => {
-        // TODO: Implement shop navigation
         console.log('Open shop:', story.brandUrl);
     }, [story.brandUrl]);
 
     const handleEmojiSelect = useCallback((emoji: string) => {
-        // Create flying emoji at random position
         const newEmoji: FlyingEmojiData = {
             id: Date.now().toString(),
             emoji,
-            x: Math.random() * 200 + 100, // Random x between 100-300
-            y: SCREEN_HEIGHT * 0.5, // Start from middle
+            x: Math.random() * 200 + 100,
+            y: SCREEN_HEIGHT * 0.5,
         };
         setFlyingEmojis(prev => [...prev, newEmoji]);
 
-        // Remove emoji after animation completes
         setTimeout(() => {
             setFlyingEmojis(prev => prev.filter(e => e.id !== newEmoji.id));
         }, 2000);
@@ -168,7 +195,6 @@ export function StoryPage({
     }, []);
 
     const handleCommercialPress = useCallback(() => {
-        // TODO: Show commercial disclosure info
         console.log('Commercial disclosure:', story.commercialType, story.brandName);
     }, [story.commercialType, story.brandName]);
 
@@ -183,7 +209,7 @@ export function StoryPage({
             if (event.translationY > 100) {
                 runOnJS(onClose)();
             } else {
-                translateY.value = withTiming(0);
+                translateY.value = withTiming(0, { duration: 200 });
             }
         });
 
@@ -191,28 +217,53 @@ export function StoryPage({
         transform: [{ translateY: translateY.value }],
     }));
 
+    const handleSeek = useCallback((time: number) => {
+        // No seek functionality, only visual progress
+    }, []);
+
     return (
         <GestureDetector gesture={panGesture}>
             <Animated.View style={[styles.container, animatedStyle]}>
-                {/* Video Background */}
-                <Video
-                    ref={videoRef}
-                    source={{ uri: story.videoUrl }}
-                    style={styles.video}
-                    resizeMode={resizeMode}
-                    repeat={false}
-                    paused={isPaused || !isActive}
-                    muted={false}
-                />
+                {/* Blurred Background */}
+                <ImageBackground
+                    source={{ uri: story.thumbnailUrl }}
+                    style={StyleSheet.absoluteFill}
+                    blurRadius={50}
+                >
+                    <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+                </ImageBackground>
+
+                {/* Video - Centered with proper aspect ratio */}
+                <View style={styles.videoContainer}>
+                    <Video
+                        ref={videoRef}
+                        source={{ uri: story.videoUrl }}
+                        style={getVideoStyle()}
+                        resizeMode="contain"
+                        repeat={false}
+                        paused={isPaused || !isActive}
+                        muted={false}
+                        onLoad={handleLoad}
+                    />
+                </View>
 
                 {/* Header with progress bars */}
                 <StoryHeader
                     story={story}
-                    progress={progress}
+                    progress={progress.value}
                     totalStories={totalStories}
                     currentStoryIndex={currentStoryIndex}
                     onClose={onClose}
                     onCommercialPress={story.isCommercial ? handleCommercialPress : undefined}
+                />
+
+                {/* Seekbar - visual only, no seek functionality */}
+                <VideoSeekBar
+                    currentTime={currentTime}
+                    duration={duration}
+                    onSeek={handleSeek}
+                    isActive={isActive}
+                    bottomOffset={140}
                 />
 
                 {/* Tap Zones with Hold */}
@@ -264,15 +315,23 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: 'black',
     },
-    video: {
+    videoContainer: {
         flex: 1,
-        width: '100%',
-        height: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    videoCover: {
+        width: SCREEN_WIDTH,
+        height: SCREEN_HEIGHT,
+    },
+    videoContain: {
+        width: SCREEN_WIDTH,
+        height: SCREEN_HEIGHT,
     },
     tapZones: {
         position: 'absolute',
         top: 100,
-        bottom: 100,
+        bottom: 180,
         left: 0,
         right: 0,
         flexDirection: 'row',
