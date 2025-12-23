@@ -50,8 +50,6 @@ export function StoryPage({
 }: StoryPageProps) {
     const videoRef = useRef<ComponentRef<typeof Video>>(null);
     const [isLiked, setIsLiked] = useState(story.isLiked || false);
-    const [isSaved, setIsSaved] = useState(story.isSaved || false);
-    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [flyingEmojis, setFlyingEmojis] = useState<FlyingEmojiData[]>([]);
     const [videoDimensions, setVideoDimensions] = useState({ width: 0, height: 0 });
 
@@ -96,7 +94,6 @@ export function StoryPage({
     useEffect(() => {
         if (isActive) {
             progress.value = 0;
-            setShowEmojiPicker(false);
         }
     }, [story.id, isActive, progress]);
 
@@ -145,32 +142,20 @@ export function StoryPage({
     }, [isPaused, onPauseToggle]);
 
     const handleTapLeft = useCallback(() => {
-        if (!showEmojiPicker) {
-            onPrev();
-        }
-    }, [showEmojiPicker, onPrev]);
+        onPrev();
+    }, [onPrev]);
 
     const handleTapRight = useCallback(() => {
-        if (!showEmojiPicker) {
-            onNext();
-        }
-    }, [showEmojiPicker, onNext]);
+        onNext();
+    }, [onNext]);
 
     const handleLike = useCallback(() => {
         setIsLiked(prev => !prev);
     }, []);
 
-    const handleSave = useCallback(() => {
-        setIsSaved(prev => !prev);
-    }, []);
-
     const handleShare = useCallback(() => {
         console.log('Share story');
     }, []);
-
-    const handleShop = useCallback(() => {
-        console.log('Open shop:', story.brandUrl);
-    }, [story.brandUrl]);
 
     const handleEmojiSelect = useCallback((emoji: string) => {
         const newEmoji: FlyingEmojiData = {
@@ -184,8 +169,6 @@ export function StoryPage({
         setTimeout(() => {
             setFlyingEmojis(prev => prev.filter(e => e.id !== newEmoji.id));
         }, 2000);
-
-        setShowEmojiPicker(false);
     }, []);
 
     const handleCommercialPress = useCallback(() => {
@@ -266,14 +249,8 @@ export function StoryPage({
                 {/* Bottom Actions */}
                 <StoryActions
                     isLiked={isLiked}
-                    isSaved={isSaved}
-                    showEmojiPicker={showEmojiPicker}
-                    hasShop={!!story.brandUrl}
                     onLike={handleLike}
-                    onSave={handleSave}
                     onShare={handleShare}
-                    onShop={handleShop}
-                    onEmojiPickerToggle={() => setShowEmojiPicker(prev => !prev)}
                     onEmojiSelect={handleEmojiSelect}
                 />
 
