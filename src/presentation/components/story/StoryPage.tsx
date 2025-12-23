@@ -8,13 +8,11 @@ import Animated, {
     useSharedValue,
     withTiming,
     runOnJS,
-    useAnimatedReaction,
 } from 'react-native-reanimated';
 import { Story } from '../../../domain/entities/Story';
 import { StoryHeader } from './StoryHeader';
 import { StoryActions } from './StoryActions';
 import { FlyingEmoji } from './FlyingEmoji';
-import { VideoSeekBar } from '../feed/VideoSeekBar';
 
 const STORY_DURATION = 5000; // 5 seconds
 const HOLD_PAUSE_DELAY = 200; // 200ms like Instagram
@@ -59,13 +57,9 @@ export function StoryPage({
 
     const holdTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const translateY = useSharedValue(0);
-
-    // Seekbar için shared values
-    const currentTime = useSharedValue(0);
-    const duration = useSharedValue(STORY_DURATION / 1000); // Convert to seconds
     const progress = useSharedValue(0);
 
-    // Progress tracking - smooth 60fps
+    // Progress tracking - smooth 60fps (requestAnimationFrame)
     useEffect(() => {
         if (!isActive || isPaused) {
             return;
@@ -79,7 +73,6 @@ export function StoryPage({
             const elapsed = Date.now() - startTime;
             const newProgress = Math.min(elapsed / STORY_DURATION, 1);
             progress.value = newProgress;
-            currentTime.value = newProgress * (STORY_DURATION / 1000);
 
             if (newProgress >= 1) {
                 onNext();
@@ -101,7 +94,6 @@ export function StoryPage({
     useEffect(() => {
         if (isActive) {
             progress.value = 0;
-            currentTime.value = 0;
             setShowEmojiPicker(false);
         }
     }, [story.id, isActive]);
@@ -217,10 +209,6 @@ export function StoryPage({
         transform: [{ translateY: translateY.value }],
     }));
 
-    const handleSeek = useCallback((time: number) => {
-        // No seek functionality, only visual progress
-    }, []);
-
     return (
         <GestureDetector gesture={panGesture}>
             <Animated.View style={[styles.container, animatedStyle]}>
@@ -255,15 +243,6 @@ export function StoryPage({
                     currentStoryIndex={currentStoryIndex}
                     onClose={onClose}
                     onCommercialPress={story.isCommercial ? handleCommercialPress : undefined}
-                />
-
-                {/* Seekbar - visual only, no seek functionality */}
-                <VideoSeekBar
-                    currentTime={currentTime}
-                    duration={duration}
-                    onSeek={handleSeek}
-                    isActive={isActive}
-                    bottomOffset={140}
                 />
 
                 {/* Tap Zones with Hold */}
@@ -331,7 +310,7 @@ const styles = StyleSheet.create({
     tapZones: {
         position: 'absolute',
         top: 100,
-        bottom: 180,
+        bottom: 120,
         left: 0,
         right: 0,
         flexDirection: 'row',
