@@ -57,7 +57,7 @@ export function StoryPage({
 
     const holdTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const translateY = useSharedValue(0);
-    const progress = useSharedValue(0);
+    const [progressState, setProgressState] = useState(0);
 
     // Progress tracking - smooth 60fps (requestAnimationFrame)
     useEffect(() => {
@@ -65,14 +65,14 @@ export function StoryPage({
             return;
         }
 
-        progress.value = 0;
+        setProgressState(0);
         const startTime = Date.now();
         let animationFrame: number;
 
         const updateProgress = () => {
             const elapsed = Date.now() - startTime;
             const newProgress = Math.min(elapsed / STORY_DURATION, 1);
-            progress.value = newProgress;
+            setProgressState(newProgress);
 
             if (newProgress >= 1) {
                 onNext();
@@ -93,7 +93,7 @@ export function StoryPage({
     // Reset state when story changes
     useEffect(() => {
         if (isActive) {
-            progress.value = 0;
+            setProgressState(0);
             setShowEmojiPicker(false);
         }
     }, [story.id, isActive]);
@@ -238,7 +238,7 @@ export function StoryPage({
                 {/* Header with progress bars */}
                 <StoryHeader
                     story={story}
-                    progress={progress.value}
+                    progress={progressState}
                     totalStories={totalStories}
                     currentStoryIndex={currentStoryIndex}
                     onClose={onClose}
