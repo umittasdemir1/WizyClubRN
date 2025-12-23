@@ -47,7 +47,7 @@ const HEARTBEAT_DURATION = 100;
 // Reusable Animated Button with Heartbeat (NO shadows)
 const ActionButton = memo(({ onPress, icon: Icon, count, isActive, activeColor }: any) => {
     const scale = useSharedValue(1);
-    const colorProgress = useSharedValue(isActive ? 1 : 0);
+    const colorProgress = useSharedValue(0);
 
     // Renk değişimini smooth yap (senkron)
     useEffect(() => {
@@ -55,7 +55,7 @@ const ActionButton = memo(({ onPress, icon: Icon, count, isActive, activeColor }
             damping: 15,
             stiffness: 150,
         });
-    }, [isActive]);
+    }, [isActive, colorProgress]);
 
     const animatedStyle = useAnimatedStyle(() => ({
         transform: [{ scale: scale.value }],
