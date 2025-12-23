@@ -57,25 +57,27 @@ export function StoryPage({
 
     const holdTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const translateY = useSharedValue(0);
-    const [progressState, setProgressState] = useState(0);
 
-    // Progress tracking - smooth 60fps (requestAnimationFrame)
+    // SharedValue for smooth 60fps progress (no re-renders)
+    const progress = useSharedValue(0);
+
+    // Progress tracking - smooth 60fps using SharedValue (feed seekbar pattern)
     useEffect(() => {
         if (!isActive || isPaused) {
             return;
         }
 
-        setProgressState(0);
+        progress.value = 0;
         const startTime = Date.now();
         let animationFrame: number;
 
         const updateProgress = () => {
             const elapsed = Date.now() - startTime;
             const newProgress = Math.min(elapsed / STORY_DURATION, 1);
-            setProgressState(newProgress);
+            progress.value = newProgress;
 
             if (newProgress >= 1) {
-                onNext();
+                runOnJS(onNext)();
             } else {
                 animationFrame = requestAnimationFrame(updateProgress);
             }
@@ -88,15 +90,15 @@ export function StoryPage({
                 cancelAnimationFrame(animationFrame);
             }
         };
-    }, [isActive, isPaused, onNext]);
+    }, [isActive, isPaused, onNext, progress]);
 
     // Reset state when story changes
     useEffect(() => {
         if (isActive) {
-            setProgressState(0);
+            progress.value = 0;
             setShowEmojiPicker(false);
         }
-    }, [story.id, isActive]);
+    }, [story.id, isActive, progress]);
 
     // Video dimensions for aspect ratio
     const handleLoad = useCallback((data: any) => {
@@ -238,7 +240,7 @@ export function StoryPage({
                 {/* Header with progress bars */}
                 <StoryHeader
                     story={story}
-                    progress={progressState}
+                    progress={progress}
                     totalStories={totalStories}
                     currentStoryIndex={currentStoryIndex}
                     onClose={onClose}

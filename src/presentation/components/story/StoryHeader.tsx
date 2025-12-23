@@ -2,12 +2,13 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X } from 'lucide-react-native';
+import Animated, { useAnimatedStyle, SharedValue } from 'react-native-reanimated';
 import { Story } from '../../../domain/entities/Story';
 import { Avatar } from '../shared/Avatar';
 
 interface StoryHeaderProps {
     story: Story;
-    progress: number;
+    progress: SharedValue<number>;
     totalStories: number;
     currentStoryIndex: number;
     onClose: () => void;
@@ -33,6 +34,33 @@ const getTimeAgo = (dateString: string): string => {
     }
 };
 
+// Progress bar item component for smooth animation
+const ProgressBarItem = ({ index, currentStoryIndex, progress }: {
+    index: number;
+    currentStoryIndex: number;
+    progress: SharedValue<number>;
+}) => {
+    const animatedStyle = useAnimatedStyle(() => {
+        'worklet';
+        let barProgress = 0;
+        if (index < currentStoryIndex) {
+            barProgress = 1;
+        } else if (index === currentStoryIndex) {
+            barProgress = progress.value;
+        }
+
+        return {
+            width: `${barProgress * 100}%`,
+        };
+    });
+
+    return (
+        <View style={styles.progressBarBackground}>
+            <Animated.View style={[styles.progressBarFill, animatedStyle]} />
+        </View>
+    );
+};
+
 export function StoryHeader({
     story,
     progress,
@@ -47,25 +75,14 @@ export function StoryHeader({
         <View style={[styles.container, { paddingTop: insets.top + 10 }]} pointerEvents="box-none">
             {/* Progress Bars */}
             <View style={styles.progressContainer}>
-                {Array.from({ length: totalStories }).map((_, index) => {
-                    let barProgress = 0;
-                    if (index < currentStoryIndex) {
-                        barProgress = 1;
-                    } else if (index === currentStoryIndex) {
-                        barProgress = progress;
-                    }
-
-                    return (
-                        <View key={index} style={styles.progressBarBackground}>
-                            <View
-                                style={[
-                                    styles.progressBarFill,
-                                    { width: `${barProgress * 100}%` },
-                                ]}
-                            />
-                        </View>
-                    );
-                })}
+                {Array.from({ length: totalStories }).map((_, index) => (
+                    <ProgressBarItem
+                        key={index}
+                        index={index}
+                        currentStoryIndex={currentStoryIndex}
+                        progress={progress}
+                    />
+                ))}
             </View>
 
             {/* Header Info */}
