@@ -1,10 +1,11 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { View, StyleSheet, FlatList, Dimensions, ViewToken } from 'react-native';
+import { View, StyleSheet, Dimensions } from 'react-native';
 import { Story } from '../../../domain/entities/Story';
 import { StoryPage } from './StoryPage';
 import { useRouter } from 'expo-router';
+import PagerView from 'react-native-pager-view';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface StoryViewerProps {
     stories: Story[];
@@ -13,33 +14,13 @@ interface StoryViewerProps {
 
 export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
     const router = useRouter();
-    const flatListRef = useRef<FlatList>(null);
+    const pagerRef = useRef<PagerView>(null);
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
     const [isPaused, setIsPaused] = useState(false);
 
-    // Scroll to initial story
-    useEffect(() => {
-        if (initialIndex > 0 && flatListRef.current) {
-            flatListRef.current.scrollToIndex({ index: initialIndex, animated: false });
-        }
-    }, [initialIndex]);
-
-    const handleViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
-        if (viewableItems.length > 0) {
-            const index = viewableItems[0].index;
-            if (index !== null && index !== undefined) {
-                setCurrentIndex(index);
-            }
-        }
-    }, []);
-
-    const viewabilityConfig = useRef({
-        itemVisiblePercentThreshold: 50,
-    });
-
     const handleNext = useCallback(() => {
         if (currentIndex < stories.length - 1) {
-            flatListRef.current?.scrollToIndex({ index: currentIndex + 1, animated: true });
+            pagerRef.current?.setPage(currentIndex + 1);
         } else {
             // Last story, close viewer
             router.back();
@@ -48,7 +29,7 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
 
     const handlePrev = useCallback(() => {
         if (currentIndex > 0) {
-            flatListRef.current?.scrollToIndex({ index: currentIndex - 1, animated: true });
+            pagerRef.current?.setPage(currentIndex - 1);
         }
     }, [currentIndex]);
 
@@ -60,49 +41,37 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
         setIsPaused(paused);
     }, []);
 
-    const renderStory = useCallback(({ item, index }: { item: Story; index: number }) => {
-        const isActive = index === currentIndex;
-
-        return (
-            <View style={styles.storyContainer}>
-                <StoryPage
-                    story={item}
-                    isActive={isActive}
-                    isPaused={isPaused}
-                    onNext={handleNext}
-                    onPrev={handlePrev}
-                    onClose={handleClose}
-                    onPauseToggle={handlePauseToggle}
-                    totalStories={stories.length}
-                    currentStoryIndex={index}
-                />
-            </View>
-        );
-    }, [currentIndex, isPaused, handleNext, handlePrev, handleClose, handlePauseToggle, stories.length]);
+    const handlePageSelected = useCallback((e: any) => {
+        setCurrentIndex(e.nativeEvent.position);
+    }, []);
 
     return (
         <View style={styles.container}>
-            <FlatList
-                ref={flatListRef}
-                data={stories}
-                renderItem={renderStory}
-                keyExtractor={(item) => item.id}
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={false}
+            <PagerView
+                ref={pagerRef}
+                style={styles.pager}
+                initialPage={initialIndex}
+                onPageSelected={handlePageSelected}
+                orientation="horizontal"
+                overdrag={false}
                 scrollEnabled={true}
-                onViewableItemsChanged={handleViewableItemsChanged}
-                viewabilityConfig={viewabilityConfig.current}
-                getItemLayout={(data, index) => ({
-                    length: SCREEN_WIDTH,
-                    offset: SCREEN_WIDTH * index,
-                    index,
-                })}
-                initialScrollIndex={initialIndex}
-                windowSize={3}
-                maxToRenderPerBatch={2}
-                removeClippedSubviews={false}
-            />
+            >
+                {stories.map((story, index) => (
+                    <View key={story.id} style={styles.page}>
+                        <StoryPage
+                            story={story}
+                            isActive={index === currentIndex}
+                            isPaused={isPaused}
+                            onNext={handleNext}
+                            onPrev={handlePrev}
+                            onClose={handleClose}
+                            onPauseToggle={handlePauseToggle}
+                            totalStories={stories.length}
+                            currentStoryIndex={index}
+                        />
+                    </View>
+                ))}
+            </PagerView>
         </View>
     );
 }
@@ -112,8 +81,11 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: 'black',
     },
-    storyContainer: {
-        width: SCREEN_WIDTH,
+    pager: {
         flex: 1,
+    },
+    page: {
+        width: SCREEN_WIDTH,
+        height: SCREEN_HEIGHT,
     },
 });
