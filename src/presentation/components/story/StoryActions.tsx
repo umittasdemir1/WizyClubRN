@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LikeIcon from '../../../../assets/icons/like.svg';
 import ShareIcon from '../../../../assets/icons/share.svg';
+import { COLORS } from '../../../core/constants';
 
 interface StoryActionsProps {
     isLiked: boolean;
@@ -22,7 +23,7 @@ export function StoryActions({
     const insets = useSafeAreaInsets();
 
     return (
-        <View style={[styles.container, { paddingBottom: insets.bottom }]} pointerEvents="box-none">
+        <View style={[styles.container, { paddingBottom: insets.bottom +10 }]} pointerEvents="box-none">
             <View style={styles.actionBar}>
                 {/* Emoji Pill Area */}
                 <View style={styles.emojiContainer}>
@@ -69,15 +70,16 @@ export function StoryActions({
 const styles = StyleSheet.create({
     container: {
         width: '100%',
-        backgroundColor: '#262730',
+        backgroundColor: COLORS.videoBackground,
         paddingTop: 16,
     },
     actionBar: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 4,
         paddingHorizontal: 16,
         height: 80,
+        marginTop: -25, // Elements moved up without resizing the background
     },
     emojiContainer: {
         flex: 1,
@@ -87,11 +89,11 @@ const styles = StyleSheet.create({
         borderRadius: 22,
         backgroundColor: 'rgba(255, 255, 255, 0.05)',
         justifyContent: 'center',
-        paddingHorizontal: 4,
+        paddingHorizontal: 10,
     },
     emojiScrollContent: {
         alignItems: 'center',
-        gap: 2,
+        gap: 4,
     },
     emojiButton: {
         width: 40,
@@ -100,16 +102,16 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     emoji: {
-        fontSize: 24,
+        fontSize: 26,
     },
     buttons: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 4,
     },
     actionButton: {
-        width: 44,
-        height: 44,
+        width: 40,
+        height: 40,
         alignItems: 'center',
         justifyContent: 'center',
     },

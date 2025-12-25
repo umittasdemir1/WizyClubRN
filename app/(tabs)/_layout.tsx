@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
+import { COLORS } from '../../src/core/constants';
 
 // Import SVGs
 import HomeIcon from '../../assets/icons/home.svg';
@@ -20,8 +21,9 @@ export default function TabLayout() {
             screenOptions={{
                 headerShown: false,
                 tabBarStyle: {
-                    backgroundColor: isDark ? '#262730' : '#fefefe',
-                    borderTopWidth: 0,
+                    backgroundColor: isDark ? COLORS.background : '#fefefe',
+                    borderTopWidth: 0.5,
+                    borderTopColor: isDark ? COLORS.border : '#E5E5E5',
                     paddingTop: 8,
                     paddingBottom: insets.bottom + 2,
                     height: 50 + insets.bottom,

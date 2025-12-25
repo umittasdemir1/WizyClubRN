@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,6 @@ import {
 import PagerView from 'react-native-pager-view';
 import Video from 'react-native-video';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import { ProfileStats } from '../../src/presentation/components/profile/ProfileStats';
@@ -25,7 +24,7 @@ import { PostsGrid } from '../../src/presentation/components/profile/PostsGrid';
 import { BioBottomSheet } from '../../src/presentation/components/profile/BioBottomSheet';
 import { ClubsBottomSheet } from '../../src/presentation/components/profile/ClubsBottomSheet';
 import { SettingsBottomSheet } from '../../src/presentation/components/profile/SettingsBottomSheet';
-import { ChevronLeft, MoreVertical, Settings } from 'lucide-react-native';
+import { ChevronLeft, UserCog } from 'lucide-react-native';
 import BottomSheet from '@gorhom/bottom-sheet';
 import Svg, { Path, Circle } from 'react-native-svg';
 import Animated, {
@@ -34,13 +33,16 @@ import Animated, {
   withSequence,
   withTiming,
   Easing,
+  useAnimatedScrollHandler,
 } from 'react-native-reanimated';
 import LikeIcon from '../../assets/icons/like.svg';
 import ShareIcon from '../../assets/icons/share.svg';
-import { Image } from 'expo-image';
+import MoreIcon from '../../assets/icons/more.svg';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import { DeletedContentSheet } from '../../src/presentation/components/profile/DeletedContentSheet';
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
+import { LIGHT_COLORS, DARK_COLORS } from '../../src/core/constants';
+import { UserOptionsModal } from '../../src/presentation/components/profile/UserOptionsModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -136,6 +138,33 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { isDark, toggleTheme } = useThemeStore();
+  const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
+
+  // Collapsible Header Logic
+  const headerTranslateY = useSharedValue(0);
+  const lastScrollY = useSharedValue(0);
+  const headerHeight = 60 + insets.top;
+
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      const currentY = event.contentOffset.y;
+      const diff = currentY - lastScrollY.value;
+
+      if (currentY <= 0) {
+        headerTranslateY.value = withTiming(0, { duration: 200 });
+      } else if (diff > 10 && currentY > 50) {
+        headerTranslateY.value = withTiming(-headerHeight, { duration: 250 });
+      } else if (diff < -10) {
+        headerTranslateY.value = withTiming(0, { duration: 200 });
+      }
+      
+      lastScrollY.value = currentY;
+    },
+  });
+
+  const animatedHeaderStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: headerTranslateY.value }],
+  }));
 
   useFocusEffect(
     useCallback(() => {
@@ -146,7 +175,8 @@ export default function ProfileScreen() {
   const [isFollowing, setIsFollowing] = useState(false);
   const [isNotificationsOn, setIsNotificationsOn] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
-  const { videos: realVideos, refreshFeed } = useVideoFeed();
+  const [isUserOptionsVisible, setIsUserOptionsVisible] = useState(false);
+  const { videos, refreshFeed } = useVideoFeed();
   const [refreshing, setRefreshing] = useState(false);
   const [previewItem, setPreviewItem] = useState<{ id: string; thumbnail: string; videoUrl: string } | null>(null);
 
@@ -161,17 +191,17 @@ export default function ProfileScreen() {
     setRefreshing(false);
   }, [refreshFeed]);
 
-  // Theme colors
-  const bgBody = isDark ? '#121212' : '#e0e0e0';
-  const bgContainer = isDark ? '#000000' : '#ffffff';
-  const textPrimary = isDark ? '#ffffff' : '#000000';
-  const textSecondary = isDark ? '#888888' : '#555555';
-  const borderColor = isDark ? '#ffffff' : '#000000';
-  const cardBg = isDark ? '#1c1c1e' : '#f0f0f0';
-  const iconColor = isDark ? '#ffffff' : '#000000';
+  // Dynamic Theme Colors
+  const bgBody = themeColors.background;
+  const bgContainer = themeColors.background;
+  const textPrimary = themeColors.textPrimary;
+  const textSecondary = themeColors.textSecondary;
+  const borderColor = themeColors.border;
+  const cardBg = themeColors.card;
+  const iconColor = themeColors.textPrimary;
   const btnFollowBg = isDark ? '#ffffff' : '#000000';
   const btnFollowText = isDark ? '#000000' : '#ffffff';
-  const btnSecondaryBg = isDark ? '#1c1c1e' : '#f0f0f0';
+  const btnSecondaryBg = themeColors.card;
 
   // Static user data
   const user = {
@@ -183,18 +213,8 @@ export default function ProfileScreen() {
     followersCount: '1.2M',
   };
 
-  const followingAvatars = [
-    'https://i.pravatar.cc/100?img=3',
-    'https://i.pravatar.cc/100?img=4',
-    'https://i.pravatar.cc/100?img=5',
-  ];
-
-  const followersAvatars = [
-    'https://i.pravatar.cc/100?img=6',
-    'https://i.pravatar.cc/100?img=7',
-    'https://i.pravatar.cc/100?img=8',
-  ];
-
+  const followingAvatars = ['https://i.pravatar.cc/100?img=3', 'https://i.pravatar.cc/100?img=4', 'https://i.pravatar.cc/100?img=5'];
+  const followersAvatars = ['https://i.pravatar.cc/100?img=6', 'https://i.pravatar.cc/100?img=7', 'https://i.pravatar.cc/100?img=8'];
   const clubLogos = [
     'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Amazon_logo.svg/200px-Amazon_logo.svg.png',
     'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/Tesla_Motors.svg/200px-Tesla_Motors.svg.png',
@@ -205,9 +225,6 @@ export default function ProfileScreen() {
     { id: '1', name: 'Amazon', logo: clubLogos[0], collaborationCount: 12 },
     { id: '2', name: 'Tesla', logo: clubLogos[1], collaborationCount: 8 },
     { id: '3', name: 'Nike', logo: clubLogos[2], collaborationCount: 15 },
-    { id: '4', name: 'Apple', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Apple_logo_black.svg/200px-Apple_logo_black.svg.png', collaborationCount: 10 },
-    { id: '5', name: 'Adidas', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/20/Adidas_Logo.svg/200px-Adidas_Logo.svg.png', collaborationCount: 7 },
-    { id: '6', name: 'Coca-Cola', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/Coca-Cola_logo.svg/200px-Coca-Cola_logo.svg.png', collaborationCount: 5 },
   ];
 
   const highlights = [
@@ -216,212 +233,138 @@ export default function ProfileScreen() {
     { id: '3', title: 'Travel', thumbnail: 'https://picsum.photos/100/100?random=3' },
   ];
 
-  // Grid Dimensions
-  const PADDING = 1;
-  const GAP = 1;
-  const ITEM_WIDTH = Math.floor((SCREEN_WIDTH - (PADDING * 2) - (GAP * 2)) / 3);
-  const GRID_ROW_HEIGHT = ITEM_WIDTH + GAP;
-  const VIDEO_ROW_HEIGHT = (ITEM_WIDTH * (16 / 9)) + GAP;
-
-  // Data Mapping
-  const postsData = realVideos.map(v => ({
-    id: v.id,
-    thumbnail: v.thumbnailUrl,
-    views: v.likesCount?.toString() || '0',
-    type: 'video' as const,
-    videoUrl: v.videoUrl,
-  }));
-
-  const videosData = realVideos.map(v => ({
-    id: v.id,
-    thumbnail: v.thumbnailUrl,
-    views: v.likesCount?.toString() || '0',
-    videoUrl: v.videoUrl,
-  }));
-
+  const safeVideos = videos || [];
+  const postsData = safeVideos.map(v => ({ id: v.id, thumbnail: v.thumbnailUrl, views: v.likesCount?.toString() || '0', type: 'video' as const, videoUrl: v.videoUrl }));
+  const videosData = safeVideos.map(v => ({ id: v.id, thumbnail: v.thumbnailUrl, views: v.likesCount?.toString() || '0', videoUrl: v.videoUrl }));
   const tagsData: any[] = [];
 
-  // Pager State
   const pagerRef = useRef<PagerView>(null);
   const [activeTab, setActiveTab] = useState(0);
-
-  const gridHeight = Math.ceil(postsData.length / 3) * GRID_ROW_HEIGHT + 20;
-  const videosHeight = Math.ceil(videosData.length / 3) * VIDEO_ROW_HEIGHT + 20;
+  const gridHeight = Math.ceil(postsData.length / 3) * (Math.floor((SCREEN_WIDTH - 3) / 3) + 1) + 20;
+  const videosHeight = Math.ceil(videosData.length / 3) * (Math.floor((SCREEN_WIDTH - 3) / 3) * (16 / 9) + 1) + 20;
   const tagsHeight = 300;
 
-  const handleTabPress = (index: number) => {
-    setActiveTab(index);
-    pagerRef.current?.setPage(index);
-  };
-
-  const showPreview = (item: any) => {
-    setPreviewItem(item);
-  };
-
-  const hidePreview = () => {
-    setPreviewItem(null);
-  };
-
+  const handleTabPress = (index: number) => { setActiveTab(index); pagerRef.current?.setPage(index); };
+  const showPreview = (item: any) => setPreviewItem(item);
+  const hidePreview = () => setPreviewItem(null);
   const bioLimit = 110;
   const truncatedBio = user.bio.length > bioLimit ? user.bio.substring(0, bioLimit) + '...' : user.bio;
 
   return (
-    <SwipeWrapper
-      enableLeft={false}
-      onSwipeRight={() => router.push('/notifications')}
-      edgeOnly={true}
-    >
-      <View style={[styles.container, { backgroundColor: bgBody }]}>
-        <View style={[styles.mobileContainer, { backgroundColor: bgContainer, borderColor, paddingTop: insets.top }]}>
-          {/* Top Nav */}
-          <View style={styles.topNav}>
-            <TouchableOpacity style={styles.navIcon} onPress={() => router.back()}>
-              <ChevronLeft size={18} color={iconColor} />
+    <View style={[styles.container, { backgroundColor: bgBody }]}>
+      {/* 
+          TOP NAVIGATION - ANIMATED & INDEPENDENT
+      */}
+      <Animated.View style={[
+        styles.topNavContainer, 
+        { paddingTop: insets.top, backgroundColor: bgContainer },
+        animatedHeaderStyle
+      ]}>
+        <View style={styles.topNav}>
+          <TouchableOpacity style={styles.navIcon} onPress={() => router.back()}>
+            <ChevronLeft size={24} color={iconColor} />
+          </TouchableOpacity>
+          <Text style={[styles.headerUsername, { color: textPrimary }]}>@{user.username}</Text>
+          <TouchableOpacity 
+            style={styles.navIcon} 
+            onPress={() => settingsSheetRef.current?.expand()}
+            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+          >
+            <MoreIcon width={24} height={24} color={iconColor} />
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
+
+      <SwipeWrapper enableLeft={false} onSwipeRight={() => router.push('/notifications')} edgeOnly={true}>
+        <Animated.ScrollView
+          onScroll={scrollHandler}
+          scrollEventThrottle={16}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingTop: insets.top + 60 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={isDark ? "#fff" : "#000"} />}
+        >
+          <View style={styles.profileContainer}>
+            <ProfileStats followingCount={user.followingCount} followingAvatars={followingAvatars} followersCount={user.followersCount} followersAvatars={followersAvatars} mainAvatarUrl={user.avatarUrl} isDark={isDark} />
+            
+            <View style={styles.userNameRow}>
+              <Text style={[styles.userNameText, { color: textPrimary }]}>{user.name}</Text>
+              <VerifiedBadge />
+            </View>
+
+            <TouchableOpacity onPress={() => bioSheetRef.current?.expand()} disabled={user.bio.length <= bioLimit}>
+              <Text style={[styles.bioText, { color: textSecondary }]}>
+                {truncatedBio}
+                {user.bio.length > bioLimit && <Text style={{ color: textPrimary, fontWeight: '600' }}> devamını gör</Text>}
+              </Text>
             </TouchableOpacity>
-            <Text style={[styles.headerUsername, { color: textPrimary }]}>@{user.username}</Text>
-            <TouchableOpacity style={styles.navIcon} onPress={() => settingsSheetRef.current?.expand()}>
-              <MoreVertical size={18} color={iconColor} />
-            </TouchableOpacity>
+
+            <View style={styles.actionsContainer}>
+              <TouchableOpacity style={[styles.btnFollow, { backgroundColor: isFollowing ? btnSecondaryBg : btnFollowBg, borderColor: isFollowing ? textSecondary : 'transparent' }]} onPress={() => setIsFollowing(!isFollowing)}>
+                <Text style={[styles.btnFollowText, { color: isFollowing ? textPrimary : btnFollowText }]}>{isFollowing ? 'Takipte' : 'Takip Et'}</Text>
+              </TouchableOpacity>
+
+              {isFollowing && (
+                <TouchableOpacity style={[styles.btnIconOnly, { backgroundColor: btnSecondaryBg }]} onPress={() => setIsUserOptionsVisible(true)}>
+                  <UserCog size={18} color={iconColor} />
+                </TouchableOpacity>
+              )}
+
+              <View style={[styles.btnIconOnly, { backgroundColor: isLiked ? '#cc0000' : btnSecondaryBg }]}>
+                <AnimatedIconButton icon={LikeIcon} onPress={() => setIsLiked(!isLiked)} isActive={isLiked} activeColor="#fff" inactiveColor={iconColor} />
+              </View>
+              <View style={[styles.btnIconOnly, { backgroundColor: isNotificationsOn ? '#cc0000' : btnSecondaryBg }]}>
+                <AnimatedIconButton 
+                  icon={({ color, width, height }: any) => (
+                    <Svg width={width} height={height} viewBox="0 0 24 24" fill={color}><Path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" /></Svg>
+                  )} 
+                  onPress={() => setIsNotificationsOn(!isNotificationsOn)} isActive={isNotificationsOn} activeColor="#fff" inactiveColor={iconColor} 
+                />
+              </View>
+              <View style={[styles.btnIconOnly, { backgroundColor: btnSecondaryBg }]}>
+                <AnimatedIconButton icon={ShareIcon} onPress={() => console.log('Share')} inactiveColor={iconColor} />
+              </View>
+            </View>
+
+            <ClubsCollaboration clubsCount={clubs.length} clubLogos={clubLogos} isDark={isDark} onPress={() => clubsSheetRef.current?.expand()} />
+            <SocialTags isDark={isDark} />
           </View>
 
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={isDark ? "#fff" : "#000"} />}
-          >
-            <View style={styles.profileContainer}>
-              <ProfileStats
-                followingCount={user.followingCount}
-                followingAvatars={followingAvatars}
-                followersCount={user.followersCount}
-                followersAvatars={followersAvatars}
-                mainAvatarUrl={user.avatarUrl}
-                isDark={isDark}
-              />
+          <View style={[styles.navTabs, { borderBottomColor: cardBg }]}>
+            <TouchableOpacity style={[styles.tab, activeTab === 0 && [styles.activeTab, { borderBottomColor: textPrimary }]]} onPress={() => handleTabPress(0)}><GridIcon color={activeTab === 0 ? textPrimary : textSecondary} /></TouchableOpacity>
+            <TouchableOpacity style={[styles.tab, activeTab === 1 && [styles.activeTab, { borderBottomColor: textPrimary }]]} onPress={() => handleTabPress(1)}><VideoIcon color={activeTab === 1 ? textPrimary : textSecondary} /></TouchableOpacity>
+            <TouchableOpacity style={[styles.tab, activeTab === 2 && [styles.activeTab, { borderBottomColor: textPrimary }]]} onPress={() => handleTabPress(2)}><TagsIcon color={activeTab === 2 ? textPrimary : textSecondary} /></TouchableOpacity>
+          </View>
 
-              <View style={styles.userNameRow}>
-                <Text style={[styles.userNameText, { color: textPrimary }]}>{user.name}</Text>
-                <VerifiedBadge />
-              </View>
+          <HighlightPills highlights={highlights} isDark={isDark} />
 
-              <TouchableOpacity onPress={() => bioSheetRef.current?.expand()} disabled={user.bio.length <= bioLimit}>
-                <Text style={[styles.bioText, { color: textSecondary }]}>
-                  {truncatedBio}
-                  {user.bio.length > bioLimit && <Text style={{ color: textPrimary, fontWeight: '600' }}> devamını gör</Text>}
-                </Text>
-              </TouchableOpacity>
-
-              {/* Action Buttons */}
-              <View style={styles.actionsContainer}>
-                <TouchableOpacity
-                  style={[styles.btnFollow, { backgroundColor: isFollowing ? btnSecondaryBg : btnFollowBg, borderColor: isFollowing ? textSecondary : 'transparent' }]}
-                  onPress={() => setIsFollowing(!isFollowing)}
-                >
-                  <Text style={[styles.btnFollowText, { color: isFollowing ? textPrimary : btnFollowText }]}>
-                    {isFollowing ? 'Takipte' : 'Takip Et'}
-                  </Text>
-                </TouchableOpacity>
-
-                {isFollowing && (
-                  <TouchableOpacity style={[styles.btnIconOnly, { backgroundColor: btnSecondaryBg }]} onPress={() => settingsSheetRef.current?.expand()}>
-                    <Settings size={18} color={iconColor} />
-                  </TouchableOpacity>
-                )}
-
-                <View style={[styles.btnIconOnly, { backgroundColor: isLiked ? '#cc0000' : btnSecondaryBg }]}>
-                  <AnimatedIconButton
-                    icon={LikeIcon}
-                    onPress={() => setIsLiked(!isLiked)}
-                    isActive={isLiked}
-                    activeColor="#fff"
-                    inactiveColor={iconColor}
-                  />
-                </View>
-
-                <View style={[styles.btnIconOnly, { backgroundColor: isNotificationsOn ? '#cc0000' : btnSecondaryBg }]}>
-                  <AnimatedIconButton
-                    icon={({ color, width, height }: any) => (
-                      <Svg width={width} height={height} viewBox="0 0 24 24" fill={color}>
-                        <Path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
-                      </Svg>
-                    )}
-                    onPress={() => setIsNotificationsOn(!isNotificationsOn)}
-                    isActive={isNotificationsOn}
-                    activeColor="#fff"
-                    inactiveColor={iconColor}
-                  />
-                </View>
-
-                <View style={[styles.btnIconOnly, { backgroundColor: btnSecondaryBg }]}>
-                  <AnimatedIconButton icon={ShareIcon} onPress={() => console.log('Share')} inactiveColor={iconColor} />
-                </View>
-              </View>
-
-              <ClubsCollaboration clubsCount={clubs.length} clubLogos={clubLogos} isDark={isDark} onPress={() => clubsSheetRef.current?.expand()} />
-              <SocialTags isDark={isDark} />
+          <PagerView ref={pagerRef} style={{ width: '100%', height: activeTab === 0 ? gridHeight : activeTab === 1 ? videosHeight : tagsHeight }} initialPage={0} onPageSelected={(e) => setActiveTab(e.nativeEvent.position)}>
+            <View key="0"><PostsGrid posts={postsData} isDark={isDark} onPreview={showPreview} onPreviewEnd={hidePreview} /></View>
+            <View key="1"><VideoGrid videos={videosData} isDark={isDark} onPreview={showPreview} onPreviewEnd={hidePreview} /></View>
+            <View key="2">
+              <PostsGrid posts={tagsData} isDark={isDark} onPreview={showPreview} onPreviewEnd={hidePreview} />
+              {tagsData.length === 0 && <View style={{ padding: 40, alignItems: 'center' }}><Text style={{ color: textSecondary }}>Etiketlenmiş gönderi yok</Text></View>}
             </View>
+          </PagerView>
+          <View style={{ height: 100 }} />
+        </Animated.ScrollView>
+      </SwipeWrapper>
 
-            {/* Tabs */}
-            <View style={[styles.navTabs, { borderBottomColor: cardBg }]}>
-              <TouchableOpacity style={[styles.tab, activeTab === 0 && [styles.activeTab, { borderBottomColor: textPrimary }]]} onPress={() => handleTabPress(0)}>
-                <GridIcon color={activeTab === 0 ? textPrimary : textSecondary} />
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.tab, activeTab === 1 && [styles.activeTab, { borderBottomColor: textPrimary }]]} onPress={() => handleTabPress(1)}>
-                <VideoIcon color={activeTab === 1 ? textPrimary : textSecondary} />
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.tab, activeTab === 2 && [styles.activeTab, { borderBottomColor: textPrimary }]]} onPress={() => handleTabPress(2)}>
-                <TagsIcon color={activeTab === 2 ? textPrimary : textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            <HighlightPills highlights={highlights} isDark={isDark} />
-
-            <PagerView
-              ref={pagerRef}
-              style={{ width: '100%', height: activeTab === 0 ? gridHeight : activeTab === 1 ? videosHeight : tagsHeight }}
-              initialPage={0}
-              onPageSelected={(e) => setActiveTab(e.nativeEvent.position)}
-            >
-              <View key="0">
-                <PostsGrid posts={postsData} isDark={isDark} onPreview={showPreview} onPreviewEnd={hidePreview} />
-              </View>
-              <View key="1">
-                <VideoGrid videos={videosData} isDark={isDark} onPreview={showPreview} onPreviewEnd={hidePreview} />
-              </View>
-              <View key="2">
-                <PostsGrid posts={tagsData} isDark={isDark} onPreview={showPreview} onPreviewEnd={hidePreview} />
-                {tagsData.length === 0 && (
-                  <View style={{ padding: 40, alignItems: 'center' }}>
-                    <Text style={{ color: textSecondary }}>Etiketlenmiş gönderi yok</Text>
-                  </View>
-                )}
-              </View>
-            </PagerView>
-
-            <View style={{ height: 100 }} />
-          </ScrollView>
-        </View>
-
-        {previewItem && <PreviewModal item={previewItem} onClose={hidePreview} />}
-
-        <BioBottomSheet ref={bioSheetRef} bio={user.bio} isDark={isDark} />
-        <ClubsBottomSheet ref={clubsSheetRef} clubs={clubs} isDark={isDark} />
-        <SettingsBottomSheet
-          ref={settingsSheetRef}
-          isDark={isDark}
-          onThemeToggle={toggleTheme}
-          onDeletedContentPress={() => deletedContentSheetRef.current?.expand()}
-        />
-        <DeletedContentSheet ref={deletedContentSheetRef} isDark={isDark} />
-      </View>
-    </SwipeWrapper>
+      {/* Overlays & Modals */}
+      {previewItem && <PreviewModal item={previewItem} onClose={hidePreview} />}
+      <BioBottomSheet ref={bioSheetRef} bio={user.bio} isDark={isDark} />
+      <ClubsBottomSheet ref={clubsSheetRef} clubs={clubs} isDark={isDark} />
+      <SettingsBottomSheet ref={settingsSheetRef} isDark={isDark} onThemeToggle={toggleTheme} onDeletedContentPress={() => deletedContentSheetRef.current?.expand()} />
+      <DeletedContentSheet ref={deletedContentSheetRef} isDark={isDark} />
+      <UserOptionsModal visible={isUserOptionsVisible} username={user.username} onClose={() => setIsUserOptionsVisible(false)} onAction={(type) => console.log('User action:', type)} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  mobileContainer: { flex: 1, overflow: 'hidden' },
+  topNavContainer: { width: '100%', zIndex: 1000, position: 'absolute', top: 0, left: 0, right: 0 },
   topNav: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, height: 60 },
-  navIcon: { width: 35, height: 35, alignItems: 'center', justifyContent: 'center', borderRadius: 17.5 },
+  navIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   headerUsername: { fontSize: 16, fontWeight: '600', flex: 1, textAlign: 'center' },
   profileContainer: { alignItems: 'center', paddingHorizontal: 10, marginTop: 5 },
   userNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },

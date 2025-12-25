@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ShoppingBag, User, Heart, Bell } from 'lucide-react-native';
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
+import { COLORS } from '../../src/core/constants';
 
 interface Notification {
     id: string;
@@ -31,8 +32,8 @@ export default function NotificationsScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
 
-    const bgBody = isDark ? '#000000' : '#f9fafb';
-    const textColor = isDark ? '#FFFFFF' : '#000000';
+    const bgBody = isDark ? COLORS.background : '#f9fafb';
+    const textColor = isDark ? COLORS.textPrimary : '#000000';
 
     useFocusEffect(
         useCallback(() => {
@@ -57,7 +58,7 @@ export default function NotificationsScreen() {
             case 'like':
                 return <Heart size={iconSize} color={isDark ? '#ef4444' : '#dc2626'} />;
             default:
-                return <Bell size={iconSize} color={isDark ? '#FFFFFF' : '#4b5563'} />;
+                return <Bell size={iconSize} color={isDark ? COLORS.textPrimary : '#4b5563'} />;
         }
     };
 
@@ -92,7 +93,7 @@ export default function NotificationsScreen() {
                             style={[
                                 styles.title,
                                 {
-                                    color: isDark ? '#FFFFFF' : '#111827',
+                                    color: isDark ? COLORS.textPrimary : '#111827',
                                     fontWeight: item.read ? '500' : '700',
                                 }
                             ]}

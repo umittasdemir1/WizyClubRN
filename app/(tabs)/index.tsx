@@ -11,6 +11,7 @@ import {
     Alert,
     StatusBar as RNStatusBar,
     ScrollView,
+    Pressable,
 } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -39,6 +40,8 @@ import { useUploadStore } from '../../src/presentation/store/useUploadStore';
 
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
 import { StoryBar } from '../../src/presentation/components/feed/StoryBar';
+
+import { COLORS } from '../../src/core/constants';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -257,8 +260,34 @@ export default function FeedScreen() {
 
     const handleTabChange = useCallback((tab: 'stories' | 'foryou') => {
         setActiveTab(tab);
-        // Story bar açılır/kapanır, route push yok artık
-    }, []);
+        // Bar açıldığında videoyu HEMEN duraklat
+        const isPaused = useActiveVideoStore.getState().isPaused;
+        if (tab === 'stories') {
+            if (!isPaused) {
+                togglePause();
+            }
+        } 
+        // Kapanma durumunda (foryou) video resume işlemini StoryBar'ın 
+        // onClose callback'i içinde animasyondan sonra yapacağız.
+    }, [togglePause]);
+
+    const handleCloseStoryBar = useCallback(() => {
+        setActiveTab('foryou');
+        // Animasyonun bitmesini bekleyip (yaklaşık 250-300ms) videoyu başlatıyoruz
+        setTimeout(() => {
+            if (useActiveVideoStore.getState().isPaused) {
+                togglePause();
+            }
+        }, 300);
+    }, [togglePause]);
+
+    const handleFeedTap = useCallback(() => {
+        if (activeTab === 'stories') {
+            handleCloseStoryBar();
+        } else {
+            togglePause();
+        }
+    }, [activeTab, handleCloseStoryBar, togglePause]);
 
     const handleStoryAvatarPress = useCallback((userId: string) => {
         // Belirli bir kullanıcının hikayesini aç
@@ -345,7 +374,7 @@ export default function FeedScreen() {
                 <DoubleTapLike
                     ref={doubleTapRef}
                     onDoubleTap={() => handleDoubleTapLike(video.id)}
-                    onSingleTap={togglePause}
+                    onSingleTap={handleFeedTap}
                 >
                     <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]}>
                         <VideoLayer
@@ -548,7 +577,16 @@ export default function FeedScreen() {
                     isVisible={activeTab === 'stories'}
                     storyUsers={MOCK_STORY_USERS}
                     onAvatarPress={handleStoryAvatarPress}
+                    onClose={handleCloseStoryBar}
                 />
+
+                {/* Touch Interceptor Overlay - Appears only when bar is open */}
+                {activeTab === 'stories' && (
+                    <Pressable 
+                        style={styles.touchInterceptor} 
+                        onPress={handleCloseStoryBar}
+                    />
+                )}
 
                 <UploadModal
                     isVisible={isUploadModalVisible}
@@ -589,7 +627,7 @@ export default function FeedScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#000000',
+        backgroundColor: COLORS.background,
     },
     itemContainer: {
         width: SCREEN_WIDTH,
@@ -601,12 +639,12 @@ const styles = StyleSheet.create({
         bottom: 120,
         zIndex: 30,
     },
-    loadingContainer: { flex: 1, backgroundColor: '#000' },
+    loadingContainer: { flex: 1, backgroundColor: COLORS.videoBackground },
     loadingText: { color: '#FFF', marginTop: 16 },
-    errorContainer: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
+    errorContainer: { flex: 1, backgroundColor: COLORS.background, justifyContent: 'center', alignItems: 'center' },
     errorText: { color: 'red', marginBottom: 16 },
     retryText: { color: '#FFF', textDecorationLine: 'underline' },
-    emptyContainer: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
+    emptyContainer: { flex: 1, backgroundColor: COLORS.background, justifyContent: 'center', alignItems: 'center' },
     emptyText: { color: '#FFF' },
     emptySubtext: { color: '#aaa' },
     footerLoader: {
@@ -614,5 +652,10 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: 'transparent'
-    }
+    },
+    touchInterceptor: {
+        ...StyleSheet.absoluteFillObject,
+        zIndex: 999, // Just below StoryBar (1000) but above everything else
+        backgroundColor: 'transparent',
+    },
 });

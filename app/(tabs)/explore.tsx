@@ -13,6 +13,7 @@ import { TrendingCarousel } from '../../src/presentation/components/explore/Tren
 import { MasonryFeed } from '../../src/presentation/components/explore/MasonryFeed';
 import { useActiveVideoStore } from '../../src/presentation/store/useActiveVideoStore';
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
+import { LIGHT_COLORS, DARK_COLORS } from '../../src/core/constants';
 
 const CATEGORIES = ['Senin İçin', 'Takip Edilen', 'Popüler'];
 
@@ -21,7 +22,8 @@ export default function ExploreScreen() {
     const router = useRouter();
     const { videos, refreshFeed } = useVideoFeed();
     const isDark = useThemeStore((state) => state.isDark);
-    const bgBody = isDark ? '#08080A' : '#F5F5F7';
+    const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
+    const bgBody = themeColors.background;
     const setActiveVideo = useActiveVideoStore((state) => state.setActiveVideo);
 
     const [selectedCategory, setSelectedCategory] = useState('Senin İçin');

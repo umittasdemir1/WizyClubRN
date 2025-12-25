@@ -7,6 +7,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
 import { Search } from 'lucide-react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
+import { COLORS } from '../../src/core/constants';
 import {
     HeroBannerCarousel,
     CategoryCard,
@@ -23,7 +24,7 @@ export default function DealsScreen() {
     const [refreshing, setRefreshing] = useState(false);
 
     const isDark = useThemeStore((state) => state.isDark);
-    const bgBody = isDark ? '#08080A' : '#FFFFFF';
+    const bgBody = isDark ? COLORS.background : '#FFFFFF';
     const textColor = isDark ? '#FFFFFF' : '#111827';
 
     useFocusEffect(

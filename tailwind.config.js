@@ -25,18 +25,18 @@ module.exports = {
         'profile-indigo': '#312E81',
 
         // Sheets
-        'sheet-dark': '#18181B',
-        'sheet-dark-lighter': '#121212',
+        'sheet-dark': '#121212',
+        'sheet-dark-lighter': '#1C1C1E',
         
         // Theme Colors
-        'theme-dark': '#262730',
+        'theme-dark': '#000000',
         'theme-light': '#fefefe',
 
         primary: '#FF3B30',
         accent: '#7C3AED',
-        muted: '#94A3B8',
-        bg: '#0B0B0F',
-        card: '#111827'
+        muted: '#8E8E93',
+        bg: '#000000',
+        card: '#121212'
       }
     }
   },

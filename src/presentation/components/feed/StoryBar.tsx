@@ -4,13 +4,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
-    withSpring,
     withTiming,
+    runOnJS,
 } from 'react-native-reanimated';
+import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { StoryAvatar } from './StoryAvatar';
 import { BlurView } from 'expo-blur';
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
 const BAR_HEIGHT = 110;
 
 interface StoryUser {
@@ -24,12 +24,14 @@ interface StoryBarProps {
     isVisible: boolean;
     storyUsers: StoryUser[];
     onAvatarPress: (userId: string) => void;
+    onClose: () => void;
 }
 
 export const StoryBar = memo(function StoryBar({
     isVisible,
     storyUsers,
     onAvatarPress,
+    onClose,
 }: StoryBarProps) {
     const insets = useSafeAreaInsets();
     const translateY = useSharedValue(-BAR_HEIGHT);
@@ -40,25 +42,47 @@ export const StoryBar = memo(function StoryBar({
     useEffect(() => {
         if (isVisible) {
             setShouldRender(true);
-            translateY.value = withSpring(0, {
-                damping: 20,
-                stiffness: 120,
-            });
-            opacity.value = withTiming(1, { duration: 200 });
+            translateY.value = withTiming(0, { duration: 300 });
+            opacity.value = withTiming(1, { duration: 250 });
         } else {
-            translateY.value = withTiming(-BAR_HEIGHT, { duration: 250 });
+            // Kapanırken bitiş callback'i kullanıyoruz
             opacity.value = withTiming(0, { duration: 200 });
-            // Delay unmount until animation completes
-            setTimeout(() => setShouldRender(false), 250);
+            translateY.value = withTiming(-BAR_HEIGHT, { duration: 250 }, (finished) => {
+                if (finished) {
+                    runOnJS(setShouldRender)(false);
+                }
+            });
         }
     }, [isVisible]);
+
+    const panGesture = Gesture.Pan()
+        .onUpdate((event) => {
+            if (event.translationY < 0) {
+                translateY.value = event.translationY;
+            }
+        })
+        .onEnd((event) => {
+            // Yukarı yeterince hızlı veya yeterince çok çekilirse
+            if (event.translationY < -30 || event.velocityY < -500) {
+                // Kapanma animasyonunu başlat
+                opacity.value = withTiming(0, { duration: 200 });
+                translateY.value = withTiming(-BAR_HEIGHT, { duration: 250 }, (finished) => {
+                    if (finished) {
+                        runOnJS(setShouldRender)(false);
+                        runOnJS(onClose)(); // Video ancak şimdi başlayabilir
+                    }
+                });
+            } else {
+                // Yeterli değilse geri yerine oturt
+                translateY.value = withTiming(0, { duration: 200 });
+            }
+        });
 
     const animatedStyle = useAnimatedStyle(() => ({
         transform: [{ translateY: translateY.value }],
         opacity: opacity.value,
     }));
 
-    // İzlenmemiş hikayeleri öne al
     const sortedUsers = useMemo(() => {
         return [...storyUsers].sort((a, b) => {
             if (a.hasUnseenStory && !b.hasUnseenStory) return -1;
@@ -67,43 +91,42 @@ export const StoryBar = memo(function StoryBar({
         });
     }, [storyUsers]);
 
-    if (!shouldRender) {
-        return null; // Performans için unmount
-    }
+    if (!shouldRender) return null;
 
     return (
-        <Animated.View
-            style={[
-                styles.container,
-                {
-                    paddingTop: insets.top,
-                    height: BAR_HEIGHT + insets.top,
-                },
-                animatedStyle,
-            ]}
-            pointerEvents={isVisible ? 'auto' : 'none'}
-        >
-            <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
-
-            <View style={styles.content}>
-                <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.scrollContent}
-                    decelerationRate="fast"
-                >
-                    {sortedUsers.map((user) => (
-                        <StoryAvatar
-                            key={user.id}
-                            username={user.username}
-                            avatarUrl={user.avatarUrl}
-                            hasUnseenStory={user.hasUnseenStory}
-                            onPress={() => onAvatarPress(user.id)}
-                        />
-                    ))}
-                </ScrollView>
-            </View>
-        </Animated.View>
+        <GestureDetector gesture={panGesture}>
+            <Animated.View
+                style={[
+                    styles.container,
+                    {
+                        paddingTop: insets.top,
+                        height: BAR_HEIGHT + insets.top,
+                    },
+                    animatedStyle,
+                ]}
+                pointerEvents={isVisible ? 'auto' : 'none'}
+            >
+                <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+                <View style={styles.content}>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.scrollContent}
+                        decelerationRate="fast"
+                    >
+                        {sortedUsers.map((user) => (
+                            <StoryAvatar
+                                key={user.id}
+                                username={user.username}
+                                avatarUrl={user.avatarUrl}
+                                hasUnseenStory={user.hasUnseenStory}
+                                onPress={() => onAvatarPress(user.id)}
+                            />
+                        ))}
+                    </ScrollView>
+                </View>
+            </Animated.View>
+        </GestureDetector>
     );
 });
 
@@ -127,3 +150,4 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
 });
+

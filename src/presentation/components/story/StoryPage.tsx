@@ -16,6 +16,7 @@ import { Story } from '../../../domain/entities/Story';
 import { StoryHeader } from './StoryHeader';
 import { StoryActions } from './StoryActions';
 import { FlyingEmoji } from './FlyingEmoji';
+import { COLORS } from '../../../core/constants';
 
 const STORY_DURATION = 5000; // 5 seconds
 const HOLD_PAUSE_DELAY = 200; // 200ms like Instagram
@@ -192,17 +193,8 @@ export function StoryPage({
     return (
         <GestureDetector gesture={panGesture}>
             <Animated.View style={[styles.container, animatedStyle]}>
-                {/* Blurred Background */}
-                <ImageBackground
-                    source={{ uri: story.thumbnailUrl }}
-                    style={StyleSheet.absoluteFill}
-                    blurRadius={50}
-                >
-                    <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
-                </ImageBackground>
-
                 {/* Top Spacer for Safe Area (simulating 8mm gap) */}
-                <View style={{ height: insets.top + 30, backgroundColor: '#262730', width: '100%' }} />
+                <View style={{ height: insets.top + 30, backgroundColor: COLORS.videoBackground, width: '100%' }} />
 
                 {/* Video Container - Fills available space above the bar */}
                 <View style={styles.videoContainer}>
@@ -269,7 +261,7 @@ export function StoryPage({
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#262730',
+        backgroundColor: COLORS.videoBackground,
     },
     videoContainer: {
         flex: 1,

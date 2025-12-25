@@ -72,7 +72,7 @@ export function StoryHeader({
     const insets = useSafeAreaInsets();
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top + 10 }]} pointerEvents="box-none">
+        <View style={[styles.container, { paddingTop: insets.top + 40 }]} pointerEvents="box-none">
             {/* Progress Bars */}
             <View style={styles.progressContainer}>
                 {Array.from({ length: totalStories }).map((_, index) => (

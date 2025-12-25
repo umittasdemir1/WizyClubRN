@@ -23,11 +23,11 @@ export function PopularDealCard({
     onPress,
     isDark = false,
 }: PopularDealCardProps) {
-    const cardBg = isDark ? '#1a1a1a' : '#f9fafb';
-    const textPrimary = isDark ? '#FFFFFF' : '#111827';
+    const cardBg = isDark ? '#121212' : '#f9fafb';
+    const textPrimary = isDark ? '#FFFFFF' : '#1C1C1E';
     const textSecondary = isDark ? '#9ca3af' : '#6b7280';
     const textMuted = isDark ? '#6b7280' : '#9ca3af';
-    const dividerColor = isDark ? '#374151' : '#d1d5db';
+    const dividerColor = isDark ? '#262626' : '#d1d5db';
 
     return (
         <TouchableOpacity

@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.5)',
     },
     content: {
-        backgroundColor: '#111827',
+        backgroundColor: '#1E293B',
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
         padding: 24,
@@ -317,10 +317,10 @@ const styles = StyleSheet.create({
     },
     videoSelect: {
         height: 120,
-        backgroundColor: '#1F2937',
+        backgroundColor: '#262626',
         borderRadius: 16,
         borderWidth: 1,
-        borderColor: '#374151',
+        borderColor: '#333333',
         borderStyle: 'dashed',
         justifyContent: 'center',
         alignItems: 'center',
@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
         fontSize: 12,
     },
     input: {
-        backgroundColor: '#1F2937',
+        backgroundColor: '#262626',
         borderRadius: 12,
         padding: 16,
         color: 'white',
@@ -372,7 +372,7 @@ const styles = StyleSheet.create({
         marginTop: 8,
     },
     disabledButton: {
-        backgroundColor: '#374151',
+        backgroundColor: '#262626',
         opacity: 0.5,
     },
     uploadButtonText: {
@@ -388,9 +388,9 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 8,
         borderRadius: 20,
-        backgroundColor: '#374151',
+        backgroundColor: '#262626',
         borderWidth: 1,
-        borderColor: '#4B5563',
+        borderColor: '#333333',
     },
     activeChip: {
         backgroundColor: '#FF3B30',
@@ -409,7 +409,7 @@ const styles = StyleSheet.create({
     },
     disabledInput: {
         opacity: 0.5,
-        backgroundColor: '#111827',
+        backgroundColor: '#121212',
     },
     checkboxRow: {
         flexDirection: 'row',
