@@ -17,7 +17,7 @@ export const ClubsCollaboration: React.FC<ClubsCollaborationProps> = ({
 }) => {
     const textColor = isDark ? '#fff' : '#000';
     const subtitleColor = isDark ? '#888' : '#555';
-    const borderColor = isDark ? '#000' : '#fff';
+    const borderColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
 
     return (
         <TouchableOpacity
@@ -34,6 +34,7 @@ export const ClubsCollaboration: React.FC<ClubsCollaborationProps> = ({
                             {
                                 zIndex: 10 - index,
                                 borderColor: borderColor,
+                                marginLeft: index === 0 ? 0 : -12, // More overlap for a tighter look
                             },
                         ]}
                     >
@@ -62,45 +63,44 @@ const styles = StyleSheet.create({
     container: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'flex-start',
-        gap: 12,
-        marginVertical: 15,
-        paddingHorizontal: 15,
-        width: '100%',
+        gap: 8,
     },
     avatarsWrapper: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
     },
     avatarContainer: {
-        width: 40,
-        height: 40,
-        borderRadius: 8,
-        borderWidth: 1.5,
+        width: 38,
+        height: 38,
+        borderRadius: 10,
+        borderWidth: 1,
         overflow: 'hidden',
         backgroundColor: '#fff',
-        elevation: 3,
+        padding: 1, // Reduced from 5 to enlarge logos a bit more
+        // 3D Glass Effect
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
+        shadowOpacity: 0.15,
+        shadowRadius: 3,
+        elevation: 4,
     },
     logo: {
         width: '100%',
         height: '100%',
     },
     textWrapper: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
+        flexDirection: 'column',
+        justifyContent: 'center',
+        height: 38,
     },
     title: {
-        fontSize: 15,
+        fontSize: 12,
         fontWeight: '800',
+        lineHeight: 14,
     },
     subtitle: {
-        fontSize: 14,
+        fontSize: 11,
         fontWeight: '500',
+        lineHeight: 13,
     },
 });

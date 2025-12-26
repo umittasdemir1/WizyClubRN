@@ -24,7 +24,12 @@ const AnimatedShareIcon = Animated.createAnimatedComponent(ShareIcon);
 const AnimatedShoppingIcon = Animated.createAnimatedComponent(ShoppingIcon);
 
 interface ActionButtonsProps {
-    video: Video;
+    isLiked: boolean;
+    likesCount: number;
+    isSaved: boolean;
+    savesCount: number;
+    sharesCount: number;
+    shopsCount: number;
     onLike: () => void;
     onSave: () => void;
     onShare: () => void;
@@ -95,7 +100,12 @@ const ActionButton = memo(({ onPress, icon: Icon, count, isActive, activeColor }
 });
 
 export const ActionButtons = memo(function ActionButtons({
-    video,
+    isLiked,
+    likesCount,
+    isSaved,
+    savesCount,
+    sharesCount,
+    shopsCount,
     onLike,
     onSave,
     onShare,
@@ -108,23 +118,23 @@ export const ActionButtons = memo(function ActionButtons({
         <View style={[styles.container, { bottom }]} pointerEvents="box-none">
             <ActionButton
                 icon={AnimatedLikeIcon}
-                count={formatCount(video.likesCount)}
+                count={formatCount(likesCount)}
                 onPress={onLike}
-                isActive={video.isLiked}
+                isActive={isLiked}
                 activeColor={LIKE_COLOR}
             />
 
             <ActionButton
                 icon={AnimatedSaveIcon}
-                count={formatCount(video.savesCount || 0)}
+                count={formatCount(savesCount || 0)}
                 onPress={onSave}
-                isActive={video.isSaved}
+                isActive={isSaved}
                 activeColor={SAVE_COLOR}
             />
 
             <ActionButton
                 icon={AnimatedShareIcon}
-                count={formatCount(video.sharesCount)}
+                count={formatCount(sharesCount)}
                 onPress={onShare}
                 isActive={false}
                 activeColor={WHITE}
@@ -132,7 +142,7 @@ export const ActionButtons = memo(function ActionButtons({
 
             <ActionButton
                 icon={AnimatedShoppingIcon}
-                count={formatCount(video.shopsCount || 0)}
+                count={formatCount(shopsCount || 0)}
                 onPress={onShop}
                 isActive={false}
                 activeColor={WHITE}

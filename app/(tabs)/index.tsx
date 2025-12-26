@@ -355,13 +355,16 @@ export default function FeedScreen() {
         const handleLikePress = useCallback(() => {
             // Eğer video henüz beğenilmemişse, animasyonu tetikle
             if (!video.isLiked) {
-                // Önce state update (senkron olsun)
-                toggleLike(video.id);
-                // Hemen ardından animasyonu tetikle (aynı frame'de)
+                // 1. Animasyonu HEMEN tetikle (UI Thread)
                 doubleTapRef.current?.animateLike();
                 if (Platform.OS !== 'web') {
                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 }
+
+                // 2. State update'i bir sonraki tick'e ertele (JS Thread rahatlasın)
+                requestAnimationFrame(() => {
+                    toggleLike(video.id);
+                });
             } else {
                 // Unlike - sadece state update, animasyon yok
                 toggleLike(video.id);
@@ -397,7 +400,12 @@ export default function FeedScreen() {
                     pointerEvents={isSeeking ? 'none' : 'box-none'}
                 >
                     <ActionButtons
-                        video={video}
+                        isLiked={video.isLiked}
+                        likesCount={video.likesCount}
+                        isSaved={video.isSaved}
+                        savesCount={video.savesCount || 0}
+                        sharesCount={video.sharesCount}
+                        shopsCount={video.shopsCount || 0}
                         onLike={handleLikePress}
                         onSave={() => toggleSave(video.id)}
                         onShare={() => toggleShare(video.id)}
