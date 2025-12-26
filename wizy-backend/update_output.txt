@@ -1,0 +1,37 @@
+﻿[dotenv@17.2.3] injecting env (8) from .env -- tip: ÔÜÖ´©Å  override existing env vars with { override: true }
+=== Testing Profile Update for: wizyclub-official ===
+
+Current Profile: {
+  id: 'wizyclub-official',
+  username: 'wizyclub-official',
+  full_name: 'WizyClub',
+  avatar_url: 'https://i.pravatar.cc/300?img=12',
+  country: 'T├╝rkiye',
+  age: 1,
+  bio: 'Dijital ├╝r├╝nler, sosyal ticaret ve veri odakl─▒ sistemler ├╝zerine ├ğal─▒┼şan bir giri┼şimciyim. Mobil uygulamalar, e-ticaret, yapay zek├ó ve otomasyon projeleri geli┼ştiriyor; fikirleri ├Âl├ğeklenebilir, gelir ├╝reten yap─▒lara d├Ân├╝┼şt├╝rmeyi hedefliyorum.',
+  created_at: '2025-12-17T20:44:36.111078+00:00',
+  website: null,
+  is_verified: false,
+  followers_count: 0,
+  following_count: 0,
+  posts_count: 0,
+  updated_at: null
+}
+
+--- Attempting Update ---
+Ô£à Update SUCCESS: {
+  id: 'wizyclub-official',
+  username: 'wizyclub_updated',
+  full_name: 'WizyClub Updated 1766783955877',
+  avatar_url: 'https://i.pravatar.cc/300?img=12',
+  country: 'T├╝rkiye',
+  age: 1,
+  bio: 'Bio Updated at 2025-12-26T21:19:15.877Z',
+  created_at: '2025-12-17T20:44:36.111078+00:00',
+  website: null,
+  is_verified: false,
+  followers_count: 0,
+  following_count: 0,
+  posts_count: 0,
+  updated_at: null
+}

@@ -3,7 +3,10 @@ import { Alert } from 'react-native';
 import { Video } from '../../domain/entities/Video';
 import { GetVideoFeedUseCase } from '../../domain/usecases/GetVideoFeedUseCase';
 import { ToggleLikeUseCase } from '../../domain/usecases/ToggleLikeUseCase';
+import { ToggleSaveUseCase } from '../../domain/usecases/ToggleSaveUseCase';
+import { ToggleFollowUseCase } from '../../domain/usecases/ToggleFollowUseCase';
 import { VideoRepositoryImpl } from '../../data/repositories/VideoRepositoryImpl';
+import { InteractionRepositoryImpl } from '../../data/repositories/InteractionRepositoryImpl';
 import { VideoCacheService } from '../../data/services/VideoCacheService';
 import { useActiveVideoStore } from '../store/useActiveVideoStore';
 
@@ -19,8 +22,8 @@ interface UseVideoFeedReturn {
     refreshFeed: () => Promise<void>;
     loadMore: () => Promise<void>;
     toggleLike: (videoId: string) => Promise<void>;
-    toggleSave: (videoId: string) => void;
-    toggleFollow: (videoId: string) => void;
+    toggleSave: (videoId: string) => Promise<void>;
+    toggleFollow: (videoId: string) => Promise<void>;
     toggleShare: (videoId: string) => void;
     toggleShop: (videoId: string) => void;
     deleteVideo: (videoId: string) => Promise<void>;
@@ -29,8 +32,12 @@ interface UseVideoFeedReturn {
 export function useVideoFeed(): UseVideoFeedReturn {
     // Repository & UseCases (Memoized to prevent recreation)
     const videoRepository = useRef(new VideoRepositoryImpl()).current;
+    const interactionRepository = useRef(new InteractionRepositoryImpl()).current;
+
     const getVideoFeedUseCase = useRef(new GetVideoFeedUseCase(videoRepository)).current;
-    const toggleLikeUseCase = useRef(new ToggleLikeUseCase(videoRepository)).current;
+    const toggleLikeUseCase = useRef(new ToggleLikeUseCase(interactionRepository)).current;
+    const toggleSaveUseCase = useRef(new ToggleSaveUseCase(interactionRepository)).current;
+    const toggleFollowUseCase = useRef(new ToggleFollowUseCase(interactionRepository)).current;
 
     // State
     const [videos, setVideos] = useState<Video[]>([]);
@@ -201,7 +208,8 @@ export function useVideoFeed(): UseVideoFeedReturn {
         }
     }, [toggleLikeUseCase]);
 
-    const toggleSave = useCallback((videoId: string) => {
+    const toggleSave = useCallback(async (videoId: string) => {
+        // Optimistic update
         setVideos((prevVideos) =>
             prevVideos.map((video) => {
                 if (video.id === videoId) {
@@ -216,24 +224,72 @@ export function useVideoFeed(): UseVideoFeedReturn {
                 return video;
             })
         );
-    }, []);
 
-    const toggleFollow = useCallback((videoId: string) => {
+        try {
+            await toggleSaveUseCase.execute(videoId);
+        } catch (err) {
+            console.error('Toggle save failed, reverting:', err);
+            // Rollback
+            setVideos((prevVideos) =>
+                prevVideos.map((video) => {
+                    if (video.id === videoId) {
+                        return {
+                            ...video,
+                            isSaved: !video.isSaved,
+                            savesCount: video.isSaved
+                                ? video.savesCount - 1
+                                : video.savesCount + 1,
+                        };
+                    }
+                    return video;
+                })
+            );
+        }
+    }, [toggleSaveUseCase]);
+
+    const toggleFollow = useCallback(async (videoId: string) => {
+        const video = videos.find(v => v.id === videoId);
+        if (!video) return;
+
+        const userIdToFollow = video.user.id;
+
+        // Optimistic update
         setVideos((prevVideos) =>
-            prevVideos.map((video) => {
-                if (video.id === videoId) {
+            prevVideos.map((v) => {
+                if (v.id === videoId) {
                     return {
-                        ...video,
+                        ...v,
                         user: {
-                            ...video.user,
-                            isFollowing: !video.user.isFollowing,
+                            ...v.user,
+                            isFollowing: !v.user.isFollowing,
                         },
                     };
                 }
-                return video;
+                return v;
             })
         );
-    }, []);
+
+        try {
+            await toggleFollowUseCase.execute(userIdToFollow);
+        } catch (err) {
+            console.error('Toggle follow failed, reverting:', err);
+            // Rollback
+            setVideos((prevVideos) =>
+                prevVideos.map((v) => {
+                    if (v.id === videoId) {
+                        return {
+                            ...v,
+                            user: {
+                                ...v.user,
+                                isFollowing: !v.user.isFollowing,
+                            },
+                        };
+                    }
+                    return v;
+                })
+            );
+        }
+    }, [videos, toggleFollowUseCase]);
 
     const toggleShare = useCallback((videoId: string) => {
         setVideos((prevVideos) =>

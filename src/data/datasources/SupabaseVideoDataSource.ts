@@ -46,14 +46,19 @@ interface SupabaseVideo {
     description: string;
     likes_count: number;
     views_count: number;
+    shares_count: number;
+    saves_count: number;
+    shops_count: number;
     created_at: string;
     sprite_url?: string;
-    width?: number; // Added
-    height?: number; // Added
+    width?: number;
+    height?: number;
     is_commercial?: boolean;
     brand_name?: string;
     brand_url?: string;
     commercial_type?: string;
+    music_name?: string;
+    music_author?: string;
     profiles?: {
         username: string;
         full_name: string;
@@ -61,6 +66,10 @@ interface SupabaseVideo {
         country: string;
         age: number;
         bio: string;
+        is_verified: boolean;
+        followers_count: number;
+        following_count: number;
+        posts_count: number;
     };
 }
 
@@ -81,27 +90,22 @@ export class SupabaseVideoDataSource {
             return [];
         }
 
-        console.log(`[DataSource] Received ${data?.length || 0} videos from DB`);
-        if (data && data.length > 0) {
-            console.log(`[DataSource] Top video ID: ${data[0].id}`);
-        }
-
         return (data as SupabaseVideo[]).map(this.mapToVideo);
     }
 
     async getStories(): Promise<Story[]> {
         const { data, error } = await supabase
-            .from('videos')
+            .from('stories')
             .select('*, profiles(*)')
             .order('created_at', { ascending: false })
-            .limit(8);
+            .limit(10);
 
         if (error) {
-            console.error('Supabase error:', error);
+            console.error('Supabase stories error:', error);
             return [];
         }
 
-        return (data as SupabaseVideo[]).map(this.mapToStory);
+        return (data as any[]).map(this.mapToStory);
     }
 
     async getVideoById(videoId: string): Promise<Video | null> {
@@ -125,13 +129,13 @@ export class SupabaseVideoDataSource {
             thumbnailUrl: dto.thumbnail_url,
             description: dto.description || '',
             likesCount: dto.likes_count || 0,
-            commentsCount: Math.floor(Math.random() * 100),
-            sharesCount: Math.floor(Math.random() * 50),
-            shopsCount: Math.floor(Math.random() * 30),
-            spriteUrl: dto.sprite_url, // Seekbar thumbnail sprite
+            commentsCount: 0, // Bu şimdilik ayrı bir tablo olmadığı için 0
+            sharesCount: dto.shares_count || 0,
+            shopsCount: dto.shops_count || 0,
+            spriteUrl: dto.sprite_url,
             isLiked: false,
             isSaved: false,
-            savesCount: Math.floor(Math.random() * 200),
+            savesCount: dto.saves_count || 0,
             user: dto.profiles ? {
                 id: dto.user_id,
                 username: dto.profiles.username,
@@ -140,10 +144,14 @@ export class SupabaseVideoDataSource {
                 country: dto.profiles.country,
                 age: dto.profiles.age,
                 bio: dto.profiles.bio,
-                isFollowing: Math.random() > 0.5,
+                isVerified: dto.profiles.is_verified,
+                followersCount: dto.profiles.followers_count,
+                followingCount: dto.profiles.following_count,
+                postsCount: dto.profiles.posts_count,
+                isFollowing: false,
             } : getUserFromId(dto.user_id),
-            musicName: 'Original Audio',
-            musicAuthor: 'WizyClub',
+            musicName: dto.music_name || 'Original Audio',
+            musicAuthor: dto.music_author || 'WizyClub',
             width: dto.width,
             height: dto.height,
             isCommercial: dto.is_commercial,
@@ -153,13 +161,13 @@ export class SupabaseVideoDataSource {
         };
     }
 
-    private mapToStory(dto: SupabaseVideo): Story {
+    private mapToStory(dto: any): Story {
         return {
             id: dto.id,
             videoUrl: dto.video_url,
             thumbnailUrl: dto.thumbnail_url,
             createdAt: dto.created_at,
-            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+            expiresAt: dto.expires_at || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
             isViewed: false,
             user: dto.profiles ? {
                 id: dto.user_id,
@@ -169,8 +177,19 @@ export class SupabaseVideoDataSource {
                 country: dto.profiles.country,
                 age: dto.profiles.age,
                 bio: dto.profiles.bio,
-                isFollowing: Math.random() > 0.5,
+                isVerified: dto.profiles.is_verified,
+                followersCount: dto.profiles.followers_count,
+                followingCount: dto.profiles.following_count,
+                postsCount: dto.profiles.posts_count,
+                isFollowing: false,
             } : getUserFromId(dto.user_id),
+            width: dto.width,
+            height: dto.height,
+            isCommercial: dto.is_commercial,
+            brandName: dto.brand_name,
+            brandUrl: dto.brand_url,
+            commercialType: dto.commercial_type,
+            likesCount: dto.likes_count || 0,
         };
     }
 }

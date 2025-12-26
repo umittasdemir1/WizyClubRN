@@ -36,6 +36,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import MoreIcon from '../../assets/icons/more.svg';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
+import { useProfile } from '../../src/presentation/hooks/useProfile';
 import { DeletedContentSheet } from '../../src/presentation/components/profile/DeletedContentSheet';
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
 import { LIGHT_COLORS, DARK_COLORS } from '../../src/core/constants';
@@ -111,7 +112,7 @@ export default function ProfileScreen() {
       } else if (diff < -10) {
         headerTranslateY.value = withTiming(0, { duration: 200 });
       }
-      
+
       lastScrollY.value = currentY;
     },
   });
@@ -127,6 +128,8 @@ export default function ProfileScreen() {
   );
 
   const { videos, refreshFeed } = useVideoFeed();
+  const { user: profileUser, socialLinks: profileLinks, isLoading, reload, updateProfile, saveSocialLinks, uploadAvatar } = useProfile('wizyclub-official'); // Test için sabit ID
+
   const [refreshing, setRefreshing] = useState(false);
   const [previewItem, setPreviewItem] = useState<{ id: string; thumbnail: string; videoUrl: string } | null>(null);
 
@@ -138,9 +141,9 @@ export default function ProfileScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refreshFeed();
+    await Promise.all([refreshFeed(), reload()]);
     setRefreshing(false);
-  }, [refreshFeed]);
+  }, [refreshFeed, reload]);
 
   // Dynamic Theme Colors
   const bgBody = themeColors.background;
@@ -149,27 +152,41 @@ export default function ProfileScreen() {
   const textSecondary = themeColors.textSecondary;
   const cardBg = themeColors.card;
   const iconColor = themeColors.textPrimary;
-  
+
   // Button Colors
   const btnEditBg = isDark ? '#333333' : '#E5E5E5';
   const btnEditText = textPrimary;
-
-  // Dynamic Social Links State
-  const [socialLinks, setSocialLinks] = useState<any[]>([]); 
 
   // PagerView States
   const pagerRef = useRef<PagerView>(null);
   const [activeTab, setActiveTab] = useState(0);
 
-  // Static user data (Current User)
-  const user = {
-    name: 'WizyClub',
+  // Current User as Domain Entity
+  const currentUser: any = profileUser || {
+    id: 'wizyclub-official',
     username: 'wizyclub-official',
+    fullName: 'WizyClub',
     avatarUrl: 'https://i.pravatar.cc/300?img=12',
-    bio: "Explore the world through our lens. Official WizyClub account showcasing the best travel moments, hidden gems, and community highlights. Join us on this journey! 🌍✈️🚀",
-    followingCount: '12',
-    followersCount: '1.2M',
-    socialLinks: socialLinks, 
+    bio: "Explore the world through our lens...",
+    country: 'TR',
+    age: 0,
+    isFollowing: false,
+    website: '',
+    isVerified: true,
+    followersCount: 1200000,
+    followingCount: 12,
+    postsCount: 150
+  };
+
+  // View model for simple UI parts
+  const user = {
+    name: currentUser.fullName,
+    username: currentUser.username,
+    avatarUrl: currentUser.avatarUrl,
+    bio: currentUser.bio || "Explore the world through our lens...",
+    followingCount: currentUser.followingCount?.toString() || '0',
+    followersCount: currentUser.followersCount?.toString() || '0',
+    socialLinks: profileLinks,
   };
 
   const followingAvatars = ['https://i.pravatar.cc/100?img=3', 'https://i.pravatar.cc/100?img=4', 'https://i.pravatar.cc/100?img=5'];
@@ -201,9 +218,9 @@ export default function ProfileScreen() {
   const videosHeight = Math.ceil(videosData.length / 3) * (Math.floor((SCREEN_WIDTH - 3) / 3) * (16 / 9) + 1) + 20;
   const tagsHeight = 300;
 
-  const handleTabPress = (index: number) => { 
-    setActiveTab(index); 
-    pagerRef.current?.setPage(index); 
+  const handleTabPress = (index: number) => {
+    setActiveTab(index);
+    pagerRef.current?.setPage(index);
   };
 
   const showPreview = (item: any) => setPreviewItem(item);
@@ -213,21 +230,17 @@ export default function ProfileScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: bgBody }]}>
-      {/* 
-          TOP NAVIGATION - ANIMATED & INDEPENDENT
-      */}
       <Animated.View style={[
-        styles.topNavContainer, 
+        styles.topNavContainer,
         { paddingTop: insets.top, backgroundColor: bgContainer },
         animatedHeaderStyle
       ]}>
         <View style={styles.topNav}>
           <View style={styles.navIcon} />
           <Text style={[styles.headerUsername, { color: textPrimary }]}>@{user.username}</Text>
-          <TouchableOpacity 
-            style={styles.navIcon} 
+          <TouchableOpacity
+            style={styles.navIcon}
             onPress={() => settingsSheetRef.current?.expand()}
-            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
           >
             <MoreIcon width={24} height={24} color={iconColor} />
           </TouchableOpacity>
@@ -244,7 +257,7 @@ export default function ProfileScreen() {
         >
           <View style={styles.profileContainer}>
             <ProfileStats followingCount={user.followingCount} followingAvatars={followingAvatars} followersCount={user.followersCount} followersAvatars={followersAvatars} mainAvatarUrl={user.avatarUrl} isDark={isDark} />
-            
+
             <View style={styles.userNameRow}>
               <Text style={[styles.userNameText, { color: textPrimary }]}>{user.name}</Text>
               <VerifiedBadge />
@@ -257,37 +270,35 @@ export default function ProfileScreen() {
               </Text>
             </TouchableOpacity>
 
-            {/* ACTION BUTTONS: Edit Profile & Share Profile */}
             <View style={styles.actionsContainer}>
-              <TouchableOpacity 
-                style={[styles.btnAction, { backgroundColor: btnEditBg }]} 
+              <TouchableOpacity
+                style={[styles.btnAction, { backgroundColor: btnEditBg }]}
                 onPress={() => editProfileSheetRef.current?.expand()}
               >
                 <Text style={[styles.btnActionText, { color: btnEditText }]}>Profili Düzenle</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
-                style={[styles.btnAction, { backgroundColor: btnEditBg }]} 
+              <TouchableOpacity
+                style={[styles.btnAction, { backgroundColor: btnEditBg }]}
                 onPress={() => console.log('Share Profile')}
               >
                 <Text style={[styles.btnActionText, { color: btnEditText }]}>Profili Paylaş</Text>
               </TouchableOpacity>
             </View>
 
-            {/* SOCIAL & CLUBS COMBINED ROW */}
             <View style={styles.socialClubsRow}>
-              {socialLinks && socialLinks.length > 0 && (
+              {user.socialLinks && user.socialLinks.length > 0 && (
                 <>
-                  <SocialTags isDark={isDark} links={socialLinks} />
+                  <SocialTags isDark={isDark} links={user.socialLinks} />
                   <View style={[styles.verticalSeparator, { backgroundColor: isDark ? '#444' : '#ccc' }]} />
                 </>
               )}
 
-              <ClubsCollaboration 
-                clubsCount={clubs.length} 
-                clubLogos={clubLogos} 
-                isDark={isDark} 
-                onPress={() => clubsSheetRef.current?.expand()} 
+              <ClubsCollaboration
+                clubsCount={clubs.length}
+                clubLogos={clubLogos}
+                isDark={isDark}
+                onPress={() => clubsSheetRef.current?.expand()}
               />
             </View>
           </View>
@@ -300,10 +311,10 @@ export default function ProfileScreen() {
 
           <HighlightPills highlights={highlights} isDark={isDark} />
 
-          <PagerView 
-            ref={pagerRef} 
-            style={{ width: '100%', height: activeTab === 0 ? gridHeight : activeTab === 1 ? videosHeight : tagsHeight }} 
-            initialPage={0} 
+          <PagerView
+            ref={pagerRef}
+            style={{ width: '100%', height: activeTab === 0 ? gridHeight : activeTab === 1 ? videosHeight : tagsHeight }}
+            initialPage={0}
             onPageSelected={(e) => setActiveTab(e.nativeEvent.position)}
           >
             <View key="0"><PostsGrid posts={postsData} isDark={isDark} onPreview={showPreview} onPreviewEnd={hidePreview} /></View>
@@ -317,15 +328,18 @@ export default function ProfileScreen() {
         </Animated.ScrollView>
       </SwipeWrapper>
 
-      {/* Overlays & Modals */}
       {previewItem && <PreviewModal item={previewItem} onClose={hidePreview} />}
-      <BioBottomSheet ref={bioSheetRef} bio={user.bio} isDark={isDark} />
+      <BioBottomSheet ref={bioSheetRef} bio={currentUser.bio || ''} isDark={isDark} />
       <ClubsBottomSheet ref={clubsSheetRef} clubs={clubs} isDark={isDark} />
       <SettingsBottomSheet ref={settingsSheetRef} isDark={isDark} onThemeToggle={toggleTheme} onDeletedContentPress={() => deletedContentSheetRef.current?.expand()} />
-      <EditProfileSheet 
-        ref={editProfileSheetRef} 
-        user={user} 
-        onSaveLinks={(links) => setSocialLinks(links)}
+      <EditProfileSheet
+        ref={editProfileSheetRef}
+        user={currentUser}
+        socialLinks={profileLinks}
+        onUpdateProfile={updateProfile}
+        onSaveSocialLinks={saveSocialLinks}
+        onUploadAvatar={uploadAvatar}
+        onUpdateCompleted={() => reload()}
       />
       <DeletedContentSheet ref={deletedContentSheetRef} isDark={isDark} />
     </View>
@@ -345,7 +359,7 @@ const styles = StyleSheet.create({
   actionsContainer: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 25, height: 36, paddingHorizontal: 5, width: '100%' },
   btnAction: { flex: 1, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   btnActionText: { fontSize: 13, fontWeight: '600' },
-  btnIconOnly: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#e5e5e5' }, 
+  btnIconOnly: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#e5e5e5' },
   navTabs: { flexDirection: 'row', borderBottomWidth: 1 },
   tab: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12 },
   activeTab: { borderBottomWidth: 2 },

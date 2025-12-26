@@ -235,6 +235,7 @@ app.post('/upload-hls', upload.single('video'), async (req, res) => {
     }
 });
 
+
 // Endpoint: DELETE Video (Soft Delete by default)
 app.delete('/videos/:id', async (req, res) => {
     const videoId = req.params.id;
@@ -368,6 +369,51 @@ app.post('/videos/:id/restore', async (req, res) => {
     } catch (error) {
         console.error('❌ [RESTORE] Error:', error);
         res.status(500).json({ error: error.message });
+    }
+});
+
+// Endpoint: Avatar Upload
+app.post('/upload-avatar', upload.single('image'), async (req, res) => {
+    const file = req.file;
+    const { userId } = req.body;
+
+    if (!file || !userId) {
+        return res.status(400).json({ error: 'Missing image or userId' });
+    }
+
+    try {
+        console.log(`👤 [AVATAR] Process starting for user: ${userId}`);
+        const extension = path.extname(file.originalname) || '.jpg';
+        const fileName = `avatars/${userId}${extension}`;
+
+        // 1. Upload to R2
+        const rawAvatarUrl = await uploadToR2(file.path, fileName, file.mimetype);
+
+        // 2. Add Cache Buster (important for CDNs and apps)
+        const avatarUrl = `${rawAvatarUrl}?t=${Date.now()}`;
+
+        // 3. Update Supabase Profile Record
+        console.log(`   👉 Syncing to Supabase Profiles...`);
+        const { error: dbError } = await supabase
+            .from('profiles')
+            .update({ avatar_url: avatarUrl })
+            .eq('id', userId);
+
+        if (dbError) {
+            console.error('   ❌ Supabase Update Error:', dbError.message);
+            throw dbError;
+        }
+
+        // Cleanup temp file
+        if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+
+        console.log(`✅ [AVATAR] Success: ${avatarUrl}`);
+        res.json({ success: true, avatarUrl });
+
+    } catch (error) {
+        console.error('❌ [AVATAR] Fatal Error:', error);
+        res.status(500).json({ error: error.message });
+        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
     }
 });
 

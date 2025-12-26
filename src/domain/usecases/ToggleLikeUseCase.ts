@@ -1,9 +1,9 @@
-import { IVideoRepository } from '../repositories/IVideoRepository';
+import { ILikeRepository } from '../repositories/ILikeRepository';
 
 export class ToggleLikeUseCase {
-    constructor(private videoRepository: IVideoRepository) { }
+    constructor(private likeRepository: ILikeRepository) { }
 
-    async execute(videoId: string): Promise<boolean> {
-        return this.videoRepository.toggleLike(videoId);
+    async execute(videoId: string, userId: string = 'wizyclub-official'): Promise<boolean> {
+        return this.likeRepository.toggleLike(userId, videoId, 'video');
     }
 }

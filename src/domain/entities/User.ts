@@ -7,4 +7,10 @@ export interface User {
     country?: string;
     age?: number;
     bio?: string;
+    website?: string;
+    isVerified?: boolean;
+    followersCount?: number;
+    followingCount?: number;
+    postsCount?: number;
 }
+
