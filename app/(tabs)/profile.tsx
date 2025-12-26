@@ -82,6 +82,7 @@ const AnimatedIconButton = ({
   activeColor,
   inactiveColor,
   size = 14,
+  outlined,
 }: {
   icon: any;
   onPress: () => void;
@@ -89,6 +90,7 @@ const AnimatedIconButton = ({
   activeColor?: string;
   inactiveColor: string;
   size?: number;
+  outlined?: boolean;
 }) => {
   const scale = useSharedValue(1);
   const animatedStyle = useAnimatedStyle(() => ({
@@ -106,11 +108,12 @@ const AnimatedIconButton = ({
   };
 
   const color = isActive && activeColor ? activeColor : inactiveColor;
+  const iconProps = outlined ? { fill: "none", stroke: color, strokeWidth: 2 } : { fill: color };
 
   return (
     <Pressable onPress={handlePress} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
       <Animated.View style={animatedStyle}>
-        <Icon width={size} height={size} color={color} />
+        <Icon width={size} height={size} {...iconProps} />
       </Animated.View>
     </Pressable>
   );
@@ -317,22 +320,24 @@ export default function ProfileScreen() {
                   activeColor="#FF3B30" 
                   inactiveColor={iconColor} 
                   size={28}
+                  outlined={!isLiked}
                 />
               </View>
               <View style={styles.btnIconOnly}>
                 <AnimatedIconButton 
-                  icon={({ color, width, height }: any) => (
-                    <Svg width={width} height={height} viewBox="0 0 24 24" fill={color}><Path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" /></Svg>
+                  icon={({ color, width, height, ...props }: any) => (
+                    <Svg width={width} height={height} viewBox="0 0 24 24" fill={props.fill || color} stroke={props.stroke} strokeWidth={props.strokeWidth}><Path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" /></Svg>
                   )} 
                   onPress={() => setIsNotificationsOn(!isNotificationsOn)} 
                   isActive={isNotificationsOn} 
                   activeColor="#FF3B30" 
                   inactiveColor={iconColor} 
                   size={28}
+                  outlined={!isNotificationsOn}
                 />
               </View>
               <View style={styles.btnIconOnly}>
-                <AnimatedIconButton icon={ShareIcon} onPress={() => console.log('Share')} inactiveColor={iconColor} size={28} />
+                <AnimatedIconButton icon={ShareIcon} onPress={() => console.log('Share')} inactiveColor={iconColor} size={28} outlined={true} />
               </View>
             </View>
 
