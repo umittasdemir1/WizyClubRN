@@ -109,8 +109,14 @@ const AnimatedIconButton = ({
     onPress();
   };
 
-  const color = isActive && activeColor ? activeColor : inactiveColor;
-  const iconProps = outlined ? { fill: "none", stroke: color, strokeWidth } : { fill: color };
+  const visibleColor = isActive && activeColor ? activeColor : inactiveColor;
+  
+  // Use 'color' prop to drive currentColor in the SVG.
+  // Outlined: color="transparent" (hides fill), stroke=visibleColor
+  // Filled: color=visibleColor (shows fill), stroke="none"
+  const iconProps = outlined 
+    ? { color: "transparent", stroke: visibleColor, strokeWidth: strokeWidth } 
+    : { color: visibleColor, stroke: "none" };
 
   return (
     <Pressable onPress={handlePress} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
