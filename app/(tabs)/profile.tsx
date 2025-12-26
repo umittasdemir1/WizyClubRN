@@ -304,24 +304,35 @@ export default function ProfileScreen() {
               </TouchableOpacity>
 
               {isFollowing && (
-                <TouchableOpacity style={[styles.btnIconOnly, { backgroundColor: btnSecondaryBg }]} onPress={() => setIsUserOptionsVisible(true)}>
-                  <UserCog size={18} color={iconColor} />
+                <TouchableOpacity style={styles.btnIconOnly} onPress={() => setIsUserOptionsVisible(true)}>
+                  <UserCog size={28} color={iconColor} />
                 </TouchableOpacity>
               )}
 
-              <View style={[styles.btnIconOnly, { backgroundColor: isLiked ? '#cc0000' : btnSecondaryBg }]}>
-                <AnimatedIconButton icon={LikeIcon} onPress={() => setIsLiked(!isLiked)} isActive={isLiked} activeColor="#fff" inactiveColor={iconColor} />
+              <View style={styles.btnIconOnly}>
+                <AnimatedIconButton 
+                  icon={LikeIcon} 
+                  onPress={() => setIsLiked(!isLiked)} 
+                  isActive={isLiked} 
+                  activeColor="#FF3B30" 
+                  inactiveColor={iconColor} 
+                  size={28}
+                />
               </View>
-              <View style={[styles.btnIconOnly, { backgroundColor: isNotificationsOn ? '#cc0000' : btnSecondaryBg }]}>
+              <View style={styles.btnIconOnly}>
                 <AnimatedIconButton 
                   icon={({ color, width, height }: any) => (
                     <Svg width={width} height={height} viewBox="0 0 24 24" fill={color}><Path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" /></Svg>
                   )} 
-                  onPress={() => setIsNotificationsOn(!isNotificationsOn)} isActive={isNotificationsOn} activeColor="#fff" inactiveColor={iconColor} 
+                  onPress={() => setIsNotificationsOn(!isNotificationsOn)} 
+                  isActive={isNotificationsOn} 
+                  activeColor="#FF3B30" 
+                  inactiveColor={iconColor} 
+                  size={28}
                 />
               </View>
-              <View style={[styles.btnIconOnly, { backgroundColor: btnSecondaryBg }]}>
-                <AnimatedIconButton icon={ShareIcon} onPress={() => console.log('Share')} inactiveColor={iconColor} />
+              <View style={styles.btnIconOnly}>
+                <AnimatedIconButton icon={ShareIcon} onPress={() => console.log('Share')} inactiveColor={iconColor} size={28} />
               </View>
             </View>
 
