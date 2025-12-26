@@ -83,6 +83,7 @@ const AnimatedIconButton = ({
   inactiveColor,
   size = 14,
   outlined,
+  strokeWidth = 2,
 }: {
   icon: any;
   onPress: () => void;
@@ -91,6 +92,7 @@ const AnimatedIconButton = ({
   inactiveColor: string;
   size?: number;
   outlined?: boolean;
+  strokeWidth?: number;
 }) => {
   const scale = useSharedValue(1);
   const animatedStyle = useAnimatedStyle(() => ({
@@ -108,7 +110,7 @@ const AnimatedIconButton = ({
   };
 
   const color = isActive && activeColor ? activeColor : inactiveColor;
-  const iconProps = outlined ? { fill: "none", stroke: color, strokeWidth: 2 } : { fill: color };
+  const iconProps = outlined ? { fill: "none", stroke: color, strokeWidth } : { fill: color };
 
   return (
     <Pressable onPress={handlePress} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -308,7 +310,7 @@ export default function ProfileScreen() {
 
               {isFollowing && (
                 <TouchableOpacity style={styles.btnIconOnly} onPress={() => setIsUserOptionsVisible(true)}>
-                  <UserCog size={28} color={iconColor} />
+                  <UserCog size={28} color={iconColor} strokeWidth={1.6} />
                 </TouchableOpacity>
               )}
 
@@ -334,6 +336,7 @@ export default function ProfileScreen() {
                   inactiveColor={iconColor} 
                   size={28}
                   outlined={!isNotificationsOn}
+                  strokeWidth={1.6}
                 />
               </View>
               <View style={styles.btnIconOnly}>
