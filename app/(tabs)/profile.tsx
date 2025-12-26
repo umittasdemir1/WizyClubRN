@@ -292,7 +292,7 @@ export default function ProfileScreen() {
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingTop: insets.top + 60 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={isDark ? "#fff" : "#000"} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={isDark ? "#fff" : "#000"} progressViewOffset={insets.top + 60} />}
         >
           <View style={styles.profileContainer}>
             <ProfileStats followingCount={user.followingCount} followingAvatars={followingAvatars} followersCount={user.followersCount} followersAvatars={followersAvatars} mainAvatarUrl={user.avatarUrl} isDark={isDark} />
