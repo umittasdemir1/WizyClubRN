@@ -2504,3 +2504,35 @@ useEffect(() => {
     }
 }, [isLandscape]);
 ```
+
+################################################################################
+# 📅 PROFIL GELISTIRME ANALIZI - 2025-12-27 16:37:33
+################################################################################
+
+### 🛠 Mevcut Durum ve Tespit Edilen Eksikler
+Profil sayfaları (kendi profilimiz ve diğer kullanıcılar) görsel olarak tamamlanmış olsa da, fonksiyonel olarak aşağıdaki geliştirmelere ihtiyaç duymaktadır:
+
+#### 1. Kullanıcıya Özel Video Filtreleme
+- **Sorun:** Profil sayfalarında tüm genel feed videoları görünmektedir.
+- **Çözüm:** GetVideoFeedUseCase ve ilgili repository metotları userId parametresi alacak şekilde güncellenmeli ve sadece o kullanıcıya ait videolar listelenmelidir.
+
+#### 2. Takip Et (Follow) Sistemi
+- **Sorun:** Takip Et butonu şu an sadece UI üzerinde state değiştirmekte, veritabanına yansımamaktadır.
+- **Çözüm:** Supabase üzerinde bir follows tablosu kurgulanmalı ve ToggleFollowUseCase oluşturularak gerçek takip mantığı entegre edilmelidir.
+
+#### 3. Dinamik Öne Çıkanlar (Highlights)
+- **Sorun:** Profildeki Highlights balonları şu an statik (mock) verilerdir.
+- **Çözüm:** Kullanıcının hikayelerinden (stories) oluşturabileceği bir öne çıkarma yapısı kurulmalı ve veriler veritabanından çekilmelidir.
+
+#### 4. Marka İşbirlikleri (Clubs) Entegrasyonu
+- **Sorun:** Amazon, Nike gibi marka logoları şu an sabit veridir.
+- **Çözüm:** Kullanıcı ve markalar arasındaki collaborations tablosu üzerinden dinamik olarak listelenmelidir.
+
+#### 5. Profil Fotoğrafı ve Medya Yönetimi
+- **Sorun:** Profil düzenleme kısmında fotoğraf güncelleme işlevi eksiktir.
+- **Çözüm:** expo-image-picker ile seçilen görsellerin Supabase Storage'a yüklenmesi ve avatar_url'nin güncellenmesi sağlanmalıdır.
+
+#### 6. İstatistik Senkronizasyonu
+- **Sorun:** Takipçi, Takip Edilen ve Gönderi sayıları manuel girilmektedir.
+- **Çözüm:** Veritabanındaki profiles tablosundaki counter'lar veya gerçek tablo sayımları (count queries) ile senkronize edilmelidir.
+

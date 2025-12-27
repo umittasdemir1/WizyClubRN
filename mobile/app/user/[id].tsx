@@ -38,6 +38,9 @@ import LikeIcon from '../../assets/icons/like.svg';
 import ShareIcon from '../../assets/icons/share.svg';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import { LIGHT_COLORS, DARK_COLORS } from '../../src/core/constants';
+import { UserRepositoryImpl } from '../../src/data/repositories/UserRepositoryImpl';
+import { GetUserProfileUseCase } from '../../src/domain/usecases/GetUserProfileUseCase';
+import { ProfileSkeleton } from '../../src/presentation/components/profile/ProfileSkeleton';
 import { UserOptionsModal } from '../../src/presentation/components/profile/UserOptionsModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -51,7 +54,7 @@ const VerifiedBadge = () => (
 
 const GridIcon = ({ color }: { color: string }) => (
   <Svg width="22" height="22" viewBox="0 -960 960 960" fill={color}>
-    <Path d="M240-160q-33 0-56.5-23.5T160-240q0-33 23.5-56.5T240-320q33 0 56.5 23.5T320-240q0 33-23.5 56.5T480-160Zm240 0q-33 0-56.5-23.5T400-240q0-33 23.5-56.5T480-320q33 0 56.5 23.5T560-240q0 33-23.5 56.5T480-160Zm240 0q-33 0-56.5-23.5T640-240q0-33 23.5-56.5T720-320q33 0 56.5 23.5T800-240q0 33-23.5 56.5T720-160ZM240-400q-33 0-56.5-23.5T160-480q0-33 23.5-56.5T240-560q33 0 56.5 23.5T320-480q0 33-23.5 56.5T240-400Zm240 0q-33 0-56.5-23.5T400-480q0-33 23.5-56.5T480-560q33 0 56.5 23.5T560-480q0 33-23.5 56.5T480-400Zm240 0q-33 0-56.5-23.5T640-480q0-33 23.5-56.5T720-560q33 0 56.5 23.5T800-480q0 33-23.5 56.5T720-400ZM240-640q-33 0-56.5-23.5T160-720q0-33 23.5-56.5T240-800q33 0 56.5 23.5T320-720q0 33-23.5 56.5T240-640Zm240 0q-33 0-56.5-23.5T400-720q0-33 23.5-56.5T480-800q33 0 56.5 23.5T560-720q0 33-23.5 56.5T480-640Zm240 0q-33 0-56.5-23.5T640-720q0-33 23.5-56.5T720-800q33 0 56.5 23.5T800-720q0 33-23.5 56.5T720-640Z" />
+    <Path d="M240-160q-33 0-56.5-23.5T160-240q0-33 23.5-56.5T240-320q33 0 56.5 23.5T320-240q0 33-23.5 56.5T240-160Zm240 0q-33 0-56.5-23.5T400-240q0-33 23.5-56.5T480-320q33 0 56.5 23.5T560-240q0 33-23.5 56.5T480-160Zm240 0q-33 0-56.5-23.5T640-240q0-33 23.5-56.5T720-320q33 0 56.5 23.5T800-240q0 33-23.5 56.5T720-160ZM240-400q-33 0-56.5-23.5T160-480q0-33 23.5-56.5T240-560q33 0 56.5 23.5T320-480q0 33-23.5 56.5T240-400Zm240 0q-33 0-56.5-23.5T400-480q0-33 23.5-56.5T480-560q33 0 56.5 23.5T560-480q0 33-23.5 56.5T480-400Zm240 0q-33 0-56.5-23.5T640-480q0-33 23.5-56.5T720-560q33 0 56.5 23.5T800-480q0 33-23.5 56.5T720-400ZM240-640q-33 0-56.5-23.5T160-720q0-33 23.5-56.5T240-800q33 0 56.5 23.5T320-720q0 33-23.5 56.5T240-640Zm240 0q-33 0-56.5-23.5T400-720q0-33 23.5-56.5T480-800q33 0 56.5 23.5T560-720q0 33-23.5 56.5T480-640Zm240 0q-33 0-56.5-23.5T640-720q0-33 23.5-56.5T720-800q33 0 56.5 23.5T800-720q0 33-23.5 56.5T720-640Z" />
   </Svg>
 );
 
@@ -141,7 +144,7 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnail: string
 export default function UserProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { id } = useLocalSearchParams(); // Get user ID from params
+  const { id } = useLocalSearchParams(); 
   const { isDark } = useThemeStore();
   const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
 
@@ -183,6 +186,7 @@ export default function UserProfileScreen() {
   const [isUserOptionsVisible, setIsUserOptionsVisible] = useState(false);
   const { videos, refreshFeed } = useVideoFeed();
   const [refreshing, setRefreshing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [previewItem, setPreviewItem] = useState<{ id: string; thumbnail: string; videoUrl: string } | null>(null);
 
   const bioSheetRef = useRef<BottomSheet>(null);
@@ -205,15 +209,56 @@ export default function UserProfileScreen() {
   const btnFollowText = isDark ? '#000000' : '#ffffff';
   const btnSecondaryBg = themeColors.card;
 
-  // Mock Data (In a real app, fetch user data based on 'id')
+  // --- Real Data Fetching ---
+  const [profileData, setProfileData] = useState({
+    name: '',
+    username: '',
+    avatarUrl: '',
+    bio: '',
+    followersCount: 0,
+    followingCount: 0,
+    socialLinks: [],
+  });
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      if (!id || typeof id !== 'string') return;
+      
+      setIsLoading(true);
+      try {
+        const repo = new UserRepositoryImpl();
+        const useCase = new GetUserProfileUseCase(repo);
+        
+        // We use the ID from the URL (which might be a username or UUID depending on your logic)
+        // Ideally, GetUserProfileUseCase should handle both or we standardize on username/uuid
+        const fetchedUser = await useCase.execute(id);
+
+        if (fetchedUser) {
+          setProfileData({
+            name: fetchedUser.fullName || fetchedUser.username,
+            username: fetchedUser.username,
+            avatarUrl: fetchedUser.avatarUrl,
+            bio: fetchedUser.bio || "No bio available.",
+            followersCount: typeof fetchedUser.followersCount === 'number' ? fetchedUser.followersCount : 0,
+            followingCount: typeof fetchedUser.followingCount === 'number' ? fetchedUser.followingCount : 0,
+            socialLinks: fetchedUser.socialLinks || [],
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch user profile:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchUser();
+  }, [id]);
+
   const user = {
-    name: 'WizyClub',
-    username: 'wizyclub-official',
-    avatarUrl: 'https://i.pravatar.cc/300?img=12',
-    bio: "Explore the world through our lens. Official WizyClub account showcasing the best travel moments, hidden gems, and community highlights. Join us on this journey! 🌍✈️🚀",
-    followingCount: '12',
-    followersCount: '1.2M',
+    ...profileData,
+    followingCount: profileData.followingCount,
+    followersCount: profileData.followersCount,
   };
+  // --------------------------
 
   const followingAvatars = ['https://i.pravatar.cc/100?img=3', 'https://i.pravatar.cc/100?img=4', 'https://i.pravatar.cc/100?img=5'];
   const followersAvatars = ['https://i.pravatar.cc/100?img=6', 'https://i.pravatar.cc/100?img=7', 'https://i.pravatar.cc/100?img=8'];
@@ -266,7 +311,7 @@ export default function UserProfileScreen() {
           <TouchableOpacity style={styles.navIcon} onPress={() => router.back()}>
             <ChevronLeft size={24} color={iconColor} />
           </TouchableOpacity>
-          <Text style={[styles.headerUsername, { color: textPrimary }]}>@{user.username}</Text>
+          <Text style={[styles.headerUsername, { color: textPrimary }]}>{!isLoading ? `@${user.username}` : ''}</Text>
           <TouchableOpacity 
             style={styles.navIcon} 
             onPress={() => setIsUserOptionsVisible(true)}
@@ -284,60 +329,66 @@ export default function UserProfileScreen() {
         contentContainerStyle={{ paddingTop: insets.top + 60 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={isDark ? "#fff" : "#000"} progressViewOffset={insets.top + 60} />}
       >
-        <View style={styles.profileContainer}>
-          <ProfileStats followingCount={user.followingCount} followingAvatars={followingAvatars} followersCount={user.followersCount} followersAvatars={followersAvatars} mainAvatarUrl={user.avatarUrl} isDark={isDark} />
-          
-          <View style={styles.userNameRow}>
-            <Text style={[styles.userNameText, { color: textPrimary }]}>{user.name}</Text>
-            <VerifiedBadge />
-          </View>
+        {isLoading ? (
+            <ProfileSkeleton />
+        ) : (
+            <View style={styles.profileContainer}>
+            <ProfileStats followingCount={user.followingCount} followingAvatars={followingAvatars} followersCount={user.followersCount} followersAvatars={followersAvatars} mainAvatarUrl={user.avatarUrl} isDark={isDark} />
+            
+            <View style={styles.userNameRow}>
+                <Text style={[styles.userNameText, { color: textPrimary }]}>{user.name}</Text>
+                <VerifiedBadge />
+            </View>
 
-          <TouchableOpacity onPress={() => bioSheetRef.current?.expand()} disabled={user.bio.length <= bioLimit}>
-            <Text style={[styles.bioText, { color: textSecondary }]}>
-              {truncatedBio}
-              {user.bio.length > bioLimit && <Text style={{ color: textPrimary, fontWeight: '600' }}> devamını gör</Text>}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Social Actions (Follow, Like, Notify) */}
-          <View style={styles.actionsContainer}>
-            <TouchableOpacity style={[styles.btnFollow, { backgroundColor: isFollowing ? btnSecondaryBg : btnFollowBg, borderColor: isFollowing ? textSecondary : 'transparent' }]} onPress={() => setIsFollowing(!isFollowing)}>
-              <Text style={[styles.btnFollowText, { color: isFollowing ? textPrimary : btnFollowText }]}>{isFollowing ? 'Takipte' : 'Takip Et'}</Text>
+            <TouchableOpacity onPress={() => bioSheetRef.current?.expand()} disabled={user.bio.length <= bioLimit}>
+                <Text style={[styles.bioText, { color: textSecondary }]}>
+                {truncatedBio}
+                {user.bio.length > bioLimit && <Text style={{ color: textPrimary, fontWeight: '600' }}> devamını gör</Text>}
+                </Text>
             </TouchableOpacity>
 
-            <View style={styles.btnIconOnly}>
-              <AnimatedIconButton 
-                icon={LikeIcon} 
-                onPress={() => setIsLiked(!isLiked)} 
-                isActive={isLiked} 
-                activeColor="#FF3B30" 
-                inactiveColor={iconColor} 
-                size={28}
-                outlined={!isLiked}
-              />
-            </View>
-            <View style={styles.btnIconOnly}>
-              <AnimatedIconButton 
-                icon={({ color, width, height, ...props }: any) => (
-                  <Svg width={width} height={height} viewBox="0 0 24 24" fill={props.fill || color} stroke={props.stroke} strokeWidth={props.strokeWidth}><Path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" /></Svg>
-                )} 
-                onPress={() => setIsNotificationsOn(!isNotificationsOn)} 
-                isActive={isNotificationsOn} 
-                activeColor="#FF3B30" 
-                inactiveColor={iconColor} 
-                size={28}
-                outlined={!isNotificationsOn}
-                strokeWidth={1.6}
-              />
-            </View>
-            <View style={styles.btnIconOnly}>
-              <AnimatedIconButton icon={ShareIcon} onPress={() => console.log('Share')} inactiveColor={iconColor} size={28} outlined={true} />
-            </View>
-          </View>
+            {/* Social Actions (Follow, Like, Notify) */}
+            <View style={styles.actionsContainer}>
+                <TouchableOpacity style={[styles.btnFollow, { backgroundColor: isFollowing ? btnSecondaryBg : btnFollowBg, borderColor: isFollowing ? textSecondary : 'transparent' }]} onPress={() => setIsFollowing(!isFollowing)}>
+                <Text style={[styles.btnFollowText, { color: isFollowing ? textPrimary : btnFollowText }]}>{isFollowing ? 'Takipte' : 'Takip Et'}</Text>
+                </TouchableOpacity>
 
-          <ClubsCollaboration clubsCount={clubs.length} clubLogos={clubLogos} isDark={isDark} onPress={() => clubsSheetRef.current?.expand()} />
-          <SocialTags isDark={isDark} />
-        </View>
+                <View style={styles.btnIconOnly}>
+                <AnimatedIconButton 
+                    icon={LikeIcon} 
+                    onPress={() => setIsLiked(!isLiked)} 
+                    isActive={isLiked} 
+                    activeColor="#FF3B30" 
+                    inactiveColor={iconColor} 
+                    size={28}
+                    outlined={!isLiked}
+                />
+                </View>
+                <View style={styles.btnIconOnly}>
+                <AnimatedIconButton 
+                    icon={({ color, width, height, ...props }: any) => (
+                    <Svg width={width} height={height} viewBox="0 0 24 24" fill={props.fill || color} stroke={props.stroke} strokeWidth={props.strokeWidth}><Path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" /></Svg>
+                    )} 
+                    onPress={() => setIsNotificationsOn(!isNotificationsOn)} 
+                    isActive={isNotificationsOn} 
+                    activeColor="#FF3B30" 
+                    inactiveColor={iconColor} 
+                    size={28}
+                    outlined={!isNotificationsOn}
+                    strokeWidth={1.6}
+                />
+                </View>
+                <View style={styles.btnIconOnly}>
+                <AnimatedIconButton icon={ShareIcon} onPress={() => console.log('Share')} inactiveColor={iconColor} size={28} outlined={true} />
+                </View>
+            </View>
+
+            <ClubsCollaboration clubsCount={clubs.length} clubLogos={clubLogos} isDark={isDark} onPress={() => clubsSheetRef.current?.expand()} />
+            {profileData.socialLinks && profileData.socialLinks.length > 0 && (
+                <SocialTags isDark={isDark} links={profileData.socialLinks} />
+            )}
+            </View>
+        )}
 
         <View style={[styles.navTabs, { borderBottomColor: cardBg }]}>
           <TouchableOpacity style={[styles.tab, activeTab === 0 && [styles.activeTab, { borderBottomColor: textPrimary }]]} onPress={() => handleTabPress(0)}><GridIcon color={activeTab === 0 ? textPrimary : textSecondary} /></TouchableOpacity>
