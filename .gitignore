@@ -17,8 +17,8 @@ node_modules/
 # Build Outputs
 dist/
 build/
-android/app/build/
-ios/Pods/
+android/
+ios/
 
 # Expo
 .expo/

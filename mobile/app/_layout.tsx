@@ -18,8 +18,8 @@ function RootNavigator() {
         // Log app open and login event for the session
         const logSession = async () => {
             try {
-                await SessionLogService.logEvent({ userId: 'wizyclub-official', eventType: 'app_open' });
-                await SessionLogService.logEvent({ userId: 'wizyclub-official', eventType: 'login' });
+                await SessionLogService.logEvent({ userId: '687c8079-e94c-42c2-9442-8a4a6b63dec6', eventType: 'app_open' });
+                await SessionLogService.logEvent({ userId: '687c8079-e94c-42c2-9442-8a4a6b63dec6', eventType: 'login' });
                 console.log('[RootNavigator] Session logged successfully');
             } catch (err) {
                 console.error('[RootNavigator] Session logging failed:', err);

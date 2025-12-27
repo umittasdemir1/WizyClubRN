@@ -129,7 +129,7 @@ export default function ProfileScreen() {
   );
 
   const { videos, refreshFeed } = useVideoFeed();
-  const { user: profileUser, socialLinks: profileLinks, isLoading, reload, updateProfile, saveSocialLinks, uploadAvatar } = useProfile('wizyclub-official'); 
+  const { user: profileUser, socialLinks: profileLinks, isLoading, reload, updateProfile, saveSocialLinks, uploadAvatar } = useProfile('687c8079-e94c-42c2-9442-8a4a6b63dec6');
 
   const [refreshing, setRefreshing] = useState(false);
   const [previewItem, setPreviewItem] = useState<{ id: string; thumbnail: string; videoUrl: string } | null>(null);
@@ -164,8 +164,8 @@ export default function ProfileScreen() {
 
   // Current User as Domain Entity
   const currentUser: any = profileUser || {
-    id: 'wizyclub-official',
-    username: 'wizyclub-official',
+    id: '687c8079-e94c-42c2-9442-8a4a6b63dec6',
+    username: 'umittasdemir',
     fullName: 'WizyClub',
     avatarUrl: 'https://i.pravatar.cc/300?img=12',
     bio: "Explore the world through our lens...",

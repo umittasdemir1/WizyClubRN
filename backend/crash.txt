@@ -1,0 +1,72 @@
+﻿Ô£à FFmpeg path: D:\WizyClub\backend\node_modules\ffmpeg-static\ffmpeg.exe
+Ô£à FFprobe path: D:\WizyClub\backend\node_modules\@ffprobe-installer\win32-x64\ffprobe.exe
+4. Initializing R2 Client...
+5. Initializing Supabase Client...
+node : D:\WizyClub\ba
+ckend\node_modules\@s
+upabase\supabase-js\d
+ist\index.cjs:146
+At line:1 char:1
++ node server.js 2>&1
+ | Out-File -FilePath
+ crash.txt -Encoding 
+utf8
++ ~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo   
+           : NotSpe  
+  cified: (D:\Wizy   
+ Club\bac...t\ind    
+ex.cjs:146:Strin    g
+) [], RemoteExc    ep
+tion
+    + FullyQualified 
+   ErrorId : Native  
+  CommandError
+ 
+	if (!trimmedUrl) thr
+ow new Error("supabas
+eUrl is required.");
+	                 ^
+
+Error: supabaseUrl is
+ required.
+    at validateSupaba
+seUrl (D:\WizyClub\ba
+ckend\node_modules\@s
+upabase\supabase-js\d
+ist\index.cjs:146:25)
+    at new SupabaseCl
+ient (D:\WizyClub\bac
+kend\node_modules\@su
+pabase\supabase-js\di
+st\index.cjs:195:19)
+    at createClient (
+D:\WizyClub\backend\n
+ode_modules\@supabase
+\supabase-js\dist\ind
+ex.cjs:386:9)
+    at Object.<anonym
+ous> (D:\WizyClub\bac
+kend\server.js:38:18)
+    at Module._compil
+e (node:internal/modu
+les/cjs/loader:1761:1
+4)
+    at Object..js (no
+de:internal/modules/c
+js/loader:1893:10)
+    at Module.load (n
+ode:internal/modules/
+cjs/loader:1481:32)
+    at Module._load (
+node:internal/modules
+/cjs/loader:1300:12)
+    at TracingChannel
+.traceSync (node:diag
+nostics_channel:328:1
+4)
+    at wrapModuleLoad
+ (node:internal/modul
+es/cjs/loader:245:24)
+
+Node.js v24.11.1

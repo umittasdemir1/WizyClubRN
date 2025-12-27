@@ -50,7 +50,7 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
     useEffect(() => {
       setTempName(user.fullName || user.username);
       setTempUsername(user.username);
-      setTempBio(user.bio);
+      setTempBio(user.bio || '');
       setCurrentAvatar(user.avatarUrl);
       if (initialLinks && initialLinks.length > 0) {
         setSocialLinks(initialLinks);
@@ -133,15 +133,10 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
       if (socialLinks.length < 5) {
         const newLink: SocialLink = {
           id: Math.random().toString(36).substr(2, 9),
-          userId: user.id, // Fixed: removed invalid property access if any
+          userId: user.id,
           platform: 'Instagram',
           url: '',
-          // displayOrder: socialLinks.length // Removed if not in SocialLink interface?
-          // SocialLink interface in User.ts: { id, platform, url }.
-          // But Remote might have added displayOrder?
-          // Local interface: { id, platform, url }.
-          // I didn't add displayOrder to User.ts.
-          // So I should remove it.
+          displayOrder: socialLinks.length
         };
         setSocialLinks([...socialLinks, newLink]);
       }

@@ -3,7 +3,8 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const ffmpeg = require('fluent-ffmpeg');
-const { S3Client, PutObjectCommand, DeleteObjectCommand, ListObjectsV2Command, DeleteObjectsCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, DeleteObjectCommand, ListObjectsV2Command, DeleteObjectsCommand, CopyObjectCommand } = require('@aws-sdk/client-s3');
+const { v4: uuidv4 } = require('uuid');
 const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 const path = require('path');
@@ -23,7 +24,7 @@ ffmpeg.setFfprobePath(ffprobeStatic);
 // Multer: Temporary uploads
 const upload = multer({ dest: 'temp_uploads/' });
 
-// Cloudflare R2 Client
+console.log('4. Initializing R2 Client...');
 const r2 = new S3Client({
     region: 'auto',
     endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
@@ -33,7 +34,7 @@ const r2 = new S3Client({
     },
 });
 
-// Supabase Client
+console.log('5. Initializing Supabase Client...');
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
 // Helper: Upload to R2
@@ -48,9 +49,11 @@ async function uploadToR2(filePath, fileName, contentType) {
     return `${process.env.R2_PUBLIC_URL}/${fileName}`;
 }
 
-// HLS Service
-const HlsService = require('./services/HlsService');
-const hlsService = new HlsService(r2, process.env.R2_BUCKET_NAME); // Use explicit bucket from env
+// console.log('6. Loading HlsService...');
+// const HlsService = require('./services/HlsService');
+// console.log('7. Initializing HlsService...');
+// const hlsService = new HlsService(r2, process.env.R2_BUCKET_NAME);
+// console.log('8. HlsService READY.');
 
 // Endpoint: HLS Video Upload
 app.post('/upload-hls', upload.single('video'), async (req, res) => {
@@ -66,11 +69,12 @@ app.post('/upload-hls', upload.single('video'), async (req, res) => {
     const isCommercial = commercialType && commercialType !== 'İş Birliği İçermiyor';
 
     const inputPath = file.path;
-    const uniqueId = Date.now().toString(); // Simple ID, ideally UUID
+    const uniqueId = uuidv4(); // Professional UUID instead of timestamp
     const tempOutputDir = path.join(__dirname, 'temp_uploads');
 
-    // Thumbnail paths
-    const thumbFileName = `thumbs/${uniqueId}.jpg`;
+    // Professional Content Routing (media/{userId}/videos/{videoId}/...)
+    const baseKey = `media/${userId || 'test-user'}/videos/${uniqueId}`;
+    const thumbFileName = `${baseKey}/thumb.jpg`;
     const processedThumbPath = path.join(tempOutputDir, `thumb_${uniqueId}.jpg`);
 
     console.log(`🎬 [HLS] Processing: ${file.originalname} (ID: ${uniqueId})`);
@@ -171,7 +175,7 @@ app.post('/upload-hls', upload.single('video'), async (req, res) => {
             const optimizedStats = fs.statSync(optimizedPath);
             console.log(`   📉 Size: ${(originalStats.size / 1024 / 1024).toFixed(2)}MB -> ${(optimizedStats.size / 1024 / 1024).toFixed(2)}MB`);
 
-            const mp4Key = `videos/${uniqueId}/master.mp4`;
+            const mp4Key = `${baseKey}/master.mp4`;
             await uploadToR2(optimizedPath, mp4Key, 'video/mp4');
             videoUrl = `${process.env.R2_PUBLIC_URL}/${mp4Key}`;
             console.log(`🔗 [VIDEO URL] Optimized MP4 URL: ${videoUrl}`);
@@ -384,7 +388,7 @@ app.post('/upload-avatar', upload.single('image'), async (req, res) => {
     try {
         console.log(`👤 [AVATAR] Process starting for user: ${userId}`);
         const extension = path.extname(file.originalname) || '.jpg';
-        const fileName = `avatars/${userId}${extension}`;
+        const fileName = `users/${userId}/profile/avatar${extension}`;
 
         // 1. Upload to R2
         const rawAvatarUrl = await uploadToR2(file.path, fileName, file.mimetype);
@@ -418,6 +422,93 @@ app.post('/upload-avatar', upload.single('image'), async (req, res) => {
 });
 
 // Health check
+// Temporary Migration Endpoint
+app.get('/migrate-assets', async (req, res) => {
+    try {
+        console.log("🚀 Starting R2 Migration via Endpoint...");
+        const mainUserId = "687c8079-e94c-42c2-9442-8a4a6b63dec6";
+
+        // 1. Migrate Avatar
+        try {
+            const oldAvatarKey = "avatars/wizyclub-official.jpg";
+            const newAvatarKey = `users/${mainUserId}/profile/avatar.jpg`;
+            await r2.send(new CopyObjectCommand({
+                Bucket: process.env.R2_BUCKET_NAME,
+                CopySource: `${process.env.R2_BUCKET_NAME}/${oldAvatarKey}`,
+                Key: newAvatarKey
+            }));
+            await supabase.from('profiles').update({ avatar_url: `${process.env.R2_PUBLIC_URL}/${newAvatarKey}` }).eq('id', mainUserId);
+            console.log("✅ Avatar migrated.");
+        } catch (e) {
+            console.log("⚠️ Avatar migration skipped.");
+        }
+
+        // 2. Migrate Videos
+        const { data: videos } = await supabase.from('videos').select('*').order('created_at', { ascending: true });
+        const r2Videos = ["1766009656643", "1766011111754", "1766012583186"];
+
+        if (videos) {
+            for (let i = 0; i < videos.length; i++) {
+                const video = videos[i];
+                const timestamp = r2Videos[i];
+                if (!timestamp) continue;
+
+                const newBase = `media/${mainUserId}/videos/${video.id}`;
+
+                // Copy Video
+                try {
+                    await r2.send(new CopyObjectCommand({
+                        Bucket: process.env.R2_BUCKET_NAME,
+                        CopySource: `${process.env.R2_BUCKET_NAME}/videos/${timestamp}/master.mp4`,
+                        Key: `${newBase}/master.mp4`
+                    }));
+                    await r2.send(new CopyObjectCommand({
+                        Bucket: process.env.R2_BUCKET_NAME,
+                        CopySource: `${process.env.R2_BUCKET_NAME}/thumbs/${timestamp}.jpg`,
+                        Key: `${newBase}/thumb.jpg`
+                    }));
+                    // Optional sprite
+                    try {
+                        await r2.send(new CopyObjectCommand({
+                            Bucket: process.env.R2_BUCKET_NAME,
+                            CopySource: `${process.env.R2_BUCKET_NAME}/videos/${timestamp}/sprite_${timestamp}_0.jpg`,
+                            Key: `${newBase}/sprite.jpg`
+                        }));
+                    } catch (e) { }
+
+                    await supabase.from('videos').update({
+                        video_url: `${process.env.R2_PUBLIC_URL}/${newBase}/master.mp4`,
+                        thumbnail_url: `${process.env.R2_PUBLIC_URL}/${newBase}/thumb.jpg`,
+                        sprite_url: `${process.env.R2_PUBLIC_URL}/${newBase}/sprite.jpg`
+                    }).eq('id', video.id);
+                    console.log(`✅ Video ${video.id} migrated.`);
+                } catch (err) {
+                    console.error(`❌ Video ${i} error:`, err.message);
+                }
+            }
+        }
+
+        // 3. Migrate Stories
+        const { data: stories } = await supabase.from('stories').select('*');
+        if (stories && videos) {
+            for (const story of stories) {
+                const matchingVideo = videos.find(v => v.id === story.id);
+                if (matchingVideo) {
+                    const newBase = `media/${mainUserId}/videos/${matchingVideo.id}`;
+                    await supabase.from('stories').update({
+                        video_url: `${process.env.R2_PUBLIC_URL}/${newBase}/master.mp4`,
+                        thumbnail_url: `${process.env.R2_PUBLIC_URL}/${newBase}/thumb.jpg`
+                    }).eq('id', story.id);
+                }
+            }
+        }
+
+        res.json({ success: true, message: "Migration triggered successfully. Check logs." });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 app.get('/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });

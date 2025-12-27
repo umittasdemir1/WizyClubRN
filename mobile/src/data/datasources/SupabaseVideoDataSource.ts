@@ -19,7 +19,7 @@ const USER_MAP: Record<string, { displayName: string; avatar: string }> = {
     'deniz_arslan': { displayName: 'Deniz Arslan', avatar: 'Deniz+Arslan' },
     'ceren_polat': { displayName: 'Ceren Polat', avatar: 'Ceren+Polat' },
     'kaan_erdogan': { displayName: 'Kaan Erdoğan', avatar: 'Kaan+Erdogan' },
-    'wizyclub-official': { displayName: 'WizyClub', avatar: 'Wizy+Club' },
+    '687c8079-e94c-42c2-9442-8a4a6b63dec6': { displayName: 'WizyClub', avatar: 'Wizy+Club' },
 };
 
 // Generate user from user_id
@@ -123,13 +123,16 @@ export class SupabaseVideoDataSource {
     }
 
     private mapToVideo(dto: SupabaseVideo): Video {
+        // Professional parsing might be needed if URLs in DB are relative, 
+        // but currently they are absolute. I'll ensure helper fields 
+        // match the IG/TikTok style.
         return {
             id: dto.id,
             videoUrl: dto.video_url,
             thumbnailUrl: dto.thumbnail_url,
             description: dto.description || '',
             likesCount: dto.likes_count || 0,
-            commentsCount: 0, // Bu şimdilik ayrı bir tablo olmadığı için 0
+            commentsCount: 0,
             sharesCount: dto.shares_count || 0,
             shopsCount: dto.shops_count || 0,
             spriteUrl: dto.sprite_url,

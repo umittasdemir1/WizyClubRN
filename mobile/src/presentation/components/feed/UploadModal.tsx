@@ -48,7 +48,7 @@ export function UploadModal({ isVisible, onClose }: UploadModalProps) {
     const [brandUrl, setBrandUrl] = useState('');
     const [isNoUrl, setIsNoUrl] = useState(false);
 
-    const [userId, setUserId] = useState('wizyclub-official');
+    const [userId, setUserId] = useState('687c8079-e94c-42c2-9442-8a4a6b63dec6');
 
     const { startUpload, setProgress, setStatus, setSuccess, setError } = useUploadStore();
 

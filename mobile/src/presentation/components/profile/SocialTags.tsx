@@ -2,10 +2,7 @@ import React from 'react';
 import { View, StyleSheet, TouchableOpacity, Linking } from 'react-native';
 import { FontAwesome6 } from '@expo/vector-icons';
 
-interface SocialLink {
-    platform: 'Instagram' | 'TikTok' | 'Youtube' | 'X' | 'Diğer';
-    url: string;
-}
+import { SocialLink } from '../../../domain/entities/SocialLink';
 
 interface SocialTagsProps {
     isDark: boolean;
@@ -44,10 +41,10 @@ export const SocialTags: React.FC<SocialTagsProps> = ({ isDark, links = [] }) =>
                         onPress={() => link.url && Linking.openURL(link.url)}
                         activeOpacity={0.7}
                     >
-                        <FontAwesome6 
-                            name={iconConfig.name} 
-                            size={22} 
-                            color={iconColor} 
+                        <FontAwesome6
+                            name={iconConfig.name}
+                            size={22}
+                            color={iconColor}
                         />
                     </TouchableOpacity>
                 );

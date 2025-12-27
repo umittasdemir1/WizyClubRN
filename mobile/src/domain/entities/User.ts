@@ -1,8 +1,4 @@
-export interface SocialLink {
-    id: string;
-    platform: string;
-    url: string;
-}
+import { SocialLink } from './SocialLink';
 
 export interface User {
     id: string;
@@ -20,3 +16,5 @@ export interface User {
     postsCount?: number;
     socialLinks?: SocialLink[];
 }
+
+export type { SocialLink };

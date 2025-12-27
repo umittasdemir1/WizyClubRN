@@ -40,22 +40,13 @@ import { useUploadStore } from '../../src/presentation/store/useUploadStore';
 
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
 import { StoryBar } from '../../src/presentation/components/feed/StoryBar';
+import { useStoryViewer } from '../../src/presentation/hooks/useStoryViewer';
 
 import { COLORS } from '../../src/core/constants';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
-// Mock story users data
-const MOCK_STORY_USERS = [
-    { id: '1', username: 'zeynep.k', avatarUrl: 'https://i.pravatar.cc/150?img=1', hasUnseenStory: true },
-    { id: '2', username: 'ahmet_y', avatarUrl: 'https://i.pravatar.cc/150?img=2', hasUnseenStory: true },
-    { id: '3', username: 'elif.oz', avatarUrl: 'https://i.pravatar.cc/150?img=3', hasUnseenStory: false },
-    { id: '4', username: 'mehmet.a', avatarUrl: 'https://i.pravatar.cc/150?img=4', hasUnseenStory: true },
-    { id: '5', username: 'ayse_m', avatarUrl: 'https://i.pravatar.cc/150?img=5', hasUnseenStory: false },
-    { id: '6', username: 'can.demir', avatarUrl: 'https://i.pravatar.cc/150?img=6', hasUnseenStory: true },
-    { id: '7', username: 'selin.y', avatarUrl: 'https://i.pravatar.cc/150?img=7', hasUnseenStory: false },
-    { id: '8', username: 'burak_k', avatarUrl: 'https://i.pravatar.cc/150?img=8', hasUnseenStory: true },
-];
+// MOCK_STORY_USERS removed - using real data
 
 const VIEWABILITY_CONFIG = {
     itemVisiblePercentThreshold: 60,
@@ -79,6 +70,21 @@ export default function FeedScreen() {
         loadMore,
         deleteVideo,
     } = useVideoFeed();
+
+    const { stories: storyListData } = useStoryViewer();
+
+    // Group stories by user for StoryBar
+    const storyUsers = storyListData.reduce((acc: any[], story) => {
+        if (!acc.find(u => u.id === story.user.id)) {
+            acc.push({
+                id: story.user.id,
+                username: story.user.username,
+                avatarUrl: story.user.avatarUrl,
+                hasUnseenStory: !story.isViewed
+            });
+        }
+        return acc;
+    }, []);
 
     // Global Store
     const setActiveVideo = useActiveVideoStore((state) => state.setActiveVideo);
@@ -266,7 +272,7 @@ export default function FeedScreen() {
             if (!isPaused) {
                 togglePause();
             }
-        } 
+        }
         // Kapanma durumunda (foryou) video resume işlemini StoryBar'ın 
         // onClose callback'i içinde animasyondan sonra yapacağız.
     }, [togglePause]);
@@ -583,15 +589,15 @@ export default function FeedScreen() {
                 {/* Story Bar - Yukarıdan Slide Down */}
                 <StoryBar
                     isVisible={activeTab === 'stories'}
-                    storyUsers={MOCK_STORY_USERS}
+                    storyUsers={storyUsers}
                     onAvatarPress={handleStoryAvatarPress}
                     onClose={handleCloseStoryBar}
                 />
 
                 {/* Touch Interceptor Overlay - Appears only when bar is open */}
                 {activeTab === 'stories' && (
-                    <Pressable 
-                        style={styles.touchInterceptor} 
+                    <Pressable
+                        style={styles.touchInterceptor}
                         onPress={handleCloseStoryBar}
                     />
                 )}
