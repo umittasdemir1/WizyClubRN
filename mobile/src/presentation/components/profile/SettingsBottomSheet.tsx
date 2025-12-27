@@ -25,7 +25,7 @@ export const SettingsBottomSheet = forwardRef<BottomSheet, SettingsBottomSheetPr
         index={-1}
         snapPoints={snapPoints}
         enablePanDownToClose
-        backgroundStyle={{ backgroundColor: bgColor }}
+        backgroundStyle={{ backgroundColor: bgColor, borderTopLeftRadius: 40, borderTopRightRadius: 40 }}
         handleIndicatorStyle={{ backgroundColor: handleColor }}
         enableOverDrag={false}
       >

@@ -112,7 +112,7 @@ export const DeletedContentSheet = React.forwardRef<BottomSheet, DeletedContentS
             index={-1}
             snapPoints={snapPoints}
             enablePanDownToClose
-            backgroundStyle={{ backgroundColor: isDark ? '#000' : '#fff' }}
+            backgroundStyle={{ backgroundColor: isDark ? '#000' : '#fff', borderTopLeftRadius: 40, borderTopRightRadius: 40 }}
             handleIndicatorStyle={{ backgroundColor: isDark ? '#fff' : '#000' }}
             backdropComponent={(props) => (
                 <BottomSheetBackdrop {...props} opacity={0.5} disappearsOnIndex={-1} />

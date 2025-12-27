@@ -16,7 +16,7 @@ export const MoreOptionsSheet = forwardRef<BottomSheet, MoreOptionsSheetProps>((
             index={-1}
             snapPoints={snapPoints}
             enablePanDownToClose
-            backgroundStyle={{ backgroundColor: '#1a1a1a' }}
+            backgroundStyle={{ backgroundColor: '#1a1a1a', borderTopLeftRadius: 40, borderTopRightRadius: 40 }}
             handleIndicatorStyle={{ backgroundColor: 'white' }}
         >
             <BottomSheetView style={styles.contentContainer}>

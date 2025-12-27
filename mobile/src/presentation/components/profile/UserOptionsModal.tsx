@@ -25,7 +25,7 @@ export const UserOptionsModal = ({ visible, username, onClose, onAction }: UserO
             <View style={styles.content}>
                 <Text style={styles.title}>@{username}</Text>
             </View>
-            
+
             <View style={styles.separator} />
             <TouchableOpacity style={styles.button} onPress={() => handleActionPress('block')}>
                 <Text style={[styles.buttonText, styles.destructiveText]}>Engelle</Text>
@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
     container: {
         width: 270,
         backgroundColor: '#1C1C1E',
-        borderRadius: 14,
+        borderRadius: 32,
         overflow: 'hidden',
     },
     content: {

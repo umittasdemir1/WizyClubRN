@@ -1,5 +1,5 @@
 import React, { forwardRef, useState, useMemo, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, Pressable, Dimensions, ScrollView } from 'react-native';
+import { Dimensions, ScrollView, View, Text, StyleSheet, TouchableOpacity, Image, Modal, Pressable } from 'react-native';
 import BottomSheet, { BottomSheetView, BottomSheetTextInput, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { RefreshCcw, XCircle, ChevronRight, PlusCircle, Trash2 } from 'lucide-react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -7,11 +7,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { useThemeStore } from '../../store/useThemeStore';
 import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-
 import { User } from '../../../domain/entities/User';
 import { SocialLink } from '../../../domain/entities/SocialLink';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface EditProfileSheetProps {
   user: User;
@@ -421,11 +420,15 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
       <>
         <BottomSheet
           ref={ref}
-          index={-1}
           snapPoints={snapPoints}
           enablePanDownToClose={activeSubView === null}
-          backgroundStyle={{ backgroundColor: bgColor }}
+          backgroundStyle={{
+            backgroundColor: bgColor,
+            borderTopLeftRadius: 40,
+            borderTopRightRadius: 40,
+          }}
           handleIndicatorStyle={{ backgroundColor: handleColor }}
+          index={-1}
         >
           <BottomSheetView style={styles.container}>
             {activeSubView === null && renderMainView()}

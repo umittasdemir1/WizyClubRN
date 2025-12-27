@@ -15,7 +15,7 @@ export const ShoppingSheet = forwardRef<BottomSheet, ShoppingSheetProps>((props,
             index={-1} // Closed by default
             snapPoints={snapPoints}
             enablePanDownToClose
-            backgroundStyle={{ backgroundColor: '#1a1a1a' }}
+            backgroundStyle={{ backgroundColor: '#1a1a1a', borderTopLeftRadius: 40, borderTopRightRadius: 40 }}
             handleIndicatorStyle={{ backgroundColor: 'white' }}
         >
             <BottomSheetView style={styles.contentContainer}>

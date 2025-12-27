@@ -24,7 +24,7 @@ export const BioBottomSheet = forwardRef<BottomSheet, BioBottomSheetProps>(
         index={-1}
         snapPoints={snapPoints}
         enablePanDownToClose
-        backgroundStyle={{ backgroundColor: bgColor }}
+        backgroundStyle={{ backgroundColor: bgColor, borderTopLeftRadius: 40, borderTopRightRadius: 40 }}
         handleIndicatorStyle={{ backgroundColor: handleColor }}
       >
         <BottomSheetView style={styles.container}>

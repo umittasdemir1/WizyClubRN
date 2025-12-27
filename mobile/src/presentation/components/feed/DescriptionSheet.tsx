@@ -14,7 +14,7 @@ import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { ChevronLeft, MoreVertical } from 'lucide-react-native';
 import { Avatar } from '../shared/Avatar';
 import { Video } from '../../../domain/entities/Video';
-import { useThemeStore } from '../../store/useThemeStore';  // 👈 BUNU EKLE
+import { useThemeStore } from '../../store/useThemeStore';
 
 interface DescriptionSheetProps {
     visible: boolean;
@@ -33,7 +33,7 @@ export function DescriptionSheet({
     onFollowPress,
 }: DescriptionSheetProps) {
     const insets = useSafeAreaInsets();
-    const isDark = useThemeStore(state => state.isDark);  // 👈 Bunu ekle
+    const isDark = useThemeStore(state => state.isDark);
     const translateY = useSharedValue(SCREEN_HEIGHT);
     const overlayOpacity = useSharedValue(0);
 
@@ -117,86 +117,86 @@ export function DescriptionSheet({
             <Animated.View
                 style={[
                     styles.sheet,
-                    { 
-                    height: SHEET_HEIGHT, 
-                    paddingBottom: insets.bottom + 16,
-                    backgroundColor: isDark ? '#121212' : '#FFFFFF',  // 👈 Bunu ekle
+                    {
+                        height: SHEET_HEIGHT,
+                        paddingBottom: insets.bottom + 16,
+                        backgroundColor: isDark ? '#121212' : '#FFFFFF',
                     },
                     sheetStyle,
                 ]}
                 pointerEvents={visible ? 'auto' : 'none'}
             >
-                    {/* Drag Handle Indicator */}
-                    <GestureDetector gesture={panGesture}>
-                        <View style={styles.handleContainer}>
-                            <View style={[styles.handle, { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)' }]} />
-                        </View>
-                    </GestureDetector>
+                {/* Drag Handle Indicator */}
+                <GestureDetector gesture={panGesture}>
+                    <View style={styles.handleContainer}>
+                        <View style={[styles.handle, { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)' }]} />
+                    </View>
+                </GestureDetector>
 
-                    {/* Header Section */}
-                    <View style={[styles.header, { paddingTop: 8 }]}>
-                        <View style={styles.headerLeft}>
-                            <Pressable
-                                onPress={onClose}
-                                style={styles.backButton}
-                                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                            >
-                                <ChevronLeft size={28} color={isDark ? 'white' : 'black'} />
-                            </Pressable>
+                {/* Header Section */}
+                <View style={[styles.header, { paddingTop: 8 }]}>
+                    <View style={styles.headerLeft}>
+                        <Pressable
+                            onPress={onClose}
+                            style={styles.backButton}
+                            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                        >
+                            <ChevronLeft size={28} color={isDark ? 'white' : 'black'} />
+                        </Pressable>
 
-                            {video && (
-                                <>
-                                    <Avatar url={video.user.avatarUrl} size={44} hasBorder={true} />
-                                    <View style={styles.userInfo}>
-                                        <Text style={[styles.fullName, { color: isDark ? 'white' : 'black' }]}>
-                                            {video.user.username}
-                                        </Text>
-                                        <Text style={[styles.username, { color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)' }]}>
-                                            @{video.user.id.toLowerCase().replace(/\s+/g, '_')}
-                                        </Text>
-                                    </View>
-                                </>
-                            )}
-                        </View>
-
-                        <View style={styles.headerRight}>
-                            {!video?.user.isFollowing && (
-                                <Pressable
-                                    style={[
-                                        styles.followPill,
-                                        { 
-                                            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
-                                            borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)',
-                                        }
-                                    ]}
-                                    onPress={onFollowPress}
-                                    hitSlop={8}
-                                >
-                                    <Text style={[styles.followText, { color: isDark ? 'white' : 'black' }]}>Takip Et</Text>
-                                </Pressable>
-                            )}
-                            <Pressable
-                                onPress={handleInternalMore}
-                                style={styles.moreButton}
-                                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                            >
-                                <MoreVertical size={24} color={isDark ? 'white' : 'black'} />
-                            </Pressable>
-                        </View>
+                        {video && (
+                            <>
+                                <Avatar url={video.user.avatarUrl} size={44} hasBorder={true} />
+                                <View style={styles.userInfo}>
+                                    <Text style={[styles.fullName, { color: isDark ? 'white' : 'black' }]}>
+                                        {video.user.username}
+                                    </Text>
+                                    <Text style={[styles.username, { color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)' }]}>
+                                        @{video.user.id.toLowerCase().replace(/\s+/g, '_')}
+                                    </Text>
+                                </View>
+                            </>
+                        )}
                     </View>
 
-                    {/* Content Section */}
-                    <ScrollView
-                        style={styles.contentScroll}
-                        showsVerticalScrollIndicator={false}
-                        contentContainerStyle={styles.scrollContent}
-                    >
-                        <View style={styles.divider} />
-                        <Text style={[styles.fullDescription, { color: isDark ? 'white' : 'black' }]}>
-                            {video?.description}
-                        </Text>
-                    </ScrollView>
-                </Animated.View>
+                    <View style={styles.headerRight}>
+                        {!video?.user.isFollowing && (
+                            <Pressable
+                                style={[
+                                    styles.followPill,
+                                    {
+                                        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+                                        borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)',
+                                    }
+                                ]}
+                                onPress={onFollowPress}
+                                hitSlop={8}
+                            >
+                                <Text style={[styles.followText, { color: isDark ? 'white' : 'black' }]}>Takip Et</Text>
+                            </Pressable>
+                        )}
+                        <Pressable
+                            onPress={handleInternalMore}
+                            style={styles.moreButton}
+                            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                        >
+                            <MoreVertical size={24} color={isDark ? 'white' : 'black'} />
+                        </Pressable>
+                    </View>
+                </View>
+
+                {/* Content Section */}
+                <ScrollView
+                    style={styles.contentScroll}
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={styles.scrollContent}
+                >
+                    <View style={styles.divider} />
+                    <Text style={[styles.fullDescription, { color: isDark ? 'white' : 'black' }]}>
+                        {video?.description}
+                    </Text>
+                </ScrollView>
+            </Animated.View>
         </View>
     );
 }
@@ -212,8 +212,8 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         bottom: 0,
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
+        borderTopLeftRadius: 40,
+        borderTopRightRadius: 40,
         zIndex: 101,
     },
     handleContainer: {

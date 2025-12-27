@@ -56,7 +56,7 @@ const styles = StyleSheet.create({
     container: {
         width: 270, // Standard iOS Alert width
         backgroundColor: '#1C1C1E', // iOS Dark Mode Alert Background
-        borderRadius: 14,
+        borderRadius: 32,
         overflow: 'hidden',
         alignItems: 'center',
     },

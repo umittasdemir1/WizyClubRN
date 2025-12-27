@@ -13,6 +13,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Request logging middleware
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+});
+
 // Set FFmpeg and FFprobe paths explicitly using static binaries
 const ffmpegStatic = require('ffmpeg-static');
 const ffprobeStatic = require('@ffprobe-installer/ffprobe').path;
@@ -49,11 +55,11 @@ async function uploadToR2(filePath, fileName, contentType) {
     return `${process.env.R2_PUBLIC_URL}/${fileName}`;
 }
 
-// console.log('6. Loading HlsService...');
-// const HlsService = require('./services/HlsService');
-// console.log('7. Initializing HlsService...');
-// const hlsService = new HlsService(r2, process.env.R2_BUCKET_NAME);
-// console.log('8. HlsService READY.');
+console.log('6. Loading HlsService...');
+const HlsService = require('./services/HlsService');
+console.log('7. Initializing HlsService...');
+const hlsService = new HlsService(r2, process.env.R2_BUCKET_NAME);
+console.log('8. HlsService READY.');
 
 // Endpoint: HLS Video Upload
 app.post('/upload-hls', upload.single('video'), async (req, res) => {
@@ -77,7 +83,11 @@ app.post('/upload-hls', upload.single('video'), async (req, res) => {
     const thumbFileName = `${baseKey}/thumb.jpg`;
     const processedThumbPath = path.join(tempOutputDir, `thumb_${uniqueId}.jpg`);
 
-    console.log(`🎬 [HLS] Processing: ${file.originalname} (ID: ${uniqueId})`);
+    console.log(`\n🎬 [HLS] --- NEW UPLOAD START ---`);
+    console.log(`🎬 [HLS] File: ${file.originalname}`);
+    console.log(`🎬 [HLS] ID: ${uniqueId}`);
+    console.log(`🎬 [HLS] UserID: ${userId}`);
+    console.log(`🎬 [HLS] Description: ${description}`);
 
     // Early response to client (Optimistic UI)? 
     // No, let's keep it sync for the MVP to ensure success, 
@@ -140,8 +150,9 @@ app.post('/upload-hls', upload.single('video'), async (req, res) => {
         } else {
             // Option B: Smart Optimized MP4 (1080p, CRF 23)
             console.log('⚡ [MP4] Smart Optimization Starting...');
-
+            console.log(`   📂 Input: ${inputPath}`);
             const optimizedPath = path.join(tempOutputDir, `optimized_${uniqueId}.mp4`);
+            console.log(`   📂 Output: ${optimizedPath}`);
 
             await new Promise((resolve, reject) => {
                 ffmpeg(inputPath)
@@ -176,6 +187,7 @@ app.post('/upload-hls', upload.single('video'), async (req, res) => {
             console.log(`   📉 Size: ${(originalStats.size / 1024 / 1024).toFixed(2)}MB -> ${(optimizedStats.size / 1024 / 1024).toFixed(2)}MB`);
 
             const mp4Key = `${baseKey}/master.mp4`;
+            console.log(`🚀 [R2] Uploading MP4 to: ${mp4Key}...`);
             await uploadToR2(optimizedPath, mp4Key, 'video/mp4');
             videoUrl = `${process.env.R2_PUBLIC_URL}/${mp4Key}`;
             console.log(`🔗 [VIDEO URL] Optimized MP4 URL: ${videoUrl}`);
@@ -185,7 +197,7 @@ app.post('/upload-hls', upload.single('video'), async (req, res) => {
         }
 
         // Step 2.5: Generate Sprite Sheet (2s intervals)
-        // CRITICAL: We generate sprites even for MP4 mode so seekbar preview works!
+        console.log(`🖼️ [SPRITE] Generating sprite sheet for ${duration}s video...`);
         const spriteUrl = await hlsService.generateSpriteSheet(inputPath, tempOutputDir, uniqueId, duration);
         console.log(`🖼️ [SPRITE] Generated sprite URL: ${spriteUrl}`);
 
@@ -513,8 +525,11 @@ app.get('/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-app.listen(process.env.PORT, () => {
-    console.log(`🚀 Video Backend running on http://localhost:${process.env.PORT}`);
-    console.log(`📦 Target Bucket: "${process.env.R2_BUCKET_NAME}"`); // DEBUG LOG
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Video Backend running on http://0.0.0.0:${PORT}`);
+    console.log(`🏠 Local Access: http://localhost:${PORT}`);
+    console.log(`🌐 Network Access: http://192.168.0.138:${PORT}`);
+    console.log(`📦 Target Bucket: "${process.env.R2_BUCKET_NAME}"`);
     console.log(`📡 Ready to accept uploads`);
 });

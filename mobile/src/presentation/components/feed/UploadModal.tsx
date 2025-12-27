@@ -295,8 +295,8 @@ const styles = StyleSheet.create({
     },
     content: {
         backgroundColor: '#1E293B',
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
+        borderTopLeftRadius: 40,
+        borderTopRightRadius: 40,
         padding: 24,
         paddingBottom: 40,
         gap: 16,
