@@ -39,6 +39,9 @@ import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import { DeletedContentSheet } from '../../src/presentation/components/profile/DeletedContentSheet';
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
 import { LIGHT_COLORS, DARK_COLORS } from '../../src/core/constants';
+import { UserRepositoryImpl } from '../../src/data/repositories/UserRepositoryImpl';
+import { GetUserProfileUseCase } from '../../src/domain/usecases/GetUserProfileUseCase';
+import { ProfileSkeleton } from '../../src/presentation/components/profile/ProfileSkeleton';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -128,6 +131,7 @@ export default function ProfileScreen() {
 
   const { videos, refreshFeed } = useVideoFeed();
   const [refreshing, setRefreshing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [previewItem, setPreviewItem] = useState<{ id: string; thumbnail: string; videoUrl: string } | null>(null);
 
   const bioSheetRef = useRef<BottomSheet>(null);
@@ -161,14 +165,52 @@ export default function ProfileScreen() {
   const pagerRef = useRef<PagerView>(null);
   const [activeTab, setActiveTab] = useState(0);
 
-  // Static user data (Current User)
+  // Profile Data State - Start empty to avoid flashing old data
+  const [profileData, setProfileData] = useState({
+    name: '',
+    username: '',
+    avatarUrl: '',
+    bio: '',
+    followersCount: 0,
+    followingCount: 0,
+  });
+
+  // Fetch real user data
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const repo = new UserRepositoryImpl();
+        const useCase = new GetUserProfileUseCase(repo);
+        const fetchedUser = await useCase.execute('wizyclub-official');
+
+        if (fetchedUser) {
+          setProfileData({
+            name: fetchedUser.fullName || fetchedUser.username,
+            username: fetchedUser.username,
+            avatarUrl: fetchedUser.avatarUrl,
+            bio: fetchedUser.bio || "No bio yet.",
+            followersCount: typeof fetchedUser.followersCount === 'number' ? fetchedUser.followersCount : 0,
+            followingCount: typeof fetchedUser.followingCount === 'number' ? fetchedUser.followingCount : 0,
+          });
+          
+          if (fetchedUser.socialLinks) {
+            setSocialLinks(fetchedUser.socialLinks);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch profile:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchUser();
+  }, []);
+
+  // Derived User Object
   const user = {
-    name: 'WizyClub',
-    username: 'wizyclub-official',
-    avatarUrl: 'https://i.pravatar.cc/300?img=12',
-    bio: "Explore the world through our lens. Official WizyClub account showcasing the best travel moments, hidden gems, and community highlights. Join us on this journey! 🌍✈️🚀",
-    followingCount: '12',
-    followersCount: '1.2M',
+    ...profileData,
+    followingCount: profileData.followingCount,
+    followersCount: profileData.followersCount,
     socialLinks: socialLinks, 
   };
 
@@ -223,7 +265,8 @@ export default function ProfileScreen() {
       ]}>
         <View style={styles.topNav}>
           <View style={styles.navIcon} />
-          <Text style={[styles.headerUsername, { color: textPrimary }]}>@{user.username}</Text>
+          {/* Show username only if not loading */}
+          <Text style={[styles.headerUsername, { color: textPrimary }]}>{!isLoading ? `@${user.username}` : ''}</Text>
           <TouchableOpacity 
             style={styles.navIcon} 
             onPress={() => settingsSheetRef.current?.expand()}
@@ -242,55 +285,59 @@ export default function ProfileScreen() {
           contentContainerStyle={{ paddingTop: insets.top + 60 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={isDark ? "#fff" : "#000"} progressViewOffset={insets.top + 60} />}
         >
-          <View style={styles.profileContainer}>
-            <ProfileStats followingCount={user.followingCount} followingAvatars={followingAvatars} followersCount={user.followersCount} followersAvatars={followersAvatars} mainAvatarUrl={user.avatarUrl} isDark={isDark} />
-            
-            <View style={styles.userNameRow}>
-              <Text style={[styles.userNameText, { color: textPrimary }]}>{user.name}</Text>
-              <VerifiedBadge />
-            </View>
+          {isLoading ? (
+            <ProfileSkeleton />
+          ) : (
+            <View style={styles.profileContainer}>
+              <ProfileStats followingCount={user.followingCount} followingAvatars={followingAvatars} followersCount={user.followersCount} followersAvatars={followersAvatars} mainAvatarUrl={user.avatarUrl} isDark={isDark} />
+              
+              <View style={styles.userNameRow}>
+                <Text style={[styles.userNameText, { color: textPrimary }]}>{user.name}</Text>
+                <VerifiedBadge />
+              </View>
 
-            <TouchableOpacity onPress={() => bioSheetRef.current?.expand()} disabled={user.bio.length <= bioLimit}>
-              <Text style={[styles.bioText, { color: textSecondary }]}>
-                {truncatedBio}
-                {user.bio.length > bioLimit && <Text style={{ color: textPrimary, fontWeight: '600' }}> devamını gör</Text>}
-              </Text>
-            </TouchableOpacity>
-
-            {/* ACTION BUTTONS: Edit Profile & Share Profile */}
-            <View style={styles.actionsContainer}>
-              <TouchableOpacity 
-                style={[styles.btnAction, { backgroundColor: btnEditBg }]} 
-                onPress={() => editProfileSheetRef.current?.expand()}
-              >
-                <Text style={[styles.btnActionText, { color: btnEditText }]}>Profili Düzenle</Text>
+              <TouchableOpacity onPress={() => bioSheetRef.current?.expand()} disabled={user.bio.length <= bioLimit}>
+                <Text style={[styles.bioText, { color: textSecondary }]}>
+                  {truncatedBio}
+                  {user.bio.length > bioLimit && <Text style={{ color: textPrimary, fontWeight: '600' }}> devamını gör</Text>}
+                </Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
-                style={[styles.btnAction, { backgroundColor: btnEditBg }]} 
-                onPress={() => console.log('Share Profile')}
-              >
-                <Text style={[styles.btnActionText, { color: btnEditText }]}>Profili Paylaş</Text>
-              </TouchableOpacity>
-            </View>
+              {/* ACTION BUTTONS: Edit Profile & Share Profile */}
+              <View style={styles.actionsContainer}>
+                <TouchableOpacity 
+                  style={[styles.btnAction, { backgroundColor: btnEditBg }]} 
+                  onPress={() => editProfileSheetRef.current?.expand()}
+                >
+                  <Text style={[styles.btnActionText, { color: btnEditText }]}>Profili Düzenle</Text>
+                </TouchableOpacity>
 
-            {/* SOCIAL & CLUBS COMBINED ROW */}
-            <View style={styles.socialClubsRow}>
-              {socialLinks && socialLinks.length > 0 && (
-                <>
-                  <SocialTags isDark={isDark} links={socialLinks} />
-                  <View style={[styles.verticalSeparator, { backgroundColor: isDark ? '#444' : '#ccc' }]} />
-                </>
-              )}
+                <TouchableOpacity 
+                  style={[styles.btnAction, { backgroundColor: btnEditBg }]} 
+                  onPress={() => console.log('Share Profile')}
+                >
+                  <Text style={[styles.btnActionText, { color: btnEditText }]}>Profili Paylaş</Text>
+                </TouchableOpacity>
+              </View>
 
-              <ClubsCollaboration 
-                clubsCount={clubs.length} 
-                clubLogos={clubLogos} 
-                isDark={isDark} 
-                onPress={() => clubsSheetRef.current?.expand()} 
-              />
+              {/* SOCIAL & CLUBS COMBINED ROW */}
+              <View style={styles.socialClubsRow}>
+                {socialLinks && socialLinks.length > 0 && (
+                  <>
+                    <SocialTags isDark={isDark} links={socialLinks} />
+                    <View style={[styles.verticalSeparator, { backgroundColor: isDark ? '#444' : '#ccc' }]} />
+                  </>
+                )}
+
+                <ClubsCollaboration 
+                  clubsCount={clubs.length} 
+                  clubLogos={clubLogos} 
+                  isDark={isDark} 
+                  onPress={() => clubsSheetRef.current?.expand()} 
+                />
+              </View>
             </View>
-          </View>
+          )}
 
           <View style={[styles.navTabs, { borderBottomColor: cardBg }]}>
             <TouchableOpacity style={[styles.tab, activeTab === 0 && [styles.activeTab, { borderBottomColor: textPrimary }]]} onPress={() => handleTabPress(0)}><GridIcon color={activeTab === 0 ? textPrimary : textSecondary} /></TouchableOpacity>

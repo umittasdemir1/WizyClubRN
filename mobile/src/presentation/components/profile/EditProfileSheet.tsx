@@ -49,12 +49,16 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
     const [isPlatformPickerVisible, setIsPlatformPickerVisible] = useState(false);
     const [activeLinkId, setActiveLinkId] = useState<string | null>(null);
 
-    // Sync internal socialLinks when user prop changes
+    // Sync internal state when user prop changes
     useEffect(() => {
+      setTempName(user.name);
+      setTempUsername(user.username);
+      setTempBio(user.bio);
+      setCurrentAvatar(user.avatarUrl);
       if (user.socialLinks) {
         setSocialLinks(user.socialLinks);
       }
-    }, [user.socialLinks]);
+    }, [user]);
 
     const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
     

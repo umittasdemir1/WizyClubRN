@@ -1,47 +1,31 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+# General
+.DS_Store
+.idea
+.vscode
+*.log
+*.tmp
+tmp/
 
-# dependencies
+# Dependencies
 node_modules/
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# Build Outputs
+dist/
+build/
+android/app/build/
+ios/Pods/
 
 # Expo
 .expo/
-dist/
-web-build/
-expo-env.d.ts
 
-# Native
-.kotlin/
-*.orig.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
-
-# Metro
-.metro-health-check*
-
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
-
-# macOS
-.DS_Store
-*.pem
-
-# local env files
-.env*.local
-
-# typescript
-*.tsbuildinfo
-
-# generated native folders
-/ios
-/android
-
-# Backend
-wizy-backend/temp_uploads/
-wizy-backend/*.mp4
-wizy-backend/test_*.py
-wizy-backend/.env
+# Wizy Specific
+*.mp4
+*.mov
+debug-output.log
+dump-output.log
+audit_log.txt
