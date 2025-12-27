@@ -208,7 +208,7 @@ export function StoryPage({
                         muted={false}
                         onLoad={handleLoad}
                     />
-                    
+
                     {/* Tap Zones inside video container */}
                     <View style={styles.tapZones} pointerEvents="box-none">
                         <Pressable
@@ -269,6 +269,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         width: '100%',
         overflow: 'hidden',
+        backgroundColor: '#000000',
     },
     videoCover: {
         width: SCREEN_WIDTH,

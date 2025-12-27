@@ -1,0 +1,60 @@
+[2025-12-26T20:32:50.128Z] Starting R2-MCP wrapper...
+[2025-12-26T20:32:51.478Z] STDOUT: Failed to refresh access token
+
+[2025-12-26T20:32:51.478Z] STDERR: [DEBUG 2025-12-26T20:32:51.468Z] Config loaded: {"accountId":"✗","apiToken":"✗"}
+[DEBUG 2025-12-26T20:32:51.470Z] Starting server...
+[DEBUG 2025-12-26T20:32:51.470Z] Created transport
+[DEBUG 2025-12-26T20:32:51.471Z] Server connected and running
+
+[2025-12-26T20:33:39.416Z] Starting R2-MCP wrapper...
+[2025-12-26T20:33:40.538Z] STDOUT: Failed to refresh access token
+
+[2025-12-26T20:33:40.539Z] STDERR: [DEBUG 2025-12-26T20:33:40.538Z] Config loaded: {"accountId":"✗","apiToken":"✗"}
+
+[2025-12-26T20:33:40.539Z] STDERR: [DEBUG 2025-12-26T20:33:40.539Z] Starting server...
+[DEBUG 2025-12-26T20:33:40.539Z] Created transport
+
+[2025-12-26T20:33:40.539Z] STDERR: [DEBUG 2025-12-26T20:33:40.539Z] Server connected and running
+
+[2025-12-26T20:33:40.541Z] STDOUT: {"result":{"protocolVersion":"2024-11-05","capabilities":{"tools":{}},"serverInfo":{"name":"cloudflare","version":"1.0.0"}},"jsonrpc":"2.0","id":1}
+
+[2025-12-26T20:33:40.569Z] Exited with code 0
+[2025-12-26T20:35:39.118Z] Starting R2-MCP wrapper...
+[2025-12-26T20:35:40.194Z] STDOUT: Failed to refresh access token
+
+[2025-12-26T20:35:40.195Z] STDERR: [DEBUG 2025-12-26T20:35:40.194Z] Config loaded: {"accountId":"✗","apiToken":"✗"}
+
+[2025-12-26T20:35:40.195Z] STDERR: [DEBUG 2025-12-26T20:35:40.195Z] Starting server...
+[DEBUG 2025-12-26T20:35:40.195Z] Created transport
+
+[2025-12-26T20:35:40.195Z] STDERR: [DEBUG 2025-12-26T20:35:40.195Z] Server connected and running
+
+[2025-12-26T20:35:40.197Z] STDOUT: {"result":{"protocolVersion":"2024-11-05","capabilities":{"tools":{}},"serverInfo":{"name":"cloudflare","version":"1.0.0"}},"jsonrpc":"2.0","id":1}
+
+[2025-12-26T20:35:40.221Z] Exited with code 0
+[2025-12-26T20:41:22.032Z] Starting R2-MCP wrapper...
+[2025-12-26T20:41:23.065Z] STDOUT: Failed to refresh access token
+
+[2025-12-26T20:41:23.065Z] STDERR: [DEBUG 2025-12-26T20:41:23.061Z] Config loaded: {"accountId":"✗","apiToken":"✗"}
+[DEBUG 2025-12-26T20:41:23.062Z] Starting server...
+
+[2025-12-26T20:41:23.065Z] STDERR: [DEBUG 2025-12-26T20:41:23.062Z] Created transport
+
+[2025-12-26T20:41:23.066Z] STDERR: [DEBUG 2025-12-26T20:41:23.063Z] Server connected and running
+
+[2025-12-26T20:41:23.069Z] STDOUT: {"result":{"protocolVersion":"2024-11-05","capabilities":{"tools":{}},"serverInfo":{"name":"cloudflare","version":"1.0.0"}},"jsonrpc":"2.0","id":1}
+
+[2025-12-26T20:41:23.096Z] Exited with code 0
+[2025-12-26T20:42:44.763Z] Starting R2-MCP wrapper...
+[2025-12-26T20:42:45.866Z] STDOUT: Failed to refresh access token
+
+[2025-12-26T20:42:45.866Z] STDERR: [DEBUG 2025-12-26T20:42:45.865Z] Config loaded: {"accountId":"✗","apiToken":"✗"}
+
+[2025-12-26T20:42:45.866Z] STDERR: [DEBUG 2025-12-26T20:42:45.866Z] Starting server...
+[DEBUG 2025-12-26T20:42:45.866Z] Created transport
+
+[2025-12-26T20:42:45.867Z] STDERR: [DEBUG 2025-12-26T20:42:45.867Z] Server connected and running
+
+[2025-12-26T20:42:45.869Z] STDOUT: {"result":{"protocolVersion":"2024-11-05","capabilities":{"tools":{}},"serverInfo":{"name":"cloudflare","version":"1.0.0"}},"jsonrpc":"2.0","id":1}
+
+[2025-12-26T20:42:45.901Z] Exited with code 0

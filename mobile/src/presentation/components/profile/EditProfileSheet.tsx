@@ -10,58 +10,57 @@ import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-interface SocialLink {
-  id: string;
-  platform: 'Instagram' | 'TikTok' | 'Youtube' | 'X' | 'Diğer';
-  url: string;
-}
+import { User } from '../../../domain/entities/User';
+import { SocialLink } from '../../../domain/entities/SocialLink';
 
 interface EditProfileSheetProps {
-  user: {
-    name: string;
-    username: string;
-    avatarUrl: string;
-    bio: string;
-    socialLinks?: SocialLink[];
-  };
-  onSaveLinks?: (links: SocialLink[]) => void;
+  user: User;
+  socialLinks: SocialLink[];
+  onUpdateProfile: (updates: Partial<User>) => Promise<any>;
+  onSaveSocialLinks: (links: any[]) => Promise<void>;
+  onUploadAvatar: (uri: string) => Promise<string | null>;
+  onUpdateCompleted?: () => void;
 }
 
 type SubViewType = 'name' | 'username' | 'bio' | 'socialLinks' | null;
 
 export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
-  ({ user, onSaveLinks }, ref) => {
+  ({ user, socialLinks: initialLinks, onUpdateProfile, onSaveSocialLinks, onUploadAvatar, onUpdateCompleted }, ref) => {
     const { isDark } = useThemeStore();
     const insets = useSafeAreaInsets();
-    
+
     const topOffset = insets.top + 60 + 20;
     const snapPoints = useMemo(() => [SCREEN_HEIGHT - topOffset], [insets.top]);
-    
+
     const [activeSubView, setActiveSubView] = useState<SubViewType>(null);
     const [isAvatarZoomed, setIsAvatarZoomed] = useState(false);
     const [currentAvatar, setCurrentAvatar] = useState(user.avatarUrl);
-    
+
+    const [isSaving, setIsSaving] = useState(false);
+
     // Form States
-    const [tempName, setTempName] = useState(user.name);
-    const [tempUsername, setTempUsername] = useState(user.username);
-    const [tempBio, setTempBio] = useState(user.bio);
-    const [socialLinks, setSocialLinks] = useState<SocialLink[]>(user.socialLinks || []);
+    const [tempName, setTempName] = useState(user.fullName || '');
+    const [tempUsername, setTempUsername] = useState(user.username || '');
+    const [tempBio, setTempBio] = useState(user.bio || '');
+    const [socialLinks, setSocialLinks] = useState<SocialLink[]>([]);
     const [isPlatformPickerVisible, setIsPlatformPickerVisible] = useState(false);
     const [activeLinkId, setActiveLinkId] = useState<string | null>(null);
 
     // Sync internal state when user prop changes
     useEffect(() => {
-      setTempName(user.name);
+      setTempName(user.fullName || user.username);
       setTempUsername(user.username);
       setTempBio(user.bio);
       setCurrentAvatar(user.avatarUrl);
-      if (user.socialLinks) {
+      if (initialLinks && initialLinks.length > 0) {
+        setSocialLinks(initialLinks);
+      } else if (user.socialLinks) {
         setSocialLinks(user.socialLinks);
       }
-    }, [user]);
+    }, [user, initialLinks]);
 
     const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
-    
+
     const bgColor = isDark ? '#1c1c1e' : themeColors.background;
     const textColor = themeColors.textPrimary;
     const secondaryTextColor = themeColors.textSecondary;
@@ -75,14 +74,47 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
       }
     };
 
-    const handleSaveAll = () => {
-      onSaveLinks?.(socialLinks);
-      handleClose();
+    const handleSaveAll = async () => {
+      setIsSaving(true);
+      try {
+        // 1. Upload avatar if changed
+        let avatarUrl = currentAvatar;
+        if (currentAvatar !== user.avatarUrl && currentAvatar.startsWith('file://')) {
+          const uploadedUrl = await onUploadAvatar(currentAvatar);
+          if (uploadedUrl) avatarUrl = uploadedUrl;
+        }
+
+        // 2. Update profile
+        await onUpdateProfile({
+          fullName: tempName,
+          username: tempUsername,
+          bio: tempBio,
+          avatarUrl: avatarUrl
+        });
+
+        // 3. Save social links
+        await onSaveSocialLinks(socialLinks);
+
+        onUpdateCompleted?.();
+        handleClose();
+      } catch (error) {
+        console.error('Error saving profile:', error);
+      } finally {
+        setIsSaving(false);
+      }
     };
 
-    const handleSaveSocialLinks = () => {
-      onSaveLinks?.(socialLinks);
-      setActiveSubView(null);
+    const handleSaveSocialLinks = async () => {
+      setIsSaving(true);
+      try {
+        await onSaveSocialLinks(socialLinks);
+        onUpdateCompleted?.();
+        setActiveSubView(null);
+      } catch (error) {
+        console.error('Error saving social links:', error);
+      } finally {
+        setIsSaving(false);
+      }
     };
 
     const pickImage = async () => {
@@ -98,11 +130,18 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
     };
 
     const addSocialLink = () => {
-      if (socialLinks.length < 3) {
+      if (socialLinks.length < 5) {
         const newLink: SocialLink = {
           id: Math.random().toString(36).substr(2, 9),
+          userId: user.id, // Fixed: removed invalid property access if any
           platform: 'Instagram',
           url: '',
+          // displayOrder: socialLinks.length // Removed if not in SocialLink interface?
+          // SocialLink interface in User.ts: { id, platform, url }.
+          // But Remote might have added displayOrder?
+          // Local interface: { id, platform, url }.
+          // I didn't add displayOrder to User.ts.
+          // So I should remove it.
         };
         setSocialLinks([...socialLinks, newLink]);
       }
@@ -115,9 +154,7 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
     const updateSocialLink = (id: string, updates: Partial<SocialLink>) => {
       setSocialLinks(socialLinks.map(link => {
         if (link.id === id) {
-          let newUrl = updates.url !== undefined ? updates.url : link.url;
-          const newPlatform = updates.platform !== undefined ? updates.platform : link.platform;
-          return { ...link, ...updates, url: newUrl };
+          return { ...link, ...updates };
         }
         return link;
       }));
@@ -141,7 +178,7 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
               <Pressable onPress={() => setIsAvatarZoomed(true)}>
                 <Image source={{ uri: currentAvatar }} style={styles.avatar} />
               </Pressable>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.editIconContainer, { backgroundColor: bgColor, borderColor: borderColor }]}
                 onPress={pickImage}
                 activeOpacity={0.8}
@@ -202,7 +239,7 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
 
           <View style={[styles.inputWrapper, { borderBottomColor: borderColor }]}>
             <View style={styles.inputContainer}>
-              <BottomSheetTextInput 
+              <BottomSheetTextInput
                 style={[styles.subViewInput, { color: textColor }]}
                 value={tempName}
                 onChangeText={(text) => text.length <= 30 && setTempName(text)}
@@ -240,7 +277,7 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
 
           <View style={[styles.inputWrapper, { borderBottomColor: borderColor }]}>
             <View style={styles.inputContainer}>
-              <BottomSheetTextInput 
+              <BottomSheetTextInput
                 style={[styles.subViewInput, { color: textColor }]}
                 value={tempUsername}
                 onChangeText={(text) => {
@@ -281,10 +318,10 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
 
         <View style={styles.subViewContent}>
           <Text style={[styles.subViewTitle, { color: secondaryTextColor }]}>Biyografi</Text>
-          
+
           <View style={[styles.inputWrapper, { borderBottomColor: borderColor }]}>
             <View style={styles.inputContainer}>
-              <BottomSheetTextInput 
+              <BottomSheetTextInput
                 style={[styles.subViewInput, { color: textColor, minHeight: 100, textAlignVertical: 'top' }]}
                 value={tempBio}
                 onChangeText={(text) => text.length <= 250 && setTempBio(text)}
@@ -324,7 +361,7 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
               </TouchableOpacity>
             )}
           </View>
-          
+
           <Text style={[styles.subViewDesc, { color: secondaryTextColor, marginTop: 8 }]}>
             Sosyal bağlantılarını istediğiniz an güncelleyebilirsiniz. En fazla 3 bağlantı ekleyebilirsiniz.
           </Text>
@@ -332,7 +369,7 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
           <View style={styles.linksList}>
             {socialLinks.map((link) => (
               <View key={link.id} style={[styles.linkRow, { borderBottomColor: borderColor }]}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.platformPicker, { backgroundColor: isDark ? '#2c2c2e' : '#f2f2f7' }]}
                   onPress={() => {
                     setActiveLinkId(link.id);
@@ -342,8 +379,8 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
                   <Text style={{ color: textColor, fontSize: 14 }}>{link.platform}</Text>
                   <ChevronRight size={14} color={secondaryTextColor} style={{ transform: [{ rotate: '90deg' }] }} />
                 </TouchableOpacity>
-                
-                <BottomSheetTextInput 
+
+                <BottomSheetTextInput
                   style={[styles.linkInput, { color: textColor }]}
                   placeholder={link.platform === 'TikTok' ? 'www.tiktok.com/@...' : 'URL girin'}
                   placeholderTextColor={secondaryTextColor}
@@ -365,8 +402,8 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
             <View style={[styles.pickerContent, { backgroundColor: isDark ? '#1c1c1e' : '#fff' }]}>
               <Text style={[styles.pickerTitle, { color: textColor }]}>Platform Seçin</Text>
               {(['Instagram', 'TikTok', 'Youtube', 'X', 'Diğer'] as const).map((p) => (
-                <TouchableOpacity 
-                  key={p} 
+                <TouchableOpacity
+                  key={p}
                   style={[styles.pickerItem, { borderTopColor: borderColor }]}
                   onPress={() => {
                     if (activeLinkId) updateSocialLink(activeLinkId, { platform: p });

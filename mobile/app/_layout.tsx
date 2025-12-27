@@ -8,9 +8,25 @@ import { ThemeProvider, useTheme } from '../src/presentation/contexts/ThemeConte
 import '../global.css';
 
 import { useThemeStore } from '../src/presentation/store/useThemeStore';
+import { SessionLogService } from '../src/core/services/SessionLogService';
+import { useEffect } from 'react';
 
 function RootNavigator() {
     const isDark = useThemeStore((state) => state.isDark);
+
+    useEffect(() => {
+        // Log app open and login event for the session
+        const logSession = async () => {
+            try {
+                await SessionLogService.logEvent({ userId: 'wizyclub-official', eventType: 'app_open' });
+                await SessionLogService.logEvent({ userId: 'wizyclub-official', eventType: 'login' });
+                console.log('[RootNavigator] Session logged successfully');
+            } catch (err) {
+                console.error('[RootNavigator] Session logging failed:', err);
+            }
+        };
+        logSession();
+    }, []);
 
     return (
         <>

@@ -1,3 +1,4 @@
+
 # WizyClub (Monorepo)
 
 Bu proje, WizyClub mobil uygulaması ve ilgili backend scriptlerini içeren bir monorepo yapısına sahiptir.

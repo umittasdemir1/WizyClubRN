@@ -1,12 +1,27 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
+import { View, StyleSheet, Dimensions, Pressable, ImageBackground } from 'react-native';
+import { BlurView } from 'expo-blur';
+import Video from 'react-native-video';
+import { useSharedValue, withTiming, Easing, cancelAnimation, runOnJS } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Story } from '../../../domain/entities/Story';
-import { StoryPage } from './StoryPage';
+import { StoryHeader } from './StoryHeader';
+import { StoryActions } from './StoryActions';
+import { FlyingEmoji } from './FlyingEmoji';
 import { useRouter } from 'expo-router';
 import PagerView from 'react-native-pager-view';
 import { COLORS } from '../../../core/constants';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('screen');
+const STORY_DURATION = 5000;
+const HOLD_PAUSE_DELAY = 200;
+
+interface FlyingEmojiData {
+    id: string;
+    emoji: string;
+    x: number;
+    y: number;
+}
 
 interface StoryViewerProps {
     stories: Story[];
@@ -15,15 +30,21 @@ interface StoryViewerProps {
 
 export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const pagerRef = useRef<PagerView>(null);
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
     const [isPaused, setIsPaused] = useState(false);
+    const [isLiked, setIsLiked] = useState(stories[initialIndex]?.isLiked || false);
+    const [flyingEmojis, setFlyingEmojis] = useState<FlyingEmojiData[]>([]);
+    const holdTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Progress bar - managed at Viewer level for static UI
+    const progress = useSharedValue(0);
 
     const handleNext = useCallback(() => {
         if (currentIndex < stories.length - 1) {
             pagerRef.current?.setPage(currentIndex + 1);
         } else {
-            // Last story, close viewer
             router.back();
         }
     }, [currentIndex, stories.length, router]);
@@ -38,41 +59,160 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
         router.back();
     }, [router]);
 
-    const handlePauseToggle = useCallback((paused: boolean) => {
-        setIsPaused(paused);
-    }, []);
+    // Progress animation
+    useEffect(() => {
+        progress.value = 0;
+
+        if (isPaused) {
+            cancelAnimation(progress);
+            return;
+        }
+
+        progress.value = withTiming(1, {
+            duration: STORY_DURATION,
+            easing: Easing.linear
+        }, (finished) => {
+            if (finished) {
+                runOnJS(handleNext)();
+            }
+        });
+
+        return () => cancelAnimation(progress);
+    }, [currentIndex, isPaused, handleNext, progress]);
 
     const handlePageSelected = useCallback((e: any) => {
-        setCurrentIndex(e.nativeEvent.position);
+        const newIndex = e.nativeEvent.position;
+        setCurrentIndex(newIndex);
+        setIsLiked(stories[newIndex]?.isLiked || false);
+        progress.value = 0;
+    }, [stories, progress]);
+
+    // Tap handlers
+    const handleHoldStart = useCallback(() => {
+        holdTimeoutRef.current = setTimeout(() => {
+            setIsPaused(true);
+        }, HOLD_PAUSE_DELAY);
     }, []);
+
+    const handleHoldEnd = useCallback(() => {
+        if (holdTimeoutRef.current) {
+            clearTimeout(holdTimeoutRef.current);
+            holdTimeoutRef.current = null;
+        }
+        if (isPaused) {
+            setIsPaused(false);
+        }
+    }, [isPaused]);
+
+    const handleTapLeft = useCallback(() => {
+        handlePrev();
+    }, [handlePrev]);
+
+    const handleTapRight = useCallback(() => {
+        handleNext();
+    }, [handleNext]);
+
+    // Actions
+    const handleLike = useCallback(() => setIsLiked(prev => !prev), []);
+    const handleShare = useCallback(() => console.log('Share story'), []);
+
+    const handleEmojiSelect = useCallback((emoji: string) => {
+        const newEmoji: FlyingEmojiData = {
+            id: Date.now().toString(),
+            emoji,
+            x: Math.random() * 200 + 100,
+            y: SCREEN_HEIGHT * 0.5,
+        };
+        setFlyingEmojis(prev => [...prev, newEmoji]);
+        setTimeout(() => {
+            setFlyingEmojis(prev => prev.filter(e => e.id !== newEmoji.id));
+        }, 2000);
+    }, []);
+
+    const activeStory = stories[currentIndex];
 
     return (
         <View style={styles.container}>
-            <PagerView
-                ref={pagerRef}
-                style={styles.pager}
-                initialPage={initialIndex}
-                onPageSelected={handlePageSelected}
-                orientation="horizontal"
-                overdrag={false}
-                scrollEnabled={true}
+            {/* Blurred Background - Static */}
+            <ImageBackground
+                source={{ uri: activeStory?.thumbnailUrl }}
+                style={StyleSheet.absoluteFill}
+                blurRadius={50}
             >
-                {stories.map((story, index) => (
-                    <View key={story.id} style={styles.page}>
-                        <StoryPage
-                            story={story}
-                            isActive={index === currentIndex}
-                            isPaused={isPaused}
-                            onNext={handleNext}
-                            onPrev={handlePrev}
-                            onClose={handleClose}
-                            onPauseToggle={handlePauseToggle}
-                            totalStories={stories.length}
-                            currentStoryIndex={index}
-                        />
-                    </View>
-                ))}
-            </PagerView>
+                <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+            </ImageBackground>
+
+            {/* Top Spacer */}
+            <View style={{ height: insets.top + 30, backgroundColor: '#000000', width: '100%' }} />
+
+            {/* Video Layer - Only videos inside PagerView */}
+            <View style={styles.videoArea}>
+                <PagerView
+                    ref={pagerRef}
+                    style={StyleSheet.absoluteFill}
+                    initialPage={initialIndex}
+                    onPageSelected={handlePageSelected}
+                    orientation="horizontal"
+                    overdrag={false}
+                    scrollEnabled={true}
+                >
+                    {stories.map((story, index) => (
+                        <View key={story.id} style={styles.page}>
+                            <Video
+                                source={{ uri: story.videoUrl }}
+                                style={styles.video}
+                                resizeMode="contain"
+                                repeat={false}
+                                paused={isPaused || index !== currentIndex}
+                                muted={false}
+                            />
+                        </View>
+                    ))}
+                </PagerView>
+
+                {/* Tap Zones - Over videos */}
+                <View style={styles.tapZones} pointerEvents="box-none">
+                    <Pressable
+                        style={styles.leftZone}
+                        onPress={handleTapLeft}
+                        onPressIn={handleHoldStart}
+                        onPressOut={handleHoldEnd}
+                    />
+                    <Pressable
+                        style={styles.rightZone}
+                        onPress={handleTapRight}
+                        onPressIn={handleHoldStart}
+                        onPressOut={handleHoldEnd}
+                    />
+                </View>
+            </View>
+
+            {/* STATIC UI - Header (absolute, stays on swipe) */}
+            <StoryHeader
+                story={activeStory}
+                progress={progress}
+                totalStories={stories.length}
+                currentStoryIndex={currentIndex}
+                onClose={handleClose}
+            />
+
+            {/* STATIC UI - Actions (relative, pushes video) */}
+            <StoryActions
+                isLiked={isLiked}
+                onLike={handleLike}
+                onShare={handleShare}
+                onEmojiSelect={handleEmojiSelect}
+            />
+
+            {/* Flying Emojis */}
+            {flyingEmojis.map((emojiData) => (
+                <FlyingEmoji
+                    key={emojiData.id}
+                    emoji={emojiData.emoji}
+                    startX={emojiData.x}
+                    startY={emojiData.y}
+                />
+            ))}
         </View>
     );
 }
@@ -82,11 +222,31 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: COLORS.videoBackground,
     },
-    pager: {
+    videoArea: {
         flex: 1,
+        backgroundColor: '#000000',
     },
     page: {
-        width: SCREEN_WIDTH,
-        height: SCREEN_HEIGHT,
+        flex: 1,
+        backgroundColor: '#000000',
+    },
+    video: {
+        flex: 1,
+        backgroundColor: '#000000',
+    },
+    tapZones: {
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        flexDirection: 'row',
+        zIndex: 10,
+    },
+    leftZone: {
+        flex: 0.3,
+    },
+    rightZone: {
+        flex: 0.7,
     },
 });
