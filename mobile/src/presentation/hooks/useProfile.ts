@@ -19,15 +19,18 @@ export const useProfile = (userId: string) => {
     const loadProfile = async () => {
         setIsLoading(true);
         try {
+            console.log('[useProfile] Loading profile for user ID:', userId);
             const [profileData, linksData] = await Promise.all([
                 profileRepo.getProfile(userId),
                 profileRepo.getSocialLinks(userId)
             ]);
+            console.log('[useProfile] Profile data loaded:', profileData);
+            console.log('[useProfile] Social links loaded:', linksData);
             setUser(profileData);
             setSocialLinks(linksData);
         } catch (err) {
             setError('Profil yüklenirken bir hata oluştu.');
-            console.error(err);
+            console.error('[useProfile] Load error:', err);
         } finally {
             setIsLoading(false);
         }

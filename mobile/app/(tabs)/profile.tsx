@@ -15,6 +15,7 @@ import Video from 'react-native-video';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
+import { useAuthStore } from '../../src/presentation/store/useAuthStore';
 import { ProfileStats } from '../../src/presentation/components/profile/ProfileStats';
 import { SocialTags } from '../../src/presentation/components/profile/SocialTags';
 import { ClubsCollaboration } from '../../src/presentation/components/profile/ClubsCollaboration';
@@ -94,6 +95,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { isDark, toggleTheme } = useThemeStore();
+  const { user: authUser, initialize, isInitialized } = useAuthStore();
   const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
 
   // Collapsible Header Logic
@@ -128,8 +130,24 @@ export default function ProfileScreen() {
     }, [isDark])
   );
 
+  // Initialize auth on mount
+  useEffect(() => {
+    if (!isInitialized) {
+      initialize();
+    }
+  }, [isInitialized, initialize]);
+
   const { videos, refreshFeed } = useVideoFeed();
-  const { user: profileUser, socialLinks: profileLinks, isLoading, reload, updateProfile, saveSocialLinks, uploadAvatar } = useProfile('687c8079-e94c-42c2-9442-8a4a6b63dec6');
+  // Use authenticated user's ID, fallback to hardcoded for development
+  const currentUserId = authUser?.id || '687c8079-e94c-42c2-9442-8a4a6b63dec6';
+
+  // Debug logging
+  useEffect(() => {
+    console.log('[Profile] Auth user:', authUser?.id);
+    console.log('[Profile] Current user ID:', currentUserId);
+  }, [authUser, currentUserId]);
+
+  const { user: profileUser, socialLinks: profileLinks, isLoading, reload, updateProfile, saveSocialLinks, uploadAvatar } = useProfile(currentUserId);
 
   const [refreshing, setRefreshing] = useState(false);
   const [previewItem, setPreviewItem] = useState<{ id: string; thumbnail: string; videoUrl: string } | null>(null);
@@ -163,21 +181,22 @@ export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState(0);
 
   // Current User as Domain Entity
-  const currentUser: any = profileUser || {
-    id: '687c8079-e94c-42c2-9442-8a4a6b63dec6',
-    username: 'umittasdemir',
-    fullName: 'WizyClub',
+  // Only show fallback if not loading and no profile data
+  const currentUser: any = profileUser || (isLoading ? null : {
+    id: currentUserId,
+    username: authUser?.email?.split('@')[0] || 'user',
+    fullName: 'User',
     avatarUrl: 'https://i.pravatar.cc/300?img=12',
-    bio: "Explore the world through our lens...",
+    bio: "Welcome to WizyClub",
     country: 'TR',
     age: 0,
     isFollowing: false,
     website: '',
-    isVerified: true,
-    followersCount: 1200000,
-    followingCount: 12,
-    postsCount: 150
-  };
+    isVerified: false,
+    followersCount: 0,
+    followingCount: 0,
+    postsCount: 0
+  });
 
   // View model for simple UI parts
   const user = {
