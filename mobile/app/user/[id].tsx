@@ -23,7 +23,7 @@ import { VideoGrid } from '../../src/presentation/components/profile/VideoGrid';
 import { PostsGrid } from '../../src/presentation/components/profile/PostsGrid';
 import { BioBottomSheet } from '../../src/presentation/components/profile/BioBottomSheet';
 import { ClubsBottomSheet } from '../../src/presentation/components/profile/ClubsBottomSheet';
-import { ChevronLeft, MoreHorizontal } from 'lucide-react-native';
+import { ChevronLeft, MoreVertical } from 'lucide-react-native';
 import BottomSheet from '@gorhom/bottom-sheet';
 import Svg, { Path, Circle } from 'react-native-svg';
 import Animated, {
@@ -312,12 +312,12 @@ export default function UserProfileScreen() {
             <ChevronLeft size={24} color={iconColor} />
           </TouchableOpacity>
           <Text style={[styles.headerUsername, { color: textPrimary }]}>{!isLoading ? `@${user.username}` : ''}</Text>
-          <TouchableOpacity 
-            style={styles.navIcon} 
+          <TouchableOpacity
+            style={styles.navIcon}
             onPress={() => setIsUserOptionsVisible(true)}
             hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
           >
-            <MoreHorizontal size={24} color={iconColor} />
+            <MoreVertical size={24} color={iconColor} />
           </TouchableOpacity>
         </View>
       </Animated.View>
@@ -395,9 +395,7 @@ export default function UserProfileScreen() {
             </View>
 
             <ClubsCollaboration clubsCount={clubs.length} clubLogos={clubLogos} isDark={isDark} onPress={() => clubsSheetRef.current?.expand()} />
-            {profileData.socialLinks && profileData.socialLinks.length > 0 && (
-                <SocialTags isDark={isDark} links={profileData.socialLinks} />
-            )}
+            <SocialTags isDark={isDark} links={profileData.socialLinks} />
             </View>
         )}
 
