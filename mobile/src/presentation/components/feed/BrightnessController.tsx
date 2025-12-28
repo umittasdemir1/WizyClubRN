@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
     backdrop: {
         ...StyleSheet.absoluteFillObject,
         backgroundColor: 'transparent',
-        zIndex: 200,
+        zIndex: 9998,
     },
     container: {
         position: 'absolute',
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         padding: 12,
         alignItems: 'center',
-        zIndex: 201,
+        zIndex: 9999,
         // Glass effect
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.15)',
