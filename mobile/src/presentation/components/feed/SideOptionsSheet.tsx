@@ -5,6 +5,8 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 import { Trash2 } from 'lucide-react-native';
 import SunIcon from '../../../../assets/icons/sun.svg';
 import { useBrightnessStore } from '../../store/useBrightnessStore';
+import { useThemeStore } from '../../store/useThemeStore';
+import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
 
 interface SideOptionsSheetProps {
     visible: boolean;
@@ -20,7 +22,11 @@ export function SideOptionsSheet({ visible, onClose, onDeletePress }: SideOption
     const overlayOpacity = useSharedValue(0);
 
     const { brightness, toggleController } = useBrightnessStore();
+    const { isDark } = useThemeStore();
     const isBrightnessActive = brightness < 1.0;
+
+    const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
+    const bgColor = isDark ? '#1c1c1e' : themeColors.background;
 
     useEffect(() => {
         translateX.value = withTiming(visible ? 0 : SHEET_WIDTH, { duration: 220 });
@@ -47,7 +53,7 @@ export function SideOptionsSheet({ visible, onClose, onDeletePress }: SideOption
             <Animated.View
                 style={[
                     styles.sheet,
-                    { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 },
+                    { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24, backgroundColor: bgColor },
                     sheetStyle,
                 ]}
                 pointerEvents={visible ? 'auto' : 'none'}
@@ -86,7 +92,6 @@ const styles = StyleSheet.create({
         bottom: 0,
         right: 0,
         width: SHEET_WIDTH,
-        backgroundColor: 'rgba(22,22,22,0.95)',
         paddingHorizontal: 18,
         paddingBottom: 24,
         gap: 12,

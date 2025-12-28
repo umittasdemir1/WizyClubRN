@@ -15,6 +15,7 @@ import { ChevronLeft, MoreVertical } from 'lucide-react-native';
 import { Avatar } from '../shared/Avatar';
 import { Video } from '../../../domain/entities/Video';
 import { useThemeStore } from '../../store/useThemeStore';
+import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
 
 interface DescriptionSheetProps {
     visible: boolean;
@@ -36,6 +37,9 @@ export function DescriptionSheet({
     const isDark = useThemeStore(state => state.isDark);
     const translateY = useSharedValue(SCREEN_HEIGHT);
     const overlayOpacity = useSharedValue(0);
+
+    const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
+    const bgColor = isDark ? '#1c1c1e' : themeColors.background;
 
     const openSheet = () => {
         translateY.value = withTiming(SCREEN_HEIGHT - SHEET_HEIGHT, {
@@ -120,7 +124,7 @@ export function DescriptionSheet({
                     {
                         height: SHEET_HEIGHT,
                         paddingBottom: insets.bottom + 16,
-                        backgroundColor: isDark ? '#121212' : '#FFFFFF',
+                        backgroundColor: bgColor,
                     },
                     sheetStyle,
                 ]}

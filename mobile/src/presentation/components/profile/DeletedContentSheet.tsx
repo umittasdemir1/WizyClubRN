@@ -4,6 +4,7 @@ import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/botto
 import { Image } from 'expo-image';
 import { supabase } from '../../../core/supabase';
 import { CONFIG } from '../../../core/config';
+import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
 
 interface DeletedContentSheetProps {
     isDark: boolean;
@@ -13,6 +14,9 @@ export const DeletedContentSheet = React.forwardRef<BottomSheet, DeletedContentS
     const snapPoints = useMemo(() => ['50%', '90%'], []);
     const [deletedVideos, setDeletedVideos] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+
+    const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
+    const bgColor = isDark ? '#1c1c1e' : themeColors.background;
 
     const fetchDeletedVideos = async () => {
         setIsLoading(true);
@@ -112,7 +116,7 @@ export const DeletedContentSheet = React.forwardRef<BottomSheet, DeletedContentS
             index={-1}
             snapPoints={snapPoints}
             enablePanDownToClose
-            backgroundStyle={{ backgroundColor: isDark ? '#000' : '#fff', borderTopLeftRadius: 40, borderTopRightRadius: 40 }}
+            backgroundStyle={{ backgroundColor: bgColor, borderTopLeftRadius: 40, borderTopRightRadius: 40 }}
             handleIndicatorStyle={{ backgroundColor: isDark ? '#fff' : '#000' }}
             backdropComponent={(props) => (
                 <BottomSheetBackdrop {...props} opacity={0.5} disappearsOnIndex={-1} />

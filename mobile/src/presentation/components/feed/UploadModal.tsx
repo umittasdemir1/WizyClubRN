@@ -16,6 +16,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { useUploadStore } from '../../store/useUploadStore';
 import { X, Video as VideoIcon, UploadCloud } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
+import { useThemeStore } from '../../store/useThemeStore';
+import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
 
 interface UploadModalProps {
     isVisible: boolean;
@@ -39,6 +41,7 @@ const COMMERCIAL_TYPES = [
 ];
 
 export function UploadModal({ isVisible, onClose }: UploadModalProps) {
+    const { isDark } = useThemeStore();
     const [selectedVideo, setSelectedVideo] = useState<ImagePicker.ImagePickerAsset | null>(null);
     const [description, setDescription] = useState('');
 
@@ -51,6 +54,9 @@ export function UploadModal({ isVisible, onClose }: UploadModalProps) {
     const [userId, setUserId] = useState('687c8079-e94c-42c2-9442-8a4a6b63dec6');
 
     const { startUpload, setProgress, setStatus, setSuccess, setError } = useUploadStore();
+
+    const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
+    const bgColor = isDark ? '#1c1c1e' : themeColors.background;
 
     const isCommercial = commercialType !== 'İş Birliği İçermiyor';
 
@@ -166,7 +172,7 @@ export function UploadModal({ isVisible, onClose }: UploadModalProps) {
                     behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                     style={styles.container}
                 >
-                    <View style={styles.content}>
+                    <View style={[styles.content, { backgroundColor: bgColor }]}>
                         {/* Header */}
                         <View style={styles.header}>
                             <Text style={styles.title}>Yeni Video Yükle</Text>
@@ -294,7 +300,6 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.5)',
     },
     content: {
-        backgroundColor: '#1E293B',
         borderTopLeftRadius: 40,
         borderTopRightRadius: 40,
         padding: 24,
