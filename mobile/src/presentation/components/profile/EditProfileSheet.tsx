@@ -421,7 +421,7 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
         <BottomSheet
           ref={ref}
           snapPoints={snapPoints}
-          enablePanDownToClose={activeSubView === null}
+          enablePanDownToClose={true}
           backgroundStyle={{
             backgroundColor: bgColor,
             borderTopLeftRadius: 40,
