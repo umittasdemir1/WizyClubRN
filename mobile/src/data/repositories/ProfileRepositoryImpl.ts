@@ -62,21 +62,6 @@ export class ProfileRepositoryImpl implements IProfileRepository {
     }
 
     private mapDtoToUser(dto: any): User {
-        const socialLinks = [];
-
-        // Map social_links from the joined table
-        if (dto.social_links && Array.isArray(dto.social_links)) {
-            dto.social_links.forEach((link: any) => {
-                socialLinks.push({
-                    id: link.id,
-                    userId: link.user_id,
-                    platform: link.platform,
-                    url: link.url,
-                    displayOrder: link.display_order
-                });
-            });
-        }
-
         return {
             id: dto.id,
             username: dto.username,
@@ -90,8 +75,7 @@ export class ProfileRepositoryImpl implements IProfileRepository {
             isVerified: dto.is_verified,
             followersCount: dto.followers_count,
             followingCount: dto.following_count,
-            postsCount: dto.posts_count,
-            socialLinks: socialLinks
+            postsCount: dto.posts_count
         };
     }
 

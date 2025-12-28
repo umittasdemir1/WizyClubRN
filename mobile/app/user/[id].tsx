@@ -37,9 +37,8 @@ import Animated, {
 import LikeIcon from '../../assets/icons/like.svg';
 import ShareIcon from '../../assets/icons/share.svg';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
+import { useProfile } from '../../src/presentation/hooks/useProfile';
 import { LIGHT_COLORS, DARK_COLORS } from '../../src/core/constants';
-import { UserRepositoryImpl } from '../../src/data/repositories/UserRepositoryImpl';
-import { GetUserProfileUseCase } from '../../src/domain/usecases/GetUserProfileUseCase';
 import { ProfileSkeleton } from '../../src/presentation/components/profile/ProfileSkeleton';
 import { UserOptionsModal } from '../../src/presentation/components/profile/UserOptionsModal';
 
@@ -186,7 +185,6 @@ export default function UserProfileScreen() {
   const [isUserOptionsVisible, setIsUserOptionsVisible] = useState(false);
   const { videos, refreshFeed } = useVideoFeed();
   const [refreshing, setRefreshing] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [previewItem, setPreviewItem] = useState<{ id: string; thumbnail: string; videoUrl: string } | null>(null);
 
   const bioSheetRef = useRef<BottomSheet>(null);
@@ -210,53 +208,16 @@ export default function UserProfileScreen() {
   const btnSecondaryBg = themeColors.card;
 
   // --- Real Data Fetching ---
-  const [profileData, setProfileData] = useState({
-    name: '',
-    username: '',
-    avatarUrl: '',
-    bio: '',
-    followersCount: 0,
-    followingCount: 0,
-    socialLinks: [],
-  });
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      if (!id || typeof id !== 'string') return;
-      
-      setIsLoading(true);
-      try {
-        const repo = new UserRepositoryImpl();
-        const useCase = new GetUserProfileUseCase(repo);
-        
-        // We use the ID from the URL (which might be a username or UUID depending on your logic)
-        // Ideally, GetUserProfileUseCase should handle both or we standardize on username/uuid
-        const fetchedUser = await useCase.execute(id);
-
-        if (fetchedUser) {
-          setProfileData({
-            name: fetchedUser.fullName || fetchedUser.username,
-            username: fetchedUser.username,
-            avatarUrl: fetchedUser.avatarUrl,
-            bio: fetchedUser.bio || "No bio available.",
-            followersCount: typeof fetchedUser.followersCount === 'number' ? fetchedUser.followersCount : 0,
-            followingCount: typeof fetchedUser.followingCount === 'number' ? fetchedUser.followingCount : 0,
-            socialLinks: fetchedUser.socialLinks || [],
-          });
-        }
-      } catch (error) {
-        console.error('Failed to fetch user profile:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchUser();
-  }, [id]);
+  const userId = (typeof id === 'string' ? id : '') || '';
+  const { user: profileUser, socialLinks: profileLinks, isLoading, reload } = useProfile(userId);
 
   const user = {
-    ...profileData,
-    followingCount: profileData.followingCount,
-    followersCount: profileData.followersCount,
+    name: profileUser?.fullName || profileUser?.username || 'User',
+    username: profileUser?.username || 'user',
+    avatarUrl: profileUser?.avatarUrl || 'https://i.pravatar.cc/300?img=12',
+    bio: profileUser?.bio || 'No bio available.',
+    followersCount: profileUser?.followersCount || 0,
+    followingCount: profileUser?.followingCount || 0,
   };
   // --------------------------
 
@@ -395,9 +356,9 @@ export default function UserProfileScreen() {
             </View>
 
             <View style={styles.socialClubsRow}>
-                {profileData.socialLinks && profileData.socialLinks.length > 0 && (
+                {profileLinks && profileLinks.length > 0 && (
                   <>
-                    <SocialTags isDark={isDark} links={profileData.socialLinks} />
+                    <SocialTags isDark={isDark} links={profileLinks} />
                     <View style={[styles.verticalSeparator, { backgroundColor: isDark ? '#444' : '#ccc' }]} />
                   </>
                 )}

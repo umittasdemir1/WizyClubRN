@@ -7,7 +7,7 @@ export class SupabaseProfileDataSource {
         console.log('[SupabaseDataSource] 🔍 Fetching profile for ID:', userId);
         const { data, error } = await supabase
             .from('profiles')
-            .select('*, social_links(*)')
+            .select('*')
             .eq('id', userId)
             .single();
 
@@ -22,7 +22,6 @@ export class SupabaseProfileDataSource {
         }
 
         console.log('[SupabaseDataSource] ✅ Profile fetched successfully:', data?.username);
-        console.log('[SupabaseDataSource] 🔗 Social links count:', data?.social_links?.length || 0);
         return data;
     }
 
