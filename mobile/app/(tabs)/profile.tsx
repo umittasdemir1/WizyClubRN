@@ -382,11 +382,11 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   topNavContainer: { width: '100%', zIndex: 1000, position: 'absolute', top: 0, left: 0, right: 0 },
-  topNav: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, height: 60 },
+  topNav: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, height: 60, position: 'relative' },
   navIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   navActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   navIconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  headerUsername: { fontSize: 16, fontWeight: '600', flex: 1, textAlign: 'center' },
+  headerUsername: { fontSize: 16, fontWeight: '600', position: 'absolute', left: 0, right: 0, textAlign: 'center', zIndex: -1 },
   profileContainer: { alignItems: 'center', paddingHorizontal: 10, marginTop: 5 },
   userNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
   userNameText: { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
