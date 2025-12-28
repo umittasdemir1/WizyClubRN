@@ -357,16 +357,16 @@ export default function UserProfileScreen() {
                     <Text style={[styles.btnFollowText, { color: btnFollowText }]}>Takip Et</Text>
                   </TouchableOpacity>
                 ) : (
-                  <>
-                    <View style={{ flex: 1 }} />
-                    <TouchableOpacity
-                      style={[styles.btnIconOnly, { backgroundColor: btnSecondaryBg, borderWidth: 1, borderColor: textSecondary }]}
-                      onPress={() => setIsFollowing(!isFollowing)}
-                    >
-                      <UserCog size={20} color={iconColor} strokeWidth={2} />
-                    </TouchableOpacity>
-                  </>
+                  <TouchableOpacity
+                    style={[styles.btnFollowing, { backgroundColor: btnSecondaryBg, borderWidth: 1, borderColor: textSecondary }]}
+                    onPress={() => setIsFollowing(!isFollowing)}
+                  >
+                    <Text style={[styles.btnFollowingText, { color: textPrimary }]}>Takipte</Text>
+                    <UserCog size={16} color={iconColor} strokeWidth={2} />
+                  </TouchableOpacity>
                 )}
+
+                <View style={{ flex: 1 }} />
 
                 <View style={styles.btnIconOnly}>
                   <AnimatedIconButton
@@ -452,8 +452,10 @@ const styles = StyleSheet.create({
   userNameText: { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
   bioText: { fontSize: 13, lineHeight: 19.5, marginBottom: 20, paddingHorizontal: 5, textAlign: 'center' },
   actionsContainer: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 25, height: 36, paddingHorizontal: 5, width: '100%' },
-  btnFollow: { flex: 1, height: 36, borderRadius: 50, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  btnFollow: { flex: 1, height: 36, borderRadius: 50, alignItems: 'center', justifyContent: 'center', borderWidth: 1, maxWidth: 200 },
   btnFollowText: { fontSize: 13, fontWeight: '600' },
+  btnFollowing: { height: 36, borderRadius: 50, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  btnFollowingText: { fontSize: 13, fontWeight: '600' },
   btnIconOnly: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 0 },
   navTabs: { flexDirection: 'row', borderBottomWidth: 1 },
   tab: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12 },
