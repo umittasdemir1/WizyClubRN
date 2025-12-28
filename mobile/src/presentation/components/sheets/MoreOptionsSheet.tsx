@@ -22,6 +22,8 @@ export const MoreOptionsSheet = forwardRef<BottomSheet, MoreOptionsSheetProps>((
     const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
     const bgColor = isDark ? '#1c1c1e' : themeColors.background;
     const handleColor = isDark ? '#fff' : '#000';
+    const textColor = isDark ? '#fff' : '#000';
+    const borderColor = isDark ? '#333' : '#e5e5e5';
 
     return (
         <BottomSheet
@@ -33,19 +35,19 @@ export const MoreOptionsSheet = forwardRef<BottomSheet, MoreOptionsSheetProps>((
             handleIndicatorStyle={{ backgroundColor: handleColor }}
         >
             <BottomSheetView style={styles.contentContainer}>
-                <OptionItem icon={<Flag color="white" size={24} />} label="Report" />
-                <OptionItem icon={<EyeOff color="white" size={24} />} label="Not Interested" />
-                <OptionItem icon={<AlertTriangle color="white" size={24} />} label="Something else" />
+                <OptionItem icon={<Flag color={textColor} size={24} />} label="Report" textColor={textColor} borderColor={borderColor} />
+                <OptionItem icon={<EyeOff color={textColor} size={24} />} label="Not Interested" textColor={textColor} borderColor={borderColor} />
+                <OptionItem icon={<AlertTriangle color={textColor} size={24} />} label="Something else" textColor={textColor} borderColor={borderColor} />
             </BottomSheetView>
         </BottomSheet>
     );
 });
 
-function OptionItem({ icon, label }: { icon: React.ReactNode; label: string }) {
+function OptionItem({ icon, label, textColor, borderColor }: { icon: React.ReactNode; label: string; textColor: string; borderColor: string }) {
     return (
-        <TouchableOpacity style={styles.optionItem}>
+        <TouchableOpacity style={[styles.optionItem, { borderBottomColor: borderColor }]}>
             {icon}
-            <Text style={styles.optionLabel}>{label}</Text>
+            <Text style={[styles.optionLabel, { color: textColor }]}>{label}</Text>
         </TouchableOpacity>
     );
 }
@@ -60,10 +62,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#333',
     },
     optionLabel: {
-        color: 'white',
         fontSize: 16,
         marginLeft: 16,
     },

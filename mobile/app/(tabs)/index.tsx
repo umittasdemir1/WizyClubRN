@@ -24,7 +24,8 @@ import { BrightnessController } from '../../src/presentation/components/feed/Bri
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import { SideOptionsSheet } from '../../src/presentation/components/feed/SideOptionsSheet';
 import { DeleteConfirmationModal } from '../../src/presentation/components/feed/DeleteConfirmationModal';
-import { DescriptionSheet } from '../../src/presentation/components/feed/DescriptionSheet';
+import { DescriptionSheet } from '../../src/presentation/components/sheets/DescriptionSheet';
+import { ShoppingSheet } from '../../src/presentation/components/sheets/ShoppingSheet';
 import {
     useActiveVideoStore,
     useAppStateSync,
@@ -33,6 +34,7 @@ import {
 import { Video } from '../../src/domain/entities/Video';
 import { useState, useRef, useCallback, useEffect, memo } from 'react';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import BottomSheet from '@gorhom/bottom-sheet';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { FeedSkeleton } from '../../src/presentation/components/feed/FeedSkeleton';
 import { UploadModal } from '../../src/presentation/components/feed/UploadModal';
@@ -151,8 +153,11 @@ export default function FeedScreen() {
     // Upload State
     const [isUploadModalVisible, setUploadModalVisible] = useState(false);
     const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
-    const [isMoreSheetVisible, setMoreSheetVisible] = useState(false);
-    const [isDescriptionSheetVisible, setDescriptionSheetVisible] = useState(false);
+
+    // Sheet refs
+    const sideOptionsSheetRef = useRef<BottomSheet>(null);
+    const descriptionSheetRef = useRef<BottomSheet>(null);
+    const shoppingSheetRef = useRef<BottomSheet>(null);
     // uploadedVideoId already declared above
 
 
@@ -252,11 +257,7 @@ export default function FeedScreen() {
     }, [toggleMute]);
 
     const handleMorePress = useCallback(() => {
-        setMoreSheetVisible(true);
-    }, []);
-
-    const handleCloseMore = useCallback(() => {
-        setMoreSheetVisible(false);
+        sideOptionsSheetRef.current?.snapToIndex(0);
     }, []);
 
     const handleStoryPress = useCallback(() => {
@@ -301,20 +302,16 @@ export default function FeedScreen() {
     }, [router]);
 
     const handleOpenDescription = useCallback(() => {
-        setDescriptionSheetVisible(true);
+        descriptionSheetRef.current?.snapToIndex(0);
         // User requested video to pause when reading description
         if (!useActiveVideoStore.getState().isPaused) {
             togglePause();
         }
     }, [togglePause]);
 
-    const handleCloseDescription = useCallback(() => {
-        setDescriptionSheetVisible(false);
-        // User requested video to resume when closed
-        if (useActiveVideoStore.getState().isPaused) {
-            togglePause();
-        }
-    }, [togglePause]);
+    const handleOpenShopping = useCallback(() => {
+        shoppingSheetRef.current?.snapToIndex(0);
+    }, []);
 
     const handleDeletePress = useCallback(() => {
         if (!activeVideoId) return;
@@ -322,9 +319,9 @@ export default function FeedScreen() {
     }, [activeVideoId]);
 
     const handleSheetDelete = useCallback(() => {
-        handleCloseMore();
+        sideOptionsSheetRef.current?.close();
         handleDeletePress();
-    }, [handleCloseMore, handleDeletePress]);
+    }, [handleDeletePress]);
 
     const handleDoubleTapLike = useCallback(
         (videoId: string) => {
@@ -415,7 +412,7 @@ export default function FeedScreen() {
                         onLike={handleLikePress}
                         onSave={() => toggleSave(video.id)}
                         onShare={() => toggleShare(video.id)}
-                        onShop={() => toggleShop(video.id)}
+                        onShop={handleOpenShopping}
                         onProfilePress={() => console.log('Profile')}
                     />
 
@@ -502,8 +499,7 @@ export default function FeedScreen() {
                 />
 
                 <SideOptionsSheet
-                    visible={isMoreSheetVisible}
-                    onClose={handleCloseMore}
+                    ref={sideOptionsSheetRef}
                     onDeletePress={handleSheetDelete}
                 />
             </View>
@@ -608,16 +604,23 @@ export default function FeedScreen() {
                 />
 
                 <SideOptionsSheet
-                    visible={isMoreSheetVisible}
-                    onClose={handleCloseMore}
+                    ref={sideOptionsSheetRef}
                     onDeletePress={handleSheetDelete}
                 />
 
                 <DescriptionSheet
-                    visible={isDescriptionSheetVisible}
-                    onClose={handleCloseDescription}
-                    video={videos.find(v => v.id === activeVideoId) || null}
-                    onFollowPress={() => activeVideoId && toggleFollow(activeVideoId)}
+                    ref={descriptionSheetRef}
+                    description={videos.find(v => v.id === activeVideoId)?.description}
+                    onChange={(index) => {
+                        // When sheet is closed (index === -1), resume video
+                        if (index === -1 && useActiveVideoStore.getState().isPaused) {
+                            togglePause();
+                        }
+                    }}
+                />
+
+                <ShoppingSheet
+                    ref={shoppingSheetRef}
                 />
 
                 {/* Brightness Controller Overlay - Global for the screen */}
