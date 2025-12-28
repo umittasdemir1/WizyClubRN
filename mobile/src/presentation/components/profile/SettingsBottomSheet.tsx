@@ -1,8 +1,11 @@
 import React, { forwardRef, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Switch } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Switch, Dimensions } from 'react-native';
 import BottomSheet, { BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X } from 'lucide-react-native';
 import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface SettingsBottomSheetProps {
   isDark: boolean;
@@ -12,7 +15,10 @@ interface SettingsBottomSheetProps {
 
 export const SettingsBottomSheet = forwardRef<BottomSheet, SettingsBottomSheetProps>(
   ({ isDark, onThemeToggle, onDeletedContentPress }, ref) => {
-    const snapPoints = useMemo(() => ['40%'], []);
+    const insets = useSafeAreaInsets();
+
+    const topOffset = insets.top + 60 + 25;
+    const snapPoints = useMemo(() => [SCREEN_HEIGHT - topOffset], [insets.top]);
 
     const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
     const bgColor = isDark ? '#1c1c1e' : themeColors.background;
@@ -26,7 +32,7 @@ export const SettingsBottomSheet = forwardRef<BottomSheet, SettingsBottomSheetPr
         ref={ref}
         index={-1}
         snapPoints={snapPoints}
-        enablePanDownToClose
+        enablePanDownToClose={true}
         backgroundStyle={{ backgroundColor: bgColor, borderTopLeftRadius: 40, borderTopRightRadius: 40 }}
         handleIndicatorStyle={{ backgroundColor: handleColor }}
         enableOverDrag={false}

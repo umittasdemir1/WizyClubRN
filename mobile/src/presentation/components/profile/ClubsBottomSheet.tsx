@@ -1,9 +1,12 @@
 import React, { forwardRef, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
 import BottomSheet, { BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X } from 'lucide-react-native';
 import { Image } from 'expo-image';
 import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface Club {
   id: string;
@@ -19,7 +22,10 @@ interface ClubsBottomSheetProps {
 
 export const ClubsBottomSheet = forwardRef<BottomSheet, ClubsBottomSheetProps>(
   ({ clubs, isDark }, ref) => {
-    const snapPoints = useMemo(() => ['60%', '90%'], []);
+    const insets = useSafeAreaInsets();
+
+    const topOffset = insets.top + 60 + 25;
+    const snapPoints = useMemo(() => [SCREEN_HEIGHT - topOffset], [insets.top]);
 
     const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
     const bgColor = isDark ? '#1c1c1e' : themeColors.background;
@@ -34,7 +40,7 @@ export const ClubsBottomSheet = forwardRef<BottomSheet, ClubsBottomSheetProps>(
         ref={ref}
         index={-1}
         snapPoints={snapPoints}
-        enablePanDownToClose
+        enablePanDownToClose={true}
         backgroundStyle={{ backgroundColor: bgColor, borderTopLeftRadius: 40, borderTopRightRadius: 40 }}
         handleIndicatorStyle={{ backgroundColor: handleColor }}
       >

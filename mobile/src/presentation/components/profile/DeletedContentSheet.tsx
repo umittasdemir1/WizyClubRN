@@ -1,17 +1,24 @@
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert, Dimensions } from 'react-native';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { supabase } from '../../../core/supabase';
 import { CONFIG } from '../../../core/config';
 import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface DeletedContentSheetProps {
     isDark: boolean;
 }
 
 export const DeletedContentSheet = React.forwardRef<BottomSheet, DeletedContentSheetProps>(({ isDark }, ref) => {
-    const snapPoints = useMemo(() => ['50%', '90%'], []);
+    const insets = useSafeAreaInsets();
+
+    const topOffset = insets.top + 60 + 25;
+    const snapPoints = useMemo(() => [SCREEN_HEIGHT - topOffset], [insets.top]);
+
     const [deletedVideos, setDeletedVideos] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -115,7 +122,7 @@ export const DeletedContentSheet = React.forwardRef<BottomSheet, DeletedContentS
             ref={ref}
             index={-1}
             snapPoints={snapPoints}
-            enablePanDownToClose
+            enablePanDownToClose={true}
             backgroundStyle={{ backgroundColor: bgColor, borderTopLeftRadius: 40, borderTopRightRadius: 40 }}
             handleIndicatorStyle={{ backgroundColor: isDark ? '#fff' : '#000' }}
             backdropComponent={(props) => (
