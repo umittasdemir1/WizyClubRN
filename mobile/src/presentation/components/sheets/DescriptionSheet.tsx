@@ -1,6 +1,6 @@
 import React, { forwardRef, useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable, Dimensions } from 'react-native';
-import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import BottomSheet, { BottomSheetScrollView, BottomSheetView } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, MoreVertical } from 'lucide-react-native';
 import { Avatar } from '../shared/Avatar';
@@ -25,7 +25,7 @@ export const DescriptionSheet = forwardRef<BottomSheet, DescriptionSheetProps>(
     const bgColor = isDark ? '#1c1c1e' : themeColors.background;
     const textPrimary = themeColors.textPrimary;
     const textSecondary = isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)';
-    const handleColor = isDark ? '#8e8e93' : '#c6c6c8';
+    const handleColor = isDark ? '#fff' : '#000';
 
     const topOffset = insets.top + 60 + 25;
     const snapPoints = useMemo(() => [SCREEN_HEIGHT - topOffset], [insets.top]);
@@ -45,8 +45,6 @@ export const DescriptionSheet = forwardRef<BottomSheet, DescriptionSheetProps>(
         ref={ref}
         snapPoints={snapPoints}
         enablePanDownToClose={true}
-        enableOverDrag={false}
-        overDragResistanceFactor={0}
         index={-1}
         onChange={onChange}
         backgroundStyle={{
@@ -56,7 +54,8 @@ export const DescriptionSheet = forwardRef<BottomSheet, DescriptionSheetProps>(
         }}
         handleIndicatorStyle={{ backgroundColor: handleColor }}
       >
-        <BottomSheetScrollView style={styles.container}>
+        <BottomSheetView style={{ flex: 1 }}>
+          <BottomSheetScrollView style={styles.container}>
           {/* Header Section */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>
@@ -117,6 +116,7 @@ export const DescriptionSheet = forwardRef<BottomSheet, DescriptionSheetProps>(
             {video?.description}
           </Text>
         </BottomSheetScrollView>
+        </BottomSheetView>
       </BottomSheet>
     );
   }

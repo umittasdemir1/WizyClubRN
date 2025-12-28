@@ -257,7 +257,7 @@ export default function FeedScreen() {
     }, [toggleMute]);
 
     const handleMorePress = useCallback(() => {
-        sideOptionsSheetRef.current?.snapToIndex(0);
+        sideOptionsSheetRef.current?.expand();
     }, []);
 
     const handleStoryPress = useCallback(() => {
@@ -302,7 +302,7 @@ export default function FeedScreen() {
     }, [router]);
 
     const handleOpenDescription = useCallback(() => {
-        descriptionSheetRef.current?.snapToIndex(0);
+        descriptionSheetRef.current?.expand();
         // User requested video to pause when reading description
         if (!useActiveVideoStore.getState().isPaused) {
             togglePause();
@@ -310,7 +310,7 @@ export default function FeedScreen() {
     }, [togglePause]);
 
     const handleOpenShopping = useCallback(() => {
-        shoppingSheetRef.current?.snapToIndex(0);
+        shoppingSheetRef.current?.expand();
     }, []);
 
     const handleDeletePress = useCallback(() => {
