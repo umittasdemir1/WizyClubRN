@@ -610,7 +610,8 @@ export default function FeedScreen() {
 
                 <DescriptionSheet
                     ref={descriptionSheetRef}
-                    description={videos.find(v => v.id === activeVideoId)?.description}
+                    video={videos.find(v => v.id === activeVideoId) || null}
+                    onFollowPress={() => activeVideoId && toggleFollow(activeVideoId)}
                     onChange={(index) => {
                         // When sheet is closed (index === -1), resume video
                         if (index === -1 && useActiveVideoStore.getState().isPaused) {

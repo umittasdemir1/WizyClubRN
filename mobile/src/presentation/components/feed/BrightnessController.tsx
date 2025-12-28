@@ -34,6 +34,7 @@ export function BrightnessController({ }: BrightnessControllerProps) {
     const sliderScale = useSharedValue(0.8);
     const thumbPosition = useSharedValue((1 - brightness) * SLIDER_HEIGHT);
     const isDragging = useSharedValue(false);
+    const startPosition = useSharedValue(0);
 
     // Sync thumb with brightness when controller opens
     useEffect(() => {
@@ -60,12 +61,13 @@ export function BrightnessController({ }: BrightnessControllerProps) {
         .onStart(() => {
             'worklet';
             isDragging.value = true;
+            startPosition.value = thumbPosition.value;
             runOnJS(triggerHaptic)();
         })
         .onUpdate((event) => {
             'worklet';
-            // Calculate new position based on drag
-            const newPosition = Math.max(0, Math.min(SLIDER_HEIGHT, thumbPosition.value + event.translationY));
+            // Calculate new position based on starting position + translation
+            const newPosition = Math.max(0, Math.min(SLIDER_HEIGHT, startPosition.value + event.translationY));
             thumbPosition.value = newPosition;
 
             // Convert position to brightness (inverted: top = bright, bottom = dark)
