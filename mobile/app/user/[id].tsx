@@ -349,32 +349,24 @@ export default function UserProfileScreen() {
 
             {/* Social Actions (Follow, Like, Notify) */}
             <View style={styles.actionsContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.btnFollow,
-                    isFollowing && styles.btnFollowingCompact,
-                    {
-                      backgroundColor: isFollowing ? btnSecondaryBg : btnFollowBg,
-                      borderColor: isFollowing ? textSecondary : 'transparent'
-                    }
-                  ]}
-                  onPress={() => setIsFollowing(!isFollowing)}
-                >
-                  <Text style={[styles.btnFollowText, { color: isFollowing ? textPrimary : btnFollowText }]}>
-                    {isFollowing ? 'Takipte' : 'Takip Et'}
-                  </Text>
-                </TouchableOpacity>
-
-                {isFollowing && (
+                {!isFollowing ? (
                   <TouchableOpacity
-                    style={styles.btnIconOnly}
-                    onPress={() => setIsUserOptionsVisible(true)}
+                    style={[styles.btnFollow, { backgroundColor: btnFollowBg, borderColor: 'transparent' }]}
+                    onPress={() => setIsFollowing(!isFollowing)}
                   >
-                    <UserCog size={24} color={iconColor} strokeWidth={2} />
+                    <Text style={[styles.btnFollowText, { color: btnFollowText }]}>Takip Et</Text>
                   </TouchableOpacity>
+                ) : (
+                  <>
+                    <View style={{ flex: 1 }} />
+                    <TouchableOpacity
+                      style={[styles.btnIconOnly, { backgroundColor: btnSecondaryBg, borderWidth: 1, borderColor: textSecondary }]}
+                      onPress={() => setIsFollowing(!isFollowing)}
+                    >
+                      <UserCog size={20} color={iconColor} strokeWidth={2} />
+                    </TouchableOpacity>
+                  </>
                 )}
-
-                {isFollowing && <View style={{ flex: 1 }} />}
 
                 <View style={styles.btnIconOnly}>
                   <AnimatedIconButton
@@ -461,7 +453,6 @@ const styles = StyleSheet.create({
   bioText: { fontSize: 13, lineHeight: 19.5, marginBottom: 20, paddingHorizontal: 5, textAlign: 'center' },
   actionsContainer: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 25, height: 36, paddingHorizontal: 5, width: '100%' },
   btnFollow: { flex: 1, height: 36, borderRadius: 50, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  btnFollowingCompact: { flex: 0, paddingHorizontal: 12, minWidth: 80 },
   btnFollowText: { fontSize: 13, fontWeight: '600' },
   btnIconOnly: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 0 },
   navTabs: { flexDirection: 'row', borderBottomWidth: 1 },
