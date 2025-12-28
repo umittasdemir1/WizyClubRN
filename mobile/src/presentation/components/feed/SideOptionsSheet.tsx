@@ -1,122 +1,158 @@
-import React, { useEffect } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { forwardRef, useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Slider from '@react-native-community/slider';
 import { Trash2 } from 'lucide-react-native';
 import SunIcon from '../../../../assets/icons/sun.svg';
 import { useBrightnessStore } from '../../store/useBrightnessStore';
 import { useThemeStore } from '../../store/useThemeStore';
 import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
 
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+
 interface SideOptionsSheetProps {
-    visible: boolean;
-    onClose: () => void;
     onDeletePress?: () => void;
 }
 
-const SHEET_WIDTH = 240;
+export const SideOptionsSheet = forwardRef<BottomSheet, SideOptionsSheetProps>(
+    ({ onDeletePress }, ref) => {
+        const insets = useSafeAreaInsets();
+        const { isDark } = useThemeStore();
+        const { brightness, setBrightness } = useBrightnessStore();
 
-export function SideOptionsSheet({ visible, onClose, onDeletePress }: SideOptionsSheetProps) {
-    const insets = useSafeAreaInsets();
-    const translateX = useSharedValue(SHEET_WIDTH);
-    const overlayOpacity = useSharedValue(0);
+        const topOffset = insets.top + 60 + 25;
+        const snapPoints = useMemo(() => [SCREEN_HEIGHT - topOffset], [insets.top]);
 
-    const { brightness, toggleController } = useBrightnessStore();
-    const { isDark } = useThemeStore();
-    const isBrightnessActive = brightness < 1.0;
+        const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
+        const bgColor = isDark ? '#1c1c1e' : themeColors.background;
+        const textColor = isDark ? '#fff' : '#000';
+        const secondaryColor = isDark ? '#888' : '#555';
+        const borderColor = isDark ? '#2c2c2e' : '#e5e5e5';
+        const handleColor = isDark ? '#fff' : '#000';
 
-    const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
-    const bgColor = isDark ? '#1c1c1e' : themeColors.background;
-
-    useEffect(() => {
-        translateX.value = withTiming(visible ? 0 : SHEET_WIDTH, { duration: 220 });
-        overlayOpacity.value = withTiming(visible ? 0.35 : 0, { duration: 200 });
-    }, [visible]);
-
-    const sheetStyle = useAnimatedStyle(() => ({
-        transform: [{ translateX: translateX.value }],
-    }));
-
-    const overlayStyle = useAnimatedStyle(() => ({
-        opacity: overlayOpacity.value,
-    }));
-
-    return (
-        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-            <Animated.View
-                style={[styles.overlay, overlayStyle]}
-                pointerEvents={visible ? 'auto' : 'none'}
+        return (
+            <BottomSheet
+                ref={ref}
+                index={-1}
+                snapPoints={snapPoints}
+                enablePanDownToClose={true}
+                backgroundStyle={{ backgroundColor: bgColor, borderTopLeftRadius: 40, borderTopRightRadius: 40 }}
+                handleIndicatorStyle={{ backgroundColor: handleColor }}
             >
-                <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-            </Animated.View>
+                <BottomSheetView style={styles.container}>
+                    {/* Header */}
+                    <View style={[styles.header, { borderBottomColor: borderColor }]}>
+                        <Text style={[styles.title, { color: textColor }]}>Seçenekler</Text>
+                    </View>
 
-            <Animated.View
-                style={[
-                    styles.sheet,
-                    { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24, backgroundColor: bgColor },
-                    sheetStyle,
-                ]}
-                pointerEvents={visible ? 'auto' : 'none'}
-            >
-                <Text style={styles.title}>Seçenekler</Text>
+                    {/* Content */}
+                    <View style={styles.content}>
+                        {/* Brightness Section */}
+                        <View style={[styles.section, { borderBottomColor: borderColor }]}>
+                            <View style={styles.sectionHeader}>
+                                <SunIcon
+                                    width={24}
+                                    height={24}
+                                    color={brightness < 1.0 ? '#FFD700' : textColor}
+                                />
+                                <Text style={[styles.sectionTitle, { color: textColor }]}>Parlaklık</Text>
+                            </View>
+                            <View style={styles.sliderContainer}>
+                                <Slider
+                                    style={styles.slider}
+                                    minimumValue={0.3}
+                                    maximumValue={1.0}
+                                    value={brightness}
+                                    onValueChange={setBrightness}
+                                    minimumTrackTintColor="#FFD700"
+                                    maximumTrackTintColor={isDark ? '#444' : '#ddd'}
+                                    thumbTintColor="#FFD700"
+                                />
+                                <Text style={[styles.brightnessValue, { color: secondaryColor }]}>
+                                    {Math.round(brightness * 100)}%
+                                </Text>
+                            </View>
+                        </View>
 
-                <Pressable style={styles.option} onPress={toggleController}>
-                    <SunIcon
-                        width={24}
-                        height={24}
-                        color={isBrightnessActive ? '#FFD700' : '#FFFFFF'}
-                    />
-                    <Text style={styles.optionLabel}>Parlaklık</Text>
-                </Pressable>
-
-                {onDeletePress && (
-                    <Pressable style={styles.option} onPress={onDeletePress}>
-                        <Trash2 width={24} height={24} color="#FF6B6B" />
-                        <Text style={[styles.optionLabel, styles.destructive]}>Sil</Text>
-                    </Pressable>
-                )}
-            </Animated.View>
-        </View>
-    );
-}
+                        {/* Delete Button */}
+                        {onDeletePress && (
+                            <TouchableOpacity
+                                style={[styles.deleteButton, { borderTopColor: borderColor }]}
+                                onPress={() => {
+                                    onDeletePress();
+                                    if (ref && typeof ref !== 'function' && ref.current) {
+                                        ref.current.close();
+                                    }
+                                }}
+                            >
+                                <Trash2 size={24} color="#FF6B6B" />
+                                <Text style={styles.deleteText}>Sil</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                </BottomSheetView>
+            </BottomSheet>
+        );
+    }
+);
 
 const styles = StyleSheet.create({
-    overlay: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        zIndex: 98,
+    container: {
+        flex: 1,
+        paddingHorizontal: 20,
+        paddingBottom: 20,
     },
-    sheet: {
-        position: 'absolute',
-        top: 0,
-        bottom: 0,
-        right: 0,
-        width: SHEET_WIDTH,
-        paddingHorizontal: 18,
-        paddingBottom: 24,
-        gap: 12,
-        zIndex: 99,
-        borderLeftWidth: 1,
-        borderLeftColor: 'rgba(255,255,255,0.08)',
+    header: {
+        paddingBottom: 15,
+        marginBottom: 20,
+        borderBottomWidth: 1,
     },
     title: {
-        color: 'white',
-        fontSize: 16,
+        fontSize: 20,
         fontWeight: '700',
-        marginBottom: 4,
     },
-    option: {
+    content: {
+        flex: 1,
+    },
+    section: {
+        paddingBottom: 20,
+        marginBottom: 20,
+        borderBottomWidth: 1,
+    },
+    sectionHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
-        paddingVertical: 10,
+        marginBottom: 16,
     },
-    optionLabel: {
-        color: 'white',
-        fontSize: 15,
+    sectionTitle: {
+        fontSize: 16,
         fontWeight: '600',
     },
-    destructive: {
+    sliderContainer: {
+        paddingHorizontal: 8,
+    },
+    slider: {
+        width: '100%',
+        height: 40,
+    },
+    brightnessValue: {
+        fontSize: 14,
+        textAlign: 'center',
+        marginTop: 4,
+    },
+    deleteButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        paddingTop: 20,
+        paddingVertical: 16,
+        borderTopWidth: 1,
+    },
+    deleteText: {
         color: '#FF6B6B',
+        fontSize: 16,
+        fontWeight: '600',
     },
 });
