@@ -10,9 +10,9 @@ export class VideoRepositoryImpl implements IVideoRepository {
         this.dataSource = new SupabaseVideoDataSource();
     }
 
-    async getFeed(page: number, limit: number): Promise<Video[]> {
+    async getFeed(page: number, limit: number, userId?: string): Promise<Video[]> {
         // Supabase data source already returns Video entities
-        return this.dataSource.getVideos(page, limit);
+        return this.dataSource.getVideos(page, limit, userId);
     }
 
     async toggleLike(videoId: string): Promise<boolean> {

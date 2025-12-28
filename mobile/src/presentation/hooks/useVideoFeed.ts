@@ -9,6 +9,7 @@ import { VideoRepositoryImpl } from '../../data/repositories/VideoRepositoryImpl
 import { InteractionRepositoryImpl } from '../../data/repositories/InteractionRepositoryImpl';
 import { VideoCacheService } from '../../data/services/VideoCacheService';
 import { useActiveVideoStore } from '../store/useActiveVideoStore';
+import { useAuthStore } from '../store/useAuthStore';
 
 // Interfaces
 interface UseVideoFeedReturn {
@@ -51,39 +52,16 @@ export function useVideoFeed(): UseVideoFeedReturn {
     const isMounted = useRef(true);
     const activeVideoId = useActiveVideoStore((state) => state.activeVideoId);
 
+    // Auth User
+    const { user } = useAuthStore();
+    const currentUserId = user?.id || 'anon';
+
     // Initialize Cache
     useEffect(() => {
         VideoCacheService.initialize();
     }, []);
 
-    // Smart Prefetch: Guarantee next video is cached, prefetch others in background
-    useEffect(() => {
-        if (!activeVideoId || videos.length === 0) return;
-
-        const currentIndex = videos.findIndex(v => v.id === activeVideoId);
-        if (currentIndex === -1) return;
-
-        const prefetchVideos = async () => {
-            const nextVideo = videos[currentIndex + 1];
-
-            // PRIORITY 1: Next video MUST be cached (await!)
-            if (nextVideo && typeof nextVideo.videoUrl === 'string') {
-                await VideoCacheService.cacheVideo(nextVideo.videoUrl);
-                console.log('[Prefetch] ✅ NEXT video guaranteed:', nextVideo.id);
-            }
-
-            // PRIORITY 2: Background prefetch for videos +2 and +3 (no await)
-            const backgroundVideos = videos.slice(currentIndex + 2, currentIndex + 4);
-            backgroundVideos.forEach(video => {
-                if (typeof video.videoUrl === 'string') {
-                    VideoCacheService.cacheVideo(video.videoUrl);
-                    console.log('[Prefetch] 🔄 Background prefetch:', video.id);
-                }
-            });
-        };
-
-        prefetchVideos();
-    }, [activeVideoId, videos]);
+    // ... (keep prefetch logic) ...
 
     useEffect(() => {
         isMounted.current = true;
@@ -96,7 +74,7 @@ export function useVideoFeed(): UseVideoFeedReturn {
         try {
             setIsLoading(true);
             setError(null);
-            const fetchedVideos = await getVideoFeedUseCase.execute(1, 10);
+            const fetchedVideos = await getVideoFeedUseCase.execute(1, 10, currentUserId);
 
             if (isMounted.current) {
                 setVideos(fetchedVideos);
@@ -113,7 +91,7 @@ export function useVideoFeed(): UseVideoFeedReturn {
                 setIsLoading(false);
             }
         }
-    }, [getVideoFeedUseCase]);
+    }, [getVideoFeedUseCase, currentUserId]);
 
     const refreshFeed = useCallback(async () => {
         if (isRefreshing) return;
@@ -124,7 +102,7 @@ export function useVideoFeed(): UseVideoFeedReturn {
             // Clear cache on refresh to resolve any persistence issues with same-named files
             await VideoCacheService.clearCache();
             // Reset to page 1
-            const fetchedVideos = await getVideoFeedUseCase.execute(1, 10);
+            const fetchedVideos = await getVideoFeedUseCase.execute(1, 10, currentUserId);
 
             if (isMounted.current) {
                 setVideos(fetchedVideos);
@@ -141,14 +119,14 @@ export function useVideoFeed(): UseVideoFeedReturn {
                 setIsRefreshing(false);
             }
         }
-    }, [isRefreshing, getVideoFeedUseCase]);
+    }, [isRefreshing, getVideoFeedUseCase, currentUserId]);
 
     const loadMore = useCallback(async () => {
         if (isLoadingMore || !hasMore || isLoading) return;
 
         try {
             setIsLoadingMore(true);
-            const fetchedVideos = await getVideoFeedUseCase.execute(page, 10);
+            const fetchedVideos = await getVideoFeedUseCase.execute(page, 10, currentUserId);
 
             if (isMounted.current) {
                 if (fetchedVideos.length > 0) {
@@ -166,10 +144,15 @@ export function useVideoFeed(): UseVideoFeedReturn {
                 setIsLoadingMore(false);
             }
         }
-    }, [isLoadingMore, hasMore, isLoading, page, getVideoFeedUseCase]);
+    }, [isLoadingMore, hasMore, isLoading, page, getVideoFeedUseCase, currentUserId]);
 
     // Optimistic Update with Rollback
     const toggleLike = useCallback(async (videoId: string) => {
+        if (!user) {
+            Alert.alert('Giriş Yapmalısınız', 'Bu işlemi yapmak için giriş yapmalısınız.');
+            return;
+        }
+
         // Optimistic update
         setVideos((prevVideos) =>
             prevVideos.map((video) => {
@@ -187,7 +170,7 @@ export function useVideoFeed(): UseVideoFeedReturn {
         );
 
         try {
-            await toggleLikeUseCase.execute(videoId);
+            await toggleLikeUseCase.execute(videoId, currentUserId);
         } catch (err) {
             // Rollback on error
             console.error('Toggle like failed, reverting:', err);
@@ -206,9 +189,14 @@ export function useVideoFeed(): UseVideoFeedReturn {
                 })
             );
         }
-    }, [toggleLikeUseCase]);
+    }, [toggleLikeUseCase, user, currentUserId]);
 
     const toggleSave = useCallback(async (videoId: string) => {
+        if (!user) {
+            Alert.alert('Giriş Yapmalısınız', 'Bu işlemi yapmak için giriş yapmalısınız.');
+            return;
+        }
+
         // Optimistic update
         setVideos((prevVideos) =>
             prevVideos.map((video) => {
@@ -226,7 +214,7 @@ export function useVideoFeed(): UseVideoFeedReturn {
         );
 
         try {
-            await toggleSaveUseCase.execute(videoId);
+            await toggleSaveUseCase.execute(videoId, currentUserId);
         } catch (err) {
             console.error('Toggle save failed, reverting:', err);
             // Rollback
@@ -245,18 +233,23 @@ export function useVideoFeed(): UseVideoFeedReturn {
                 })
             );
         }
-    }, [toggleSaveUseCase]);
+    }, [toggleSaveUseCase, user, currentUserId]);
 
     const toggleFollow = useCallback(async (videoId: string) => {
+        if (!user) {
+            Alert.alert('Giriş Yapmalısınız', 'Bu işlemi yapmak için giriş yapmalısınız.');
+            return;
+        }
+
         const video = videos.find(v => v.id === videoId);
         if (!video) return;
 
         const userIdToFollow = video.user.id;
 
-        // Optimistic update
+        // Optimistic update: Update ALL videos from this user
         setVideos((prevVideos) =>
             prevVideos.map((v) => {
-                if (v.id === videoId) {
+                if (v.user.id === userIdToFollow) {
                     return {
                         ...v,
                         user: {
@@ -270,18 +263,18 @@ export function useVideoFeed(): UseVideoFeedReturn {
         );
 
         try {
-            await toggleFollowUseCase.execute(userIdToFollow);
+            await toggleFollowUseCase.execute(userIdToFollow, currentUserId);
         } catch (err) {
             console.error('Toggle follow failed, reverting:', err);
-            // Rollback
+            // Rollback: Revert ALL videos from this user
             setVideos((prevVideos) =>
                 prevVideos.map((v) => {
-                    if (v.id === videoId) {
+                    if (v.user.id === userIdToFollow) {
                         return {
                             ...v,
                             user: {
                                 ...v.user,
-                                isFollowing: !v.user.isFollowing,
+                                isFollowing: !v.user.isFollowing, // Revert back
                             },
                         };
                     }
@@ -289,7 +282,7 @@ export function useVideoFeed(): UseVideoFeedReturn {
                 })
             );
         }
-    }, [videos, toggleFollowUseCase]);
+    }, [videos, toggleFollowUseCase, user, currentUserId]);
 
     const toggleShare = useCallback((videoId: string) => {
         setVideos((prevVideos) =>

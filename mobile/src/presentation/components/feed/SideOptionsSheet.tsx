@@ -1,9 +1,17 @@
-import React, { forwardRef, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import React, { forwardRef, useMemo, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, LayoutChangeEvent } from 'react-native';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Slider from '@react-native-community/slider';
 import { Trash2 } from 'lucide-react-native';
+import { GestureDetector, Gesture } from 'react-native-gesture-handler';
+import Animated, {
+    useSharedValue,
+    useAnimatedStyle,
+    runOnJS,
+    withTiming,
+    Easing
+} from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import SunIcon from '../../../../assets/icons/sun.svg';
 import { useBrightnessStore } from '../../store/useBrightnessStore';
 import { useThemeStore } from '../../store/useThemeStore';
@@ -14,6 +22,111 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 interface SideOptionsSheetProps {
     onDeletePress?: () => void;
 }
+
+// Separate component for real-time slider
+const BrightnessSlider = ({
+    initialValue,
+    onValueChange,
+    isDark,
+}: {
+    initialValue: number;
+    onValueChange: (val: number) => void;
+    isDark: boolean;
+}) => {
+    const sliderWidth = useSharedValue(0);
+    // Use SharedValue for instant UI updates
+    const progress = useSharedValue((initialValue - 0.3) / 0.7);
+
+    const syncToStore = useCallback((val: number) => {
+        onValueChange(val);
+    }, [onValueChange]);
+
+    const triggerHaptic = useCallback(() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }, []);
+
+    const pan = Gesture.Pan()
+        .onStart((e) => {
+            'worklet';
+            const width = sliderWidth.value;
+            if (width > 0) {
+                const newProgress = Math.min(Math.max(e.x / width, 0), 1);
+                progress.value = newProgress;
+                const newValue = 0.3 + (newProgress * 0.7);
+                runOnJS(syncToStore)(newValue);
+                runOnJS(triggerHaptic)();
+            }
+        })
+        .onUpdate((e) => {
+            'worklet';
+            const width = sliderWidth.value;
+            if (width > 0) {
+                const newProgress = Math.min(Math.max(e.x / width, 0), 1);
+                progress.value = newProgress;
+                const newValue = 0.3 + (newProgress * 0.7);
+                runOnJS(syncToStore)(newValue);
+            }
+        });
+
+    const tap = Gesture.Tap()
+        .onStart((e) => {
+            'worklet';
+            const width = sliderWidth.value;
+            if (width > 0) {
+                const newProgress = Math.min(Math.max(e.x / width, 0), 1);
+                progress.value = withTiming(newProgress, { duration: 100, easing: Easing.out(Easing.ease) });
+                const newValue = 0.3 + (newProgress * 0.7);
+                runOnJS(syncToStore)(newValue);
+                runOnJS(triggerHaptic)();
+            }
+        });
+
+    const composed = Gesture.Race(pan, tap);
+
+    const handleLayout = useCallback((e: LayoutChangeEvent) => {
+        sliderWidth.value = e.nativeEvent.layout.width;
+    }, []);
+
+    // Animated styles for instant visual feedback
+    const animatedFillStyle = useAnimatedStyle(() => ({
+        width: `${progress.value * 100}%`,
+    }));
+
+    const animatedThumbStyle = useAnimatedStyle(() => ({
+        left: `${progress.value * 100}%`,
+    }));
+
+    const trackBg = isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)';
+    const fillColor = isDark ? '#FFF' : '#000';
+
+    return (
+        <View style={styles.sliderWrapper} onLayout={handleLayout}>
+            <GestureDetector gesture={composed}>
+                <View style={styles.touchArea}>
+                    <View style={[styles.sliderTrack, { backgroundColor: trackBg }]}>
+                        <Animated.View
+                            style={[
+                                styles.sliderFill,
+                                { backgroundColor: fillColor },
+                                animatedFillStyle
+                            ]}
+                        />
+                        <Animated.View
+                            style={[
+                                styles.sliderThumb,
+                                { backgroundColor: fillColor },
+                                animatedThumbStyle
+                            ]}
+                        />
+                    </View>
+                </View>
+            </GestureDetector>
+            <Text style={[styles.brightnessValue, { color: isDark ? '#888' : '#555' }]}>
+                {Math.round((0.3 + progress.value * 0.7) * 100)}%
+            </Text>
+        </View>
+    );
+};
 
 export const SideOptionsSheet = forwardRef<BottomSheet, SideOptionsSheetProps>(
     ({ onDeletePress }, ref) => {
@@ -27,7 +140,6 @@ export const SideOptionsSheet = forwardRef<BottomSheet, SideOptionsSheetProps>(
         const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
         const bgColor = isDark ? '#1c1c1e' : themeColors.background;
         const textColor = isDark ? '#fff' : '#000';
-        const secondaryColor = isDark ? '#888' : '#555';
         const borderColor = isDark ? '#2c2c2e' : '#e5e5e5';
         const handleColor = isDark ? '#fff' : '#000';
 
@@ -58,21 +170,12 @@ export const SideOptionsSheet = forwardRef<BottomSheet, SideOptionsSheetProps>(
                                 />
                                 <Text style={[styles.sectionTitle, { color: textColor }]}>Parlaklık</Text>
                             </View>
-                            <View style={styles.sliderContainer}>
-                                <Slider
-                                    style={styles.slider}
-                                    minimumValue={0.3}
-                                    maximumValue={1.0}
-                                    value={brightness}
-                                    onValueChange={setBrightness}
-                                    minimumTrackTintColor="#FFD700"
-                                    maximumTrackTintColor={isDark ? '#444' : '#ddd'}
-                                    thumbTintColor="#FFD700"
-                                />
-                                <Text style={[styles.brightnessValue, { color: secondaryColor }]}>
-                                    {Math.round(brightness * 100)}%
-                                </Text>
-                            </View>
+
+                            <BrightnessSlider
+                                initialValue={brightness}
+                                onValueChange={setBrightness}
+                                isDark={isDark}
+                            />
                         </View>
 
                         {/* Delete Button */}
@@ -130,17 +233,42 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
     },
-    sliderContainer: {
-        paddingHorizontal: 8,
-    },
-    slider: {
+    sliderWrapper: {
         width: '100%',
-        height: 40,
+        paddingVertical: 10,
+    },
+    touchArea: {
+        height: 44,
+        justifyContent: 'center',
+        width: '100%',
+    },
+    sliderTrack: {
+        height: 4,
+        width: '100%',
+        borderRadius: 2,
+        overflow: 'visible',
+        position: 'relative',
+    },
+    sliderFill: {
+        height: '100%',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        borderRadius: 2,
+    },
+    sliderThumb: {
+        position: 'absolute',
+        top: -5,
+        width: 14,
+        height: 14,
+        marginLeft: -7,
+        borderRadius: 7,
     },
     brightnessValue: {
         fontSize: 14,
         textAlign: 'center',
-        marginTop: 4,
+        marginTop: 8,
+        fontWeight: '500',
     },
     deleteButton: {
         flexDirection: 'row',

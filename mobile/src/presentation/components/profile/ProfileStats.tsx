@@ -3,8 +3,8 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Avatar } from '../shared/Avatar';
 
 interface ProfileStatsProps {
-  followingCount: string;
-  followersCount: string;
+  followingCount: string | number;
+  followersCount: string | number;
   mainAvatarUrl: string;
   isDark: boolean;
 }

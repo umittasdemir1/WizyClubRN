@@ -1,7 +1,7 @@
 import { User, SocialLink } from '../entities';
 
 export interface IProfileRepository {
-    getProfile(userId: string): Promise<User | null>;
+    getProfile(userId: string, viewerId?: string): Promise<User | null>;
     updateProfile(userId: string, profile: Partial<User>): Promise<User>;
     getSocialLinks(userId: string): Promise<SocialLink[]>;
     addSocialLink(userId: string, link: Omit<SocialLink, 'id' | 'userId'>): Promise<SocialLink>;

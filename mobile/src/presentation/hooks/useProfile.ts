@@ -1,27 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { User, SocialLink } from '../../domain/entities';
 import { ProfileRepositoryImpl } from '../../data/repositories/ProfileRepositoryImpl';
 
 const profileRepo = new ProfileRepositoryImpl();
 
-export const useProfile = (userId: string) => {
+export const useProfile = (userId: string, viewerId?: string) => {
     const [user, setUser] = useState<User | null>(null);
     const [socialLinks, setSocialLinks] = useState<SocialLink[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        if (userId) {
-            loadProfile();
-        }
-    }, [userId]);
-
-    const loadProfile = async () => {
+    const loadProfile = useCallback(async () => {
         setIsLoading(true);
         try {
             console.log('[useProfile] Loading profile for user ID:', userId);
             const [profileData, linksData] = await Promise.all([
-                profileRepo.getProfile(userId),
+                profileRepo.getProfile(userId, viewerId),
                 profileRepo.getSocialLinks(userId)
             ]);
             console.log('[useProfile] Profile data loaded:', profileData);
@@ -34,9 +28,15 @@ export const useProfile = (userId: string) => {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [userId, viewerId]);
 
-    const updateProfile = async (updates: Partial<User>) => {
+    useEffect(() => {
+        if (userId) {
+            loadProfile();
+        }
+    }, [loadProfile, userId]);
+
+    const updateProfile = useCallback(async (updates: Partial<User>) => {
         try {
             console.log('[useProfile] Updating profile with:', updates);
             const updatedUser = await profileRepo.updateProfile(userId, updates);
@@ -51,9 +51,9 @@ export const useProfile = (userId: string) => {
             setError('Profil güncellenirken bir hata oluştu.');
             throw err;
         }
-    };
+    }, [userId, loadProfile]);
 
-    const saveSocialLinks = async (links: Omit<SocialLink, 'id' | 'userId'>[]) => {
+    const saveSocialLinks = useCallback(async (links: Omit<SocialLink, 'id' | 'userId'>[]) => {
         try {
             // Basitleştirmek için: Mevcutları silip yenileri ekliyoruz (veya id'si olanları update ediyoruz)
             // Şimdilik sadece yeni ekleme/güncelleme mantığı backend'e bağlı
@@ -77,9 +77,9 @@ export const useProfile = (userId: string) => {
             setError('Bağlantılar kaydedilirken bir hata oluştu.');
             throw err;
         }
-    };
+    }, [userId]);
 
-    const uploadAvatar = async (fileUri: string) => {
+    const uploadAvatar = useCallback(async (fileUri: string) => {
         try {
             const avatarUrl = await profileRepo.uploadAvatar(userId, fileUri);
             // Burada avatarUrl'i profile update ile de göndermek gerekebilir
@@ -89,7 +89,7 @@ export const useProfile = (userId: string) => {
             setError('Profil resmi yüklenirken bir hata oluştu.');
             throw err;
         }
-    };
+    }, [userId, updateProfile]);
 
     return {
         user,

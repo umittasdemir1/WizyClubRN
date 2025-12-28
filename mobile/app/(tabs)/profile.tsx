@@ -98,6 +98,33 @@ export default function ProfileScreen() {
   const { user: authUser, initialize, isInitialized } = useAuthStore();
   const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
 
+  // Use authenticated user's ID, fallback to hardcoded for development
+  const currentUserId = authUser?.id || '687c8079-e94c-42c2-9442-8a4a6b63dec6';
+
+  // Initialize auth on mount
+  useEffect(() => {
+    if (!isInitialized) {
+      initialize();
+    }
+  }, [isInitialized, initialize]);
+
+  const { videos, refreshFeed } = useVideoFeed();
+
+  // Debug logging
+  useEffect(() => {
+    console.log('[Profile] Auth user:', authUser?.id);
+    console.log('[Profile] Current user ID:', currentUserId);
+  }, [authUser, currentUserId]);
+
+  const { user: profileUser, socialLinks: profileLinks, isLoading, reload, updateProfile, saveSocialLinks, uploadAvatar } = useProfile(currentUserId);
+
+  useFocusEffect(
+    useCallback(() => {
+      RNStatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
+      reload();
+    }, [isDark, reload])
+  );
+
   // Collapsible Header Logic
   const headerTranslateY = useSharedValue(0);
   const lastScrollY = useSharedValue(0);
@@ -123,31 +150,6 @@ export default function ProfileScreen() {
   const animatedHeaderStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: headerTranslateY.value }],
   }));
-
-  useFocusEffect(
-    useCallback(() => {
-      RNStatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
-    }, [isDark])
-  );
-
-  // Initialize auth on mount
-  useEffect(() => {
-    if (!isInitialized) {
-      initialize();
-    }
-  }, [isInitialized, initialize]);
-
-  const { videos, refreshFeed } = useVideoFeed();
-  // Use authenticated user's ID, fallback to hardcoded for development
-  const currentUserId = authUser?.id || '687c8079-e94c-42c2-9442-8a4a6b63dec6';
-
-  // Debug logging
-  useEffect(() => {
-    console.log('[Profile] Auth user:', authUser?.id);
-    console.log('[Profile] Current user ID:', currentUserId);
-  }, [authUser, currentUserId]);
-
-  const { user: profileUser, socialLinks: profileLinks, isLoading, reload, updateProfile, saveSocialLinks, uploadAvatar } = useProfile(currentUserId);
 
   const [refreshing, setRefreshing] = useState(false);
   const [previewItem, setPreviewItem] = useState<{ id: string; thumbnail: string; videoUrl: string } | null>(null);
@@ -362,7 +364,16 @@ export default function ProfileScreen() {
       {previewItem && <PreviewModal item={previewItem} onClose={hidePreview} />}
       <BioBottomSheet ref={bioSheetRef} bio={currentUser.bio || ''} isDark={isDark} />
       <ClubsBottomSheet ref={clubsSheetRef} clubs={clubs} isDark={isDark} />
-      <SettingsBottomSheet ref={settingsSheetRef} isDark={isDark} onThemeToggle={toggleTheme} onDeletedContentPress={() => deletedContentSheetRef.current?.expand()} />
+      <SettingsBottomSheet
+        ref={settingsSheetRef}
+        isDark={isDark}
+        onThemeToggle={toggleTheme}
+        onDeletedContentPress={() => deletedContentSheetRef.current?.expand()}
+        onSignOut={async () => {
+          await useAuthStore.getState().signOut();
+          router.replace('/login');
+        }}
+      />
       <EditProfileSheet
         ref={editProfileSheetRef}
         user={currentUser}

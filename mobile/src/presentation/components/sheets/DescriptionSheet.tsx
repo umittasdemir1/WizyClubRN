@@ -1,4 +1,4 @@
-import React, { forwardRef, useMemo } from 'react';
+import React, { forwardRef, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable, Dimensions } from 'react-native';
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -31,7 +31,7 @@ export const DescriptionSheet = forwardRef<BottomSheet, DescriptionSheetProps>(
     const snapPoints = useMemo(() => [SCREEN_HEIGHT - topOffset], [insets.top]);
 
     const handleInternalMore = () => {
-      console.log('Internal More Menu Pressed - Separate from feed');
+      console.log('Internal More Menu Pressed');
     };
 
     const handleClose = () => {
@@ -40,15 +40,24 @@ export const DescriptionSheet = forwardRef<BottomSheet, DescriptionSheetProps>(
       }
     };
 
+    // When user tries to drag up, snap back to position 0
+    const handleAnimate = useCallback((fromIndex: number, toIndex: number) => {
+      // If trying to go above max snap point (index 0), snap back
+      if (toIndex > 0 && ref && typeof ref !== 'function' && ref.current) {
+        ref.current.snapToIndex(0);
+      }
+    }, [ref]);
+
     return (
       <BottomSheet
         ref={ref}
         snapPoints={snapPoints}
-        enablePanDownToClose={true}
-        enableOverDrag={false}
-        overDragResistanceFactor={0}
         index={-1}
         onChange={onChange}
+        onAnimate={handleAnimate}
+        enablePanDownToClose={true}
+        enableContentPanningGesture={false}
+        enableHandlePanningGesture={true}
         backgroundStyle={{
           backgroundColor: bgColor,
           borderTopLeftRadius: 40,
@@ -56,63 +65,58 @@ export const DescriptionSheet = forwardRef<BottomSheet, DescriptionSheetProps>(
         }}
         handleIndicatorStyle={{ backgroundColor: handleColor }}
       >
-        <BottomSheetScrollView style={styles.container}>
-          {/* Header Section */}
-          <View style={styles.header}>
-            <View style={styles.headerLeft}>
-              <Pressable
-                onPress={handleClose}
-                style={styles.backButton}
-                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-              >
-                <ChevronLeft size={28} color={textPrimary} />
-              </Pressable>
+        {/* Fixed Header */}
+        <View style={[styles.header, { backgroundColor: bgColor }]}>
+          <View style={styles.headerLeft}>
+            <Pressable
+              onPress={handleClose}
+              style={styles.backButton}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <ChevronLeft size={28} color={textPrimary} />
+            </Pressable>
 
-              {video && (
-                <>
-                  <Avatar url={video.user.avatarUrl} size={44} hasBorder={true} />
-                  <View style={styles.userInfo}>
-                    <Text style={[styles.fullName, { color: textPrimary }]}>
-                      {video.user.username}
-                    </Text>
-                    <Text style={[styles.username, { color: textSecondary }]}>
-                      @{video.user.id.toLowerCase().replace(/\s+/g, '_')}
-                    </Text>
-                  </View>
-                </>
-              )}
-            </View>
-
-            <View style={styles.headerRight}>
-              {video && !video.user.isFollowing && (
-                <Pressable
-                  style={[
-                    styles.followPill,
-                    {
-                      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
-                      borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)',
-                    }
-                  ]}
-                  onPress={onFollowPress}
-                  hitSlop={8}
-                >
-                  <Text style={[styles.followText, { color: textPrimary }]}>Takip Et</Text>
-                </Pressable>
-              )}
-              <Pressable
-                onPress={handleInternalMore}
-                style={styles.moreButton}
-                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-              >
-                <MoreVertical size={24} color={textPrimary} />
-              </Pressable>
-            </View>
+            {video && (
+              <>
+                <Avatar url={video.user.avatarUrl} size={44} hasBorder={true} />
+                <View style={styles.userInfo}>
+                  <Text style={[styles.fullName, { color: textPrimary }]}>
+                    {video.user.fullName || video.user.username}
+                  </Text>
+                  <Text style={[styles.username, { color: textSecondary }]}>
+                    @{video.user.username}
+                  </Text>
+                </View>
+              </>
+            )}
           </View>
 
-          {/* Divider */}
-          <View style={styles.divider} />
+          <View style={styles.headerRight}>
+            {video && !video.user.isFollowing && (
+              <Pressable
+                style={[
+                  styles.followPill,
+                  {
+                    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)',
+                  }
+                ]}
+                onPress={onFollowPress}
+                hitSlop={8}
+              >
+                <Text style={[styles.followText, { color: textPrimary }]}>Takip Et</Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
 
-          {/* Description Content */}
+        {/* Divider */}
+        <View style={[styles.divider, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]} />
+
+        {/* Scrollable Content */}
+        <BottomSheetScrollView
+          contentContainerStyle={{ paddingBottom: insets.bottom + 40, paddingHorizontal: 20 }}
+        >
           <Text style={[styles.description, { color: textPrimary }]}>
             {video?.description}
           </Text>
@@ -123,15 +127,12 @@ export const DescriptionSheet = forwardRef<BottomSheet, DescriptionSheetProps>(
 );
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingBottom: 4,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -174,13 +175,13 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   divider: {
-    height: 16,
+    height: 1,
+    marginVertical: 12,
+    marginHorizontal: 16,
   },
   description: {
     fontSize: 15,
     lineHeight: 22,
     fontWeight: '400',
-    paddingHorizontal: 20,
-    paddingBottom: 20,
   },
 });

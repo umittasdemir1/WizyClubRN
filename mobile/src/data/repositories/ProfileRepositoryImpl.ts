@@ -9,9 +9,9 @@ export class ProfileRepositoryImpl implements IProfileRepository {
         this.dataSource = new SupabaseProfileDataSource();
     }
 
-    async getProfile(userId: string): Promise<User | null> {
+    async getProfile(userId: string, viewerId?: string): Promise<User | null> {
         try {
-            const data = await this.dataSource.getProfile(userId);
+            const data = await this.dataSource.getProfile(userId, viewerId);
             console.log('[ProfileRepository] ✅ Mapping profile data to domain entity');
             return this.mapDtoToUser(data);
         } catch (error: any) {
@@ -67,7 +67,7 @@ export class ProfileRepositoryImpl implements IProfileRepository {
             username: dto.username,
             fullName: dto.full_name,
             avatarUrl: dto.avatar_url,
-            isFollowing: false, // Bu ayrı bir join veya check gerektirir
+            isFollowing: !!dto.is_following, // Use the flag from DataSource
             bio: dto.bio,
             country: dto.country,
             age: dto.age,

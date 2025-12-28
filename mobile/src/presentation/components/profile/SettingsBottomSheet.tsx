@@ -11,10 +11,11 @@ interface SettingsBottomSheetProps {
   isDark: boolean;
   onThemeToggle: () => void;
   onDeletedContentPress: () => void;
+  onSignOut: () => void;
 }
 
 export const SettingsBottomSheet = forwardRef<BottomSheet, SettingsBottomSheetProps>(
-  ({ isDark, onThemeToggle, onDeletedContentPress }, ref) => {
+  ({ isDark, onThemeToggle, onDeletedContentPress, onSignOut }, ref) => {
     const insets = useSafeAreaInsets();
 
     const topOffset = insets.top + 60 + 25;
@@ -95,6 +96,19 @@ export const SettingsBottomSheet = forwardRef<BottomSheet, SettingsBottomSheetPr
               </View>
               {/* Chevron or icon */}
               <Text style={{ color: secondaryColor, fontSize: 18 }}>›</Text>
+            </TouchableOpacity>
+
+            {/* Sign Out */}
+            <TouchableOpacity
+              style={[styles.settingItem, { borderBottomColor: 'transparent' }]}
+              onPress={() => {
+                if (ref && typeof ref !== 'function' && ref.current) {
+                  ref.current.close();
+                }
+                onSignOut();
+              }}
+            >
+              <Text style={[styles.settingLabel, { color: '#FF3B30', marginTop: 10 }]}>Çıkış Yap</Text>
             </TouchableOpacity>
 
           </BottomSheetScrollView>

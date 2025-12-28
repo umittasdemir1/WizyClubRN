@@ -74,9 +74,9 @@ interface SupabaseVideo {
 }
 
 export class SupabaseVideoDataSource {
-    async getVideos(page: number, limit: number): Promise<Video[]> {
+    async getVideos(page: number, limit: number, userId?: string): Promise<Video[]> {
         const offset = (page - 1) * limit;
-        console.log(`[DataSource] Fetching videos: page=${page}, offset=${offset}, limit=${limit}`);
+        console.log(`[DataSource] Fetching videos: page=${page}, offset=${offset}, limit=${limit}, userId=${userId}`);
 
         const { data, error } = await supabase
             .from('videos')
@@ -90,8 +90,36 @@ export class SupabaseVideoDataSource {
             return [];
         }
 
-        return (data as SupabaseVideo[]).map(this.mapToVideo);
+        const videos = data as SupabaseVideo[];
+        if (!videos.length) return [];
+
+        // If no user, just map without personalization
+        if (!userId) {
+            return videos.map(v => this.mapToVideo(v));
+        }
+
+        // Fetch interactions for these videos
+        const videoIds = videos.map(v => v.id);
+        const authorIds = [...new Set(videos.map(v => v.user_id))];
+
+        const [likes, saves, follows] = await Promise.all([
+            supabase.from('likes').select('video_id').eq('user_id', userId).in('video_id', videoIds),
+            supabase.from('saves').select('video_id').eq('user_id', userId).in('video_id', videoIds),
+            supabase.from('follows').select('following_id').eq('follower_id', userId).in('following_id', authorIds)
+        ]);
+
+        const likedVideoIds = new Set(likes.data?.map(l => l.video_id) || []);
+        const savedVideoIds = new Set(saves.data?.map(s => s.video_id) || []);
+        const followedUserIds = new Set(follows.data?.map(f => f.following_id) || []);
+
+        return videos.map(v => this.mapToVideo(v, {
+            isLiked: likedVideoIds.has(v.id),
+            isSaved: savedVideoIds.has(v.id),
+            isFollowing: followedUserIds.has(v.user_id)
+        }));
     }
+
+    // ... (getStories remains same for now) ...
 
     async getStories(): Promise<Story[]> {
         const { data, error } = await supabase
@@ -119,10 +147,12 @@ export class SupabaseVideoDataSource {
             return null;
         }
 
+        // Note: For simplicity in single video fetch, we are not fetching interaction status yet.
+        // In a real app, we should pass userId here too if available.
         return this.mapToVideo(data as SupabaseVideo);
     }
 
-    private mapToVideo(dto: SupabaseVideo): Video {
+    private mapToVideo(dto: SupabaseVideo, interactions?: { isLiked: boolean; isSaved: boolean; isFollowing: boolean }): Video {
         // Professional parsing might be needed if URLs in DB are relative, 
         // but currently they are absolute. I'll ensure helper fields 
         // match the IG/TikTok style.
@@ -136,8 +166,8 @@ export class SupabaseVideoDataSource {
             sharesCount: dto.shares_count || 0,
             shopsCount: dto.shops_count || 0,
             spriteUrl: dto.sprite_url,
-            isLiked: false,
-            isSaved: false,
+            isLiked: interactions?.isLiked || false,
+            isSaved: interactions?.isSaved || false,
             savesCount: dto.saves_count || 0,
             user: dto.profiles ? {
                 id: dto.user_id,
@@ -151,7 +181,7 @@ export class SupabaseVideoDataSource {
                 followersCount: dto.profiles.followers_count,
                 followingCount: dto.profiles.following_count,
                 postsCount: dto.profiles.posts_count,
-                isFollowing: false,
+                isFollowing: interactions?.isFollowing || false,
             } : getUserFromId(dto.user_id),
             musicName: dto.music_name || 'Original Audio',
             musicAuthor: dto.music_author || 'WizyClub',

@@ -3,7 +3,7 @@ import { User, SocialLink } from '../../domain/entities';
 import { CONFIG } from '../../core/config';
 
 export class SupabaseProfileDataSource {
-    async getProfile(userId: string): Promise<any> {
+    async getProfile(userId: string, viewerId?: string): Promise<any> {
         console.log('[SupabaseDataSource] 🔍 Fetching profile for ID:', userId);
         const { data, error } = await supabase
             .from('profiles')
@@ -19,6 +19,16 @@ export class SupabaseProfileDataSource {
                 code: error.code
             });
             throw error;
+        }
+
+        if (viewerId) {
+            const { count } = await supabase
+                .from('follows')
+                .select('*', { count: 'exact', head: true })
+                .eq('follower_id', viewerId)
+                .eq('following_id', userId);
+
+            data.is_following = count ? count > 0 : false;
         }
 
         console.log('[SupabaseDataSource] ✅ Profile fetched successfully:', data?.username);
@@ -120,13 +130,14 @@ export class SupabaseProfileDataSource {
 
     private mapUserToDto(user: Partial<User>) {
         const dto: any = {};
-        if (user.username) dto.username = user.username;
-        if (user.fullName) dto.full_name = user.fullName;
-        if (user.avatarUrl) dto.avatar_url = user.avatarUrl;
-        if (user.bio) dto.bio = user.bio;
-        if (user.country) dto.country = user.country;
-        if (user.age) dto.age = user.age;
-        if (user.website) dto.website = user.website;
+        if ('username' in user) dto.username = user.username;
+        if ('fullName' in user) dto.full_name = user.fullName;
+        if ('avatarUrl' in user) dto.avatar_url = user.avatarUrl;
+        if ('bio' in user) dto.bio = user.bio;
+        if ('country' in user) dto.country = user.country;
+        if ('age' in user) dto.age = user.age;
+        if ('website' in user) dto.website = user.website;
+        dto.updated_at = new Date().toISOString();
         return dto;
     }
 }

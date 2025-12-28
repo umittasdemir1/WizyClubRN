@@ -413,12 +413,12 @@ export default function FeedScreen() {
                         onSave={() => toggleSave(video.id)}
                         onShare={() => toggleShare(video.id)}
                         onShop={handleOpenShopping}
-                        onProfilePress={() => console.log('Profile')}
+                        onProfilePress={() => router.push(`/user/${video.user.id}`)}
                     />
 
                     <MetadataLayer
                         video={video}
-                        onAvatarPress={() => console.log('Open Story/Profile')}
+                        onAvatarPress={() => router.push(`/user/${video.user.id}`)}
                         onFollowPress={() => toggleFollow(video.id)}
                         onReadMorePress={handleOpenDescription}
                         onCommercialTagPress={() => console.log('Open Commercial Info')}

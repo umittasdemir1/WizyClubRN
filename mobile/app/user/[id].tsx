@@ -41,6 +41,9 @@ import { useProfile } from '../../src/presentation/hooks/useProfile';
 import { LIGHT_COLORS, DARK_COLORS } from '../../src/core/constants';
 import { ProfileSkeleton } from '../../src/presentation/components/profile/ProfileSkeleton';
 import { UserOptionsModal } from '../../src/presentation/components/profile/UserOptionsModal';
+import { useAuthStore } from '../../src/presentation/store/useAuthStore';
+import { InteractionRepositoryImpl } from '../../src/data/repositories/InteractionRepositoryImpl';
+import { ToggleFollowUseCase } from '../../src/domain/usecases/ToggleFollowUseCase';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -108,9 +111,9 @@ const AnimatedIconButton = ({
   };
 
   const visibleColor = isActive && activeColor ? activeColor : inactiveColor;
-  
-  const iconProps = outlined 
-    ? { color: "transparent", stroke: visibleColor, strokeWidth: strokeWidth } 
+
+  const iconProps = outlined
+    ? { color: "transparent", stroke: visibleColor, strokeWidth: strokeWidth }
     : { color: visibleColor, stroke: "none" };
 
   return (
@@ -143,7 +146,7 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnail: string
 export default function UserProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { id } = useLocalSearchParams(); 
+  const { id } = useLocalSearchParams();
   const { isDark } = useThemeStore();
   const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
 
@@ -164,7 +167,7 @@ export default function UserProfileScreen() {
       } else if (diff < -10) {
         headerTranslateY.value = withTiming(0, { duration: 200 });
       }
-      
+
       lastScrollY.value = currentY;
     },
   });
@@ -189,7 +192,7 @@ export default function UserProfileScreen() {
 
   const bioSheetRef = useRef<BottomSheet>(null);
   const clubsSheetRef = useRef<BottomSheet>(null);
-  
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await refreshFeed();
@@ -208,8 +211,44 @@ export default function UserProfileScreen() {
   const btnSecondaryBg = themeColors.card;
 
   // --- Real Data Fetching ---
+  const { user: authUser } = useAuthStore();
+  const currentUserId = authUser?.id;
+
   const userId = (typeof id === 'string' ? id : '') || '';
-  const { user: profileUser, socialLinks: profileLinks, isLoading, reload } = useProfile(userId);
+  const { user: profileUser, socialLinks: profileLinks, isLoading, reload } = useProfile(userId, currentUserId);
+
+  // Sync isFollowing from profile data
+  useEffect(() => {
+    if (profileUser) {
+      setIsFollowing(profileUser.isFollowing);
+    }
+  }, [profileUser]);
+
+  // Use Case
+  const interactionRepository = useRef(new InteractionRepositoryImpl()).current;
+  const toggleFollowUseCase = useRef(new ToggleFollowUseCase(interactionRepository)).current;
+
+  const handleToggleFollow = async () => {
+    if (!currentUserId) {
+      // Alert if not logged in (though typically shouldn't be here if not logged in? Or public view allowed?)
+      return;
+    }
+
+    // Optimistic Update
+    const newState = !isFollowing;
+    setIsFollowing(newState);
+
+    try {
+      await toggleFollowUseCase.execute(userId, currentUserId);
+
+      // Update local profile stats optimistically
+      // Note: exact count update might require reload, but usually +/- 1 is enough for UI
+      // We are not updating 'user.followersCount' here in UI state, but we could.
+    } catch (err) {
+      console.error('Follow toggle failed', err);
+      setIsFollowing(!newState); // Rollback
+    }
+  };
 
   const user = {
     name: profileUser?.fullName || profileUser?.username || 'User',
@@ -262,7 +301,7 @@ export default function UserProfileScreen() {
           TOP NAVIGATION - ANIMATED & INDEPENDENT
       */}
       <Animated.View style={[
-        styles.topNavContainer, 
+        styles.topNavContainer,
         { paddingTop: insets.top, backgroundColor: bgContainer },
         animatedHeaderStyle
       ]}>
@@ -289,86 +328,86 @@ export default function UserProfileScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={isDark ? "#fff" : "#000"} progressViewOffset={insets.top + 60} />}
       >
         {isLoading ? (
-            <ProfileSkeleton />
+          <ProfileSkeleton />
         ) : (
-            <View style={styles.profileContainer}>
+          <View style={styles.profileContainer}>
             <ProfileStats followingCount={user.followingCount} followersCount={user.followersCount} mainAvatarUrl={user.avatarUrl} isDark={isDark} />
-            
+
             <View style={styles.userNameRow}>
-                <Text style={[styles.userNameText, { color: textPrimary }]}>{user.name}</Text>
-                <VerifiedBadge />
+              <Text style={[styles.userNameText, { color: textPrimary }]}>{user.name}</Text>
+              <VerifiedBadge />
             </View>
 
             <TouchableOpacity onPress={() => bioSheetRef.current?.expand()} disabled={user.bio.length <= bioLimit}>
-                <Text style={[styles.bioText, { color: textSecondary }]}>
+              <Text style={[styles.bioText, { color: textSecondary }]}>
                 {truncatedBio}
                 {user.bio.length > bioLimit && <Text style={{ color: textPrimary, fontWeight: '600' }}> devamını gör</Text>}
-                </Text>
+              </Text>
             </TouchableOpacity>
 
             {/* Social Actions (Follow, Like, Notify) */}
             <View style={styles.actionsContainer}>
-                <TouchableOpacity
-                  style={[styles.btnFollow, { backgroundColor: isFollowing ? btnSecondaryBg : btnFollowBg, borderColor: isFollowing ? textSecondary : 'transparent' }]}
-                  onPress={() => setIsFollowing(!isFollowing)}
-                >
-                  <Text style={[styles.btnFollowText, { color: isFollowing ? textPrimary : btnFollowText }]}>{isFollowing ? 'Takipte' : 'Takip Et'}</Text>
-                </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.btnFollow, { backgroundColor: isFollowing ? btnSecondaryBg : btnFollowBg, borderColor: isFollowing ? textSecondary : 'transparent' }]}
+                onPress={() => setIsFollowing(!isFollowing)}
+              >
+                <Text style={[styles.btnFollowText, { color: isFollowing ? textPrimary : btnFollowText }]}>{isFollowing ? 'Takipte' : 'Takip Et'}</Text>
+              </TouchableOpacity>
 
-                <View style={styles.btnIconOnly}>
-                  <AnimatedIconButton
-                    icon={LikeIcon}
-                    onPress={() => setIsLiked(!isLiked)}
-                    isActive={isLiked}
-                    activeColor="#FF3B30"
-                    inactiveColor={iconColor}
-                    size={28}
-                    outlined={!isLiked}
-                  />
-                </View>
-                <View style={styles.btnIconOnly}>
-                  <AnimatedIconButton
-                    icon={({ color, width, height, ...props }: any) => (
-                      <Svg width={width} height={height} viewBox="0 0 24 24" fill={props.fill || color} stroke={props.stroke} strokeWidth={props.strokeWidth}>
-                        <Path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
-                      </Svg>
-                    )}
-                    onPress={() => setIsNotificationsOn(!isNotificationsOn)}
-                    isActive={isNotificationsOn}
-                    activeColor="#FF3B30"
-                    inactiveColor={iconColor}
-                    size={28}
-                    outlined={!isNotificationsOn}
-                    strokeWidth={1.6}
-                  />
-                </View>
-                <View style={styles.btnIconOnly}>
-                  <AnimatedIconButton
-                    icon={ShareIcon}
-                    onPress={() => console.log('Share')}
-                    inactiveColor={iconColor}
-                    size={28}
-                    outlined={true}
-                  />
-                </View>
+              <View style={styles.btnIconOnly}>
+                <AnimatedIconButton
+                  icon={LikeIcon}
+                  onPress={() => setIsLiked(!isLiked)}
+                  isActive={isLiked}
+                  activeColor="#FF3B30"
+                  inactiveColor={iconColor}
+                  size={28}
+                  outlined={!isLiked}
+                />
+              </View>
+              <View style={styles.btnIconOnly}>
+                <AnimatedIconButton
+                  icon={({ color, width, height, ...props }: any) => (
+                    <Svg width={width} height={height} viewBox="0 0 24 24" fill={props.fill || color} stroke={props.stroke} strokeWidth={props.strokeWidth}>
+                      <Path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
+                    </Svg>
+                  )}
+                  onPress={() => setIsNotificationsOn(!isNotificationsOn)}
+                  isActive={isNotificationsOn}
+                  activeColor="#FF3B30"
+                  inactiveColor={iconColor}
+                  size={28}
+                  outlined={!isNotificationsOn}
+                  strokeWidth={1.6}
+                />
+              </View>
+              <View style={styles.btnIconOnly}>
+                <AnimatedIconButton
+                  icon={ShareIcon}
+                  onPress={() => console.log('Share')}
+                  inactiveColor={iconColor}
+                  size={28}
+                  outlined={true}
+                />
+              </View>
             </View>
 
             <View style={styles.socialClubsRow}>
-                {profileLinks && profileLinks.length > 0 && (
-                  <>
-                    <SocialTags isDark={isDark} links={profileLinks} />
-                    <View style={[styles.verticalSeparator, { backgroundColor: isDark ? '#444' : '#ccc' }]} />
-                  </>
-                )}
+              {profileLinks && profileLinks.length > 0 && (
+                <>
+                  <SocialTags isDark={isDark} links={profileLinks} />
+                  <View style={[styles.verticalSeparator, { backgroundColor: isDark ? '#444' : '#ccc' }]} />
+                </>
+              )}
 
-                <ClubsCollaboration
-                  clubsCount={clubs.length}
-                  clubLogos={clubLogos}
-                  isDark={isDark}
-                  onPress={() => clubsSheetRef.current?.expand()}
-                />
+              <ClubsCollaboration
+                clubsCount={clubs.length}
+                clubLogos={clubLogos}
+                isDark={isDark}
+                onPress={() => clubsSheetRef.current?.expand()}
+              />
             </View>
-            </View>
+          </View>
         )}
 
         <View style={[styles.navTabs, { borderBottomColor: cardBg }]}>
