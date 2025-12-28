@@ -394,8 +394,21 @@ export default function UserProfileScreen() {
                 </View>
             </View>
 
-            <ClubsCollaboration clubsCount={clubs.length} clubLogos={clubLogos} isDark={isDark} onPress={() => clubsSheetRef.current?.expand()} />
-            <SocialTags isDark={isDark} links={profileData.socialLinks} />
+            <View style={styles.socialClubsRow}>
+                {profileData.socialLinks && profileData.socialLinks.length > 0 && (
+                  <>
+                    <SocialTags isDark={isDark} links={profileData.socialLinks} />
+                    <View style={[styles.verticalSeparator, { backgroundColor: isDark ? '#444' : '#ccc' }]} />
+                  </>
+                )}
+
+                <ClubsCollaboration
+                  clubsCount={clubs.length}
+                  clubLogos={clubLogos}
+                  isDark={isDark}
+                  onPress={() => clubsSheetRef.current?.expand()}
+                />
+            </View>
             </View>
         )}
 
@@ -444,6 +457,8 @@ const styles = StyleSheet.create({
   navTabs: { flexDirection: 'row', borderBottomWidth: 1 },
   tab: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12 },
   activeTab: { borderBottomWidth: 2 },
+  socialClubsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15, marginVertical: 10, width: '100%' },
+  verticalSeparator: { width: 1.5, height: 20 },
   previewOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', zIndex: 999 },
   previewCard: { width: '80%', height: 480, borderRadius: 30, overflow: 'hidden', backgroundColor: '#000', elevation: 20, shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 15, shadowOffset: { width: 0, height: 10 } },
   previewVideo: { width: '100%', height: '100%' },
