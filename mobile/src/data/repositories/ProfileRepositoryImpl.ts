@@ -12,9 +12,16 @@ export class ProfileRepositoryImpl implements IProfileRepository {
     async getProfile(userId: string): Promise<User | null> {
         try {
             const data = await this.dataSource.getProfile(userId);
+            console.log('[ProfileRepository] ✅ Mapping profile data to domain entity');
             return this.mapDtoToUser(data);
-        } catch (error) {
-            console.error('[ProfileRepository] getProfile error:', error);
+        } catch (error: any) {
+            console.error('[ProfileRepository] ❌ getProfile error:', {
+                message: error?.message,
+                details: error?.details,
+                hint: error?.hint,
+                code: error?.code,
+                fullError: error
+            });
             return null;
         }
     }
@@ -25,8 +32,20 @@ export class ProfileRepositoryImpl implements IProfileRepository {
     }
 
     async getSocialLinks(userId: string): Promise<SocialLink[]> {
-        const data = await this.dataSource.getSocialLinks(userId);
-        return data.map(this.mapDtoToSocialLink);
+        try {
+            const data = await this.dataSource.getSocialLinks(userId);
+            console.log('[ProfileRepository] ✅ Mapping social links to domain entities');
+            return data.map(this.mapDtoToSocialLink);
+        } catch (error: any) {
+            console.error('[ProfileRepository] ❌ getSocialLinks error:', {
+                message: error?.message,
+                details: error?.details,
+                hint: error?.hint,
+                code: error?.code
+            });
+            // Don't fail the whole profile load if social links fail
+            return [];
+        }
     }
 
     async addSocialLink(userId: string, link: Omit<SocialLink, 'id' | 'userId'>): Promise<SocialLink> {
