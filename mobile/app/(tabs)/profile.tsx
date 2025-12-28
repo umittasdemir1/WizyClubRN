@@ -26,7 +26,7 @@ import { BioBottomSheet } from '../../src/presentation/components/profile/BioBot
 import { ClubsBottomSheet } from '../../src/presentation/components/profile/ClubsBottomSheet';
 import { SettingsBottomSheet } from '../../src/presentation/components/profile/SettingsBottomSheet';
 import { EditProfileSheet } from '../../src/presentation/components/profile/EditProfileSheet';
-import { ChevronLeft } from 'lucide-react-native';
+import { ChevronLeft, Eye } from 'lucide-react-native';
 import BottomSheet from '@gorhom/bottom-sheet';
 import Svg, { Path, Circle } from 'react-native-svg';
 import Animated, {
@@ -258,12 +258,21 @@ export default function ProfileScreen() {
         <View style={styles.topNav}>
           <View style={styles.navIcon} />
           <Text style={[styles.headerUsername, { color: textPrimary }]}>{!isLoading ? `@${user.username}` : ''}</Text>
-          <TouchableOpacity
-            style={styles.navIcon}
-            onPress={() => settingsSheetRef.current?.expand()}
-          >
-            <MoreIcon width={24} height={24} color={iconColor} />
-          </TouchableOpacity>
+          <View style={styles.navActions}>
+            <TouchableOpacity
+              style={styles.navIconButton}
+              onPress={() => router.push(`/user/${currentUserId}`)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Eye size={24} color={iconColor} strokeWidth={2} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.navIconButton}
+              onPress={() => settingsSheetRef.current?.expand()}
+            >
+              <MoreIcon width={24} height={24} color={iconColor} />
+            </TouchableOpacity>
+          </View>
         </View>
       </Animated.View>
 
@@ -375,6 +384,8 @@ const styles = StyleSheet.create({
   topNavContainer: { width: '100%', zIndex: 1000, position: 'absolute', top: 0, left: 0, right: 0 },
   topNav: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, height: 60 },
   navIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  navActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  navIconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   headerUsername: { fontSize: 16, fontWeight: '600', flex: 1, textAlign: 'center' },
   profileContainer: { alignItems: 'center', paddingHorizontal: 10, marginTop: 5 },
   userNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
