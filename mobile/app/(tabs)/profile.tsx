@@ -275,18 +275,6 @@ export default function ProfileScreen() {
           contentContainerStyle={{ paddingTop: insets.top + 60 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={isDark ? "#fff" : "#000"} progressViewOffset={insets.top + 60} />}
         >
-          {/* DEBUG INFO - Remove after fixing */}
-          <View style={{ backgroundColor: isDark ? '#1a1a1a' : '#f0f0f0', padding: 10, marginHorizontal: 10, borderRadius: 8, marginBottom: 10 }}>
-            <Text style={{ color: textPrimary, fontSize: 11, fontFamily: 'monospace' }}>
-              🔍 DEBUG:{'\n'}
-              Auth User: {authUser?.id ? authUser.id.substring(0, 20) + '...' : 'null'}{'\n'}
-              Current User ID: {currentUserId.substring(0, 20)}...{'\n'}
-              Profile User: {profileUser ? '✅ Loaded' : '❌ null'}{'\n'}
-              Loading: {isLoading ? 'true' : 'false'}{'\n'}
-              {profileUser && `Username: ${profileUser.username}`}
-            </Text>
-          </View>
-
           {isLoading ? (
             <ProfileSkeleton />
           ) : (
