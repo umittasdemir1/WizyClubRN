@@ -4,13 +4,24 @@ import { CONFIG } from '../../core/config';
 
 export class SupabaseProfileDataSource {
     async getProfile(userId: string): Promise<any> {
+        console.log('[SupabaseDataSource] 🔍 Fetching profile for ID:', userId);
         const { data, error } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', userId)
             .single();
 
-        if (error) throw error;
+        if (error) {
+            console.error('[SupabaseDataSource] ❌ Profile fetch error:', {
+                message: error.message,
+                details: error.details,
+                hint: error.hint,
+                code: error.code
+            });
+            throw error;
+        }
+
+        console.log('[SupabaseDataSource] ✅ Profile fetched successfully:', data?.username);
         return data;
     }
 
@@ -27,13 +38,24 @@ export class SupabaseProfileDataSource {
     }
 
     async getSocialLinks(userId: string): Promise<any[]> {
+        console.log('[SupabaseDataSource] 🔗 Fetching social links for ID:', userId);
         const { data, error } = await supabase
             .from('social_links')
             .select('*')
             .eq('user_id', userId)
             .order('display_order', { ascending: true });
 
-        if (error) throw error;
+        if (error) {
+            console.error('[SupabaseDataSource] ❌ Social links fetch error:', {
+                message: error.message,
+                details: error.details,
+                hint: error.hint,
+                code: error.code
+            });
+            throw error;
+        }
+
+        console.log('[SupabaseDataSource] ✅ Social links fetched:', data?.length || 0);
         return data || [];
     }
 
