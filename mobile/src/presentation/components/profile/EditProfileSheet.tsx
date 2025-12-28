@@ -28,7 +28,7 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
     const { isDark } = useThemeStore();
     const insets = useSafeAreaInsets();
 
-    const topOffset = insets.top + 60 + 20;
+    const topOffset = insets.top + 60 + 25;
     const snapPoints = useMemo(() => [SCREEN_HEIGHT - topOffset], [insets.top]);
 
     const [activeSubView, setActiveSubView] = useState<SubViewType>(null);
