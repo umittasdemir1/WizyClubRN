@@ -2,6 +2,7 @@ import React, { forwardRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import BottomSheet, { BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { X } from 'lucide-react-native';
+import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
 
 interface BioBottomSheetProps {
   bio: string;
@@ -12,7 +13,8 @@ export const BioBottomSheet = forwardRef<BottomSheet, BioBottomSheetProps>(
   ({ bio, isDark }, ref) => {
     const snapPoints = useMemo(() => ['70%'], []);
 
-    const bgColor = isDark ? '#1c1c1e' : '#fff';
+    const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
+    const bgColor = isDark ? '#1c1c1e' : themeColors.background;
     const textColor = isDark ? '#fff' : '#000';
     const secondaryColor = isDark ? '#888' : '#555';
     const borderColor = isDark ? '#1c1c1e' : '#f0f0f0';

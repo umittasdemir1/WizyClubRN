@@ -2,6 +2,7 @@ import React, { forwardRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Switch } from 'react-native';
 import BottomSheet, { BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { X } from 'lucide-react-native';
+import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
 
 interface SettingsBottomSheetProps {
   isDark: boolean;
@@ -13,7 +14,8 @@ export const SettingsBottomSheet = forwardRef<BottomSheet, SettingsBottomSheetPr
   ({ isDark, onThemeToggle, onDeletedContentPress }, ref) => {
     const snapPoints = useMemo(() => ['40%'], []);
 
-    const bgColor = isDark ? '#1c1c1e' : '#fff';
+    const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
+    const bgColor = isDark ? '#1c1c1e' : themeColors.background;
     const textColor = isDark ? '#fff' : '#000';
     const secondaryColor = isDark ? '#888' : '#555';
     const borderColor = isDark ? '#2c2c2e' : '#e5e5e5';
