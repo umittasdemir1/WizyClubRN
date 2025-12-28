@@ -23,7 +23,7 @@ import { VideoGrid } from '../../src/presentation/components/profile/VideoGrid';
 import { PostsGrid } from '../../src/presentation/components/profile/PostsGrid';
 import { BioBottomSheet } from '../../src/presentation/components/profile/BioBottomSheet';
 import { ClubsBottomSheet } from '../../src/presentation/components/profile/ClubsBottomSheet';
-import { ChevronLeft, MoreHorizontal, UserCog } from 'lucide-react-native';
+import { ChevronLeft, MoreHorizontal } from 'lucide-react-native';
 import BottomSheet from '@gorhom/bottom-sheet';
 import Svg, { Path, Circle } from 'react-native-svg';
 import Animated, {
@@ -349,24 +349,12 @@ export default function UserProfileScreen() {
 
             {/* Social Actions (Follow, Like, Notify) */}
             <View style={styles.actionsContainer}>
-                {!isFollowing ? (
-                  <TouchableOpacity
-                    style={[styles.btnFollow, { backgroundColor: btnFollowBg, borderColor: 'transparent' }]}
-                    onPress={() => setIsFollowing(!isFollowing)}
-                  >
-                    <Text style={[styles.btnFollowText, { color: btnFollowText }]}>Takip Et</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    style={[styles.btnFollowing, { backgroundColor: btnSecondaryBg, borderWidth: 1, borderColor: textSecondary }]}
-                    onPress={() => setIsFollowing(!isFollowing)}
-                  >
-                    <Text style={[styles.btnFollowingText, { color: textPrimary }]}>Takipte</Text>
-                    <UserCog size={16} color={iconColor} strokeWidth={2} />
-                  </TouchableOpacity>
-                )}
-
-                <View style={{ flex: 1 }} />
+                <TouchableOpacity
+                  style={[styles.btnFollow, { backgroundColor: isFollowing ? btnSecondaryBg : btnFollowBg, borderColor: isFollowing ? textSecondary : 'transparent' }]}
+                  onPress={() => setIsFollowing(!isFollowing)}
+                >
+                  <Text style={[styles.btnFollowText, { color: isFollowing ? textPrimary : btnFollowText }]}>{isFollowing ? 'Takipte' : 'Takip Et'}</Text>
+                </TouchableOpacity>
 
                 <View style={styles.btnIconOnly}>
                   <AnimatedIconButton
@@ -452,10 +440,8 @@ const styles = StyleSheet.create({
   userNameText: { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
   bioText: { fontSize: 13, lineHeight: 19.5, marginBottom: 20, paddingHorizontal: 5, textAlign: 'center' },
   actionsContainer: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 25, height: 36, paddingHorizontal: 5, width: '100%' },
-  btnFollow: { flex: 1, height: 36, borderRadius: 50, alignItems: 'center', justifyContent: 'center', borderWidth: 1, maxWidth: 200 },
+  btnFollow: { flex: 1, height: 36, borderRadius: 50, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   btnFollowText: { fontSize: 13, fontWeight: '600' },
-  btnFollowing: { height: 36, borderRadius: 50, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  btnFollowingText: { fontSize: 13, fontWeight: '600' },
   btnIconOnly: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 0 },
   navTabs: { flexDirection: 'row', borderBottomWidth: 1 },
   tab: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12 },
