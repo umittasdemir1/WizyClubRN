@@ -1,28 +1,22 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { AvatarStack } from './AvatarStack';
 import { Avatar } from '../shared/Avatar';
 
 interface ProfileStatsProps {
   followingCount: string;
-  followingAvatars: string[];
   followersCount: string;
-  followersAvatars: string[];
   mainAvatarUrl: string;
   isDark: boolean;
 }
 
 export const ProfileStats: React.FC<ProfileStatsProps> = ({
   followingCount,
-  followingAvatars,
   followersCount,
-  followersAvatars,
   mainAvatarUrl,
   isDark,
 }) => {
   const textColor = isDark ? '#fff' : '#000';
   const labelColor = isDark ? '#888' : '#555';
-  const borderColor = isDark ? '#000' : '#fff';
   const cardBg = isDark ? '#1c1c1e' : '#f0f0f0';
 
   return (
@@ -32,15 +26,6 @@ export const ProfileStats: React.FC<ProfileStatsProps> = ({
         <View style={styles.textContainer}>
           <Text style={[styles.statNum, { color: textColor }]}>{followersCount}</Text>
           <Text style={[styles.statLabel, { color: labelColor }]}>TAKİPÇİ</Text>
-        </View>
-        <View style={styles.avatarContainer}>
-          <AvatarStack
-            avatars={followersAvatars}
-            size={30}
-            overlap={10}
-            borderColor={borderColor}
-            borderWidth={1.5}
-          />
         </View>
       </View>
 
@@ -54,15 +39,6 @@ export const ProfileStats: React.FC<ProfileStatsProps> = ({
         <View style={styles.textContainer}>
           <Text style={[styles.statNum, { color: textColor }]}>{followingCount}</Text>
           <Text style={[styles.statLabel, { color: labelColor }]}>TAKİPTE</Text>
-        </View>
-        <View style={styles.avatarContainer}>
-          <AvatarStack
-            avatars={followingAvatars}
-            size={30}
-            overlap={10}
-            borderColor={borderColor}
-            borderWidth={1.5}
-          />
         </View>
       </View>
     </View>
@@ -83,9 +59,6 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     alignItems: 'center',
     gap: 8,
-  },
-  avatarContainer: {
-    // paddingLeft: 10, Removed to center alignment better
   },
   textContainer: {
     flexDirection: 'column',

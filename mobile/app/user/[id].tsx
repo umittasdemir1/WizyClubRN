@@ -221,8 +221,6 @@ export default function UserProfileScreen() {
   };
   // --------------------------
 
-  const followingAvatars = ['https://i.pravatar.cc/100?img=3', 'https://i.pravatar.cc/100?img=4', 'https://i.pravatar.cc/100?img=5'];
-  const followersAvatars = ['https://i.pravatar.cc/100?img=6', 'https://i.pravatar.cc/100?img=7', 'https://i.pravatar.cc/100?img=8'];
   const clubLogos = [
     'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Amazon_logo.svg/200px-Amazon_logo.svg.png',
     'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/Tesla_Motors.svg/200px-Tesla_Motors.svg.png',
@@ -294,7 +292,7 @@ export default function UserProfileScreen() {
             <ProfileSkeleton />
         ) : (
             <View style={styles.profileContainer}>
-            <ProfileStats followingCount={user.followingCount} followingAvatars={followingAvatars} followersCount={user.followersCount} followersAvatars={followersAvatars} mainAvatarUrl={user.avatarUrl} isDark={isDark} />
+            <ProfileStats followingCount={user.followingCount} followersCount={user.followersCount} mainAvatarUrl={user.avatarUrl} isDark={isDark} />
             
             <View style={styles.userNameRow}>
                 <Text style={[styles.userNameText, { color: textPrimary }]}>{user.name}</Text>
