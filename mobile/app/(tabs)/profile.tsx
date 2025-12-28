@@ -181,8 +181,8 @@ export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState(0);
 
   // Current User as Domain Entity
-  // Only show fallback if not loading and no profile data
-  const currentUser: any = profileUser || (isLoading ? null : {
+  // Always provide a fallback to prevent null errors
+  const currentUser: any = profileUser || {
     id: currentUserId,
     username: authUser?.email?.split('@')[0] || 'user',
     fullName: 'User',
@@ -196,16 +196,16 @@ export default function ProfileScreen() {
     followersCount: 0,
     followingCount: 0,
     postsCount: 0
-  });
+  };
 
   // View model for simple UI parts
   const user = {
-    name: currentUser.fullName,
-    username: currentUser.username,
-    avatarUrl: currentUser.avatarUrl,
-    bio: currentUser.bio || "Explore the world through our lens...",
-    followingCount: currentUser.followingCount?.toString() || '0',
-    followersCount: currentUser.followersCount?.toString() || '0',
+    name: currentUser?.fullName || 'User',
+    username: currentUser?.username || 'user',
+    avatarUrl: currentUser?.avatarUrl || 'https://i.pravatar.cc/300?img=12',
+    bio: currentUser?.bio || "Welcome to WizyClub",
+    followingCount: currentUser?.followingCount?.toString() || '0',
+    followersCount: currentUser?.followersCount?.toString() || '0',
     socialLinks: profileLinks,
   };
 
