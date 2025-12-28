@@ -374,6 +374,8 @@ export default function UserProfileScreen() {
                   </TouchableOpacity>
                 )}
 
+                {isFollowing && <View style={{ flex: 1 }} />}
+
                 <View style={styles.btnIconOnly}>
                   <AnimatedIconButton
                     icon={LikeIcon}
