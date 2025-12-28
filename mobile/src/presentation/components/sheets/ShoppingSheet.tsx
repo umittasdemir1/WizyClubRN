@@ -21,6 +21,7 @@ export const ShoppingSheet = forwardRef<BottomSheet, ShoppingSheetProps>((props,
     const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
     const bgColor = isDark ? '#1c1c1e' : themeColors.background;
     const handleColor = isDark ? '#fff' : '#000';
+    const textColor = isDark ? '#fff' : '#000';
 
     return (
         <BottomSheet
@@ -32,9 +33,9 @@ export const ShoppingSheet = forwardRef<BottomSheet, ShoppingSheetProps>((props,
             handleIndicatorStyle={{ backgroundColor: handleColor }}
         >
             <BottomSheetView style={styles.contentContainer}>
-                <Text style={styles.title}>Shop Products</Text>
-                <View style={styles.placeholder}>
-                    <Text style={styles.placeholderText}>Product List Here</Text>
+                <Text style={[styles.title, { color: textColor }]}>Shop Products</Text>
+                <View style={[styles.placeholder, { backgroundColor: isDark ? '#333' : '#e5e5e5' }]}>
+                    <Text style={[styles.placeholderText, { color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)' }]}>Product List Here</Text>
                 </View>
             </BottomSheetView>
         </BottomSheet>
@@ -48,7 +49,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     title: {
-        color: 'white',
         fontSize: 20,
         fontWeight: 'bold',
         marginBottom: 20,
@@ -56,12 +56,11 @@ const styles = StyleSheet.create({
     placeholder: {
         width: '100%',
         height: 200,
-        backgroundColor: '#333',
         borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
     },
     placeholderText: {
-        color: 'rgba(255,255,255,0.5)',
+        fontSize: 14,
     },
 });
