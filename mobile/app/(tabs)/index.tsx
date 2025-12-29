@@ -37,7 +37,6 @@ import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-na
 import BottomSheet from '@gorhom/bottom-sheet';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { FeedSkeleton } from '../../src/presentation/components/feed/FeedSkeleton';
-import { UploadModal } from '../../src/presentation/components/feed/UploadModal';
 import { useUploadStore } from '../../src/presentation/store/useUploadStore';
 
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
@@ -150,8 +149,7 @@ export default function FeedScreen() {
     // Tab State
     const [activeTab, setActiveTab] = useState<'stories' | 'foryou'>('foryou');
 
-    // Upload State
-    const [isUploadModalVisible, setUploadModalVisible] = useState(false);
+    // Delete modal state
     const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
 
     // Sheet refs
@@ -485,18 +483,13 @@ export default function FeedScreen() {
                         onToggleMute={handleToggleMute}
                         onStoryPress={handleStoryPress}
                         onMorePress={handleMorePress}
-                        onUploadPress={() => setUploadModalVisible(true)}
+                        onUploadPress={() => router.push('/upload')}
                         activeTab={activeTab}
                         onTabChange={handleTabChange}
                         showBrightnessButton={false}
                         hasUnseenStories={hasUnseenStories}
                     />
                 </Animated.View>
-
-                <UploadModal
-                    isVisible={isUploadModalVisible}
-                    onClose={() => setUploadModalVisible(false)}
-                />
 
                 <SideOptionsSheet
                     ref={sideOptionsSheetRef}
@@ -518,7 +511,7 @@ export default function FeedScreen() {
     return (
         <SwipeWrapper
             onSwipeLeft={() => router.push('/explore')}
-            onSwipeRight={() => setUploadModalVisible(true)}
+            onSwipeRight={() => router.push('/upload')}
         >
             <View style={styles.container}>
                 {/* @ts-ignore */}
@@ -574,7 +567,7 @@ export default function FeedScreen() {
                         onToggleMute={handleToggleMute}
                         onStoryPress={handleStoryPress}
                         onMorePress={handleMorePress}
-                        onUploadPress={() => setUploadModalVisible(true)}
+                        onUploadPress={() => router.push('/upload')}
                         activeTab={activeTab}
                         onTabChange={handleTabChange}
                         showBrightnessButton={false}
@@ -597,11 +590,6 @@ export default function FeedScreen() {
                         onPress={handleCloseStoryBar}
                     />
                 )}
-
-                <UploadModal
-                    isVisible={isUploadModalVisible}
-                    onClose={() => setUploadModalVisible(false)}
-                />
 
                 <SideOptionsSheet
                     ref={sideOptionsSheetRef}
