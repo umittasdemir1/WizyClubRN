@@ -400,13 +400,15 @@ app.post('/upload-avatar', upload.single('image'), async (req, res) => {
     try {
         console.log(`👤 [AVATAR] Process starting for user: ${userId}`);
         const extension = path.extname(file.originalname) || '.jpg';
-        const fileName = `users/${userId}/profile/avatar${extension}`;
+        // Upload to avatars/ path (matches worker proxy expectation)
+        const fileName = `avatars/${userId}${extension}`;
 
         // 1. Upload to R2
         const rawAvatarUrl = await uploadToR2(file.path, fileName, file.mimetype);
 
-        // 2. Add Cache Buster (important for CDNs and apps)
-        const avatarUrl = `${rawAvatarUrl}?t=${Date.now()}`;
+        // 2. Use Cloudflare Worker proxy URL
+        const workerUrl = 'https://wizy-r2-proxy.tasdemir-umit.workers.dev';
+        const avatarUrl = `${workerUrl}/${fileName}?t=${Date.now()}`;
 
         // 3. Update Supabase Profile Record
         console.log(`   👉 Syncing to Supabase Profiles...`);
