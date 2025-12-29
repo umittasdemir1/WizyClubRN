@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
         flex: 1,
         marginHorizontal: 0,
         marginTop: 30,
-        marginBottom: 30,
+        marginBottom: 80,
         borderRadius: 28,
         overflow: 'hidden',
     },
