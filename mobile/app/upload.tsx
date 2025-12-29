@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
     },
     cameraContainer: {
         flex: 1,
-        marginHorizontal: 10,
+        marginHorizontal: 30,
         marginTop: 10,
         marginBottom: 8,
         borderRadius: 28,
