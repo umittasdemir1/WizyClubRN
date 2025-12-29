@@ -1,37 +1,8 @@
-# 🚀 WizyClub Backend Setup Guide
+# 🚀 WizyClub Backend Kurulum Rehberi
 
-## 📖 Ne Yaptık?
+## 🏢 İŞTE (Cloud - Firebase Studio)
 
-### Problem:
-- Expo app'i **tunnel mode** ile çalıştırıyorsun
-- Backend local'de çalışıyor ama app ona erişemiyor
-- Ev ve iş bilgisayarında farklı IP'ler var
-
-### Çözüm:
-1. **Localtunnel** ile backend'i internete açtık
-2. **Environment variables** ile her ortamda farklı URL kullanıyoruz
-3. Backend **Cloudflare R2** (S3-compatible storage) kullanıyor
-
----
-
-## 🏗️ Mimari
-
-```
-[Mobile App (Tunnel)]
-    ↓ HTTPS
-[Localtunnel: https://xxx.loca.lt]
-    ↓ HTTP
-[Backend: localhost:3000]
-    ↓ HTTPS
-[Cloudflare R2 Storage]
-[Supabase Database]
-```
-
----
-
-## 📋 Günlük Çalıştırma (İş PC'de)
-
-### 1️⃣ Backend Başlat
+### Günlük Çalıştırma (3 Terminal):
 
 **Terminal 1: Backend**
 ```bash
@@ -39,208 +10,115 @@ cd ~/WizyClubRN/backend
 npm start
 ```
 
-Çıktı:
-```
-✅ Video Backend running on http://0.0.0.0:3000
-📤 Ready to accept uploads
-```
-
----
-
-### 2️⃣ Tunnel Aç
-
-**Terminal 2: Localtunnel**
+**Terminal 2: Ngrok**
 ```bash
-lt --port 3000
+ngrok http 3000
+# URL'i kopyala (örn: https://abc-xyz.ngrok-free.app)
 ```
 
-Çıktı:
-```
-your url is: https://abc-xyz-123.loca.lt
-```
-
-**⚠️ ÖNEMLİ:** Bu URL her seferinde değişir!
-
----
-
-### 3️⃣ Mobile .env Güncelle
-
-**Terminal 3: .env Dosyasını Güncelle**
+**Terminal 3: Mobile**
 ```bash
 cd ~/WizyClubRN/mobile
 nano .env
-```
+# EXPO_PUBLIC_API_URL=<NGROK_URL_BURAYA>
+# Kaydet: CTRL+X, Y, Enter
 
-İçine localtunnel URL'ini yaz:
-```env
-EXPO_PUBLIC_API_URL=https://abc-xyz-123.loca.lt
-```
-
-Kaydet: `CTRL+X` → `Y` → `Enter`
-
----
-
-### 4️⃣ Expo App Başlat
-
-**Terminal 3 (devam):**
-```bash
 npx expo start --dev-client --tunnel
 ```
 
 ---
 
-## 🏠 Ev vs İş Farkı
+## 🏠 EVDE (Kendi PC)
 
-### Evde:
+### Günlük Çalıştırma (2 Terminal):
+
+**Terminal 1: Backend**
 ```bash
-# .env dosyası
-EXPO_PUBLIC_API_URL=https://home-tunnel-url.loca.lt
+cd backend
+npm start
 ```
 
-### İşte:
+**Terminal 2: Mobile**
 ```bash
-# .env dosyası
-EXPO_PUBLIC_API_URL=https://work-tunnel-url.loca.lt
-```
+cd mobile
+nano .env
+# EXPO_PUBLIC_API_URL=http://192.168.0.138:3000
+# (Kendi local IP'ni kullan)
 
-**Not:** `.env` dosyası Git'e gitmez, her ortamda farklı olabilir!
-
----
-
-## 📁 Dosya Yapısı
-
-```
-WizyClubRN/
-├── backend/
-│   ├── .env              # Backend config (R2, Supabase)
-│   ├── .env.example      # Template
-│   └── server.js         # Express server
-│
-├── mobile/
-│   ├── .env              # Frontend config (API URL) ← Her gün değişir!
-│   ├── .env.example      # Template
-│   └── src/
-│       └── core/
-│           └── config.ts # process.env.EXPO_PUBLIC_API_URL kullanır
-│
-└── BACKEND_SETUP_GUIDE.md  # Bu dosya
+npx expo start --dev-client
+# Tunnel yok!
 ```
 
 ---
 
-## 🔧 Troubleshooting
+## ⚙️ Konfigürasyon
+
+### backend/.env (Her Yerde Aynı)
+```env
+SUPABASE_URL=https://snpckjrjmwxwgqcqghkl.supabase.co
+SUPABASE_KEY=eyJhbGci...
+
+R2_ACCOUNT_ID=952ab104...
+R2_ACCESS_KEY_ID=83698d55...
+R2_SECRET_ACCESS_KEY=568611ad...
+R2_BUCKET_NAME=wizyclub-assets
+R2_PUBLIC_URL=https://wizy-r2-proxy.tasdemir-umit.workers.dev
+```
+
+**⚠️ ÖNEMLİ:** `R2_PUBLIC_URL` worker URL olmalı!
+
+---
+
+### mobile/.env (Her Ortamda Farklı)
+
+**İşte:**
+```env
+EXPO_PUBLIC_API_URL=https://abc-xyz.ngrok-free.app
+```
+
+**Evde:**
+```env
+EXPO_PUBLIC_API_URL=http://192.168.0.138:3000
+```
+
+---
+
+## 🔧 Sorun Giderme
 
 ### Backend başlamıyor
 ```bash
 # .env dosyasını kontrol et
 cat ~/WizyClubRN/backend/.env
-
-# Supabase URL ve R2 credentials doğru mu?
 ```
 
 ### App backend'e bağlanamıyor
 ```bash
-# 1. Localtunnel çalışıyor mu?
-# Terminal 2'de "your url is:" görmeli
-
-# 2. mobile/.env güncel mi?
+# mobile/.env doğru mu?
 cat ~/WizyClubRN/mobile/.env
 
-# 3. Expo'yu restart et
-# CTRL+C ile durdur, tekrar başlat
-```
-
-### Localtunnel URL değişti
-```bash
-# 1. Yeni URL'i kopyala
-# 2. mobile/.env'i güncelle
-nano ~/WizyClubRN/mobile/.env
-
-# 3. Expo'yu restart et
+# Expo restart
+CTRL+C, tekrar başlat
 ```
 
 ### Avatar upload çalışmıyor
 ```bash
-# 1. Backend loglarını kontrol et (Terminal 1)
-# 2. R2 credentials doğru mu?
-cat ~/WizyClubRN/backend/.env | grep R2
+# backend/.env'de R2_PUBLIC_URL worker URL mi?
+grep R2_PUBLIC_URL ~/WizyClubRN/backend/.env
 
-# 3. Tunnel bağlantısı var mı?
-curl https://your-tunnel-url.loca.lt/health
+# Şu olmalı:
+# R2_PUBLIC_URL=https://wizy-r2-proxy.tasdemir-umit.workers.dev
 ```
 
 ---
 
-## 🎯 Hızlı Başlangıç (Tek Komut)
+## 📝 Özet
 
-İşe geldiğinde her gün:
+**İşte:** Backend + Ngrok + Expo (3 terminal)
+**Evde:** Backend + Expo (2 terminal)
 
-```bash
-# Terminal 1
-cd ~/WizyClubRN/backend && npm start
-
-# Terminal 2 (yeni tab)
-lt --port 3000
-
-# URL'i kopyala, .env'ye yapıştır, app'i başlat
-# Terminal 3 (yeni tab)
-cd ~/WizyClubRN/mobile && \
-nano .env && \
-npx expo start --dev-client --tunnel
-```
-
----
-
-## 📝 Environment Variables
-
-### Backend (.env)
-```env
-# Supabase
-SUPABASE_URL=https://snpckjrjmwxwgqcqghkl.supabase.co
-SUPABASE_KEY=eyJhbGci...
-
-# Cloudflare R2
-R2_ACCOUNT_ID=952ab104...
-R2_ACCESS_KEY_ID=83698d55...
-R2_SECRET_ACCESS_KEY=568611ad...
-R2_BUCKET_NAME=wizy-club-staging
-R2_PUBLIC_URL=http://pub-426c6d2d3e914041a80d464249339e3c.r2.dev
-```
-
-### Mobile (.env)
-```env
-# API URL (localtunnel)
-EXPO_PUBLIC_API_URL=https://xxx.loca.lt
-```
-
----
-
-## 🔒 Güvenlik
-
-- ✅ `.env` dosyaları `.gitignore`'da
-- ✅ Credentials GitHub'a gitmez
-- ✅ Localtunnel geçici URL (her seferinde değişir)
-- ⚠️ Production'da ngrok auth veya Cloudflare Tunnel kullan
-
----
-
-## 🚨 Önemli Notlar
-
-1. **Localtunnel URL her gün değişir** - `mobile/.env`'yi güncellemeyi unutma!
-2. **Backend .env sabittir** - Bir kez kuruldu mu değişmez
-3. **3 terminal** gerekli: Backend, Tunnel, Expo
-4. **Expo restart** gerekir - .env değişince app'i yeniden başlat
-
----
-
-## 📞 Yardım
-
-Sorun yaşarsan:
-1. Bu dosyayı oku
-2. Troubleshooting bölümüne bak
-3. Terminal loglarını kontrol et
+**mobile/.env** → Her gün değişir (ngrok URL)
+**backend/.env** → Sabit kalır (worker URL)
 
 ---
 
 **Son güncelleme:** 2025-12-29
-**Branch:** claude/supabase-test-users-GQe5c
