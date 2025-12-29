@@ -47,16 +47,66 @@ export class InteractionDataSource {
     }
 
     async follow(followerId: string, followingId: string): Promise<void> {
+        // 1. Add follow relationship
         await supabase.from('follows').insert({
             follower_id: followerId,
             following_id: followingId
         });
+
+        // 2. Update follower's following_count
+        const { data: followerProfile } = await supabase
+            .from('profiles')
+            .select('following_count')
+            .eq('id', followerId)
+            .single();
+
+        await supabase
+            .from('profiles')
+            .update({ following_count: (followerProfile?.following_count || 0) + 1 })
+            .eq('id', followerId);
+
+        // 3. Update following's followers_count
+        const { data: followingProfile } = await supabase
+            .from('profiles')
+            .select('followers_count')
+            .eq('id', followingId)
+            .single();
+
+        await supabase
+            .from('profiles')
+            .update({ followers_count: (followingProfile?.followers_count || 0) + 1 })
+            .eq('id', followingId);
     }
 
     async unfollow(followerId: string, followingId: string): Promise<void> {
+        // 1. Remove follow relationship
         await supabase.from('follows')
             .delete()
             .eq('follower_id', followerId)
             .eq('following_id', followingId);
+
+        // 2. Update follower's following_count
+        const { data: followerProfile } = await supabase
+            .from('profiles')
+            .select('following_count')
+            .eq('id', followerId)
+            .single();
+
+        await supabase
+            .from('profiles')
+            .update({ following_count: Math.max(0, (followerProfile?.following_count || 0) - 1) })
+            .eq('id', followerId);
+
+        // 3. Update following's followers_count
+        const { data: followingProfile } = await supabase
+            .from('profiles')
+            .select('followers_count')
+            .eq('id', followingId)
+            .single();
+
+        await supabase
+            .from('profiles')
+            .update({ followers_count: Math.max(0, (followingProfile?.followers_count || 0) - 1) })
+            .eq('id', followingId);
     }
 }
