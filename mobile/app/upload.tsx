@@ -98,6 +98,25 @@ export default function CameraScreen() {
 
     return (
         <View style={styles.container}>
+            {/* Top Header - Outside Camera */}
+            <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
+                <Pressable onPress={() => router.back()} style={styles.iconButton}>
+                    <X color="#FFFFFF" size={28} strokeWidth={2.5} />
+                </Pressable>
+
+                <Pressable onPress={toggleFlash} style={styles.iconButton}>
+                    {flash === 'off' ? (
+                        <ZapOff color="#FFFFFF" size={26} strokeWidth={2} />
+                    ) : (
+                        <Zap color="#FFD60A" size={26} strokeWidth={2} fill="#FFD60A" />
+                    )}
+                </Pressable>
+
+                <Pressable onPress={() => console.log('Settings')} style={styles.iconButton}>
+                    <Settings color="#FFFFFF" size={26} strokeWidth={2} />
+                </Pressable>
+            </View>
+
             {/* Camera Preview - Rounded Container */}
             <View style={styles.cameraContainer}>
                 <CameraView
@@ -105,71 +124,52 @@ export default function CameraScreen() {
                     style={styles.camera}
                     facing={facing}
                     flash={flash}
-                >
-                {/* Top Header */}
-                <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
-                    <Pressable onPress={() => router.back()} style={styles.iconButton}>
-                        <X color="#FFFFFF" size={28} strokeWidth={2.5} />
-                    </Pressable>
+                />
+            </View>
 
-                    <Pressable onPress={toggleFlash} style={styles.iconButton}>
-                        {flash === 'off' ? (
-                            <ZapOff color="#FFFFFF" size={26} strokeWidth={2} />
+            {/* Bottom Controls - Outside Camera */}
+            <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 20 }]}>
+                {/* Mode Selector */}
+                <View style={styles.modeSelector}>
+                    {MODES.map((mode) => (
+                        <Pressable
+                            key={mode}
+                            onPress={() => setSelectedMode(mode)}
+                            style={styles.modeButton}
+                        >
+                            <Text
+                                style={[
+                                    styles.modeText,
+                                    selectedMode === mode && styles.modeTextActive
+                                ]}
+                            >
+                                {mode}
+                            </Text>
+                        </Pressable>
+                    ))}
+                </View>
+
+                {/* Bottom Actions */}
+                <View style={styles.bottomActions}>
+                    {/* Gallery Preview */}
+                    <Pressable onPress={openGallery} style={styles.galleryButton}>
+                        {lastPhoto ? (
+                            <Image source={{ uri: lastPhoto }} style={styles.galleryPreview} />
                         ) : (
-                            <Zap color="#FFD60A" size={26} strokeWidth={2} fill="#FFD60A" />
+                            <View style={styles.galleryPlaceholder} />
                         )}
                     </Pressable>
 
-                    <Pressable onPress={() => console.log('Settings')} style={styles.iconButton}>
-                        <Settings color="#FFFFFF" size={26} strokeWidth={2} />
+                    {/* Capture Button */}
+                    <Pressable onPress={takePicture} style={styles.captureButtonOuter}>
+                        <View style={styles.captureButtonInner} />
+                    </Pressable>
+
+                    {/* Flip Camera */}
+                    <Pressable onPress={toggleCameraFacing} style={styles.flipButton}>
+                        <RotateCw color="#FFFFFF" size={32} strokeWidth={2.5} />
                     </Pressable>
                 </View>
-
-                {/* Bottom Controls */}
-                <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 20 }]}>
-                    {/* Mode Selector */}
-                    <View style={styles.modeSelector}>
-                        {MODES.map((mode) => (
-                            <Pressable
-                                key={mode}
-                                onPress={() => setSelectedMode(mode)}
-                                style={styles.modeButton}
-                            >
-                                <Text
-                                    style={[
-                                        styles.modeText,
-                                        selectedMode === mode && styles.modeTextActive
-                                    ]}
-                                >
-                                    {mode}
-                                </Text>
-                            </Pressable>
-                        ))}
-                    </View>
-
-                    {/* Bottom Actions */}
-                    <View style={styles.bottomActions}>
-                        {/* Gallery Preview */}
-                        <Pressable onPress={openGallery} style={styles.galleryButton}>
-                            {lastPhoto ? (
-                                <Image source={{ uri: lastPhoto }} style={styles.galleryPreview} />
-                            ) : (
-                                <View style={styles.galleryPlaceholder} />
-                            )}
-                        </Pressable>
-
-                        {/* Capture Button */}
-                        <Pressable onPress={takePicture} style={styles.captureButtonOuter}>
-                            <View style={styles.captureButtonInner} />
-                        </Pressable>
-
-                        {/* Flip Camera */}
-                        <Pressable onPress={toggleCameraFacing} style={styles.flipButton}>
-                            <RotateCw color="#FFFFFF" size={32} strokeWidth={2.5} />
-                        </Pressable>
-                    </View>
-                </View>
-                </CameraView>
             </View>
         </View>
     );
@@ -182,14 +182,13 @@ const styles = StyleSheet.create({
     },
     cameraContainer: {
         flex: 1,
-        margin: 0,
-        borderRadius: 20,
+        marginHorizontal: 16,
+        marginVertical: 8,
+        borderRadius: 24,
         overflow: 'hidden',
     },
     camera: {
         flex: 1,
-        width: SCREEN_WIDTH,
-        height: SCREEN_HEIGHT,
     },
     permissionContainer: {
         justifyContent: 'center',
@@ -216,8 +215,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingBottom: 16,
+        paddingHorizontal: 20,
+        paddingBottom: 12,
+        zIndex: 10,
     },
     iconButton: {
         width: 44,
@@ -226,12 +226,9 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     bottomBar: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
         alignItems: 'center',
         gap: 16,
+        zIndex: 10,
     },
     modeSelector: {
         flexDirection: 'row',
