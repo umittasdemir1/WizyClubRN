@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -18,10 +18,12 @@ import { X, Video as VideoIcon, UploadCloud } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 import { useThemeStore } from '../../store/useThemeStore';
 import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
+import { CONFIG } from '../../../core/config';
 
 interface UploadModalProps {
     isVisible: boolean;
     onClose: () => void;
+    initialVideo?: ImagePicker.ImagePickerAsset | null;
 }
 
 import { ScrollView, TouchableOpacity } from 'react-native';
@@ -40,10 +42,17 @@ const COMMERCIAL_TYPES = [
     'Kendi Markam'
 ];
 
-export function UploadModal({ isVisible, onClose }: UploadModalProps) {
+export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalProps) {
     const { isDark } = useThemeStore();
-    const [selectedVideo, setSelectedVideo] = useState<ImagePicker.ImagePickerAsset | null>(null);
+    const [selectedVideo, setSelectedVideo] = useState<ImagePicker.ImagePickerAsset | null>(initialVideo || null);
     const [description, setDescription] = useState('');
+
+    // Sync with initialVideo when it changes
+    useEffect(() => {
+        if (initialVideo) {
+            setSelectedVideo(initialVideo);
+        }
+    }, [initialVideo]);
 
     // Commercial Logic
     const [commercialType, setCommercialType] = useState(COMMERCIAL_TYPES[0]); // Default: İş Birliği İçermiyor
@@ -114,7 +123,7 @@ export function UploadModal({ isVisible, onClose }: UploadModalProps) {
 
         try {
             const xhr = new XMLHttpRequest();
-            xhr.open('POST', 'http://192.168.0.138:3000/upload-hls');
+            xhr.open('POST', `${CONFIG.API_URL}/upload-hls`);
 
             xhr.upload.onprogress = (event) => {
                 if (event.lengthComputable) {

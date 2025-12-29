@@ -13,6 +13,7 @@ import * as MediaLibrary from 'expo-media-library';
 import { X, Zap, ZapOff, Settings, RotateCw } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { UploadModal } from '../src/presentation/components/feed/UploadModal';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -27,6 +28,10 @@ export default function CameraScreen() {
     const [permission, requestPermission] = useCameraPermissions();
     const [selectedMode, setSelectedMode] = useState('HİKAYE');
     const [lastPhoto, setLastPhoto] = useState<string | null>(null);
+
+    // Upload Modal state
+    const [showUploadModal, setShowUploadModal] = useState(false);
+    const [selectedVideoForUpload, setSelectedVideoForUpload] = useState<ImagePicker.ImagePickerAsset | null>(null);
 
     // Get last photo from gallery for preview
     useEffect(() => {
@@ -73,14 +78,15 @@ export default function CameraScreen() {
 
     const openGallery = async () => {
         const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.All,
+            mediaTypes: ImagePicker.MediaTypeOptions.Videos,
             allowsEditing: true,
             quality: 1,
         });
 
         if (!result.canceled) {
-            // Handle selected media
-            console.log('Selected media:', result.assets[0]);
+            // Pass selected video to upload modal
+            setSelectedVideoForUpload(result.assets[0]);
+            setShowUploadModal(true);
         }
     };
 
@@ -171,6 +177,16 @@ export default function CameraScreen() {
                     ))}
                 </View>
             </View>
+
+            {/* Upload Modal */}
+            <UploadModal
+                isVisible={showUploadModal}
+                onClose={() => {
+                    setShowUploadModal(false);
+                    setSelectedVideoForUpload(null);
+                }}
+                initialVideo={selectedVideoForUpload}
+            />
         </View>
     );
 }
