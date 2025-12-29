@@ -1,280 +1,165 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     Pressable,
-    TextInput,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
+    Image,
+    Dimensions,
 } from 'react-native';
+import { CameraView, CameraType, FlashMode, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
-import { useUploadStore } from '../src/presentation/store/useUploadStore';
-import { X, Video as VideoIcon, UploadCloud, CheckCircle2, Circle, ArrowLeft } from 'lucide-react-native';
-import { useThemeStore } from '../src/presentation/store/useThemeStore';
-import { LIGHT_COLORS, DARK_COLORS } from '../src/core/constants';
+import { X, Zap, ZapOff, Settings, RotateCw } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const COMMERCIAL_TYPES = [
-    'İş Birliği İçermiyor',
-    'Reklam',
-    'İş Birliği',
-    'Hediye Ürün',
-    'Barter',
-    'Satış Ortaklığı',
-    'Marka Elçisi',
-    'Marka Daveti',
-    'Ürün İncelemesi',
-    'Kendi Markam'
-];
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-export default function UploadScreen() {
+const MODES = ['GÖNDERI', 'HİKAYE', 'REELS', 'VİDEO'];
+
+export default function CameraScreen() {
     const insets = useSafeAreaInsets();
-    const { isDark } = useThemeStore();
-    const [selectedVideo, setSelectedVideo] = useState<ImagePicker.ImagePickerAsset | null>(null);
-    const [description, setDescription] = useState('');
+    const cameraRef = useRef<any>(null);
 
-    // Commercial Logic
-    const [commercialType, setCommercialType] = useState(COMMERCIAL_TYPES[0]);
-    const [brandName, setBrandName] = useState('');
-    const [brandUrl, setBrandUrl] = useState('');
-    const [isNoUrl, setIsNoUrl] = useState(false);
+    const [facing, setFacing] = useState<CameraType>('back');
+    const [flash, setFlash] = useState<FlashMode>('off');
+    const [permission, requestPermission] = useCameraPermissions();
+    const [selectedMode, setSelectedMode] = useState('HİKAYE');
+    const [lastPhoto, setLastPhoto] = useState<string | null>(null);
 
-    const [userId, setUserId] = useState('687c8079-e94c-42c2-9442-8a4a6b63dec6');
+    // Get last photo from gallery for preview
+    useEffect(() => {
+        (async () => {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status === 'granted') {
+                const result = await ImagePicker.getMediaLibraryPermissionsAsync();
+                // Note: Getting the last photo requires additional implementation
+                // For now, we'll leave it as a placeholder
+            }
+        })();
+    }, []);
 
-    const { startUpload, setProgress, setStatus, setSuccess, setError } = useUploadStore();
+    if (!permission) {
+        return <View style={styles.container} />;
+    }
 
-    const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
-    const bgColor = themeColors.background;
-    const textColor = themeColors.textPrimary;
+    if (!permission.granted) {
+        return (
+            <View style={[styles.container, styles.permissionContainer]}>
+                <Text style={styles.permissionText}>Kamera erişimi gerekli</Text>
+                <Pressable onPress={requestPermission} style={styles.permissionButton}>
+                    <Text style={styles.permissionButtonText}>İzin Ver</Text>
+                </Pressable>
+            </View>
+        );
+    }
 
-    const isCommercial = commercialType !== 'İş Birliği İçermiyor';
+    const toggleFlash = () => {
+        setFlash(current => current === 'off' ? 'on' : 'off');
+    };
 
-    const pickVideo = async () => {
+    const toggleCameraFacing = () => {
+        setFacing(current => current === 'back' ? 'front' : 'back');
+    };
+
+    const openGallery = async () => {
         const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+            mediaTypes: ImagePicker.MediaTypeOptions.All,
             allowsEditing: true,
             quality: 1,
         });
 
         if (!result.canceled) {
-            setSelectedVideo(result.assets[0]);
+            // Handle selected media
+            console.log('Selected media:', result.assets[0]);
         }
     };
 
-    const handleUpload = async () => {
-        if (!selectedVideo) {
-            Alert.alert('Video Seçilmedi', 'Lütfen yüklemek için bir video seçin.');
-            return;
-        }
-
-        // Validate Commercial Fields
-        if (isCommercial) {
-            if (!brandName.trim()) {
-                Alert.alert('Eksik Bilgi', 'Lütfen marka adını girin.');
-                return;
+    const takePicture = async () => {
+        if (cameraRef.current) {
+            try {
+                const photo = await cameraRef.current.takePictureAsync();
+                console.log('Photo taken:', photo.uri);
+                // Handle captured photo
+            } catch (error) {
+                console.error('Error taking picture:', error);
             }
-            if (!isNoUrl && !brandUrl.trim()) {
-                Alert.alert('Eksik Bilgi', 'Lütfen ürün linkini girin veya belirtmek istemiyorsanız kutucuğu işaretleyin.');
-                return;
-            }
-        }
-
-        router.back();
-        startUpload();
-
-        const formData = new FormData();
-        formData.append('userId', userId);
-        formData.append('description', description);
-        formData.append('commercialType', commercialType);
-
-        if (isCommercial) {
-            formData.append('brandName', brandName);
-            if (!isNoUrl) {
-                formData.append('brandUrl', brandUrl);
-            }
-        }
-
-        formData.append('video', {
-            uri: selectedVideo.uri,
-            type: 'video/mp4',
-            name: 'upload.mp4',
-        } as any);
-
-        try {
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', 'http://192.168.0.138:3000/upload-hls');
-
-            xhr.upload.onprogress = (event) => {
-                if (event.lengthComputable) {
-                    const progressPercent = (event.loaded / event.total) * 100;
-                    setProgress(progressPercent);
-                    if (progressPercent === 100) setStatus('processing');
-                    else setStatus('uploading');
-                }
-            };
-
-            xhr.onload = () => {
-                if (xhr.status === 200) {
-                    const response = JSON.parse(xhr.responseText);
-                    console.log('Upload success:', response);
-                    setSuccess(response.data?.id || 'new-video');
-                    // Reset
-                    setSelectedVideo(null);
-                    setDescription('');
-                    setBrandName('');
-                    setBrandUrl('');
-                    setCommercialType(COMMERCIAL_TYPES[0]);
-                    setIsNoUrl(false);
-                } else {
-                    console.error('Upload failed:', xhr.responseText);
-                    setError('Yükleme başarısız oldu.');
-                    setStatus('error');
-                }
-            };
-
-            xhr.onerror = (e) => {
-                console.error('Upload error:', e);
-                setError('Ağ hatası oluştu.');
-                setStatus('error');
-            };
-
-            xhr.send(formData);
-
-        } catch (error) {
-            console.error('Upload exception:', error);
-            setError('Beklenmedik bir hata oluştu.');
-            setStatus('error');
         }
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: bgColor }]}>
-            {/* Header */}
-            <View style={[styles.header, { paddingTop: insets.top + 8, backgroundColor: bgColor }]}>
-                <Pressable onPress={() => router.back()} style={styles.backButton}>
-                    <ArrowLeft color={textColor} size={24} />
-                </Pressable>
-                <Text style={[styles.title, { color: textColor }]}>Yeni Video Yükle</Text>
-                <View style={{ width: 40 }} />
-            </View>
-
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={styles.flex}
+        <View style={styles.container}>
+            {/* Camera Preview - Full Screen */}
+            <CameraView
+                ref={cameraRef}
+                style={styles.camera}
+                facing={facing}
+                flash={flash}
             >
-                <ScrollView
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 20 }]}
-                >
-                    {/* Video Select */}
-                    <Pressable onPress={pickVideo} style={[styles.videoSelect, { backgroundColor: isDark ? '#262626' : '#F3F4F6', borderColor: isDark ? '#333333' : '#E5E7EB' }]}>
-                        {selectedVideo ? (
-                            <View style={styles.selectedVideoInfo}>
-                                <VideoIcon color="#4ADE80" size={32} />
-                                <Text style={styles.videoText}>Video Seçildi</Text>
-                                <Text style={styles.videoSubText}>{(selectedVideo.fileSize ? (selectedVideo.fileSize / 1024 / 1024).toFixed(1) : '?')} MB</Text>
-                            </View>
+                {/* Top Header */}
+                <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
+                    <Pressable onPress={() => router.back()} style={styles.iconButton}>
+                        <X color="#FFFFFF" size={28} strokeWidth={2.5} />
+                    </Pressable>
+
+                    <Pressable onPress={toggleFlash} style={styles.iconButton}>
+                        {flash === 'off' ? (
+                            <ZapOff color="#FFFFFF" size={26} strokeWidth={2} />
                         ) : (
-                            <View style={styles.placeholder}>
-                                <UploadCloud color="#9CA3AF" size={40} />
-                                <Text style={styles.placeholderText}>Video Seçmek İçin Dokun</Text>
-                            </View>
+                            <Zap color="#FFD60A" size={26} strokeWidth={2} fill="#FFD60A" />
                         )}
                     </Pressable>
 
-                    {/* Description */}
-                    <TextInput
-                        style={[styles.input, { backgroundColor: isDark ? '#262626' : '#F3F4F6', color: textColor }]}
-                        placeholder="Açıklama yaz..."
-                        placeholderTextColor="#9CA3AF"
-                        value={description}
-                        onChangeText={setDescription}
-                        multiline
-                    />
+                    <Pressable onPress={() => console.log('Settings')} style={styles.iconButton}>
+                        <Settings color="#FFFFFF" size={26} strokeWidth={2} />
+                    </Pressable>
+                </View>
 
-                    {/* Commercial Type Selection */}
-                    <View>
-                        <Text style={[styles.label, { color: textColor }]}>Ticari İlişki Türü</Text>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsContainer}>
-                            {COMMERCIAL_TYPES.map((type) => (
-                                <Pressable
-                                    key={type}
-                                    onPress={() => setCommercialType(type)}
+                {/* Bottom Controls */}
+                <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 20 }]}>
+                    {/* Mode Selector */}
+                    <View style={styles.modeSelector}>
+                        {MODES.map((mode) => (
+                            <Pressable
+                                key={mode}
+                                onPress={() => setSelectedMode(mode)}
+                                style={styles.modeButton}
+                            >
+                                <Text
                                     style={[
-                                        styles.chip,
-                                        { backgroundColor: isDark ? '#262626' : '#F3F4F6', borderColor: isDark ? '#333333' : '#E5E7EB' },
-                                        commercialType === type && styles.activeChip
+                                        styles.modeText,
+                                        selectedMode === mode && styles.modeTextActive
                                     ]}
                                 >
-                                    <Text style={[
-                                        styles.chipText,
-                                        { color: isDark ? '#D1D5DB' : '#6B7280' },
-                                        commercialType === type && styles.activeChipText
-                                    ]}>
-                                        {type}
-                                    </Text>
-                                </Pressable>
-                            ))}
-                        </ScrollView>
-                    </View>
-
-                    {isCommercial && (
-                        <View style={styles.commercialFields}>
-                            <TextInput
-                                style={[styles.input, { backgroundColor: isDark ? '#262626' : '#F3F4F6', color: textColor }]}
-                                placeholder="Marka Adı (Örn: Nike)"
-                                placeholderTextColor="#9CA3AF"
-                                value={brandName}
-                                onChangeText={setBrandName}
-                            />
-
-                            <TextInput
-                                style={[
-                                    styles.input,
-                                    { backgroundColor: isDark ? '#262626' : '#F3F4F6', color: textColor },
-                                    isNoUrl && styles.disabledInput
-                                ]}
-                                placeholder="Ürün Linki (https://...)"
-                                placeholderTextColor="#9CA3AF"
-                                value={brandUrl}
-                                onChangeText={setBrandUrl}
-                                autoCapitalize="none"
-                                editable={!isNoUrl}
-                            />
-
-                            <Pressable
-                                style={styles.checkboxRow}
-                                onPress={() => setIsNoUrl(!isNoUrl)}
-                            >
-                                {isNoUrl ? (
-                                    <CheckCircle2 color="#FF3B30" size={24} />
-                                ) : (
-                                    <Circle color="#9CA3AF" size={24} />
-                                )}
-                                <Text style={styles.checkboxText}>
-                                    URL Belirtmek istemiyorum. Gönderimin hangi ticari ilişkiyi belirttiğinden emin değilim.
+                                    {mode}
                                 </Text>
                             </Pressable>
-                        </View>
-                    )}
+                        ))}
+                    </View>
 
-                    {/* Submit Button */}
-                    <Pressable
-                        style={[
-                            styles.uploadButton,
-                            !selectedVideo && styles.disabledButton
-                        ]}
-                        onPress={handleUpload}
-                        disabled={!selectedVideo}
-                    >
-                        <Text style={styles.uploadButtonText}>Yüklemeyi Başlat</Text>
-                    </Pressable>
-                </ScrollView>
-            </KeyboardAvoidingView>
+                    {/* Bottom Actions */}
+                    <View style={styles.bottomActions}>
+                        {/* Gallery Preview */}
+                        <Pressable onPress={openGallery} style={styles.galleryButton}>
+                            {lastPhoto ? (
+                                <Image source={{ uri: lastPhoto }} style={styles.galleryPreview} />
+                            ) : (
+                                <View style={styles.galleryPlaceholder} />
+                            )}
+                        </Pressable>
+
+                        {/* Capture Button */}
+                        <Pressable onPress={takePicture} style={styles.captureButtonOuter}>
+                            <View style={styles.captureButtonInner} />
+                        </Pressable>
+
+                        {/* Flip Camera */}
+                        <Pressable onPress={toggleCameraFacing} style={styles.flipButton}>
+                            <RotateCw color="#FFFFFF" size={32} strokeWidth={2.5} />
+                        </Pressable>
+                    </View>
+                </View>
+            </CameraView>
         </View>
     );
 }
@@ -282,123 +167,119 @@ export default function UploadScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: '#000',
     },
-    flex: {
+    camera: {
         flex: 1,
+        width: SCREEN_WIDTH,
+        height: SCREEN_HEIGHT,
     },
-    header: {
+    permissionContainer: {
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 20,
+    },
+    permissionText: {
+        color: '#FFF',
+        fontSize: 16,
+        textAlign: 'center',
+    },
+    permissionButton: {
+        backgroundColor: '#FF3B30',
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        borderRadius: 12,
+    },
+    permissionButtonText: {
+        color: '#FFF',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    topBar: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingBottom: 12,
-        borderBottomWidth: 0.5,
-        borderBottomColor: '#333',
+        paddingHorizontal: 16,
+        paddingBottom: 16,
     },
-    backButton: {
-        width: 40,
-        height: 40,
+    iconButton: {
+        width: 44,
+        height: 44,
         justifyContent: 'center',
+        alignItems: 'center',
     },
-    title: {
-        fontSize: 18,
-        fontWeight: '700',
-    },
-    content: {
-        padding: 20,
+    bottomBar: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        alignItems: 'center',
         gap: 16,
     },
-    videoSelect: {
-        height: 120,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderStyle: 'dashed',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    placeholder: {
-        alignItems: 'center',
-        gap: 8,
-    },
-    placeholderText: {
-        color: '#9CA3AF',
-        fontSize: 14,
-    },
-    selectedVideoInfo: {
-        alignItems: 'center',
-        gap: 4,
-    },
-    videoText: {
-        color: '#4ADE80',
-        fontWeight: '600',
-    },
-    videoSubText: {
-        color: '#6B7280',
-        fontSize: 12,
-    },
-    input: {
-        borderRadius: 12,
-        padding: 16,
-        fontSize: 16,
-    },
-    label: {
-        fontSize: 16,
-        fontWeight: '500',
+    modeSelector: {
+        flexDirection: 'row',
+        gap: 20,
         marginBottom: 8,
     },
-    uploadButton: {
-        backgroundColor: '#FF3B30',
-        borderRadius: 16,
-        padding: 18,
-        alignItems: 'center',
-        marginTop: 8,
-    },
-    disabledButton: {
-        backgroundColor: '#262626',
-        opacity: 0.5,
-    },
-    uploadButtonText: {
-        color: 'white',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    chipsContainer: {
-        gap: 8,
+    modeButton: {
         paddingVertical: 8,
+        paddingHorizontal: 4,
     },
-    chip: {
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 20,
-        borderWidth: 1,
+    modeText: {
+        color: 'rgba(255, 255, 255, 0.5)',
+        fontSize: 13,
+        fontWeight: '600',
+        letterSpacing: 0.5,
     },
-    activeChip: {
-        backgroundColor: '#FF3B30',
-        borderColor: '#FF3B30',
-    },
-    chipText: {
+    modeTextActive: {
+        color: '#FFFFFF',
         fontSize: 14,
-        fontWeight: '500',
+        fontWeight: '700',
     },
-    activeChipText: {
-        color: 'white',
-    },
-    commercialFields: {
-        gap: 12,
-    },
-    disabledInput: {
-        opacity: 0.5,
-    },
-    checkboxRow: {
+    bottomActions: {
         flexDirection: 'row',
+        justifyContent: 'space-between',
         alignItems: 'center',
-        gap: 12,
-        paddingVertical: 4,
+        width: '100%',
+        paddingHorizontal: 24,
     },
-    checkboxText: {
-        color: '#9CA3AF',
-        fontSize: 12,
-        flex: 1,
-        lineHeight: 16,
+    galleryButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 8,
+        overflow: 'hidden',
+        borderWidth: 2,
+        borderColor: 'rgba(255, 255, 255, 0.6)',
+    },
+    galleryPreview: {
+        width: '100%',
+        height: '100%',
+    },
+    galleryPlaceholder: {
+        width: '100%',
+        height: '100%',
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    captureButtonOuter: {
+        width: 76,
+        height: 76,
+        borderRadius: 38,
+        backgroundColor: 'rgba(255, 255, 255, 0.3)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 4,
+        borderColor: '#FFFFFF',
+    },
+    captureButtonInner: {
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        backgroundColor: '#FFFFFF',
+    },
+    flipButton: {
+        width: 44,
+        height: 44,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 });
