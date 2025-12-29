@@ -9,13 +9,14 @@ import {
 } from 'react-native';
 import { CameraView, CameraType, FlashMode, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library';
 import { X, Zap, ZapOff, Settings, RotateCw } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const MODES = ['GÖNDERI', 'HİKAYE', 'REELS', 'VİDEO'];
+const MODES = ['HİKAYE', 'VİDEO'];
 
 export default function CameraScreen() {
     const insets = useSafeAreaInsets();
@@ -30,11 +31,19 @@ export default function CameraScreen() {
     // Get last photo from gallery for preview
     useEffect(() => {
         (async () => {
-            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            const { status } = await MediaLibrary.requestPermissionsAsync();
             if (status === 'granted') {
-                const result = await ImagePicker.getMediaLibraryPermissionsAsync();
-                // Note: Getting the last photo requires additional implementation
-                // For now, we'll leave it as a placeholder
+                try {
+                    const albums = await MediaLibrary.getAssetsAsync({
+                        first: 1,
+                        sortBy: [[MediaLibrary.SortBy.creationTime, false]],
+                    });
+                    if (albums.assets.length > 0) {
+                        setLastPhoto(albums.assets[0].uri);
+                    }
+                } catch (error) {
+                    console.error('Error fetching last photo:', error);
+                }
             }
         })();
     }, []);
@@ -89,13 +98,14 @@ export default function CameraScreen() {
 
     return (
         <View style={styles.container}>
-            {/* Camera Preview - Full Screen */}
-            <CameraView
-                ref={cameraRef}
-                style={styles.camera}
-                facing={facing}
-                flash={flash}
-            >
+            {/* Camera Preview - Rounded Container */}
+            <View style={styles.cameraContainer}>
+                <CameraView
+                    ref={cameraRef}
+                    style={styles.camera}
+                    facing={facing}
+                    flash={flash}
+                >
                 {/* Top Header */}
                 <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
                     <Pressable onPress={() => router.back()} style={styles.iconButton}>
@@ -159,7 +169,8 @@ export default function CameraScreen() {
                         </Pressable>
                     </View>
                 </View>
-            </CameraView>
+                </CameraView>
+            </View>
         </View>
     );
 }
@@ -168,6 +179,12 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#000',
+    },
+    cameraContainer: {
+        flex: 1,
+        margin: 0,
+        borderRadius: 20,
+        overflow: 'hidden',
     },
     camera: {
         flex: 1,
@@ -226,15 +243,17 @@ const styles = StyleSheet.create({
         paddingHorizontal: 4,
     },
     modeText: {
-        color: 'rgba(255, 255, 255, 0.5)',
-        fontSize: 13,
-        fontWeight: '600',
-        letterSpacing: 0.5,
+        color: 'rgba(255, 255, 255, 0.4)',
+        fontSize: 12,
+        fontWeight: '500',
     },
     modeTextActive: {
         color: '#FFFFFF',
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: '700',
+        textShadowColor: 'rgba(0, 0, 0, 0.5)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 2,
     },
     bottomActions: {
         flexDirection: 'row',
