@@ -404,9 +404,11 @@ app.post('/upload-avatar', upload.single('image'), async (req, res) => {
 
         // 1. Upload to R2
         const rawAvatarUrl = await uploadToR2(file.path, fileName, file.mimetype);
-
-        // 2. Add Cache Buster (important for CDNs and apps)
-        const avatarUrl = `${rawAvatarUrl}?t=${Date.now()}`;
+        
+        // 2.Use Cloudflare Worker proxy for avatars
+        const workerUrl = 'https://wizy-r2-proxy.tasdemir-umit.workers.dev';
+        const avatarPath = fileName.replace('users/', 'avatars/').replace('/profile/avatar', '');
+        const avatarUrl = `${workerUrl}/${avatarPath}?t=${Date.now()}`;
 
         // 3. Update Supabase Profile Record
         console.log(`   👉 Syncing to Supabase Profiles...`);
