@@ -36,6 +36,25 @@ export class SupabaseProfileDataSource {
     }
 
     async updateProfile(userId: string, profile: Partial<User>): Promise<any> {
+        // 1. Update auth.users metadata for consistency
+        const authMetadata: any = {};
+        if ('fullName' in profile) authMetadata.full_name = profile.fullName;
+        if ('avatarUrl' in profile) authMetadata.avatar_url = profile.avatarUrl;
+
+        if (Object.keys(authMetadata).length > 0) {
+            const { error: authError } = await supabase.auth.updateUser({
+                data: authMetadata
+            });
+
+            if (authError) {
+                console.warn('[SupabaseDataSource] ⚠️ Auth metadata update warning:', authError);
+                // Don't throw - profiles table update is more critical
+            } else {
+                console.log('[SupabaseDataSource] ✅ Auth metadata updated:', authMetadata);
+            }
+        }
+
+        // 2. Update profiles table
         const { data, error } = await supabase
             .from('profiles')
             .update(this.mapUserToDto(profile))
