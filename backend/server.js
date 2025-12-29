@@ -403,10 +403,10 @@ app.post('/upload-avatar', upload.single('image'), async (req, res) => {
         // Upload to avatars/ path (matches worker proxy expectation)
         const fileName = `avatars/${userId}${extension}`;
 
-        // 1. Upload to R2
-        const rawAvatarUrl = await uploadToR2(file.path, fileName, file.mimetype);
+        // 1. Upload to R2 (ignore returned R2 URL)
+        await uploadToR2(file.path, fileName, file.mimetype);
 
-        // 2. Use Cloudflare Worker proxy URL
+        // 2. Build Cloudflare Worker proxy URL (not R2 public URL)
         const workerUrl = 'https://wizy-r2-proxy.tasdemir-umit.workers.dev';
         const avatarUrl = `${workerUrl}/${fileName}?t=${Date.now()}`;
 
