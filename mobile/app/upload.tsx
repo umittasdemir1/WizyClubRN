@@ -124,52 +124,52 @@ export default function CameraScreen() {
                             <Settings color="#FFFFFF" size={26} strokeWidth={2} />
                         </Pressable>
                     </View>
-
-                    {/* Bottom Controls - Overlay on Camera */}
-                    <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 20 }]}>
-                        {/* Bottom Actions */}
-                        <View style={styles.bottomActions}>
-                            {/* Gallery Preview */}
-                            <Pressable onPress={openGallery} style={styles.galleryButton}>
-                                {lastPhoto ? (
-                                    <Image source={{ uri: lastPhoto }} style={styles.galleryPreview} />
-                                ) : (
-                                    <View style={styles.galleryPlaceholder} />
-                                )}
-                            </Pressable>
-
-                            {/* Capture Button */}
-                            <Pressable onPress={takePicture} style={styles.captureButtonOuter}>
-                                <View style={styles.captureButtonInner} />
-                            </Pressable>
-
-                            {/* Flip Camera */}
-                            <Pressable onPress={toggleCameraFacing} style={styles.flipButton}>
-                                <RotateCw color="#FFFFFF" size={32} strokeWidth={2.5} />
-                            </Pressable>
-                        </View>
-
-                        {/* Mode Selector - Below Actions */}
-                        <View style={styles.modeSelector}>
-                            {MODES.map((mode) => (
-                                <Pressable
-                                    key={mode}
-                                    onPress={() => setSelectedMode(mode)}
-                                    style={styles.modeButton}
-                                >
-                                    <Text
-                                        style={[
-                                            styles.modeText,
-                                            selectedMode === mode && styles.modeTextActive
-                                        ]}
-                                    >
-                                        {mode}
-                                    </Text>
-                                </Pressable>
-                            ))}
-                        </View>
-                    </View>
                 </CameraView>
+            </View>
+
+            {/* Bottom Controls - Outside Camera, in Black Area */}
+            <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 20 }]}>
+                {/* Bottom Actions */}
+                <View style={styles.bottomActions}>
+                    {/* Gallery Preview */}
+                    <Pressable onPress={openGallery} style={styles.galleryButton}>
+                        {lastPhoto ? (
+                            <Image source={{ uri: lastPhoto }} style={styles.galleryPreview} />
+                        ) : (
+                            <View style={styles.galleryPlaceholder} />
+                        )}
+                    </Pressable>
+
+                    {/* Capture Button */}
+                    <Pressable onPress={takePicture} style={styles.captureButtonOuter}>
+                        <View style={styles.captureButtonInner} />
+                    </Pressable>
+
+                    {/* Flip Camera */}
+                    <Pressable onPress={toggleCameraFacing} style={styles.flipButton}>
+                        <RotateCw color="#FFFFFF" size={32} strokeWidth={2.5} />
+                    </Pressable>
+                </View>
+
+                {/* Mode Selector - Below Actions */}
+                <View style={styles.modeSelector}>
+                    {MODES.map((mode) => (
+                        <Pressable
+                            key={mode}
+                            onPress={() => setSelectedMode(mode)}
+                            style={styles.modeButton}
+                        >
+                            <Text
+                                style={[
+                                    styles.modeText,
+                                    selectedMode === mode && styles.modeTextActive
+                                ]}
+                            >
+                                {mode}
+                            </Text>
+                        </Pressable>
+                    ))}
+                </View>
             </View>
         </View>
     );
@@ -231,10 +231,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     bottomBar: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
         alignItems: 'center',
         gap: 12,
         zIndex: 100,
