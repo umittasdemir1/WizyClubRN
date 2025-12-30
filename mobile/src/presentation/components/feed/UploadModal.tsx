@@ -220,7 +220,7 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
                 style={[styles.container, { backgroundColor: bgColor }]}
             >
                 {/* Header */}
-                <View style={[styles.header, { backgroundColor: bgColor, borderBottomColor: borderColor, paddingTop: insets.top }]}>
+                <View style={[styles.header, { backgroundColor: bgColor, paddingTop: insets.top }]}>
                     <Pressable onPress={onClose} style={styles.backButton}>
                         <ChevronLeft color={textColor} size={28} strokeWidth={2} />
                     </Pressable>
@@ -332,7 +332,7 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
                 </ScrollView>
 
                 {/* Bottom Buttons */}
-                <View style={[styles.bottomButtons, { backgroundColor: bgColor, borderTopColor: borderColor, paddingBottom: insets.bottom + 12 }]}>
+                <View style={[styles.bottomButtons, { backgroundColor: bgColor, paddingBottom: insets.bottom + 12 }]}>
                     <Pressable
                         style={[styles.draftButton, { backgroundColor: isDark ? '#2C2C2E' : '#F0F0F0' }]}
                         onPress={handleSaveDraft}
@@ -454,7 +454,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: 20,
         height: 60,
-        borderBottomWidth: 1,
+        position: 'relative',
     },
     backButton: {
         width: 44,
@@ -614,10 +614,9 @@ const styles = StyleSheet.create({
     },
     bottomButtons: {
         flexDirection: 'row',
-        paddingHorizontal: 16,
+        paddingHorizontal: 20,
         paddingTop: 12,
         gap: 12,
-        borderTopWidth: 1,
     },
     draftButton: {
         flex: 1,
