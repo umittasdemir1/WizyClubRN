@@ -12,8 +12,14 @@ npm start
 
 **Terminal 2: Ngrok**
 ```bash
-ngrok http 3000
-# URL'i kopyala (örn: https://abc-xyz.ngrok-free.app)
+# Binary indir
+wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
+
+# Aç
+tar xvzf ngrok-v3-stable-linux-amd64.tgz
+
+# Çalıştır
+./ngrok http 3000
 ```
 
 **Terminal 3: Mobile**
