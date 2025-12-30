@@ -220,12 +220,16 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
                 style={[styles.container, { backgroundColor: bgColor }]}
             >
                 {/* Header */}
-                <View style={[styles.header, { backgroundColor: bgColor, borderBottomColor: borderColor, paddingTop: insets.top }]}>
-                    <Pressable onPress={onClose} style={styles.backButton}>
-                        <ChevronLeft color={textColor} size={28} strokeWidth={2} />
-                    </Pressable>
-                    <Text style={[styles.headerTitle, { color: textColor }]}>Yeni Video</Text>
-                    <View style={styles.backButton} />
+                <View style={[styles.header, { backgroundColor: bgColor, paddingTop: insets.top }]}>
+                    <View style={styles.headerLeft}>
+                        <Pressable onPress={onClose} style={styles.backButton}>
+                            <ChevronLeft color={textColor} size={28} strokeWidth={2} />
+                        </Pressable>
+                    </View>
+                    <View style={styles.headerCenter}>
+                        <Text style={[styles.headerTitle, { color: textColor }]}>Yeni Video</Text>
+                    </View>
+                    <View style={styles.headerRight} />
                 </View>
 
                 <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
@@ -454,7 +458,18 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: 20,
         height: 60,
-        borderBottomWidth: 1,
+    },
+    headerLeft: {
+        width: 44,
+        alignItems: 'flex-start',
+    },
+    headerCenter: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    headerRight: {
+        width: 44,
     },
     backButton: {
         width: 44,
@@ -465,11 +480,7 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 16,
         fontWeight: '600',
-        position: 'absolute',
-        left: 0,
-        right: 0,
         textAlign: 'center',
-        zIndex: -1,
     },
     scrollView: {
         flex: 1,
