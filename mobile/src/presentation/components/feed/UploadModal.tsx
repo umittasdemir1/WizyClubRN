@@ -18,7 +18,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { Video } from 'expo-av';
 import { useUploadStore } from '../../store/useUploadStore';
-import { ChevronLeft, ChevronRight, Users, Tag } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, Users, Tag, PlusCircle, X } from 'lucide-react-native';
 import { useThemeStore } from '../../store/useThemeStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -60,6 +60,8 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
     const [useAILabel, setUseAILabel] = useState(false);
     const [showCommercialMenu, setShowCommercialMenu] = useState(false);
     const [showBrandInfoModal, setShowBrandInfoModal] = useState(false);
+    const [showTagInputModal, setShowTagInputModal] = useState(false);
+    const [currentTagInput, setCurrentTagInput] = useState('');
 
     // Set StatusBar when modal opens
     useEffect(() => {
@@ -113,6 +115,22 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
         if (type !== 'İş Birliği İçermiyor' && type !== 'Kendi Markam') {
             setShowBrandInfoModal(true);
         }
+    };
+
+    const handleAddTag = () => {
+        setShowTagInputModal(true);
+    };
+
+    const handleSaveTag = () => {
+        if (currentTagInput.trim() && tags.length < 5) {
+            setTags([...tags, currentTagInput.trim()]);
+            setCurrentTagInput('');
+            setShowTagInputModal(false);
+        }
+    };
+
+    const handleRemoveTag = (index: number) => {
+        setTags(tags.filter((_, i) => i !== index));
     };
 
     const handleShare = async () => {
@@ -277,10 +295,21 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
                     {/* Topic Tags */}
                     <View style={styles.section}>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tagsScroll}>
-                            <View style={styles.tagChip}>
-                                <Text style={styles.tagChipIcon}>#</Text>
-                                <Text style={[styles.tagChipText, { color: textColor }]}>Konu etiketleri</Text>
-                            </View>
+                            {tags.map((tag, index) => (
+                                <View key={index} style={[styles.tagChip, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.08)', borderColor: isDark ? 'rgba(255, 255, 255, 0.25)' : 'rgba(0, 0, 0, 0.1)' }]}>
+                                    <Text style={[styles.tagHashIcon, { color: textColor }]}>#</Text>
+                                    <Text style={[styles.tagText, { color: textColor }]}>{tag}</Text>
+                                    <Pressable onPress={() => handleRemoveTag(index)} hitSlop={8}>
+                                        <X size={14} color={subtextColor} />
+                                    </Pressable>
+                                </View>
+                            ))}
+                            {tags.length < 5 && (
+                                <Pressable onPress={handleAddTag} style={[styles.addTagButton, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.08)', borderColor: isDark ? 'rgba(255, 255, 255, 0.25)' : 'rgba(0, 0, 0, 0.1)' }]}>
+                                    <Text style={[styles.tagHashIcon, { color: textColor }]}>#</Text>
+                                    <PlusCircle size={16} color={isDark ? '#007AFF' : '#007AFF'} />
+                                </Pressable>
+                            )}
                         </ScrollView>
                     </View>
 
@@ -444,6 +473,51 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
                 </View>
             </Pressable>
         </Modal>
+
+        {/* Tag Input Modal */}
+        <Modal
+            visible={showTagInputModal}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => setShowTagInputModal(false)}
+        >
+            <Pressable
+                style={styles.modalOverlay}
+                onPress={() => setShowTagInputModal(false)}
+            >
+                <View style={[styles.menuModal, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF' }]}>
+                    <View style={styles.menuHeader}>
+                        <Text style={[styles.menuTitle, { color: textColor }]}>Konu Etiketi Ekle</Text>
+                    </View>
+
+                    <View style={styles.brandFormSection}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Text style={[styles.brandFormLabel, { color: textColor, fontSize: 18 }]}>#</Text>
+                            <TextInput
+                                style={[styles.brandFormInput, { flex: 1, backgroundColor: inputBg, color: textColor, borderColor: borderColor }]}
+                                placeholder="etiket giriniz"
+                                placeholderTextColor={subtextColor}
+                                value={currentTagInput}
+                                onChangeText={setCurrentTagInput}
+                                autoFocus
+                                maxLength={30}
+                            />
+                        </View>
+
+                        <Text style={[styles.tagHintText, { color: subtextColor }]}>
+                            En fazla 5 etiket ekleyebilirsiniz ({tags.length}/5)
+                        </Text>
+
+                        <Pressable
+                            style={[styles.brandSaveButton, { backgroundColor: '#3A8DFF' }]}
+                            onPress={handleSaveTag}
+                        >
+                            <Text style={styles.brandSaveButtonText}>Ekle</Text>
+                        </Pressable>
+                    </View>
+                </View>
+            </Pressable>
+        </Modal>
         </>
     );
 }
@@ -537,20 +611,34 @@ const styles = StyleSheet.create({
     tagChip: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#2C2C2E',
         paddingHorizontal: 12,
-        paddingVertical: 8,
+        paddingVertical: 5,
         borderRadius: 20,
-        gap: 4,
+        borderWidth: 1,
+        gap: 6,
+        marginRight: 8,
     },
-    tagChipIcon: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#3A8DFF',
-    },
-    tagChipText: {
+    tagHashIcon: {
         fontSize: 14,
+        fontWeight: '600',
+    },
+    tagText: {
+        fontSize: 13,
         fontWeight: '500',
+    },
+    addTagButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 5,
+        borderRadius: 20,
+        borderWidth: 1,
+        gap: 6,
+    },
+    tagHintText: {
+        fontSize: 12,
+        marginTop: 8,
+        marginBottom: 16,
     },
     menuSection: {
         paddingHorizontal: 16,
