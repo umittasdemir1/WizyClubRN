@@ -12,7 +12,8 @@ import {
     Switch,
     ScrollView,
     Image,
-    Dimensions
+    Dimensions,
+    StatusBar
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useUploadStore } from '../../store/useUploadStore';
@@ -75,6 +76,21 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
         // TODO: Taslak kaydetme işlevi
         Alert.alert('Taslak Kaydedildi', 'Videonuz taslak olarak kaydedildi.');
         onClose();
+    };
+
+    const handleCoverEdit = () => {
+        // TODO: Kapak düzenleme modal'ı aç
+        Alert.alert('Kapak Düzenle', 'Kapak düzenleme özelliği yakında eklenecek.');
+    };
+
+    const handleClubsSelect = () => {
+        // TODO: CLUB's seçim modal'ı aç
+        Alert.alert('CLUB\'s Seç', 'CLUB seçim özelliği yakında eklenecek.');
+    };
+
+    const handleCommercialTypeSelect = () => {
+        // TODO: Ticari İlişki seçim modal'ı aç
+        Alert.alert('Ticari İlişki Türü', 'Lütfen ticari ilişki türünü seçin:\n\n' + COMMERCIAL_TYPES.join('\n'));
     };
 
     const handleShare = async () => {
@@ -168,6 +184,7 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
             onRequestClose={onClose}
             statusBarTranslucent
         >
+            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={[styles.container, { backgroundColor: bgColor }]}
@@ -191,9 +208,9 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
                                     style={styles.previewImage}
                                     resizeMode="cover"
                                 />
-                                <View style={styles.coverEditButton}>
+                                <Pressable style={styles.coverEditButton} onPress={handleCoverEdit}>
                                     <Text style={styles.coverEditText}>Kapağı düzenle</Text>
-                                </View>
+                                </Pressable>
                             </View>
                         </View>
                     )}
@@ -224,7 +241,7 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
                     {/* Menu Items */}
                     <View style={styles.menuSection}>
                         {/* CLUB's ekle */}
-                        <Pressable style={[styles.menuItem, { borderBottomColor: borderColor }]}>
+                        <Pressable style={[styles.menuItem, { borderBottomColor: borderColor }]} onPress={handleClubsSelect}>
                             <View style={styles.menuItemLeft}>
                                 <Users color={textColor} size={24} />
                                 <Text style={[styles.menuItemText, { color: textColor }]}>CLUB's ekle</Text>
@@ -233,7 +250,7 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
                         </Pressable>
 
                         {/* Ticari İlişki Ekle (Zorunlu) */}
-                        <Pressable style={[styles.menuItem, { borderBottomColor: borderColor }]}>
+                        <Pressable style={[styles.menuItem, { borderBottomColor: borderColor }]} onPress={handleCommercialTypeSelect}>
                             <View style={styles.menuItemLeft}>
                                 <Tag color={textColor} size={24} />
                                 <Text style={[styles.menuItemText, { color: textColor }]}>
