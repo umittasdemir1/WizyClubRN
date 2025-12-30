@@ -55,6 +55,8 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
     const [tags, setTags] = useState<string[]>([]);
     const [selectedClubs, setSelectedClubs] = useState<string[]>([]);
     const [commercialType, setCommercialType] = useState<string | null>(null); // Zorunlu - başlangıçta null
+    const [brandName, setBrandName] = useState('');
+    const [brandUrl, setBrandUrl] = useState('');
     const [useAILabel, setUseAILabel] = useState(false);
     const [showCommercialMenu, setShowCommercialMenu] = useState(false);
 
@@ -62,6 +64,7 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
     useEffect(() => {
         if (isVisible) {
             RNStatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
+            RNStatusBar.setHidden(false, 'none'); // Show StatusBar
         }
     }, [isVisible, isDark]);
 
@@ -132,6 +135,12 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
         formData.append('description', description);
         formData.append('commercialType', commercialType);
 
+        // Add brand info if commercial type requires it
+        if (commercialType !== 'İş Birliği İçermiyor' && commercialType !== 'Kendi Markam') {
+            if (brandName) formData.append('brandName', brandName);
+            if (brandUrl) formData.append('brandUrl', brandUrl);
+        }
+
         // IMPORTANT: File must be appended LAST for Multer to process body fields first!
         const isVideo = selectedMedia.type === 'video';
         const fileExtension = isVideo ? 'mp4' : 'jpg';
@@ -165,6 +174,8 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
                     setSelectedMedia(null);
                     setDescription('');
                     setCommercialType(null);
+                    setBrandName('');
+                    setBrandUrl('');
                     setSelectedClubs([]);
                     setTags([]);
                 } else {
@@ -292,6 +303,28 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
                                 <ChevronRight color={subtextColor} size={20} />
                             </View>
                         </Pressable>
+
+                        {/* Brand Info - Show only if commercial type requires it */}
+                        {commercialType && commercialType !== 'İş Birliği İçermiyor' && commercialType !== 'Kendi Markam' && (
+                            <View style={styles.brandInfoSection}>
+                                <TextInput
+                                    style={[styles.brandInput, { backgroundColor: inputBg, color: textColor, borderColor: borderColor }]}
+                                    placeholder="Marka Adı"
+                                    placeholderTextColor={subtextColor}
+                                    value={brandName}
+                                    onChangeText={setBrandName}
+                                />
+                                <TextInput
+                                    style={[styles.brandInput, { backgroundColor: inputBg, color: textColor, borderColor: borderColor }]}
+                                    placeholder="Marka URL'si (opsiyonel)"
+                                    placeholderTextColor={subtextColor}
+                                    value={brandUrl}
+                                    onChangeText={setBrandUrl}
+                                    keyboardType="url"
+                                    autoCapitalize="none"
+                                />
+                            </View>
+                        )}
 
                         {/* Yapay zeka etiketi ekle */}
                         <View style={[styles.menuItem, { borderBottomColor: 'transparent' }]}>
@@ -511,6 +544,17 @@ const styles = StyleSheet.create({
         fontSize: 12,
         marginTop: 4,
         lineHeight: 16,
+    },
+    brandInfoSection: {
+        paddingVertical: 12,
+        gap: 12,
+    },
+    brandInput: {
+        fontSize: 15,
+        paddingHorizontal: 12,
+        paddingVertical: 12,
+        borderRadius: 8,
+        borderWidth: 1,
     },
     bottomButtons: {
         flexDirection: 'row',
