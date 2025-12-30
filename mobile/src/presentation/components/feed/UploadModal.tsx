@@ -30,9 +30,6 @@ interface UploadModalProps {
     initialVideo?: ImagePicker.ImagePickerAsset | null;
 }
 
-import { ScrollView, TouchableOpacity } from 'react-native';
-import { Check, CheckCircle2, Circle } from 'lucide-react-native';
-
 const COMMERCIAL_TYPES = [
     'İş Birliği İçermiyor',
     'Reklam',
