@@ -16,6 +16,7 @@ import {
     StatusBar
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { Video } from 'expo-av';
 import { useUploadStore } from '../../store/useUploadStore';
 import { ChevronLeft, ChevronRight, Users, Tag } from 'lucide-react-native';
 import { useThemeStore } from '../../store/useThemeStore';
@@ -203,11 +204,23 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
                     {selectedMedia && (
                         <View style={styles.previewSection}>
                             <View style={styles.previewContainer}>
-                                <Image
-                                    source={{ uri: selectedMedia.uri }}
-                                    style={styles.previewImage}
-                                    resizeMode="cover"
-                                />
+                                {selectedMedia.type === 'video' ? (
+                                    <Video
+                                        source={{ uri: selectedMedia.uri }}
+                                        style={styles.previewImage}
+                                        resizeMode="cover"
+                                        shouldPlay={false}
+                                        isLooping={false}
+                                        isMuted={true}
+                                        useNativeControls={false}
+                                    />
+                                ) : (
+                                    <Image
+                                        source={{ uri: selectedMedia.uri }}
+                                        style={styles.previewImage}
+                                        resizeMode="cover"
+                                    />
+                                )}
                                 <Pressable style={styles.coverEditButton} onPress={handleCoverEdit}>
                                     <Text style={styles.coverEditText}>Kapağı düzenle</Text>
                                 </Pressable>
