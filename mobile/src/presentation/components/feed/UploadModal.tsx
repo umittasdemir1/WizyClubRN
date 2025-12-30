@@ -71,7 +71,7 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
 
     const pickVideo = async () => {
         const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+            mediaTypes: ImagePicker.MediaTypeOptions.All, // Support both photos and videos
             allowsEditing: true,
             quality: 1,
         });
@@ -83,7 +83,7 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
 
     const handleUpload = async () => {
         if (!selectedVideo) {
-            Alert.alert('Video Seçilmedi', 'Lütfen yüklemek için bir video seçin.');
+            Alert.alert('Medya Seçilmedi', 'Lütfen yüklemek için bir fotoğraf veya video seçin.');
             return;
         }
 
@@ -115,10 +115,14 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
         }
 
         // IMPORTANT: File must be appended LAST for Multer to process body fields first!
+        const isVideo = selectedVideo.type === 'video';
+        const fileExtension = isVideo ? 'mp4' : 'jpg';
+        const mimeType = isVideo ? 'video/mp4' : 'image/jpeg';
+
         formData.append('video', {
             uri: selectedVideo.uri,
-            type: 'video/mp4',
-            name: 'upload.mp4',
+            type: mimeType,
+            name: `upload.${fileExtension}`,
         } as any);
 
         try {
@@ -184,25 +188,27 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
                     <View style={[styles.content, { backgroundColor: bgColor }]}>
                         {/* Header */}
                         <View style={styles.header}>
-                            <Text style={styles.title}>Yeni Video Yükle</Text>
+                            <Text style={styles.title}>Yeni Gönderi Yükle</Text>
                             <Pressable onPress={onClose} style={styles.closeButton}>
                                 <X color="#FFF" size={24} />
                             </Pressable>
                         </View>
 
                         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16 }}>
-                            {/* Video Select */}
+                            {/* Media Select */}
                             <Pressable onPress={pickVideo} style={styles.videoSelect}>
                                 {selectedVideo ? (
                                     <View style={styles.selectedVideoInfo}>
                                         <VideoIcon color="#4ADE80" size={32} />
-                                        <Text style={styles.videoText}>Video Seçildi</Text>
+                                        <Text style={styles.videoText}>
+                                            {selectedVideo.type === 'video' ? 'Video' : 'Fotoğraf'} Seçildi
+                                        </Text>
                                         <Text style={styles.videoSubText}>{(selectedVideo.fileSize ? (selectedVideo.fileSize / 1024 / 1024).toFixed(1) : '?')} MB</Text>
                                     </View>
                                 ) : (
                                     <View style={styles.placeholder}>
                                         <UploadCloud color="#9CA3AF" size={40} />
-                                        <Text style={styles.placeholderText}>Video Seçmek İçin Dokun</Text>
+                                        <Text style={styles.placeholderText}>Fotoğraf veya Video Seç</Text>
                                     </View>
                                 )}
                             </Pressable>
