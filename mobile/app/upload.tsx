@@ -33,6 +33,9 @@ export default function CameraScreen() {
     const [showUploadModal, setShowUploadModal] = useState(false);
     const [selectedVideoForUpload, setSelectedVideoForUpload] = useState<ImagePicker.ImagePickerAsset | null>(null);
 
+    // Recording state
+    const [isRecording, setIsRecording] = useState(false);
+
     // Get last photo from gallery for preview
     useEffect(() => {
         (async () => {
@@ -78,13 +81,13 @@ export default function CameraScreen() {
 
     const openGallery = async () => {
         const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+            mediaTypes: ImagePicker.MediaTypeOptions.All, // Support both photos and videos
             allowsEditing: true,
             quality: 1,
         });
 
         if (!result.canceled) {
-            // Pass selected video to upload modal
+            // Pass selected media to upload modal
             setSelectedVideoForUpload(result.assets[0]);
             setShowUploadModal(true);
         }
@@ -95,10 +98,74 @@ export default function CameraScreen() {
             try {
                 const photo = await cameraRef.current.takePictureAsync();
                 console.log('Photo taken:', photo.uri);
-                // Handle captured photo
+                // Convert photo to ImagePicker.ImagePickerAsset format
+                const photoAsset: ImagePicker.ImagePickerAsset = {
+                    uri: photo.uri,
+                    width: photo.width,
+                    height: photo.height,
+                    assetId: null,
+                    fileName: null,
+                    fileSize: null,
+                    type: 'image',
+                    duration: null,
+                    base64: null,
+                    exif: null,
+                    mimeType: 'image/jpeg'
+                };
+                setSelectedVideoForUpload(photoAsset);
+                setShowUploadModal(true);
             } catch (error) {
                 console.error('Error taking picture:', error);
             }
+        }
+    };
+
+    const toggleRecording = async () => {
+        if (!cameraRef.current) return;
+
+        if (isRecording) {
+            // Stop recording
+            try {
+                cameraRef.current.stopRecording();
+                setIsRecording(false);
+            } catch (error) {
+                console.error('Error stopping recording:', error);
+            }
+        } else {
+            // Start recording
+            try {
+                setIsRecording(true);
+                const video = await cameraRef.current.recordAsync();
+                console.log('Video recorded:', video.uri);
+                // Convert video to ImagePicker.ImagePickerAsset format
+                const videoAsset: ImagePicker.ImagePickerAsset = {
+                    uri: video.uri,
+                    width: null,
+                    height: null,
+                    assetId: null,
+                    fileName: null,
+                    fileSize: null,
+                    type: 'video',
+                    duration: null,
+                    base64: null,
+                    exif: null,
+                    mimeType: 'video/mp4'
+                };
+                setSelectedVideoForUpload(videoAsset);
+                setShowUploadModal(true);
+                setIsRecording(false);
+            } catch (error) {
+                console.error('Error recording video:', error);
+                setIsRecording(false);
+            }
+        }
+    };
+
+    const handleCapture = () => {
+        if (selectedMode === 'VİDEO') {
+            toggleRecording();
+        } else {
+            takePicture();
         }
     };
 
@@ -117,6 +184,13 @@ export default function CameraScreen() {
                         <Pressable onPress={() => router.back()} style={styles.iconButton}>
                             <X color="#FFFFFF" size={28} strokeWidth={2.5} />
                         </Pressable>
+
+                        {isRecording && (
+                            <View style={styles.recordingIndicator}>
+                                <View style={styles.recordingDot} />
+                                <Text style={styles.recordingText}>Kaydediliyor</Text>
+                            </View>
+                        )}
 
                         <Pressable onPress={toggleFlash} style={styles.iconButton}>
                             {flash === 'off' ? (
@@ -147,8 +221,11 @@ export default function CameraScreen() {
                     </Pressable>
 
                     {/* Capture Button */}
-                    <Pressable onPress={takePicture} style={styles.captureButtonOuter}>
-                        <View style={styles.captureButtonInner} />
+                    <Pressable onPress={handleCapture} style={styles.captureButtonOuter}>
+                        <View style={[
+                            styles.captureButtonInner,
+                            isRecording && styles.captureButtonRecording
+                        ]} />
                     </Pressable>
 
                     {/* Flip Camera */}
@@ -313,10 +390,36 @@ const styles = StyleSheet.create({
         borderRadius: 32,
         backgroundColor: '#FFFFFF',
     },
+    captureButtonRecording: {
+        backgroundColor: '#FF3B30',
+        borderRadius: 8,
+        width: 32,
+        height: 32,
+    },
     flipButton: {
         width: 44,
         height: 44,
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    recordingIndicator: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: 'rgba(255, 59, 48, 0.9)',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+    },
+    recordingDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#FFFFFF',
+    },
+    recordingText: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: '600',
     },
 });
