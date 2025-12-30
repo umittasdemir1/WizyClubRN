@@ -4,7 +4,7 @@ import Video, { OnProgressData, OnLoadData, VideoRef, OnVideoErrorData } from 'r
 import { Video as VideoEntity } from '../../../domain/entities/Video';
 import PlayIcon from '../../../../assets/icons/play.svg';
 import ReplayIcon from '../../../../assets/icons/replay.svg';
-import { useActiveVideoStore } from '../../store/useActiveVideoStore';
+import { useActiveVideoStore, saveVideoPosition, getVideoPosition, clearVideoPosition } from '../../store/useActiveVideoStore';
 import * as Haptics from 'expo-haptics';
 import { BrightnessOverlay } from './BrightnessOverlay';
 import { RefreshCcw, AlertCircle } from 'lucide-react-native';
@@ -87,12 +87,15 @@ export const VideoLayer = memo(function VideoLayer({
 
     const shouldPlay = isActive && isAppActive && isScreenFocused && !isSeeking && !isPausedGlobal && !isFinished && !hasError;
 
-    // Initial resizeMode based on pre-calculated dimensions
+    // 🔥 CRITICAL: Calculate resizeMode UPFRONT using pre-stored dimensions
+    // This prevents re-render during video load which causes 2-3 second delay!
     const [resizeMode, setResizeMode] = useState<'cover' | 'contain' | 'stretch'>(() => {
         if (video.width && video.height) {
-            return 'cover'; // Use cover for full-screen status bar alignment
+            const aspectRatio = video.width / video.height;
+            // Vertical videos (aspectRatio < 0.8) = cover, Landscape/Square = contain
+            return aspectRatio < 0.8 ? 'cover' : 'contain';
         }
-        return 'cover'; // Default to cover
+        return 'cover'; // Default for unknown dimensions
     });
 
     // Poster State (Manual Overlay)
@@ -102,25 +105,25 @@ export const VideoLayer = memo(function VideoLayer({
     const [videoSource, setVideoSource] = useState<any>(null);
     const [isSourceReady, setIsSourceReady] = useState(false);
 
-    // Optimize buffer based on source type (Faz 5 + HLS optimization)
+    // Optimize buffer based on source type (TikTok-style aggressive buffering)
     const isLocal = videoSource?.uri?.startsWith('file://');
     const isHLS = typeof video.videoUrl === 'string' && video.videoUrl.endsWith('.m3u8');
 
     const bufferConfig = isLocal
         ? {
-            // Local files: smaller buffer for disk I/O
-            minBufferMs: 500,
-            maxBufferMs: 2000,
-            bufferForPlaybackMs: 100,
-            bufferForPlaybackAfterRebufferMs: 250
+            // 🔥 AGGRESSIVE: Cached files - start playing ASAP
+            minBufferMs: 250,
+            maxBufferMs: 1500,
+            bufferForPlaybackMs: 50,  // TikTok-style: minimal buffer before play
+            bufferForPlaybackAfterRebufferMs: 100
         }
         : isHLS
             ? {
                 // HLS: larger buffer for segment streaming
-                minBufferMs: 3000,
-                maxBufferMs: 15000,
-                bufferForPlaybackMs: 1000,
-                bufferForPlaybackAfterRebufferMs: 2000
+                minBufferMs: 2000,
+                maxBufferMs: 10000,
+                bufferForPlaybackMs: 500,
+                bufferForPlaybackAfterRebufferMs: 1000
             }
             : defaultBufferConfig;
 
@@ -135,6 +138,7 @@ export const VideoLayer = memo(function VideoLayer({
     // Cache-First Strategy: Check cache BEFORE setting source
     useEffect(() => {
         let isCancelled = false;
+        const startTime = Date.now(); // ⏱️ TIMING START
 
         const initVideoSource = async () => {
             if (typeof video.videoUrl !== 'string') {
@@ -144,45 +148,49 @@ export const VideoLayer = memo(function VideoLayer({
             }
 
             // STEP 1: Memory cache (synchronous, instant)
+            const step1Start = Date.now();
             const memoryCached = VideoCacheService.getMemoryCachedPath(video.videoUrl);
+            const step1Time = Date.now() - step1Start;
+
             if (memoryCached && !isCancelled) {
-                // For HLS, memory cache returns the original URL (prefetch marker)
                 const isHLS = video.videoUrl.endsWith('.m3u8');
                 console.log(
-                    isHLS
-                        ? '[VideoLayer] 📺 HLS prefetched (native cache):'
-                        : '[VideoLayer] 🚀 Memory cache HIT:',
-                    video.id
+                    `[TIMING] 🚀 Memory cache HIT: ${video.id} | Check: ${step1Time}ms | Total: ${Date.now() - startTime}ms`
                 );
-                memoryCachedRef.current = !isHLS; // Only true for actual file cache, not HLS
+                memoryCachedRef.current = !isHLS;
                 setVideoSource({ uri: memoryCached });
                 setIsSourceReady(true);
-                // Don't call endTransition here - wait for onLoad!
                 return;
             }
 
             // STEP 2: Disk cache (async, fast)
+            const step2Start = Date.now();
             const diskCached = await VideoCacheService.getCachedVideoPath(video.videoUrl);
+            const step2Time = Date.now() - step2Start;
+
             if (diskCached && !isCancelled) {
-                console.log('[VideoLayer] ⚡ Disk cache HIT:', video.id);
+                console.log(
+                    `[TIMING] ⚡ Disk cache HIT: ${video.id} | Check: ${step2Time}ms | Total: ${Date.now() - startTime}ms`
+                );
                 memoryCachedRef.current = false;
                 setVideoSource({ uri: diskCached });
                 setIsSourceReady(true);
-                // Don't call endTransition here - wait for onLoad!
                 return;
             }
 
             // STEP 3: Network fallback (slow)
             if (!isCancelled) {
-                console.log('[VideoLayer] 🌐 Network MISS:', video.id);
+                console.log(
+                    `[TIMING] 🌐 Network MISS: ${video.id} | Cache checks: ${Date.now() - startTime}ms`
+                );
                 memoryCachedRef.current = false;
                 setVideoSource({ uri: video.videoUrl });
                 setIsSourceReady(true);
-                // Don't call endTransition here - wait for onLoad!
             }
         };
 
         // Reset states
+        console.log(`[TIMING] ⏱️ START source init: ${video.id}`);
         setIsSourceReady(false);
         setShowPoster(true);
         memoryCachedRef.current = false;
@@ -219,16 +227,62 @@ export const VideoLayer = memo(function VideoLayer({
         };
     }, []);
 
-    // Handle Global Pause Toggle for Replay
+    // 🎬 POSITION MEMORY: Save when leaving, restore when returning
+    const lastSavedPosition = useRef(0);
+    const hasRestoredPosition = useRef(false);
+
     useEffect(() => {
-        // If unpaused and was finished, restart
-        if (!isPausedGlobal && isFinished && isActive) {
+        if (isActive) {
+            // Returning to this video - restore position IMMEDIATELY
+            const savedPos = getVideoPosition(video.id);
+            if (savedPos > 0 && !hasRestoredPosition.current) {
+                console.log(`[Position] ▶️ Resuming ${video.id} at ${savedPos.toFixed(1)}s`);
+                hasRestoredPosition.current = true;
+                // Seek immediately without delay
+                videoRef.current?.seek(savedPos);
+            }
+        } else {
+            // Leaving this video - save current position
+            hasRestoredPosition.current = false; // Reset for next return
+            if (lastSavedPosition.current > 0.5 && duration > 0) {
+                // Don't save if near end (within 2 seconds of end)
+                if (lastSavedPosition.current < duration - 2) {
+                    saveVideoPosition(video.id, lastSavedPosition.current);
+                }
+            }
+        }
+    }, [isActive, video.id, duration]);
+
+    // Track current position for saving
+    useEffect(() => {
+        // Update lastSavedPosition from SharedValue periodically
+        const interval = setInterval(() => {
+            if (currentTimeSV.value > 0) {
+                lastSavedPosition.current = currentTimeSV.value;
+            }
+        }, 500);
+        return () => clearInterval(interval);
+    }, []);
+
+    // Track if user toggled pause (for replay detection)
+    const wasPausedBefore = useRef(isPausedGlobal);
+
+    // Handle Manual Replay (only when user TAPS to unpause a finished video)
+    useEffect(() => {
+        // Detect if isPausedGlobal changed from true to false (user tapped)
+        const userToggledToUnpause = wasPausedBefore.current === true && isPausedGlobal === false;
+        wasPausedBefore.current = isPausedGlobal;
+
+        // Only restart if: user tapped to unpause + video was finished + video is active
+        if (userToggledToUnpause && isFinished && isActive) {
+            console.log(`[Replay] 🔄 User tapped replay on ${video.id}`);
             setIsFinished(false);
             loopCount.current = 0;
+            clearVideoPosition(video.id);
             videoRef.current?.seek(0);
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         }
-    }, [isPausedGlobal, isFinished, isActive]);
+    }, [isPausedGlobal, isFinished, isActive, video.id]);
 
     // shouldPlay logic moved to top of component to include isScreenFocused
     // const shouldPlay = isActive && isAppActive && !isSeeking && !isPausedGlobal && !isFinished && !hasError;
@@ -237,30 +291,21 @@ export const VideoLayer = memo(function VideoLayer({
         setDuration(data.duration);
         durationSV.value = data.duration;
         setHasError(false);
-        setShowPoster(false); // Hide poster when video loads
+        setShowPoster(false);
 
-        // Performance: Track actual load time (from mount to first frame ready)
+        // Performance logging
         const source = videoSource?.uri?.startsWith('file://')
             ? 'disk-cache'
-            : isHLS
-                ? 'network'
-                : memoryCachedRef.current
-                    ? 'memory-cache'
-                    : 'network';
+            : isHLS ? 'network' : memoryCachedRef.current ? 'memory-cache' : 'network';
 
         PerformanceLogger.endTransition(video.id, source);
+        console.log(`[TIMING] ✅ VIDEO LOADED: ${video.id} | Source: ${source.toUpperCase()}`);
 
+        // Note: resizeMode is pre-calculated from video.width/height in useState
+        // onResizeModeChange is called if parent needs to know
         if (data.naturalSize) {
-            const { width, height } = data.naturalSize;
-            const aspectRatio = width / height;
-
-            // Logic: Vertical videos (aspectRatio < 1) should use 'cover' to fill and align with status bar.
-            // Horizontal or Square (aspectRatio >= 1) should use 'contain' to avoid heavy cropping.
-            const newMode = aspectRatio < 0.8 ? 'cover' : 'contain';
-
-            console.log(`[VideoLayer] Aspect Ratio: ${aspectRatio.toFixed(2)} -> Mode: ${newMode}`);
-            setResizeMode(newMode);
-            onResizeModeChange?.(newMode);
+            const aspectRatio = data.naturalSize.width / data.naturalSize.height;
+            onResizeModeChange?.(aspectRatio < 0.8 ? 'cover' : 'contain');
         }
     }, [onResizeModeChange, video.id, videoSource, isHLS]);
 
@@ -317,14 +362,18 @@ export const VideoLayer = memo(function VideoLayer({
 
     const handleEnd = useCallback(() => {
         loopCount.current += 1;
+        console.log(`[Loop] 🔄 Video ${video.id} ended, loop ${loopCount.current}/${MAX_LOOPS}`);
+
         if (loopCount.current >= MAX_LOOPS) {
+            console.log(`[Loop] ✅ Max loops reached, showing replay icon`);
             setIsFinished(true);
-            setPaused(true); // Show replay icon logic effectively
+            clearVideoPosition(video.id); // Clear position on finish
             onVideoEnd?.();
         } else {
+            console.log(`[Loop] ⏪ Looping video from start`);
             videoRef.current?.seek(0);
         }
-    }, [onVideoEnd, setPaused]);
+    }, [onVideoEnd, video.id]);
 
     const seekTo = useCallback((time: number) => {
         videoRef.current?.seek(time);
@@ -334,14 +383,9 @@ export const VideoLayer = memo(function VideoLayer({
         }
     }, [isFinished, setPaused]);
 
-    // Reset to start when video becomes active (scrolled back)
+    // Provide seek function to parent when active (NO auto-reset - position memory handles it)
     useEffect(() => {
-        if (isActive) {
-            if (!hasError) {
-                loopCount.current = 0;
-                setIsFinished(false);
-                videoRef.current?.seek(0); // Reset video to start when becoming active
-            }
+        if (isActive && !hasError) {
             onSeekReady?.(seekTo);
         }
     }, [isActive, seekTo, onSeekReady, hasError]);
@@ -360,16 +404,15 @@ export const VideoLayer = memo(function VideoLayer({
                     source={videoSource}
                     style={[styles.video, { backgroundColor: '#000' }]} // Black bg to prevent white flash
                     resizeMode={resizeMode}
-                    // poster={video.thumbnailUrl} // Removed: Causes glitch (Start -> Thumb -> Start)
-                    // posterResizeMode={resizeMode}
                     repeat={false}
-                    controls={false} // FIX: Hide ghost native controls
+                    controls={false}
                     paused={!shouldPlay}
                     muted={isMuted}
                     bufferConfig={bufferConfig}
-                    onLoad={handleLoad} // Triggers fade out of manual poster
-                    onLoadStart={() => {
-                        // Hide poster as soon as video starts loading to prevent conflicts
+                    onLoad={handleLoad}
+                    onReadyForDisplay={() => {
+                        // 🔥 CRITICAL: Hide poster ONLY when first frame is ready
+                        console.log(`[TIMING] 🎬 READY FOR DISPLAY: ${video.id}`);
                         setShowPoster(false);
                     }}
                     onError={handleVideoError}
@@ -379,7 +422,6 @@ export const VideoLayer = memo(function VideoLayer({
                     playWhenInactive={false}
                     ignoreSilentSwitch="ignore"
                     progressUpdateInterval={33}
-                    // HLS optimizations
                     automaticallyWaitsToMinimizeStalling={true}
                     preventsDisplaySleepDuringVideoPlayback={true}
                 />

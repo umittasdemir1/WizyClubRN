@@ -43,7 +43,7 @@ const r2 = new S3Client({
 console.log('5. Initializing Supabase Client...');
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-// Helper: Upload to R2
+// Helper: Upload to R2 with CDN Cache Headers
 async function uploadToR2(filePath, fileName, contentType) {
     const fileStream = fs.readFileSync(filePath);
     await r2.send(new PutObjectCommand({
@@ -51,6 +51,7 @@ async function uploadToR2(filePath, fileName, contentType) {
         Key: fileName,
         Body: fileStream,
         ContentType: contentType,
+        CacheControl: 'public, max-age=31536000, immutable', // 1 year CDN cache
     }));
     return `${process.env.R2_PUBLIC_URL}/${fileName}`;
 }
@@ -148,28 +149,35 @@ app.post('/upload-hls', upload.single('video'), async (req, res) => {
             videoUrl = await hlsService.transcodeToHls(inputPath, tempOutputDir, uniqueId, hasAudio, width, height);
             console.log(`🔗 [VIDEO URL] Generated HLS URL: ${videoUrl}`);
         } else {
-            // Option B: Smart Optimized MP4 (1080p, CRF 23)
+            // Option B: Smart Optimized MP4 (CRF 26, TikTok-style compression)
             console.log('⚡ [MP4] Smart Optimization Starting...');
             console.log(`   📂 Input: ${inputPath}`);
+            console.log(`   📐 Original Dimensions: ${width}x${height}`);
             const optimizedPath = path.join(tempOutputDir, `optimized_${uniqueId}.mp4`);
             console.log(`   📂 Output: ${optimizedPath}`);
 
+            // Smart Scaling: Only downscale if video is larger than 1080p width
+            const shouldScale = width > 1080;
+            console.log(`   🎯 Scaling: ${shouldScale ? 'YES (downscale to 1080p)' : 'NO (keep original size)'}`);
+
             await new Promise((resolve, reject) => {
-                ffmpeg(inputPath)
-                    .videoCodec('libx264')
-                    // Resize to 1080p width (keep aspect ratio), but only if input is larger
-                    // 'scale=1080:-2' means width=1080, height=calc(maintain aspect), ensure height divisible by 2
-                    // But we should check dimensions. Simple approach: 'scale=min(iw\,1080):-2' not supported by helper
-                    .size('1080x?')
-                    .outputOptions([
-                        '-crf 23',           // Visual Quality (Lower = Better, 18-28 is good range)
-                        '-preset veryfast',  // Fast encoding
-                        '-movflags +faststart', // Move atom to front for instant playback
-                        '-pix_fmt yuv420p',  // Ensure compatibility
-                        '-maxrate 4M',       // Cap max bitrate for safety (4Mbps is plenty for 1080p mobile)
-                        '-bufsize 8M'
-                    ])
-                    .on('start', (cmd) => console.log('   👉 FFmpeg Command:', cmd))
+                let cmd = ffmpeg(inputPath)
+                    .videoCodec('libx264');
+
+                // Only apply scaling if needed (prevents upscaling small videos)
+                if (shouldScale) {
+                    cmd = cmd.size('1080x?');
+                }
+
+                cmd.outputOptions([
+                    '-crf 26',           // TikTok-style compression (smaller files, good quality)
+                    '-preset veryfast',  // Fast encoding
+                    '-movflags +faststart', // Move atom to front for instant playback
+                    '-pix_fmt yuv420p',  // Ensure compatibility
+                    '-maxrate 3M',       // Lower max bitrate for mobile-optimized delivery
+                    '-bufsize 6M'
+                ])
+                    .on('start', (cmdLine) => console.log('   👉 FFmpeg Command:', cmdLine))
                     .on('end', () => {
                         console.log('   ✅ Optimization Complete.');
                         resolve();
@@ -400,12 +408,12 @@ app.post('/upload-avatar', upload.single('image'), async (req, res) => {
     try {
         console.log(`👤 [AVATAR] Process starting for user: ${userId}`);
         const extension = path.extname(file.originalname) || '.jpg';
-        
+
         const fileName = `users/${userId}/profile/avatar${extension}`;
 
         // 1. Upload to R2
         const rawAvatarUrl = await uploadToR2(file.path, fileName, file.mimetype);
-        
+
         // 2. Add Cache Buster (important for CDNs and apps)
 
         const avatarUrl = `${rawAvatarUrl}?t=${Date.now()}`;

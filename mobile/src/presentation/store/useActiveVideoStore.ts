@@ -82,6 +82,28 @@ export const useActiveVideoStore = create<ActiveVideoState>((set, get) => ({
 }));
 
 // ===================================
+// 🎬 VIDEO POSITION MEMORY
+// ===================================
+// Remember playback position when scrolling away
+const videoPositions = new Map<string, number>();
+
+export function saveVideoPosition(videoId: string, position: number) {
+    // Only save if position is meaningful (> 0.5 sec and not near end)
+    if (position > 0.5) {
+        videoPositions.set(videoId, position);
+        console.log(`[Position] 💾 Saved: ${videoId} at ${position.toFixed(1)}s`);
+    }
+}
+
+export function getVideoPosition(videoId: string): number {
+    return videoPositions.get(videoId) || 0;
+}
+
+export function clearVideoPosition(videoId: string) {
+    videoPositions.delete(videoId);
+}
+
+// ===================================
 // 🔄 APP STATE HOOK
 // ===================================
 // App foreground/background durumunu takip eder.

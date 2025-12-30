@@ -8,6 +8,7 @@ import { ToggleFollowUseCase } from '../../domain/usecases/ToggleFollowUseCase';
 import { VideoRepositoryImpl } from '../../data/repositories/VideoRepositoryImpl';
 import { InteractionRepositoryImpl } from '../../data/repositories/InteractionRepositoryImpl';
 import { VideoCacheService } from '../../data/services/VideoCacheService';
+import { Image } from 'expo-image';
 import { useActiveVideoStore } from '../store/useActiveVideoStore';
 import { useAuthStore } from '../store/useAuthStore';
 
@@ -61,7 +62,57 @@ export function useVideoFeed(): UseVideoFeedReturn {
         VideoCacheService.initialize();
     }, []);
 
-    // ... (keep prefetch logic) ...
+    // ============================================
+    // PREFETCH MECHANISM (TikTok-style)
+    // ============================================
+
+    // 1. Initial Prefetch: When feed loads, prefetch first 3 videos
+    const hasInitialPrefetched = useRef(false);
+    useEffect(() => {
+        if (videos.length > 0 && !hasInitialPrefetched.current) {
+            hasInitialPrefetched.current = true;
+            console.log('[Prefetch] 🚀 Initial prefetch starting...');
+
+            videos.slice(0, 3).forEach((v, i) => {
+                // Video prefetch (background download)
+                VideoCacheService.cacheVideo(v.videoUrl).then(path => {
+                    if (path) console.log(`[Prefetch] ✅ Video ${i + 1} cached`);
+                });
+                // Thumbnail prefetch (for instant display)
+                if (v.thumbnailUrl) {
+                    Image.prefetch(v.thumbnailUrl);
+                }
+            });
+        }
+    }, [videos.length > 0]);
+
+    // 2. Scroll Prefetch: When active video changes, prefetch next 3 videos
+    const lastPrefetchedIndex = useRef(-1);
+    useEffect(() => {
+        if (!activeVideoId || videos.length === 0) return;
+
+        const currentIndex = videos.findIndex(v => v.id === activeVideoId);
+        if (currentIndex === -1 || currentIndex === lastPrefetchedIndex.current) return;
+
+        lastPrefetchedIndex.current = currentIndex;
+
+        // Prefetch next 3 videos (if they exist)
+        const nextVideos = videos.slice(currentIndex + 1, currentIndex + 4);
+        if (nextVideos.length > 0) {
+            console.log(`[Prefetch] 📥 Prefetching ${nextVideos.length} upcoming videos...`);
+
+            nextVideos.forEach((v, i) => {
+                VideoCacheService.cacheVideo(v.videoUrl).then(path => {
+                    if (path) console.log(`[Prefetch] ✅ Next video ${i + 1} cached`);
+                });
+                if (v.thumbnailUrl) {
+                    Image.prefetch(v.thumbnailUrl);
+                }
+            });
+        }
+    }, [activeVideoId, videos]);
+
+    // ============================================
 
     useEffect(() => {
         isMounted.current = true;

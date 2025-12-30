@@ -20,6 +20,7 @@ import { ActionButtons } from '../../src/presentation/components/feed/ActionButt
 import { HeaderOverlay } from '../../src/presentation/components/feed/HeaderOverlay';
 import { MetadataLayer } from '../../src/presentation/components/feed/MetadataLayer';
 import { DoubleTapLike, DoubleTapLikeRef } from '../../src/presentation/components/feed/DoubleTapLike';
+import { FeedItem } from '../../src/presentation/components/feed/FeedItem';
 import { BrightnessController } from '../../src/presentation/components/feed/BrightnessController';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import { SideOptionsSheet } from '../../src/presentation/components/feed/SideOptionsSheet';
@@ -349,89 +350,37 @@ export default function FeedScreen() {
         }
     }, [videos.length, ITEM_HEIGHT]);
 
-    // FeedItem - Memo bileşeni (Performance için)
-    const FeedItem = memo(({ video, isActive }: { video: Video; isActive: boolean }) => {
-        const doubleTapRef = useRef<DoubleTapLikeRef>(null);
-
-        const handleLikePress = useCallback(() => {
-            // Eğer video henüz beğenilmemişse, animasyonu tetikle
-            if (!video.isLiked) {
-                // 1. Animasyonu HEMEN tetikle (UI Thread)
-                doubleTapRef.current?.animateLike();
-                if (Platform.OS !== 'web') {
-                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                }
-
-                // 2. State update'i bir sonraki tick'e ertele (JS Thread rahatlasın)
-                requestAnimationFrame(() => {
-                    toggleLike(video.id);
-                });
-            } else {
-                // Unlike - sadece state update, animasyon yok
-                toggleLike(video.id);
-            }
-        }, [video.isLiked, video.id]);
-
-        return (
-            <View style={[styles.itemContainer, { height: ITEM_HEIGHT }]}>
-                {/* Layer 1: Content & Gestures (Background) */}
-                <DoubleTapLike
-                    ref={doubleTapRef}
-                    onDoubleTap={() => handleDoubleTapLike(video.id)}
-                    onSingleTap={handleFeedTap}
-                >
-                    <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]}>
-                        <VideoLayer
-                            video={video}
-                            isActive={isActive}
-                            isMuted={isMuted}
-                            isScrolling={isScrollingSV}
-                            onSeekReady={isActive ? handleSeekReady : undefined}
-                            onRemoveVideo={() => {
-                                console.log(`[FeedScreen] Auto-removing dead video: ${video.id}`);
-                                deleteVideo(video.id);
-                            }}
-                        />
-                    </View>
-                </DoubleTapLike>
-
-                {/* Layer 2: UI Overlays (Foreground) - Animate Opacity */}
-                <Animated.View
-                    style={[StyleSheet.absoluteFill, { zIndex: 50 }, uiOpacityStyle]}
-                    pointerEvents={isSeeking ? 'none' : 'box-none'}
-                >
-                    <ActionButtons
-                        isLiked={video.isLiked}
-                        likesCount={video.likesCount}
-                        isSaved={video.isSaved}
-                        savesCount={video.savesCount || 0}
-                        sharesCount={video.sharesCount}
-                        shopsCount={video.shopsCount || 0}
-                        onLike={handleLikePress}
-                        onSave={() => toggleSave(video.id)}
-                        onShare={() => toggleShare(video.id)}
-                        onShop={handleOpenShopping}
-                        onProfilePress={() => router.push(`/user/${video.user.id}`)}
-                    />
-
-                    <MetadataLayer
-                        video={video}
-                        onAvatarPress={() => router.push(`/user/${video.user.id}`)}
-                        onFollowPress={() => toggleFollow(video.id)}
-                        onReadMorePress={handleOpenDescription}
-                        onCommercialTagPress={() => console.log('Open Commercial Info')}
-                    />
-                </Animated.View>
-            </View>
-        );
-    });
+    // Stable callback handlers for FeedItem (prevents re-render on activeVideoId change)
+    const handleRemoveVideo = useCallback((videoId: string) => {
+        console.log(`[FeedScreen] Auto-removing dead video: ${videoId}`);
+        deleteVideo(videoId);
+    }, [deleteVideo]);
 
     const renderItem = useCallback(
         ({ item }: { item: Video }) => {
             const isActive = item.id === activeVideoId && isAppActive;
-            return <FeedItem video={item} isActive={isActive} />;
+            return (
+                <FeedItem
+                    video={item}
+                    isActive={isActive}
+                    isMuted={isMuted}
+                    isScrolling={isScrollingSV}
+                    isSeeking={isSeeking}
+                    uiOpacityStyle={uiOpacityStyle}
+                    onDoubleTapLike={handleDoubleTapLike}
+                    onFeedTap={handleFeedTap}
+                    onSeekReady={isActive ? handleSeekReady : undefined}
+                    onRemoveVideo={handleRemoveVideo}
+                    onToggleLike={toggleLike}
+                    onToggleSave={toggleSave}
+                    onToggleShare={toggleShare}
+                    onToggleFollow={toggleFollow}
+                    onOpenShopping={handleOpenShopping}
+                    onOpenDescription={handleOpenDescription}
+                />
+            );
         },
-        [activeVideoId, isAppActive]
+        [activeVideoId, isAppActive, isMuted, isSeeking]
     );
 
     const keyExtractor = useCallback((item: Video) => item.id, []);
@@ -539,9 +488,9 @@ export default function FeedScreen() {
                     onEndReached={hasMore ? loadMore : null}
                     onEndReachedThreshold={0.5}
                     ListFooterComponent={renderFooter}
-                    removeClippedSubviews={true}
+                    removeClippedSubviews={false} // 🔥 CRITICAL: Keep videos mounted to prevent re-decode delay
                     maxToRenderPerBatch={3}
-                    windowSize={5}
+                    windowSize={7} // Increased buffer for smoother scroll
                     initialNumToRender={1}
                     bounces={false}
                     overScrollMode="never"
