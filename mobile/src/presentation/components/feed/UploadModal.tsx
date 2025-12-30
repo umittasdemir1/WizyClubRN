@@ -13,7 +13,7 @@ import {
     ScrollView,
     Image,
     Dimensions,
-    StatusBar
+    StatusBar as RNStatusBar
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Video } from 'expo-av';
@@ -56,6 +56,14 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
     const [selectedClubs, setSelectedClubs] = useState<string[]>([]);
     const [commercialType, setCommercialType] = useState<string | null>(null); // Zorunlu - başlangıçta null
     const [useAILabel, setUseAILabel] = useState(false);
+    const [showCommercialMenu, setShowCommercialMenu] = useState(false);
+
+    // Set StatusBar when modal opens
+    useEffect(() => {
+        if (isVisible) {
+            RNStatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
+        }
+    }, [isVisible, isDark]);
 
     // Sync with initialVideo when it changes
     useEffect(() => {
@@ -74,24 +82,28 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
     const inputBg = isDark ? '#1C1C1E' : '#F5F5F5';
 
     const handleSaveDraft = () => {
-        // TODO: Taslak kaydetme işlevi
+        // TODO: Backend'e taslak kaydet
         Alert.alert('Taslak Kaydedildi', 'Videonuz taslak olarak kaydedildi.');
         onClose();
     };
 
     const handleCoverEdit = () => {
-        // TODO: Kapak düzenleme modal'ı aç
-        Alert.alert('Kapak Düzenle', 'Kapak düzenleme özelliği yakında eklenecek.');
+        // TODO: Thumbnail seçim/düzenleme modal'ı aç
+        console.log('Cover edit tapped');
     };
 
     const handleClubsSelect = () => {
-        // TODO: CLUB's seçim modal'ı aç
-        Alert.alert('CLUB\'s Seç', 'CLUB seçim özelliği yakında eklenecek.');
+        // TODO: CLUB seçim modal'ı aç
+        console.log('Clubs select tapped');
     };
 
     const handleCommercialTypeSelect = () => {
-        // TODO: Ticari İlişki seçim modal'ı aç
-        Alert.alert('Ticari İlişki Türü', 'Lütfen ticari ilişki türünü seçin:\n\n' + COMMERCIAL_TYPES.join('\n'));
+        setShowCommercialMenu(true);
+    };
+
+    const selectCommercialType = (type: string) => {
+        setCommercialType(type);
+        setShowCommercialMenu(false);
     };
 
     const handleShare = async () => {
@@ -178,6 +190,7 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
     };
 
     return (
+        <>
         <Modal
             animationType="slide"
             transparent={false}
@@ -185,7 +198,6 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
             onRequestClose={onClose}
             statusBarTranslucent
         >
-            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={[styles.container, { backgroundColor: bgColor }]}
@@ -320,6 +332,50 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
                 </View>
             </KeyboardAvoidingView>
         </Modal>
+
+        {/* Commercial Type Selection Modal */}
+        <Modal
+            visible={showCommercialMenu}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => setShowCommercialMenu(false)}
+        >
+            <Pressable
+                style={styles.modalOverlay}
+                onPress={() => setShowCommercialMenu(false)}
+            >
+                <View style={[styles.menuModal, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF' }]}>
+                    <View style={styles.menuHeader}>
+                        <Text style={[styles.menuTitle, { color: textColor }]}>Ticari İlişki Türü Seçin</Text>
+                    </View>
+                    <ScrollView style={styles.menuList}>
+                        {COMMERCIAL_TYPES.map((type, index) => (
+                            <Pressable
+                                key={type}
+                                style={[
+                                    styles.menuOptionItem,
+                                    { borderBottomColor: borderColor },
+                                    index === COMMERCIAL_TYPES.length - 1 && { borderBottomWidth: 0 }
+                                ]}
+                                onPress={() => selectCommercialType(type)}
+                            >
+                                <Text style={[
+                                    styles.menuOptionText,
+                                    { color: textColor },
+                                    commercialType === type && styles.menuOptionTextSelected
+                                ]}>
+                                    {type}
+                                </Text>
+                                {commercialType === type && (
+                                    <Text style={styles.checkmark}>✓</Text>
+                                )}
+                            </Pressable>
+                        ))}
+                    </ScrollView>
+                </View>
+            </Pressable>
+        </Modal>
+        </>
     );
 }
 
@@ -490,5 +546,52 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 16,
         fontWeight: '700',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    menuModal: {
+        width: '100%',
+        maxWidth: 400,
+        borderRadius: 16,
+        maxHeight: '70%',
+        overflow: 'hidden',
+    },
+    menuHeader: {
+        padding: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E5E5E5',
+    },
+    menuTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        textAlign: 'center',
+    },
+    menuList: {
+        maxHeight: 400,
+    },
+    menuOptionItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 16,
+        borderBottomWidth: 1,
+    },
+    menuOptionText: {
+        fontSize: 16,
+        flex: 1,
+    },
+    menuOptionTextSelected: {
+        fontWeight: '600',
+        color: '#3A8DFF',
+    },
+    checkmark: {
+        fontSize: 20,
+        color: '#3A8DFF',
+        marginLeft: 8,
     },
 });
