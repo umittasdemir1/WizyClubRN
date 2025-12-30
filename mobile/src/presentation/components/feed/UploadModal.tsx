@@ -224,7 +224,7 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
                     <Pressable onPress={onClose} style={styles.backButton}>
                         <ChevronLeft color={textColor} size={28} strokeWidth={2} />
                     </Pressable>
-                    <Text style={[styles.headerTitle, { color: textColor }]}>Yeni Video</Text>
+                    <Text style={[styles.headerTitle, { color: textColor }]} pointerEvents="none">Yeni Video</Text>
                     <View style={styles.backButton} />
                 </View>
 
@@ -469,7 +469,7 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         textAlign: 'center',
-        zIndex: -1,
+        zIndex: 0,
     },
     scrollView: {
         flex: 1,
