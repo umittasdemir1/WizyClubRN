@@ -19,6 +19,7 @@ import { useUploadStore } from '../../store/useUploadStore';
 import { ChevronLeft, ChevronRight, Users, Tag } from 'lucide-react-native';
 import { useThemeStore } from '../../store/useThemeStore';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
 import { CONFIG } from '../../../core/config';
 
@@ -46,6 +47,7 @@ const COMMERCIAL_TYPES = [
 export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalProps) {
     const { isDark } = useThemeStore();
     const { user } = useAuthStore();
+    const insets = useSafeAreaInsets();
     const [selectedMedia, setSelectedMedia] = useState<ImagePicker.ImagePickerAsset | null>(initialVideo || null);
     const [description, setDescription] = useState('');
     const [tags, setTags] = useState<string[]>([]);
@@ -171,7 +173,7 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
                 style={[styles.container, { backgroundColor: bgColor }]}
             >
                 {/* Header */}
-                <View style={[styles.header, { backgroundColor: bgColor, borderBottomColor: borderColor }]}>
+                <View style={[styles.header, { backgroundColor: bgColor, borderBottomColor: borderColor, paddingTop: insets.top + 12 }]}>
                     <Pressable onPress={onClose} style={styles.backButton}>
                         <ChevronLeft color={textColor} size={28} />
                     </Pressable>
@@ -271,7 +273,7 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
                 </ScrollView>
 
                 {/* Bottom Buttons */}
-                <View style={[styles.bottomButtons, { backgroundColor: bgColor, borderTopColor: borderColor }]}>
+                <View style={[styles.bottomButtons, { backgroundColor: bgColor, borderTopColor: borderColor, paddingBottom: insets.bottom + 12 }]}>
                     <Pressable
                         style={[styles.draftButton, { backgroundColor: isDark ? '#2C2C2E' : '#F0F0F0' }]}
                         onPress={handleSaveDraft}
@@ -301,7 +303,6 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: 16,
         paddingVertical: 12,
-        paddingTop: Platform.OS === 'ios' ? 50 : 12,
         borderBottomWidth: 1,
     },
     backButton: {
@@ -428,8 +429,7 @@ const styles = StyleSheet.create({
     bottomButtons: {
         flexDirection: 'row',
         paddingHorizontal: 16,
-        paddingVertical: 12,
-        paddingBottom: Platform.OS === 'ios' ? 32 : 12,
+        paddingTop: 12,
         gap: 12,
         borderTopWidth: 1,
     },
