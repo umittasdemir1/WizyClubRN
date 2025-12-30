@@ -59,6 +59,7 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
     const [brandUrl, setBrandUrl] = useState('');
     const [useAILabel, setUseAILabel] = useState(false);
     const [showCommercialMenu, setShowCommercialMenu] = useState(false);
+    const [showBrandInfoModal, setShowBrandInfoModal] = useState(false);
 
     // Set StatusBar when modal opens
     useEffect(() => {
@@ -107,6 +108,11 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
     const selectCommercialType = (type: string) => {
         setCommercialType(type);
         setShowCommercialMenu(false);
+
+        // Open brand info modal if the type requires brand details
+        if (type !== 'İş Birliği İçermiyor' && type !== 'Kendi Markam') {
+            setShowBrandInfoModal(true);
+        }
     };
 
     const handleShare = async () => {
@@ -214,12 +220,12 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
                 style={[styles.container, { backgroundColor: bgColor }]}
             >
                 {/* Header */}
-                <View style={[styles.header, { backgroundColor: bgColor, borderBottomColor: borderColor, paddingTop: insets.top + 12 }]}>
+                <View style={[styles.header, { backgroundColor: bgColor, borderBottomColor: borderColor, paddingTop: insets.top }]}>
                     <Pressable onPress={onClose} style={styles.backButton}>
-                        <ChevronLeft color={textColor} size={28} />
+                        <ChevronLeft color={textColor} size={28} strokeWidth={2} />
                     </Pressable>
                     <Text style={[styles.headerTitle, { color: textColor }]}>Yeni Video</Text>
-                    <View style={{ width: 28 }} />
+                    <View style={styles.backButton} />
                 </View>
 
                 <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
@@ -304,28 +310,6 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
                             </View>
                         </Pressable>
 
-                        {/* Brand Info - Show only if commercial type requires it */}
-                        {commercialType && commercialType !== 'İş Birliği İçermiyor' && commercialType !== 'Kendi Markam' && (
-                            <View style={styles.brandInfoSection}>
-                                <TextInput
-                                    style={[styles.brandInput, { backgroundColor: inputBg, color: textColor, borderColor: borderColor }]}
-                                    placeholder="Marka Adı"
-                                    placeholderTextColor={subtextColor}
-                                    value={brandName}
-                                    onChangeText={setBrandName}
-                                />
-                                <TextInput
-                                    style={[styles.brandInput, { backgroundColor: inputBg, color: textColor, borderColor: borderColor }]}
-                                    placeholder="Marka URL'si (opsiyonel)"
-                                    placeholderTextColor={subtextColor}
-                                    value={brandUrl}
-                                    onChangeText={setBrandUrl}
-                                    keyboardType="url"
-                                    autoCapitalize="none"
-                                />
-                            </View>
-                        )}
-
                         {/* Yapay zeka etiketi ekle */}
                         <View style={[styles.menuItem, { borderBottomColor: 'transparent' }]}>
                             <View style={styles.menuItemLeft}>
@@ -408,6 +392,60 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
                 </View>
             </Pressable>
         </Modal>
+
+        {/* Brand Info Modal */}
+        <Modal
+            visible={showBrandInfoModal}
+            transparent={false}
+            animationType="slide"
+            onRequestClose={() => setShowBrandInfoModal(false)}
+            statusBarTranslucent
+        >
+            <View style={[styles.container, { backgroundColor: bgColor }]}>
+                {/* Header matching profile page */}
+                <View style={[styles.brandModalHeader, { backgroundColor: bgColor, borderBottomColor: borderColor, paddingTop: insets.top }]}>
+                    <Pressable onPress={() => setShowBrandInfoModal(false)} style={styles.brandModalBackButton}>
+                        <ChevronLeft color={textColor} size={28} strokeWidth={2} />
+                    </Pressable>
+                    <Text style={[styles.brandModalTitle, { color: textColor }]}>{commercialType}</Text>
+                    <View style={styles.brandModalBackButton} />
+                </View>
+
+                <ScrollView style={styles.brandModalContent} showsVerticalScrollIndicator={false}>
+                    <View style={styles.brandFormSection}>
+                        <Text style={[styles.brandFormLabel, { color: textColor }]}>Marka Adı</Text>
+                        <TextInput
+                            style={[styles.brandFormInput, { backgroundColor: inputBg, color: textColor, borderColor: borderColor }]}
+                            placeholder="Marka adını giriniz"
+                            placeholderTextColor={subtextColor}
+                            value={brandName}
+                            onChangeText={setBrandName}
+                        />
+
+                        <Text style={[styles.brandFormLabel, { color: textColor, marginTop: 24 }]}>Marka URL'si</Text>
+                        <TextInput
+                            style={[styles.brandFormInput, { backgroundColor: inputBg, color: textColor, borderColor: borderColor }]}
+                            placeholder="https://marka.com (opsiyonel)"
+                            placeholderTextColor={subtextColor}
+                            value={brandUrl}
+                            onChangeText={setBrandUrl}
+                            keyboardType="url"
+                            autoCapitalize="none"
+                        />
+                    </View>
+                </ScrollView>
+
+                {/* Save Button */}
+                <View style={[styles.brandModalFooter, { backgroundColor: bgColor, borderTopColor: borderColor, paddingBottom: insets.bottom + 12 }]}>
+                    <Pressable
+                        style={[styles.brandSaveButton, { backgroundColor: '#3A8DFF' }]}
+                        onPress={() => setShowBrandInfoModal(false)}
+                    >
+                        <Text style={styles.brandSaveButtonText}>Kaydet</Text>
+                    </Pressable>
+                </View>
+            </View>
+        </Modal>
         </>
     );
 }
@@ -420,16 +458,24 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
+        paddingHorizontal: 20,
+        height: 60,
         borderBottomWidth: 1,
     },
     backButton: {
-        padding: 4,
+        width: 44,
+        height: 44,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '600',
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        textAlign: 'center',
+        zIndex: -1,
     },
     scrollView: {
         flex: 1,
@@ -545,16 +591,62 @@ const styles = StyleSheet.create({
         marginTop: 4,
         lineHeight: 16,
     },
-    brandInfoSection: {
-        paddingVertical: 12,
-        gap: 12,
+    brandModalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        height: 60,
+        borderBottomWidth: 1,
     },
-    brandInput: {
+    brandModalBackButton: {
+        width: 44,
+        height: 44,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    brandModalTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        textAlign: 'center',
+        zIndex: -1,
+    },
+    brandModalContent: {
+        flex: 1,
+    },
+    brandFormSection: {
+        padding: 20,
+    },
+    brandFormLabel: {
         fontSize: 15,
-        paddingHorizontal: 12,
-        paddingVertical: 12,
-        borderRadius: 8,
+        fontWeight: '600',
+        marginBottom: 8,
+    },
+    brandFormInput: {
+        fontSize: 15,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        borderRadius: 10,
         borderWidth: 1,
+    },
+    brandModalFooter: {
+        paddingHorizontal: 20,
+        paddingTop: 16,
+        borderTopWidth: 1,
+    },
+    brandSaveButton: {
+        paddingVertical: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    brandSaveButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '700',
     },
     bottomButtons: {
         flexDirection: 'row',
