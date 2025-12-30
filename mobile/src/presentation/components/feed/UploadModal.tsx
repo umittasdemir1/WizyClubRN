@@ -17,6 +17,7 @@ import { useUploadStore } from '../../store/useUploadStore';
 import { X, Video as VideoIcon, UploadCloud } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 import { useThemeStore } from '../../store/useThemeStore';
+import { useAuthStore } from '../../store/useAuthStore';
 import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
 import { CONFIG } from '../../../core/config';
 
@@ -44,6 +45,7 @@ const COMMERCIAL_TYPES = [
 
 export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalProps) {
     const { isDark } = useThemeStore();
+    const { user } = useAuthStore();
     const [selectedVideo, setSelectedVideo] = useState<ImagePicker.ImagePickerAsset | null>(initialVideo || null);
     const [description, setDescription] = useState('');
 
@@ -59,8 +61,6 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
     const [brandName, setBrandName] = useState('');
     const [brandUrl, setBrandUrl] = useState('');
     const [isNoUrl, setIsNoUrl] = useState(false);
-
-    const [userId, setUserId] = useState('687c8079-e94c-42c2-9442-8a4a6b63dec6');
 
     const { startUpload, setProgress, setStatus, setSuccess, setError } = useUploadStore();
 
@@ -87,6 +87,12 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
             return;
         }
 
+        // Check if user is logged in
+        if (!user?.id) {
+            Alert.alert('Giriş Gerekli', 'Video yüklemek için lütfen giriş yapın.');
+            return;
+        }
+
         // Validate Commercial Fields
         if (isCommercial) {
             if (!brandName.trim()) {
@@ -103,7 +109,7 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
         startUpload();
 
         const formData = new FormData();
-        formData.append('userId', userId);
+        formData.append('userId', user.id);
         formData.append('description', description);
         formData.append('commercialType', commercialType);
 
