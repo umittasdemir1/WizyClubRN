@@ -127,16 +127,17 @@ export default function FeedScreen() {
 
             // Check if the first video is indeed the one we just uploaded
             const isMatch = uploadedVideoId && videos[0].id === uploadedVideoId;
+            const targetId = isMatch ? uploadedVideoId! : videos[0].id;
 
-            // Scroll to top
-            listRef.current?.scrollToIndex({ index: 0, animated: false });
+            // 🔥 IMMEDIATE: Set active video first
+            setActiveVideo(targetId, 0);
 
-            // Play it
-            if (isMatch) {
-                setActiveVideo(uploadedVideoId!, 0);
-            } else {
-                setActiveVideo(videos[0].id, 0);
-            }
+            // 🔥 DELAYED: Scroll after list updates (ensure FlashList has rendered)
+            setTimeout(() => {
+                listRef.current?.scrollToIndex({ index: 0, animated: false });
+                // Double-set to ensure it sticks
+                setActiveVideo(targetId, 0);
+            }, 100);
 
             // Cleanup
             isUploadRefreshRef.current = false;

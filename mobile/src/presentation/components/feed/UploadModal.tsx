@@ -160,8 +160,8 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
             setThumbnailUri(selectedMedia.uri);
         }
 
-        // 🔥 CRITICAL: Navigate to Feed immediately - upload continues in background
-        router.replace('/');
+        // 🔥 CRITICAL: Navigate back to Feed without reload - upload continues in background
+        router.back();
 
         const formData = new FormData();
         formData.append('userId', user.id);
@@ -191,9 +191,10 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
 
             xhr.upload.onprogress = (event) => {
                 if (event.lengthComputable) {
-                    const progressPercent = (event.loaded / event.total) * 100;
+                    const progressPercent = Math.min((event.loaded / event.total) * 100, 100);
+                    console.log(`📤 [Upload] Progress: ${Math.round(progressPercent)}%`);
                     setProgress(progressPercent);
-                    if (progressPercent === 100) setStatus('processing');
+                    if (progressPercent >= 100) setStatus('processing');
                     else setStatus('uploading');
                 }
             };

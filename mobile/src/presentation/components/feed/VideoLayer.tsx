@@ -214,6 +214,16 @@ export const VideoLayer = memo(function VideoLayer({
         videoRef.current?.seek(0); // Use seek instead of remount
     }, [video.id]);
 
+    // 🔥 ALWAYS start from beginning when becoming active
+    useEffect(() => {
+        if (isActive) {
+            console.log(`[VideoLayer] ▶️ Video ${video.id} became active, seeking to 0`);
+            videoRef.current?.seek(0);
+            currentTimeSV.value = 0;
+            setIsFinished(false);
+        }
+    }, [isActive, video.id]);
+
     // Unlock orientation when component unmounts
     useEffect(() => {
         return () => {
