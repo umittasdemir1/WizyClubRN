@@ -125,21 +125,21 @@ export function VideoSeekBar({
         setSeeking(true);
     }, [setSeeking]);
 
-    const updateSeek = useCallback((percentage: number) => {
-        if (duration.value > 0) {
-            const seekTime = percentage * duration.value;
+    // 🔥 Changed: Accept seekTime directly to avoid reading SharedValue in JS callback
+    const updateSeek = useCallback((seekTime: number) => {
+        if (seekTime >= 0) {
             onSeek(seekTime);
             currentTime.value = seekTime;
         }
-    }, [duration, onSeek, currentTime]);
+    }, [onSeek, currentTime]);
 
-    const endScrubbing = useCallback((percentage: number) => {
-        if (duration.value > 0) {
-            const seekTime = percentage * duration.value;
+    // 🔥 Changed: Accept seekTime directly from worklet
+    const endScrubbing = useCallback((seekTime: number) => {
+        if (seekTime >= 0) {
             onSeek(seekTime);
         }
         setSeeking(false);
-    }, [duration, onSeek, setSeeking]);
+    }, [onSeek, setSeeking]);
 
     const pan = Gesture.Pan()
         //.activateAfterLongPress(200) // Removed for immediate response
@@ -171,8 +171,8 @@ export function VideoSeekBar({
             trackHeight.value = withTiming(TRACK_HEIGHT, { duration: 150 });
             tooltipOpacity.value = withTiming(0, { duration: 150 });
 
-            const finalProgress = currentTime.value / duration.value;
-            runOnJS(endScrubbing)(finalProgress);
+            // Pass seekTime directly (already calculated in currentTime during pan)
+            runOnJS(endScrubbing)(currentTime.value);
             runOnJS(triggerHaptic)();
         })
         .onFinalize(() => {
@@ -191,7 +191,8 @@ export function VideoSeekBar({
             'worklet';
             const absoluteX = event.absoluteX - HORIZONTAL_PADDING;
             const newProgress = Math.max(0, Math.min(absoluteX / BAR_WIDTH, 1));
-            runOnJS(updateSeek)(newProgress);
+            const seekTime = newProgress * duration.value; // Calculate in worklet
+            runOnJS(updateSeek)(seekTime);
             runOnJS(triggerHaptic)();
         });
 

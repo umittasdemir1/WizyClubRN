@@ -6,6 +6,7 @@ import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, {
     useAnimatedStyle,
     useSharedValue,
+    useAnimatedReaction,
     withTiming,
     runOnJS,
     cancelAnimation,
@@ -64,21 +65,37 @@ export function StoryPage({
     // SharedValue for smooth 60fps progress (no re-renders)
     const progress = useSharedValue(0);
 
+    // Ref to track current progress for resuming (avoids reading .value during render)
+    const progressSnapshot = useRef(0);
+
+    // 🔥 Sync progress SharedValue to ref via useAnimatedReaction (no direct .value read)
+    useAnimatedReaction(
+        () => progress.value,
+        (currentProgress: number) => {
+            runOnJS((val: number) => { progressSnapshot.current = val; })(currentProgress);
+        }
+    );
+
     // Progress tracking - smooth 60fps using Reanimated
     useEffect(() => {
         if (!isActive) {
             cancelAnimation(progress);
             progress.value = 0;
+            progressSnapshot.current = 0;
             return;
         }
 
         if (isPaused) {
+            // Animation paused - snapshot is already synced via useAnimatedReaction
             cancelAnimation(progress);
             return;
         }
 
-        const duration = STORY_DURATION * (1 - progress.value);
+        // Calculate remaining duration based on saved progress snapshot
+        const startProgress = progressSnapshot.current;
+        const duration = STORY_DURATION * (1 - startProgress);
 
+        progress.value = startProgress; // Start from snapshot
         progress.value = withTiming(1, {
             duration: duration,
             easing: Easing.linear
@@ -89,6 +106,7 @@ export function StoryPage({
         });
 
         return () => {
+            // No need to read .value here - snapshot is synced via useAnimatedReaction
             cancelAnimation(progress);
         };
     }, [isActive, isPaused, onNext, progress]);

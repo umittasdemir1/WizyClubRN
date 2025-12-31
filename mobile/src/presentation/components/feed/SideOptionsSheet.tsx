@@ -1,4 +1,4 @@
-import React, { forwardRef, useMemo, useCallback } from 'react';
+import React, { forwardRef, useMemo, useCallback, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, LayoutChangeEvent } from 'react-native';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -37,8 +37,12 @@ const BrightnessSlider = ({
     // Use SharedValue for instant UI updates
     const progress = useSharedValue((initialValue - 0.3) / 0.7);
 
+    // 🔥 FIX: Use React state for text display instead of reading .value during render
+    const [displayPercent, setDisplayPercent] = useState(Math.round(initialValue * 100));
+
     const syncToStore = useCallback((val: number) => {
         onValueChange(val);
+        setDisplayPercent(Math.round(val * 100)); // Also update display
     }, [onValueChange]);
 
     const triggerHaptic = useCallback(() => {
@@ -122,7 +126,7 @@ const BrightnessSlider = ({
                 </View>
             </GestureDetector>
             <Text style={[styles.brightnessValue, { color: isDark ? '#888' : '#555' }]}>
-                {Math.round((0.3 + progress.value * 0.7) * 100)}%
+                {displayPercent}%
             </Text>
         </View>
     );

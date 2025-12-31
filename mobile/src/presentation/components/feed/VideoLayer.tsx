@@ -331,7 +331,8 @@ export const VideoLayer = memo(function VideoLayer({
     const handleProgress = useCallback((data: OnProgressData) => {
         onProgressUpdate?.(data.currentTime, duration);
         currentTimeSV.value = data.currentTime;
-        if (duration > 0 && durationSV.value !== duration) {
+        // Update durationSV only once when duration is available (avoid reading .value)
+        if (duration > 0) {
             durationSV.value = duration;
         }
     }, [duration, onProgressUpdate]);
