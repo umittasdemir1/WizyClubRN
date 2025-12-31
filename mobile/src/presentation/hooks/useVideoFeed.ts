@@ -407,8 +407,8 @@ export function useVideoFeed(): UseVideoFeedReturn {
                 tokenPreview: token ? token.substring(0, 30) + '...' : 'NULL'
             });
 
-            // Hard delete with ?force=true
-            const response = await fetch(`${CONFIG.API_URL}/videos/${videoId}?force=true`, {
+            // Soft delete (default)
+            const response = await fetch(`${CONFIG.API_URL}/videos/${videoId}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${token}`,

@@ -167,7 +167,7 @@ app.post('/upload-hls', upload.single('video'), async (req, res) => {
 
         if (ENABLE_HLS) {
             // Option A: HLS Transcoding
-            videoUrl = await hlsService.transcodeToHls(inputPath, tempOutputDir, uniqueId, hasAudio, width, height);
+            videoUrl = await hlsService.transcodeToHls(inputPath, tempOutputDir, uniqueId, baseKey, hasAudio, width, height);
             console.log(`🔗 [VIDEO URL] Generated HLS URL: ${videoUrl}`);
         } else {
             // Option B: Smart Optimized MP4 (CRF 26, TikTok-style compression)
@@ -228,7 +228,7 @@ app.post('/upload-hls', upload.single('video'), async (req, res) => {
 
         // Step 2.5: Generate Sprite Sheet (2s intervals)
         console.log(`🖼️ [SPRITE] Generating sprite sheet for ${duration}s video...`);
-        const spriteUrl = await hlsService.generateSpriteSheet(inputPath, tempOutputDir, uniqueId, duration);
+        const spriteUrl = await hlsService.generateSpriteSheet(inputPath, tempOutputDir, uniqueId, baseKey, duration);
         console.log(`🖼️ [SPRITE] Generated sprite URL: ${spriteUrl}`);
         setUploadProgress(uniqueId, 'saving', 85);
 
@@ -337,31 +337,40 @@ app.delete('/videos/:id', async (req, res) => {
                 return res.status(404).json({ error: 'Video not found' });
             }
 
-            // 2. R2 Cleanup - Support BOTH legacy and new URL formats
-            let folderPrefix = null;
-            const videoUrl = video.video_url;
+            // 1. Fetch Video Details (Already done above as 'video')
+            // Using 'video' object which contains video_url, sprite_url, thumbnail_url since we selected '*'
 
-            // Try new format first: media/USER_ID/videos/UUID
-            const newFormatMatch = videoUrl.match(/media\/[^/]+\/videos\/[^/]+/);
-            if (newFormatMatch) {
-                folderPrefix = newFormatMatch[0];
-                console.log(`   📁 [NEW FORMAT] R2 Folder: ${folderPrefix}`);
-            } else {
-                // Legacy format: videos/TIMESTAMP
-                const legacyMatch = videoUrl.match(/videos\/(\d+)/);
-                if (legacyMatch && legacyMatch[1]) {
-                    folderPrefix = `videos/${legacyMatch[1]}`;
-                    console.log(`   📁 [LEGACY FORMAT] R2 Folder: ${folderPrefix}`);
+            // 2. R2 Cleanup - Support BOTH legacy and new URL formats
+            const videoUrl = video.video_url;
+            const pathsToClean = new Set();
+
+            // A. Add Video Folder (Main)
+            let videoFolder = null;
+            if (videoUrl.includes('/media/')) {
+                const match = videoUrl.match(/media\/.*\/videos\/[^\/]+/); // media/USER/videos/UUID
+                if (match) videoFolder = match[0];
+            } else if (videoUrl.includes('/videos/')) {
+                const match = videoUrl.match(/videos\/[^\/]+/); // videos/UUID
+                if (match) videoFolder = match[0];
+            }
+            if (videoFolder) pathsToClean.add(videoFolder);
+
+            // B. Add Sprite Folder (Often 'videos/UUID' even if main video is in 'media/')
+            if (video?.sprite_url) {
+                const spriteMatch = video.sprite_url.match(/videos\/[^\/]+/); // videos/UUID
+                if (spriteMatch) {
+                    pathsToClean.add(spriteMatch[0]);
+                    console.log(`   found separate sprite folder: ${spriteMatch[0]}`);
                 }
             }
 
-            if (folderPrefix) {
+            // Execute Cleanup for all identified folders
+            for (const folder of pathsToClean) {
                 try {
-                    console.log(`   👉 [HARD] Cleaning R2 Folder: ${folderPrefix}`);
-
+                    console.log(`   👉 [HARD] Cleaning R2 Folder: ${folder}`);
                     const listCmd = new ListObjectsV2Command({
                         Bucket: process.env.R2_BUCKET_NAME,
-                        Prefix: folderPrefix
+                        Prefix: folder
                     });
                     const listRes = await r2.send(listCmd);
 
@@ -373,31 +382,13 @@ app.delete('/videos/:id', async (req, res) => {
                             }
                         };
                         await r2.send(new DeleteObjectsCommand(deleteParams));
-                        console.log(`   ✅ R2 Folder Deleted (${listRes.Contents.length} files).`);
+                        console.log(`   ✅ R2 Folder Deleted (${listRes.Contents.length} files) from: ${folder}`);
                     } else {
-                        console.log(`   ⚠️ No files found in R2 folder.`);
+                        console.log(`   ⚠️ No files found in R2 folder: ${folder}`);
                     }
-
-                    // Delete Legacy Thumbnail (only for legacy format)
-                    if (videoUrl.includes('/videos/') && !videoUrl.includes('/media/')) {
-                        const legacyMatch = videoUrl.match(/videos\/(\d+)/);
-                        if (legacyMatch && legacyMatch[1]) {
-                            const thumbKey = `thumbs/${legacyMatch[1]}.jpg`;
-                            try {
-                                await r2.send(new DeleteObjectCommand({
-                                    Bucket: process.env.R2_BUCKET_NAME,
-                                    Key: thumbKey
-                                }));
-                                console.log(`   ✅ R2 Legacy Thumbnail Deleted.`);
-                            } catch (e) { }
-                        }
-                    }
-
                 } catch (r2Error) {
-                    console.error('   ⚠️ R2 Cleanup Error:', r2Error.message);
+                    console.error(`   ⚠️ R2 Cleanup Error for ${folder}:`, r2Error.message);
                 }
-            } else {
-                console.log(`   ⚠️ Could not determine R2 folder from URL: ${videoUrl}`);
             }
 
             // 3. DB Delete (using authenticated client for RLS)
