@@ -9,6 +9,7 @@ interface MetadataLayerProps {
     onFollowPress: () => void;
     onReadMorePress: () => void;
     onCommercialTagPress: () => void;
+    currentUserId?: string; // Add currentUserId prop
 }
 
 const BASE_BOTTOM_POSITION = 80; // Aligned exactly with seekbar center (80px touch area / 2)
@@ -16,6 +17,7 @@ const SAFE_AREA_OFFSET = 0; // No extra offset needed as seekbar is also at 0
 
 export function MetadataLayer({
     video,
+    currentUserId,
     onAvatarPress,
     onFollowPress,
     onReadMorePress,
@@ -23,6 +25,11 @@ export function MetadataLayer({
 }: MetadataLayerProps) {
     const insets = useSafeAreaInsets();
     const bottom = Math.max(BASE_BOTTOM_POSITION, insets.bottom + SAFE_AREA_OFFSET);
+
+    // Hide follow button if:
+    // 1. User is already following
+    // 2. It's the user's own video
+    const showFollowButton = !video.user.isFollowing && video.user.id !== currentUserId;
 
     return (
         <View style={[styles.container, { bottom }]} pointerEvents="box-none">
@@ -45,7 +52,7 @@ export function MetadataLayer({
                     </Text>
                 </Pressable>
 
-                {!video.user.isFollowing && (
+                {showFollowButton && (
                     <Pressable
                         onPress={onFollowPress}
                         style={styles.followPill}
@@ -160,14 +167,14 @@ const styles = StyleSheet.create({
         marginLeft: 2,
     },
     commercialTag: {
-    position: 'absolute',  // 👈 Bunu ekle
-    bottom: -20,           // 👈 Negatif = aşağı, Pozitif = yukarı
-    left: 0,               // 👈 Bunu ekle
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 2,
-},
+        position: 'absolute',  // 👈 Bunu ekle
+        bottom: -20,           // 👈 Negatif = aşağı, Pozitif = yukarı
+        left: 0,               // 👈 Bunu ekle
+        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 2,
+    },
     commercialText: {
         color: 'black',
         fontSize: 10,

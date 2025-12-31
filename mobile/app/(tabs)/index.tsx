@@ -39,6 +39,7 @@ import BottomSheet from '@gorhom/bottom-sheet';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { FeedSkeleton } from '../../src/presentation/components/feed/FeedSkeleton';
 import { useUploadStore } from '../../src/presentation/store/useUploadStore';
+import { useAuthStore } from '../../src/presentation/store/useAuthStore';
 
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
 import { StoryBar } from '../../src/presentation/components/feed/StoryBar';
@@ -441,6 +442,9 @@ export default function FeedScreen() {
         deleteVideo(videoId);
     }, [deleteVideo]);
 
+    const { user } = useAuthStore();
+    const currentUserId = user?.id;
+
     const renderItem = useCallback(
         ({ item }: { item: Video }) => {
             const isActive = item.id === activeVideoId && isAppActive;
@@ -452,6 +456,7 @@ export default function FeedScreen() {
                     isScrolling={isScrollingSV}
                     isSeeking={isSeeking}
                     uiOpacityStyle={uiOpacityStyle}
+                    currentUserId={currentUserId}
                     onDoubleTapLike={handleDoubleTapLike}
                     onFeedTap={handleFeedTap}
                     onSeekReady={isActive ? handleSeekReady : undefined}
@@ -465,7 +470,7 @@ export default function FeedScreen() {
                 />
             );
         },
-        [activeVideoId, isAppActive, isMuted, isSeeking]
+        [activeVideoId, isAppActive, isMuted, isSeeking, currentUserId]
     );
 
     const keyExtractor = useCallback((item: Video) => item.id, []);

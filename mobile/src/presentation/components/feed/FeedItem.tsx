@@ -32,6 +32,7 @@ interface FeedItemProps {
     onToggleFollow: (videoId: string) => void;
     onOpenShopping: () => void;
     onOpenDescription: () => void;
+    currentUserId?: string; // Add currentUserId prop
 }
 
 // 🔥 CRITICAL: Component defined OUTSIDE render function for proper memoization
@@ -42,6 +43,7 @@ export const FeedItem = memo(function FeedItem({
     isScrolling,
     isSeeking,
     uiOpacityStyle,
+    currentUserId,
     onDoubleTapLike,
     onFeedTap,
     onSeekReady,
@@ -111,6 +113,7 @@ export const FeedItem = memo(function FeedItem({
 
                 <MetadataLayer
                     video={video}
+                    currentUserId={currentUserId}
                     onAvatarPress={() => router.push(`/user/${video.user.id}`)}
                     onFollowPress={() => onToggleFollow(video.id)}
                     onReadMorePress={onOpenDescription}
