@@ -13,7 +13,7 @@ import PagerView from 'react-native-pager-view';
 import { COLORS } from '../../../core/constants';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('screen');
-const STORY_DURATION = 5000;
+const DEFAULT_STORY_DURATION = 10000; // 10 seconds for images
 const HOLD_PAUSE_DELAY = 200;
 
 interface FlyingEmojiData {
@@ -38,6 +38,9 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
     const [flyingEmojis, setFlyingEmojis] = useState<FlyingEmojiData[]>([]);
     const holdTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+    // 🔥 FIX: Track actual video duration
+    const [videoDuration, setVideoDuration] = useState(0);
+
     // Progress bar - managed at Viewer level for static UI
     const progress = useSharedValue(0);
 
@@ -59,32 +62,33 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
         router.back();
     }, [router]);
 
-    // Progress animation
-    useEffect(() => {
-        progress.value = 0;
+    // 🔥 FIX: Handle video load to get actual duration
+    const handleVideoLoad = useCallback((data: any) => {
+        const durationMs = (data.duration || 10) * 1000; // Convert to ms
+        console.log(`[StoryViewer] Video loaded, duration: ${durationMs}ms`);
+        setVideoDuration(durationMs);
+    }, []);
 
-        if (isPaused) {
-            cancelAnimation(progress);
-            return;
+    // 🔥 FIX: Sync progress with video playback
+    const handleVideoProgress = useCallback((data: any) => {
+        if (videoDuration > 0 && !isPaused) {
+            const currentProgress = data.currentTime / (videoDuration / 1000);
+            progress.value = Math.min(currentProgress, 1);
         }
+    }, [videoDuration, isPaused, progress]);
 
-        progress.value = withTiming(1, {
-            duration: STORY_DURATION,
-            easing: Easing.linear
-        }, (finished) => {
-            if (finished) {
-                runOnJS(handleNext)();
-            }
-        });
-
-        return () => cancelAnimation(progress);
-    }, [currentIndex, isPaused, handleNext, progress]);
+    // 🔥 FIX: Handle video end
+    const handleVideoEnd = useCallback(() => {
+        console.log('[StoryViewer] Video ended, going to next');
+        handleNext();
+    }, [handleNext]);
 
     const handlePageSelected = useCallback((e: any) => {
         const newIndex = e.nativeEvent.position;
         setCurrentIndex(newIndex);
         setIsLiked(stories[newIndex]?.isLiked || false);
         progress.value = 0;
+        setVideoDuration(0); // Reset for new video's duration
     }, [stories, progress]);
 
     // Tap handlers
@@ -165,6 +169,9 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
                                 repeat={false}
                                 paused={isPaused || index !== currentIndex}
                                 muted={false}
+                                onLoad={index === currentIndex ? handleVideoLoad : undefined}
+                                onProgress={index === currentIndex ? handleVideoProgress : undefined}
+                                onEnd={index === currentIndex ? handleVideoEnd : undefined}
                             />
                         </View>
                     ))}

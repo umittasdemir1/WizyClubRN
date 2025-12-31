@@ -32,6 +32,7 @@ interface UploadModalProps {
     isVisible: boolean;
     onClose: () => void;
     initialVideo?: ImagePicker.ImagePickerAsset | null;
+    uploadMode?: 'story' | 'video'; // 'story' = stories table, 'video' = videos/feed table
 }
 
 const COMMERCIAL_TYPES = [
@@ -47,7 +48,7 @@ const COMMERCIAL_TYPES = [
     'Kendi Markam'
 ];
 
-export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalProps) {
+export function UploadModal({ isVisible, onClose, initialVideo, uploadMode = 'video' }: UploadModalProps) {
     const { isDark } = useThemeStore();
     const { user } = useAuthStore();
     const insets = useSafeAreaInsets();
@@ -187,7 +188,9 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
 
         try {
             const xhr = new XMLHttpRequest();
-            xhr.open('POST', `${CONFIG.API_URL}/upload-hls`);
+            // 🔥 CONDITIONAL: Story goes to /upload-story, Video goes to /upload-hls
+            const endpoint = uploadMode === 'story' ? '/upload-story' : '/upload-hls';
+            xhr.open('POST', `${CONFIG.API_URL}${endpoint}`);
 
             // 🔥 SIMPLE: Linear progress from 0 to 95, then 100 on success
             let currentProgress = 0;
@@ -219,7 +222,9 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
                             clearInterval(finishInterval);
                             // Give user a moment to see 100%
                             setTimeout(() => {
-                                setSuccess(response.data?.id || 'new-video');
+                                // 🔥 For stories, don't pass ID (avoids video fetch error in feed)
+                                // For videos, pass ID so feed can prepend the new video
+                                setSuccess(uploadMode === 'story' ? '' : (response.data?.id || 'new-video'));
                                 // Reset form
                                 setSelectedMedia(null);
                                 setDescription('');
@@ -278,7 +283,9 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
                             </Pressable>
                         </View>
                         <View style={styles.headerCenter}>
-                            <Text style={[styles.headerTitle, { color: textColor }]}>Yeni Video</Text>
+                            <Text style={[styles.headerTitle, { color: textColor }]}>
+                                {uploadMode === 'story' ? 'Yeni Hikaye' : 'Yeni Video'}
+                            </Text>
                         </View>
                         <View style={styles.headerRight} />
                     </View>

@@ -8,6 +8,7 @@ const { v4: uuidv4 } = require('uuid');
 const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 const path = require('path');
+const os = require('os'); // For temp directory in story uploads
 
 const app = express();
 app.use(cors());
@@ -279,6 +280,125 @@ app.post('/upload-hls', upload.single('video'), async (req, res) => {
         res.status(500).json({ error: error.message });
 
         // Basic cleanup
+        if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+    }
+});
+
+
+// ============================================
+// Endpoint: STORY Upload (Simple, no HLS)
+// ============================================
+app.post('/upload-story', upload.single('video'), async (req, res) => {
+    const file = req.file;
+    const { userId, description, brandName, brandUrl, commercialType } = req.body;
+
+    if (!file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    if (!userId) {
+        return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    const uniqueId = Date.now().toString() + '_' + Math.random().toString(36).substr(2, 9);
+    const inputPath = file.path;
+    const isVideo = file.mimetype.startsWith('video/');
+    const fileExtension = isVideo ? 'mp4' : 'jpg';
+    const baseKey = `stories/${userId}/${uniqueId}`;
+
+    console.log(`📖 [STORY] Upload started: ${uniqueId}`);
+    console.log(`📖 [STORY] User: ${userId}, Type: ${isVideo ? 'video' : 'image'}`);
+
+    try {
+        let storyUrl = '';
+        let thumbnailUrl = '';
+        let width = 0;
+        let height = 0;
+
+        if (isVideo) {
+            // Get video metadata
+            const metadata = await new Promise((resolve, reject) => {
+                ffmpeg(inputPath).ffprobe((err, data) => {
+                    if (err) reject(err);
+                    else resolve(data);
+                });
+            });
+
+            const videoStream = metadata.streams.find(s => s.codec_type === 'video');
+            width = videoStream?.width || 1080;
+            height = videoStream?.height || 1920;
+
+            // Upload original video to R2 (no transcoding for stories)
+            const videoKey = `${baseKey}/story.${fileExtension}`;
+            await uploadToR2(inputPath, videoKey, file.mimetype);
+            storyUrl = `${process.env.R2_PUBLIC_URL}/${videoKey}`;
+
+            // Generate thumbnail
+            const thumbPath = path.join(os.tmpdir(), `${uniqueId}_thumb.jpg`);
+            await new Promise((resolve, reject) => {
+                ffmpeg(inputPath)
+                    .screenshots({
+                        count: 1,
+                        folder: os.tmpdir(),
+                        filename: `${uniqueId}_thumb.jpg`,
+                        size: '?x480'
+                    })
+                    .on('end', resolve)
+                    .on('error', reject);
+            });
+
+            const thumbKey = `${baseKey}/thumb.jpg`;
+            await uploadToR2(thumbPath, thumbKey, 'image/jpeg');
+            thumbnailUrl = `${process.env.R2_PUBLIC_URL}/${thumbKey}`;
+
+            // Cleanup temp thumb
+            if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
+        } else {
+            // Image story - upload directly
+            const imageKey = `${baseKey}/story.jpg`;
+            await uploadToR2(inputPath, imageKey, file.mimetype);
+            storyUrl = `${process.env.R2_PUBLIC_URL}/${imageKey}`;
+            thumbnailUrl = storyUrl; // Same as image for photos
+        }
+
+        // Insert into stories table
+        const isCommercial = commercialType && commercialType !== 'İş Birliği İçermiyor';
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
+
+        const { data, error } = await supabase.from('stories').insert({
+            user_id: userId,
+            video_url: storyUrl,
+            thumbnail_url: thumbnailUrl,
+            width,
+            height,
+            is_commercial: isCommercial,
+            brand_name: brandName || null,
+            brand_url: brandUrl || null,
+            commercial_type: commercialType || null,
+            expires_at: expiresAt.toISOString()
+        }).select();
+
+        if (error) {
+            console.error('❌ [STORY] Supabase error:', error);
+            return res.status(500).json({ error: error.message });
+        }
+
+        console.log('🎉 [STORY] Upload successful!', data[0]?.id);
+
+        res.json({
+            success: true,
+            message: 'Story uploaded successfully',
+            data: data[0]
+        });
+
+        // Cleanup input file
+        if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+
+    } catch (error) {
+        console.error('❌ [STORY] Error:', error);
+        res.status(500).json({ error: error.message });
+
+        // Cleanup
         if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
     }
 });

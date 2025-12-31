@@ -125,17 +125,20 @@ export class SupabaseVideoDataSource {
     }
 
     async getStories(): Promise<Story[]> {
+        const now = new Date().toISOString();
         const { data, error } = await supabase
             .from('stories')
             .select('*, profiles(*)')
+            .gt('expires_at', now) // Only show unexpired stories
             .order('created_at', { ascending: false })
-            .limit(10);
+            .limit(20);
 
         if (error) {
             console.error('Supabase stories error:', error);
             return [];
         }
 
+        console.log('[Stories] Fetched', data?.length || 0, 'active stories');
         return (data as any[]).map(this.mapToStory);
     }
 

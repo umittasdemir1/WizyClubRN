@@ -4,7 +4,7 @@ import { GetStoriesUseCase } from '../../domain/usecases/GetStoriesUseCase';
 import { StoryRepositoryImpl } from '../../data/repositories/StoryRepositoryImpl';
 import { useRouter } from 'expo-router';
 
-export function useStoryViewer(initialStoryId?: string) {
+export function useStoryViewer(userId?: string) {
     const [stories, setStories] = useState<Story[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
@@ -15,18 +15,21 @@ export function useStoryViewer(initialStoryId?: string) {
 
     useEffect(() => {
         const fetchStories = async () => {
-            const fetchedStories = await getStoriesUseCase.execute();
-            setStories(fetchedStories);
+            const allStories = await getStoriesUseCase.execute();
 
-            if (initialStoryId) {
-                const index = fetchedStories.findIndex(s => s.id === initialStoryId);
-                if (index !== -1) setCurrentIndex(index);
-            }
+            // 🔥 FIX: Filter stories by user_id (Instagram-like behavior)
+            // Only show stories from the clicked user
+            const userStories = userId
+                ? allStories.filter(s => s.user.id === userId)
+                : allStories;
 
+            console.log(`[StoryViewer] Loaded ${userStories.length} stories for user: ${userId}`);
+            setStories(userStories);
+            setCurrentIndex(0); // Always start from first story of that user
             setIsLoading(false);
         };
         fetchStories();
-    }, [initialStoryId]);
+    }, [userId]);
 
     const goToNext = useCallback(() => {
         if (currentIndex < stories.length - 1) {
@@ -40,9 +43,7 @@ export function useStoryViewer(initialStoryId?: string) {
         if (currentIndex > 0) {
             setCurrentIndex(prev => prev - 1);
         } else {
-            // Restart story or close? Usually restart or do nothing.
-            // Let's restart the current one or go back to previous user's story if we had that logic.
-            // For now, just restart.
+            // Already at first story, do nothing or restart
             setCurrentIndex(0);
         }
     }, [currentIndex]);

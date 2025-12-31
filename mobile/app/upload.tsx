@@ -263,6 +263,7 @@ export default function CameraScreen() {
                     setSelectedVideoForUpload(null);
                 }}
                 initialVideo={selectedVideoForUpload}
+                uploadMode={selectedMode === 'HİKAYE' ? 'story' : 'video'}
             />
         </View>
     );
