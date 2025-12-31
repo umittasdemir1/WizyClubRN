@@ -395,16 +395,24 @@ export function useVideoFeed(): UseVideoFeedReturn {
         // 4. Optimistic Update - Remove from list
         setVideos((prev) => prev.filter(v => v.id !== videoId));
 
-        // 5. Network call (background) with JWT authentication
+        // 5. Network call (background) with JWT authentication for HARD DELETE
         try {
             const { CONFIG } = require('../../core/config');
-            const token = useAuthStore.getState().session?.access_token;
-            console.log(`[Delete] 🔑 Auth token: ${token ? 'Present' : 'MISSING'}`);
+            const authState = useAuthStore.getState();
+            const token = authState.session?.access_token;
+            console.log(`[Delete] 🔑 Auth State Debug:`, {
+                hasSession: !!authState.session,
+                hasUser: !!authState.user,
+                hasToken: !!token,
+                tokenPreview: token ? token.substring(0, 30) + '...' : 'NULL'
+            });
 
-            const response = await fetch(`${CONFIG.API_URL}/videos/${videoId}`, {
+            // Hard delete with ?force=true
+            const response = await fetch(`${CONFIG.API_URL}/videos/${videoId}?force=true`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
                 },
             });
 

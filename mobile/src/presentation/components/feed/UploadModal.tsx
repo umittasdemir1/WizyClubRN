@@ -209,16 +209,31 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
                 if (xhr.status === 200) {
                     const response = JSON.parse(xhr.responseText);
                     console.log('Upload success:', response);
-                    setProgress(100);
-                    setSuccess(response.data?.id || 'new-video');
-                    // Reset form
-                    setSelectedMedia(null);
-                    setDescription('');
-                    setCommercialType(null);
-                    setBrandName('');
-                    setBrandUrl('');
-                    setSelectedClubs([]);
-                    setTags([]);
+
+                    // 🔥 Quick animation to 100% before closing
+                    let finalProgress = currentProgress;
+                    const finishInterval = setInterval(() => {
+                        finalProgress += 5;
+                        if (finalProgress >= 100) {
+                            setProgress(100);
+                            clearInterval(finishInterval);
+                            // Give user a moment to see 100%
+                            setTimeout(() => {
+                                setSuccess(response.data?.id || 'new-video');
+                                // Reset form
+                                setSelectedMedia(null);
+                                setDescription('');
+                                setCommercialType(null);
+                                setBrandName('');
+                                setBrandUrl('');
+                                setSelectedClubs([]);
+                                setTags([]);
+                            }, 300);
+                        } else {
+                            setProgress(finalProgress);
+                        }
+                    }, 30);
+
                 } else {
                     console.error('Upload failed:', xhr.responseText);
                     setError('Yükleme başarısız oldu.');

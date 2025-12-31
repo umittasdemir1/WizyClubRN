@@ -75,9 +75,18 @@ export const DeletedContentSheet = React.forwardRef<BottomSheet, DeletedContentS
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            // Call Backend DELETE with ?force=true
+                            // 🔥 Get auth token for authenticated delete
+                            const { useAuthStore } = require('../../store/useAuthStore');
+                            const token = useAuthStore.getState().session?.access_token;
+                            console.log(`[HardDelete] 🔑 Token: ${token ? 'Present' : 'MISSING'}`);
+
+                            // Call Backend DELETE with ?force=true + Auth header
                             const response = await fetch(`${CONFIG.API_URL}/videos/${id}?force=true`, {
                                 method: 'DELETE',
+                                headers: {
+                                    'Authorization': `Bearer ${token}`,
+                                    'Content-Type': 'application/json',
+                                },
                             });
                             const result = await response.json();
                             if (result.success) {
