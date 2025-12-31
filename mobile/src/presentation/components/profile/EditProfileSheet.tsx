@@ -8,15 +8,12 @@ import * as ImagePicker from 'expo-image-picker';
 import { useThemeStore } from '../../store/useThemeStore';
 import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
 import { User } from '../../../domain/entities/User';
-import { SocialLink } from '../../../domain/entities/SocialLink';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface EditProfileSheetProps {
   user: User;
-  socialLinks: SocialLink[];
   onUpdateProfile: (updates: Partial<User>) => Promise<any>;
-  onSaveSocialLinks: (links: any[]) => Promise<void>;
   onUploadAvatar: (uri: string) => Promise<string | null>;
   onUpdateCompleted?: () => void;
 }
@@ -24,7 +21,7 @@ interface EditProfileSheetProps {
 type SubViewType = 'name' | 'username' | 'bio' | 'socialLinks' | null;
 
 export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
-  ({ user, socialLinks: initialLinks, onUpdateProfile, onSaveSocialLinks, onUploadAvatar, onUpdateCompleted }, ref) => {
+  ({ user, onUpdateProfile, onUploadAvatar, onUpdateCompleted }, ref) => {
     const { isDark } = useThemeStore();
     const insets = useSafeAreaInsets();
 
@@ -41,22 +38,27 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
     const [tempName, setTempName] = useState(user.fullName || '');
     const [tempUsername, setTempUsername] = useState(user.username || '');
     const [tempBio, setTempBio] = useState(user.bio || '');
-    const [socialLinks, setSocialLinks] = useState<SocialLink[]>([]);
-    const [isPlatformPickerVisible, setIsPlatformPickerVisible] = useState(false);
-    const [activeLinkId, setActiveLinkId] = useState<string | null>(null);
+    const [tempWebsite, setTempWebsite] = useState(user.website || '');
+
+    // Social Links States
+    const [tempInstagram, setTempInstagram] = useState(user.instagramUrl || '');
+    const [tempTiktok, setTempTiktok] = useState(user.tiktokUrl || '');
+    const [tempYoutube, setTempYoutube] = useState(user.youtubeUrl || '');
+    const [tempX, setTempX] = useState(user.xUrl || '');
 
     // Sync internal state when user prop changes
     useEffect(() => {
       setTempName(user.fullName || user.username);
       setTempUsername(user.username);
       setTempBio(user.bio || '');
+      setTempWebsite(user.website || '');
       setCurrentAvatar(user.avatarUrl);
-      if (initialLinks && initialLinks.length > 0) {
-        setSocialLinks(initialLinks);
-      } else if (user.socialLinks) {
-        setSocialLinks(user.socialLinks);
-      }
-    }, [user, initialLinks]);
+
+      setTempInstagram(user.instagramUrl || '');
+      setTempTiktok(user.tiktokUrl || '');
+      setTempYoutube(user.youtubeUrl || '');
+      setTempX(user.xUrl || '');
+    }, [user]);
 
     const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
 
@@ -83,16 +85,18 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
           if (uploadedUrl) avatarUrl = uploadedUrl;
         }
 
-        // 2. Update profile
+        // 2. Update profile with all fields
         await onUpdateProfile({
           fullName: tempName,
           username: tempUsername,
           bio: tempBio,
-          avatarUrl: avatarUrl
+          avatarUrl: avatarUrl,
+          website: tempWebsite,
+          instagramUrl: tempInstagram,
+          tiktokUrl: tempTiktok,
+          youtubeUrl: tempYoutube,
+          xUrl: tempX
         });
-
-        // 3. Save social links
-        await onSaveSocialLinks(socialLinks);
 
         onUpdateCompleted?.();
         handleClose();
@@ -106,7 +110,13 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
     const handleSaveSocialLinks = async () => {
       setIsSaving(true);
       try {
-        await onSaveSocialLinks(socialLinks);
+        await onUpdateProfile({
+          instagramUrl: tempInstagram,
+          tiktokUrl: tempTiktok,
+          youtubeUrl: tempYoutube,
+          xUrl: tempX,
+          website: tempWebsite
+        });
         onUpdateCompleted?.();
         setActiveSubView(null);
       } catch (error) {
@@ -126,32 +136,6 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
       if (!result.canceled) {
         setCurrentAvatar(result.assets[0].uri);
       }
-    };
-
-    const addSocialLink = () => {
-      if (socialLinks.length < 5) {
-        const newLink: SocialLink = {
-          id: Math.random().toString(36).substr(2, 9),
-          userId: user.id,
-          platform: 'Instagram',
-          url: '',
-          displayOrder: socialLinks.length
-        };
-        setSocialLinks([...socialLinks, newLink]);
-      }
-    };
-
-    const removeSocialLink = (id: string) => {
-      setSocialLinks(socialLinks.filter(link => link.id !== id));
-    };
-
-    const updateSocialLink = (id: string, updates: Partial<SocialLink>) => {
-      setSocialLinks(socialLinks.map(link => {
-        if (link.id === id) {
-          return { ...link, ...updates };
-        }
-        return link;
-      }));
     };
 
     const renderMainView = () => (
@@ -204,7 +188,7 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
             <TouchableOpacity style={styles.clickableRow} onPress={() => setActiveSubView('socialLinks')}>
               <Text style={[styles.label, { color: textColor }]}>Bağlantılar</Text>
               <Text style={[styles.valueText, { color: secondaryTextColor }]}>
-                {socialLinks.length > 0 ? `${socialLinks.length} bağlantı` : 'Bağlantı ekle'}
+                Düzenle
               </Text>
               <ChevronRight size={18} color={secondaryTextColor} />
             </TouchableOpacity>
@@ -346,73 +330,67 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
           </TouchableOpacity>
         </View>
 
-        <View style={styles.subViewContent}>
-          <View style={styles.linksHeaderRow}>
-            <Text style={[styles.subViewTitle, { color: secondaryTextColor }]}>Sosyal Bağlantılar ({socialLinks.length}/3)</Text>
-            {socialLinks.length < 3 && (
-              <TouchableOpacity onPress={addSocialLink}>
-                <PlusCircle size={24} color="#007AFF" />
-              </TouchableOpacity>
-            )}
+        <BottomSheetScrollView contentContainerStyle={[styles.contentContainer, { paddingHorizontal: 16 }]}>
+          <View style={[styles.inputWrapper, { borderBottomColor: borderColor, marginBottom: 20 }]}>
+            <Text style={[styles.subViewTitle, { color: secondaryTextColor, marginBottom: 8 }]}>Website</Text>
+            <BottomSheetTextInput
+              style={[styles.subViewInput, { color: textColor }]}
+              value={tempWebsite}
+              onChangeText={setTempWebsite}
+              placeholder="https://mysite.com"
+              placeholderTextColor={secondaryTextColor}
+              autoCapitalize="none"
+            />
           </View>
 
-          <Text style={[styles.subViewDesc, { color: secondaryTextColor, marginTop: 8 }]}>
-            Sosyal bağlantılarını istediğiniz an güncelleyebilirsiniz. En fazla 3 bağlantı ekleyebilirsiniz.
-          </Text>
-
-          <View style={styles.linksList}>
-            {socialLinks.map((link) => (
-              <View key={link.id} style={[styles.linkRow, { borderBottomColor: borderColor }]}>
-                <TouchableOpacity
-                  style={[styles.platformPicker, { backgroundColor: isDark ? '#2c2c2e' : '#f2f2f7' }]}
-                  onPress={() => {
-                    setActiveLinkId(link.id);
-                    setIsPlatformPickerVisible(true);
-                  }}
-                >
-                  <Text style={{ color: textColor, fontSize: 14 }}>{link.platform}</Text>
-                  <ChevronRight size={14} color={secondaryTextColor} style={{ transform: [{ rotate: '90deg' }] }} />
-                </TouchableOpacity>
-
-                <BottomSheetTextInput
-                  style={[styles.linkInput, { color: textColor }]}
-                  placeholder={link.platform === 'TikTok' ? 'www.tiktok.com/@...' : 'URL girin'}
-                  placeholderTextColor={secondaryTextColor}
-                  value={link.url}
-                  onChangeText={(text) => updateSocialLink(link.id, { url: text })}
-                  autoCapitalize="none"
-                />
-
-                <TouchableOpacity onPress={() => removeSocialLink(link.id)}>
-                  <Trash2 size={18} color="#FF3B30" />
-                </TouchableOpacity>
-              </View>
-            ))}
+          <View style={[styles.inputWrapper, { borderBottomColor: borderColor, marginBottom: 20 }]}>
+            <Text style={[styles.subViewTitle, { color: secondaryTextColor, marginBottom: 8 }]}>Instagram</Text>
+            <BottomSheetTextInput
+              style={[styles.subViewInput, { color: textColor }]}
+              value={tempInstagram}
+              onChangeText={setTempInstagram}
+              placeholder="Instagram profile URL"
+              placeholderTextColor={secondaryTextColor}
+              autoCapitalize="none"
+            />
           </View>
-        </View>
 
-        <Modal visible={isPlatformPickerVisible} transparent animationType="slide">
-          <View style={styles.pickerOverlay}>
-            <View style={[styles.pickerContent, { backgroundColor: isDark ? '#1c1c1e' : '#fff' }]}>
-              <Text style={[styles.pickerTitle, { color: textColor }]}>Platform Seçin</Text>
-              {(['Instagram', 'TikTok', 'Youtube', 'X', 'Diğer'] as const).map((p) => (
-                <TouchableOpacity
-                  key={p}
-                  style={[styles.pickerItem, { borderTopColor: borderColor }]}
-                  onPress={() => {
-                    if (activeLinkId) updateSocialLink(activeLinkId, { platform: p });
-                    setIsPlatformPickerVisible(false);
-                  }}
-                >
-                  <Text style={{ color: textColor, fontSize: 16 }}>{p}</Text>
-                </TouchableOpacity>
-              ))}
-              <TouchableOpacity style={styles.pickerCancel} onPress={() => setIsPlatformPickerVisible(false)}>
-                <Text style={{ color: '#FF3B30', fontSize: 16, fontWeight: '600' }}>İptal</Text>
-              </TouchableOpacity>
-            </View>
+          <View style={[styles.inputWrapper, { borderBottomColor: borderColor, marginBottom: 20 }]}>
+            <Text style={[styles.subViewTitle, { color: secondaryTextColor, marginBottom: 8 }]}>TikTok</Text>
+            <BottomSheetTextInput
+              style={[styles.subViewInput, { color: textColor }]}
+              value={tempTiktok}
+              onChangeText={setTempTiktok}
+              placeholder="TikTok profile URL"
+              placeholderTextColor={secondaryTextColor}
+              autoCapitalize="none"
+            />
           </View>
-        </Modal>
+
+          <View style={[styles.inputWrapper, { borderBottomColor: borderColor, marginBottom: 20 }]}>
+            <Text style={[styles.subViewTitle, { color: secondaryTextColor, marginBottom: 8 }]}>YouTube</Text>
+            <BottomSheetTextInput
+              style={[styles.subViewInput, { color: textColor }]}
+              value={tempYoutube}
+              onChangeText={setTempYoutube}
+              placeholder="YouTube channel URL"
+              placeholderTextColor={secondaryTextColor}
+              autoCapitalize="none"
+            />
+          </View>
+
+          <View style={[styles.inputWrapper, { borderBottomColor: borderColor, marginBottom: 20 }]}>
+            <Text style={[styles.subViewTitle, { color: secondaryTextColor, marginBottom: 8 }]}>X (Twitter)</Text>
+            <BottomSheetTextInput
+              style={[styles.subViewInput, { color: textColor }]}
+              value={tempX}
+              onChangeText={setTempX}
+              placeholder="X profile URL"
+              placeholderTextColor={secondaryTextColor}
+              autoCapitalize="none"
+            />
+          </View>
+        </BottomSheetScrollView>
       </Animated.View>
     );
 

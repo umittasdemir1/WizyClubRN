@@ -116,7 +116,7 @@ export default function ProfileScreen() {
     console.log('[Profile] Current user ID:', currentUserId);
   }, [authUser, currentUserId]);
 
-  const { user: profileUser, socialLinks: profileLinks, isLoading, reload, updateProfile, saveSocialLinks, uploadAvatar } = useProfile(currentUserId);
+  const { user: profileUser, isLoading, reload, updateProfile, uploadAvatar } = useProfile(currentUserId);
 
   useFocusEffect(
     useCallback(() => {
@@ -208,7 +208,7 @@ export default function ProfileScreen() {
     bio: currentUser?.bio || "Welcome to WizyClub",
     followingCount: currentUser?.followingCount?.toString() || '0',
     followersCount: currentUser?.followersCount?.toString() || '0',
-    socialLinks: profileLinks,
+    entity: currentUser,
   };
 
   const clubLogos = [
@@ -319,12 +319,8 @@ export default function ProfileScreen() {
               </View>
 
               <View style={styles.socialClubsRow}>
-                {user.socialLinks && user.socialLinks.length > 0 && (
-                  <>
-                    <SocialTags isDark={isDark} links={user.socialLinks} />
-                    <View style={[styles.verticalSeparator, { backgroundColor: isDark ? '#444' : '#ccc' }]} />
-                  </>
-                )}
+                <SocialTags isDark={isDark} user={user.entity} />
+                <View style={[styles.verticalSeparator, { backgroundColor: isDark ? '#444' : '#ccc' }]} />
 
                 <ClubsCollaboration
                   clubsCount={clubs.length}
@@ -377,9 +373,7 @@ export default function ProfileScreen() {
       <EditProfileSheet
         ref={editProfileSheetRef}
         user={currentUser}
-        socialLinks={profileLinks}
         onUpdateProfile={updateProfile}
-        onSaveSocialLinks={saveSocialLinks}
         onUploadAvatar={uploadAvatar}
         onUpdateCompleted={() => reload()}
       />

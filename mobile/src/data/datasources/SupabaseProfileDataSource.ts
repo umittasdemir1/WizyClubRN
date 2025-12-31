@@ -1,5 +1,5 @@
 import { supabase } from '../../core/supabase';
-import { User, SocialLink } from '../../domain/entities';
+import { User } from '../../domain/entities';
 import { CONFIG } from '../../core/config';
 
 export class SupabaseProfileDataSource {
@@ -66,53 +66,6 @@ export class SupabaseProfileDataSource {
         return data;
     }
 
-    async getSocialLinks(userId: string): Promise<any[]> {
-        console.log('[SupabaseDataSource] 🔗 Fetching social links for ID:', userId);
-        const { data, error } = await supabase
-            .from('social_links')
-            .select('*')
-            .eq('user_id', userId)
-            .order('display_order', { ascending: true });
-
-        if (error) {
-            console.error('[SupabaseDataSource] ❌ Social links fetch error:', {
-                message: error.message,
-                details: error.details,
-                hint: error.hint,
-                code: error.code
-            });
-            throw error;
-        }
-
-        console.log('[SupabaseDataSource] ✅ Social links fetched:', data?.length || 0);
-        return data || [];
-    }
-
-    async addSocialLink(userId: string, link: any): Promise<any> {
-        const { data, error } = await supabase
-            .from('social_links')
-            .insert({
-                user_id: userId,
-                platform: link.platform,
-                url: link.url,
-                display_order: link.displayOrder || 0
-            })
-            .select()
-            .single();
-
-        if (error) throw error;
-        return data;
-    }
-
-    async deleteSocialLink(linkId: string): Promise<void> {
-        const { error } = await supabase
-            .from('social_links')
-            .delete()
-            .eq('id', linkId);
-
-        if (error) throw error;
-    }
-
     async uploadAvatar(userId: string, fileUri: string): Promise<string> {
         console.log(`🚀 [UPLOAD] Starting avatar upload for: ${userId}`);
 
@@ -156,6 +109,12 @@ export class SupabaseProfileDataSource {
         if ('country' in user) dto.country = user.country;
         if ('age' in user) dto.age = user.age;
         if ('website' in user) dto.website = user.website;
+        // Social Links
+        if ('instagramUrl' in user) dto.instagram_url = user.instagramUrl;
+        if ('tiktokUrl' in user) dto.tiktok_url = user.tiktokUrl;
+        if ('youtubeUrl' in user) dto.youtube_url = user.youtubeUrl;
+        if ('xUrl' in user) dto.x_url = user.xUrl;
+
         dto.updated_at = new Date().toISOString();
         return dto;
     }

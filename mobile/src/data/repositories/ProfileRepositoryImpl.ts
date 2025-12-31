@@ -1,5 +1,5 @@
 import { IProfileRepository } from '../../domain/repositories/IProfileRepository';
-import { User, SocialLink } from '../../domain/entities';
+import { User } from '../../domain/entities';
 import { SupabaseProfileDataSource } from '../datasources/SupabaseProfileDataSource';
 
 export class ProfileRepositoryImpl implements IProfileRepository {
@@ -27,34 +27,12 @@ export class ProfileRepositoryImpl implements IProfileRepository {
     }
 
     async updateProfile(userId: string, profile: Partial<User>): Promise<User> {
+        // Convert camelCase to snake_case for DB is handled in DataSource usually 
+        // or we need to map it here before sending if DataSource expects snake_case.
+        // Let's assume DataSource handles basic updates or takes Partial<User> and maps it.
+        // We will check DataSource next.
         const data = await this.dataSource.updateProfile(userId, profile);
         return this.mapDtoToUser(data);
-    }
-
-    async getSocialLinks(userId: string): Promise<SocialLink[]> {
-        try {
-            const data = await this.dataSource.getSocialLinks(userId);
-            console.log('[ProfileRepository] ✅ Mapping social links to domain entities');
-            return data.map(this.mapDtoToSocialLink);
-        } catch (error: any) {
-            console.error('[ProfileRepository] ❌ getSocialLinks error:', {
-                message: error?.message,
-                details: error?.details,
-                hint: error?.hint,
-                code: error?.code
-            });
-            // Don't fail the whole profile load if social links fail
-            return [];
-        }
-    }
-
-    async addSocialLink(userId: string, link: Omit<SocialLink, 'id' | 'userId'>): Promise<SocialLink> {
-        const data = await this.dataSource.addSocialLink(userId, link);
-        return this.mapDtoToSocialLink(data);
-    }
-
-    async deleteSocialLink(linkId: string): Promise<void> {
-        await this.dataSource.deleteSocialLink(linkId);
     }
 
     async uploadAvatar(userId: string, fileUri: string): Promise<string> {
@@ -75,17 +53,12 @@ export class ProfileRepositoryImpl implements IProfileRepository {
             isVerified: dto.is_verified,
             followersCount: dto.followers_count,
             followingCount: dto.following_count,
-            postsCount: dto.posts_count
-        };
-    }
-
-    private mapDtoToSocialLink(dto: any): SocialLink {
-        return {
-            id: dto.id,
-            userId: dto.user_id,
-            platform: dto.platform,
-            url: dto.url,
-            displayOrder: dto.display_order
+            postsCount: dto.posts_count,
+            // New Social Fields
+            instagramUrl: dto.instagram_url,
+            tiktokUrl: dto.tiktok_url,
+            youtubeUrl: dto.youtube_url,
+            xUrl: dto.x_url
         };
     }
 }

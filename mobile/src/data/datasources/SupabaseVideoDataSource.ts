@@ -70,6 +70,11 @@ interface SupabaseVideo {
         followers_count: number;
         following_count: number;
         posts_count: number;
+        instagram_url?: string;
+        tiktok_url?: string;
+        youtube_url?: string;
+        x_url?: string;
+        website?: string;
     };
 }
 
@@ -119,8 +124,6 @@ export class SupabaseVideoDataSource {
         }));
     }
 
-    // ... (getStories remains same for now) ...
-
     async getStories(): Promise<Story[]> {
         const { data, error } = await supabase
             .from('stories')
@@ -147,15 +150,10 @@ export class SupabaseVideoDataSource {
             return null;
         }
 
-        // Note: For simplicity in single video fetch, we are not fetching interaction status yet.
-        // In a real app, we should pass userId here too if available.
         return this.mapToVideo(data as SupabaseVideo);
     }
 
     private mapToVideo(dto: SupabaseVideo, interactions?: { isLiked: boolean; isSaved: boolean; isFollowing: boolean }): Video {
-        // Professional parsing might be needed if URLs in DB are relative, 
-        // but currently they are absolute. I'll ensure helper fields 
-        // match the IG/TikTok style.
         return {
             id: dto.id,
             videoUrl: dto.video_url,
@@ -177,11 +175,16 @@ export class SupabaseVideoDataSource {
                 country: dto.profiles.country,
                 age: dto.profiles.age,
                 bio: dto.profiles.bio,
+                website: dto.profiles.website,
                 isVerified: dto.profiles.is_verified,
                 followersCount: dto.profiles.followers_count,
                 followingCount: dto.profiles.following_count,
                 postsCount: dto.profiles.posts_count,
                 isFollowing: interactions?.isFollowing || false,
+                instagramUrl: dto.profiles.instagram_url,
+                tiktokUrl: dto.profiles.tiktok_url,
+                youtubeUrl: dto.profiles.youtube_url,
+                xUrl: dto.profiles.x_url,
             } : getUserFromId(dto.user_id),
             musicName: dto.music_name || 'Original Audio',
             musicAuthor: dto.music_author || 'WizyClub',

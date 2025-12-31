@@ -215,7 +215,7 @@ export default function UserProfileScreen() {
   const currentUserId = authUser?.id;
 
   const userId = (typeof id === 'string' ? id : '') || '';
-  const { user: profileUser, socialLinks: profileLinks, isLoading, reload } = useProfile(userId, currentUserId);
+  const { user: profileUser, isLoading, reload } = useProfile(userId, currentUserId);
 
   // Sync isFollowing from profile data
   useEffect(() => {
@@ -393,9 +393,9 @@ export default function UserProfileScreen() {
             </View>
 
             <View style={styles.socialClubsRow}>
-              {profileLinks && profileLinks.length > 0 && (
+              {(profileUser?.instagramUrl || profileUser?.tiktokUrl || profileUser?.youtubeUrl || profileUser?.xUrl || profileUser?.website) && (
                 <>
-                  <SocialTags isDark={isDark} links={profileLinks} />
+                  <SocialTags isDark={isDark} user={profileUser} />
                   <View style={[styles.verticalSeparator, { backgroundColor: isDark ? '#444' : '#ccc' }]} />
                 </>
               )}

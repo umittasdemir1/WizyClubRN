@@ -2,18 +2,18 @@ import React from 'react';
 import { View, StyleSheet, TouchableOpacity, Linking } from 'react-native';
 import { FontAwesome6 } from '@expo/vector-icons';
 
-import { SocialLink } from '../../../domain/entities/SocialLink';
+import { User } from '../../../domain/entities/User';
 
 interface SocialTagsProps {
     isDark: boolean;
-    links?: SocialLink[];
+    user?: User | null;
 }
 
-export const SocialTags: React.FC<SocialTagsProps> = ({ isDark, links = [] }) => {
+export const SocialTags: React.FC<SocialTagsProps> = ({ isDark, user }) => {
     const iconColor = '#000'; // Dark icons look better on the 3D white glass background
     const borderColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
 
-    const getIconConfig = (platform: SocialLink['platform']) => {
+    const getIconConfig = (platform: string) => {
         switch (platform) {
             case 'Instagram':
                 return { name: 'instagram' };
@@ -28,7 +28,40 @@ export const SocialTags: React.FC<SocialTagsProps> = ({ isDark, links = [] }) =>
         }
     };
 
-    if (!links || links.length === 0) return null;
+    if (!user) return null;
+
+    const links = [
+        { platform: 'Instagram', url: user.instagramUrl },
+        { platform: 'TikTok', url: user.tiktokUrl },
+        { platform: 'Youtube', url: user.youtubeUrl },
+        { platform: 'X', url: user.xUrl },
+        { platform: 'Website', url: user.website },
+    ].filter(link => link.url && link.url.trim() !== '');
+
+    const openLink = async (url: string | undefined) => {
+        if (!url) return;
+
+        try {
+            // Trim whitespace
+            let targetUrl = url.trim();
+
+            // If no protocol is present, basic check for common patterns or just prepend https://
+            if (!targetUrl.match(/^[a-zA-Z]+:\/\//)) {
+                targetUrl = `https://${targetUrl}`;
+            }
+
+            const supported = await Linking.canOpenURL(targetUrl);
+            if (supported) {
+                await Linking.openURL(targetUrl);
+            } else {
+                console.error("Don't know how to open URI: " + targetUrl);
+            }
+        } catch (error) {
+            console.error('Error opening URL:', error);
+        }
+    };
+
+    if (links.length === 0) return null;
 
     return (
         <View style={styles.container}>
@@ -38,7 +71,7 @@ export const SocialTags: React.FC<SocialTagsProps> = ({ isDark, links = [] }) =>
                     <TouchableOpacity
                         key={index}
                         style={[styles.socialTag, { borderColor }]}
-                        onPress={() => link.url && Linking.openURL(link.url)}
+                        onPress={() => openLink(link.url)}
                         activeOpacity={0.7}
                     >
                         <FontAwesome6

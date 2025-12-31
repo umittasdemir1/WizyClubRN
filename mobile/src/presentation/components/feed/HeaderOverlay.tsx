@@ -44,39 +44,16 @@ function UploadButton({ onPress }: { onPress: () => void }) {
     const status = useUploadStore(state => state.status);
     const isProcessing = status === 'compressing' || status === 'uploading' || status === 'processing';
 
-    const spin = useSharedValue(0);
-
-    const animatedStyle = useAnimatedStyle(() => ({
-        transform: [{ rotate: `${spin.value}deg` }],
-    }));
-
-    useEffect(() => {
-        if (isProcessing) {
-            spin.value = withRepeat(
-                withTiming(360, { duration: 1000, easing: Easing.linear }),
-                -1,
-                false
-            );
-        } else {
-            spin.value = 0;
-            // Ensure visual reset
-            cancelAnimation(spin);
-        }
-    }, [isProcessing]);
+    // If uploading, hide the button completely (User wants ONLY thumbnail + %)
+    if (isProcessing) return null;
 
     return (
         <Pressable
             style={[styles.iconButton]}
-            onPress={isProcessing ? undefined : onPress}
+            onPress={onPress}
             hitSlop={12}
         >
-            {isProcessing ? (
-                <Animated.View style={animatedStyle}>
-                    <Loader width={24} height={24} color="#FFD700" />
-                </Animated.View>
-            ) : (
-                <Plus width={24} height={24} color="#FFFFFF" />
-            )}
+            <Plus width={24} height={24} color="#FFFFFF" />
         </Pressable>
     );
 }
@@ -108,12 +85,13 @@ function UploadThumbnail() {
 
 const thumbnailStyles = StyleSheet.create({
     container: {
-        width: 36,
-        height: 64, // 9:16 ratio (36 * 16/9 = 64)
-        borderRadius: 6,
+        width: 48, // Increased from 36
+        height: 85, // 9:16 ratio (48 * 16/9 ≈ 85.33)
+        borderRadius: 8,
         overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.3)',
+        borderWidth: 1.5,
+        borderColor: 'rgba(255,255,255,0.4)',
+        marginTop: 4, // Spacing from top
     },
     image: {
         width: '100%',
@@ -121,14 +99,17 @@ const thumbnailStyles = StyleSheet.create({
     },
     overlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0,0,0,0.4)',
+        backgroundColor: 'rgba(0,0,0,0.5)', // Slightly Darker for readability
         justifyContent: 'center',
         alignItems: 'center',
     },
     percentText: {
         color: '#FFFFFF',
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: '700',
+        textShadowColor: 'rgba(0, 0, 0, 0.75)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 3,
     },
 });
 

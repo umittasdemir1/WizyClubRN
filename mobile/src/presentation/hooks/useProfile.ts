@@ -1,12 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { User, SocialLink } from '../../domain/entities';
+import { User } from '../../domain/entities';
 import { ProfileRepositoryImpl } from '../../data/repositories/ProfileRepositoryImpl';
 
 const profileRepo = new ProfileRepositoryImpl();
 
 export const useProfile = (userId: string, viewerId?: string) => {
     const [user, setUser] = useState<User | null>(null);
-    const [socialLinks, setSocialLinks] = useState<SocialLink[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -14,14 +13,9 @@ export const useProfile = (userId: string, viewerId?: string) => {
         setIsLoading(true);
         try {
             console.log('[useProfile] Loading profile for user ID:', userId);
-            const [profileData, linksData] = await Promise.all([
-                profileRepo.getProfile(userId, viewerId),
-                profileRepo.getSocialLinks(userId)
-            ]);
-            console.log('[useProfile] Profile data loaded:', profileData);
-            console.log('[useProfile] Social links loaded:', linksData);
+            const profileData = await profileRepo.getProfile(userId, viewerId);
+            console.log('[useProfile] Profile data loaded:', profileData ? 'Found' : 'Null');
             setUser(profileData);
-            setSocialLinks(linksData);
         } catch (err) {
             setError('Profil yüklenirken bir hata oluştu.');
             console.error('[useProfile] Load error:', err);
@@ -53,32 +47,6 @@ export const useProfile = (userId: string, viewerId?: string) => {
         }
     }, [userId, loadProfile]);
 
-    const saveSocialLinks = useCallback(async (links: Omit<SocialLink, 'id' | 'userId'>[]) => {
-        try {
-            // Basitleştirmek için: Mevcutları silip yenileri ekliyoruz (veya id'si olanları update ediyoruz)
-            // Şimdilik sadece yeni ekleme/güncelleme mantığı backend'e bağlı
-            // Mevcut mock verileriyle uyumlu olması için:
-            const currentLinks = await profileRepo.getSocialLinks(userId);
-
-            // Gerçek implementation'da daha karmaşık bir diff logic gerekir
-            // Ama şimdilik API'ye uygun şekilde tek tek ekleyelim
-            // Önce mevcutları sil (isteğe bağlı, şimdilik repository metotlarını kullanıyoruz)
-            for (const link of currentLinks) {
-                await profileRepo.deleteSocialLink(link.id);
-            }
-
-            const newLinks: SocialLink[] = [];
-            for (const link of links) {
-                const added = await profileRepo.addSocialLink(userId, link);
-                newLinks.push(added);
-            }
-            setSocialLinks(newLinks);
-        } catch (err) {
-            setError('Bağlantılar kaydedilirken bir hata oluştu.');
-            throw err;
-        }
-    }, [userId]);
-
     const uploadAvatar = useCallback(async (fileUri: string) => {
         try {
             const avatarUrl = await profileRepo.uploadAvatar(userId, fileUri);
@@ -93,11 +61,9 @@ export const useProfile = (userId: string, viewerId?: string) => {
 
     return {
         user,
-        socialLinks,
         isLoading,
         error,
         updateProfile,
-        saveSocialLinks,
         uploadAvatar,
         reload: loadProfile
     };

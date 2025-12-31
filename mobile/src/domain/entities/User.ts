@@ -1,5 +1,3 @@
-import { SocialLink } from './SocialLink';
-
 export interface User {
     id: string;
     username: string;
@@ -11,10 +9,12 @@ export interface User {
     age?: number;
     bio?: string;
     website?: string;
-    followersCount?: number | string;
-    followingCount?: number | string;
+    followersCount?: number;
+    followingCount?: number;
     postsCount?: number;
-    socialLinks?: SocialLink[];
+    // Social Links
+    instagramUrl?: string;
+    tiktokUrl?: string;
+    youtubeUrl?: string;
+    xUrl?: string;
 }
-
-export type { SocialLink };
