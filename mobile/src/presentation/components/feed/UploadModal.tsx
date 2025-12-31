@@ -16,7 +16,7 @@ import {
     StatusBar as RNStatusBar
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { Video } from 'expo-av';
+import { Video, ResizeMode } from 'expo-av';
 import { useUploadStore } from '../../store/useUploadStore';
 import { ChevronLeft, ChevronRight, Users, Tag, PlusCircle, X } from 'lucide-react-native';
 import { useThemeStore } from '../../store/useThemeStore';
@@ -24,6 +24,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
 import { CONFIG } from '../../../core/config';
+import { router } from 'expo-router';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -78,7 +79,7 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
         }
     }, [initialVideo]);
 
-    const { startUpload, setProgress, setStatus, setSuccess, setError } = useUploadStore();
+    const { startUpload, setProgress, setStatus, setSuccess, setError, setThumbnailUri } = useUploadStore();
 
     const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
     const bgColor = isDark ? '#000000' : '#FFFFFF';
@@ -154,6 +155,14 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
         onClose();
         startUpload();
 
+        // 🔥 Set thumbnail for header display during upload
+        if (selectedMedia?.uri) {
+            setThumbnailUri(selectedMedia.uri);
+        }
+
+        // 🔥 CRITICAL: Navigate to Feed immediately - upload continues in background
+        router.replace('/');
+
         const formData = new FormData();
         formData.append('userId', user.id);
         formData.append('description', description);
@@ -226,298 +235,298 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
 
     return (
         <>
-        <Modal
-            animationType="slide"
-            transparent={false}
-            visible={isVisible}
-            onRequestClose={onClose}
-            statusBarTranslucent
-        >
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={[styles.container, { backgroundColor: bgColor }]}
+            <Modal
+                animationType="slide"
+                transparent={false}
+                visible={isVisible}
+                onRequestClose={onClose}
+                statusBarTranslucent
             >
-                {/* Header */}
-                <View style={[styles.header, { backgroundColor: bgColor, paddingTop: insets.top }]}>
-                    <View style={styles.headerLeft}>
-                        <Pressable onPress={onClose} style={styles.backButton}>
-                            <ChevronLeft color={textColor} size={28} strokeWidth={2} />
-                        </Pressable>
-                    </View>
-                    <View style={styles.headerCenter}>
-                        <Text style={[styles.headerTitle, { color: textColor }]}>Yeni Video</Text>
-                    </View>
-                    <View style={styles.headerRight} />
-                </View>
-
-                <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-                    {/* Video/Photo Preview */}
-                    {selectedMedia && (
-                        <View style={styles.previewSection}>
-                            <View style={styles.previewContainer}>
-                                {selectedMedia.type === 'video' ? (
-                                    <Video
-                                        source={{ uri: selectedMedia.uri }}
-                                        style={styles.previewImage}
-                                        resizeMode="cover"
-                                        shouldPlay={false}
-                                        isLooping={false}
-                                        isMuted={true}
-                                        useNativeControls={false}
-                                    />
-                                ) : (
-                                    <Image
-                                        source={{ uri: selectedMedia.uri }}
-                                        style={styles.previewImage}
-                                        resizeMode="cover"
-                                    />
-                                )}
-                                <Pressable style={styles.coverEditButton} onPress={handleCoverEdit}>
-                                    <Text style={styles.coverEditText}>Kapağı düzenle</Text>
-                                </Pressable>
-                            </View>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={[styles.container, { backgroundColor: bgColor }]}
+                >
+                    {/* Header */}
+                    <View style={[styles.header, { backgroundColor: bgColor, paddingTop: insets.top }]}>
+                        <View style={styles.headerLeft}>
+                            <Pressable onPress={onClose} style={styles.backButton}>
+                                <ChevronLeft color={textColor} size={28} strokeWidth={2} />
+                            </Pressable>
                         </View>
-                    )}
-
-                    {/* Description Input */}
-                    <View style={[styles.descriptionSection, { backgroundColor: inputBg }]}>
-                        <TextInput
-                            style={[styles.descriptionInput, { color: textColor }]}
-                            placeholder="Bir açıklama yaz ve konu etiketleri ekle..."
-                            placeholderTextColor={subtextColor}
-                            value={description}
-                            onChangeText={setDescription}
-                            multiline
-                            maxLength={2200}
-                        />
+                        <View style={styles.headerCenter}>
+                            <Text style={[styles.headerTitle, { color: textColor }]}>Yeni Video</Text>
+                        </View>
+                        <View style={styles.headerRight} />
                     </View>
 
-                    {/* Topic Tags */}
-                    <View style={styles.section}>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tagsScroll}>
-                            {tags.map((tag, index) => (
-                                <View key={index} style={[styles.tagChip, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.08)', borderColor: isDark ? 'rgba(255, 255, 255, 0.25)' : 'rgba(0, 0, 0, 0.1)' }]}>
-                                    <Text style={[styles.tagHashIcon, { color: textColor }]}>#</Text>
-                                    <Text style={[styles.tagText, { color: textColor }]}>{tag}</Text>
-                                    <Pressable onPress={() => handleRemoveTag(index)} hitSlop={8}>
-                                        <X size={14} color={subtextColor} />
+                    <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+                        {/* Video/Photo Preview */}
+                        {selectedMedia && (
+                            <View style={styles.previewSection}>
+                                <View style={styles.previewContainer}>
+                                    {selectedMedia.type === 'video' ? (
+                                        <Video
+                                            source={{ uri: selectedMedia.uri }}
+                                            style={styles.previewImage}
+                                            resizeMode={ResizeMode.COVER}
+                                            shouldPlay={false}
+                                            isLooping={false}
+                                            isMuted={true}
+                                            useNativeControls={false}
+                                        />
+                                    ) : (
+                                        <Image
+                                            source={{ uri: selectedMedia.uri }}
+                                            style={styles.previewImage}
+                                            resizeMode="cover"
+                                        />
+                                    )}
+                                    <Pressable style={styles.coverEditButton} onPress={handleCoverEdit}>
+                                        <Text style={styles.coverEditText}>Kapağı düzenle</Text>
                                     </Pressable>
                                 </View>
-                            ))}
-                            {tags.length < 5 && (
-                                <Pressable onPress={handleAddTag} style={[styles.addTagButton, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.08)', borderColor: isDark ? 'rgba(255, 255, 255, 0.25)' : 'rgba(0, 0, 0, 0.1)' }]}>
-                                    <Text style={[styles.tagHashIcon, { color: textColor }]}>#</Text>
-                                    <PlusCircle size={16} color={isDark ? '#007AFF' : '#007AFF'} />
-                                </Pressable>
-                            )}
-                        </ScrollView>
-                    </View>
-
-                    {/* Menu Items */}
-                    <View style={styles.menuSection}>
-                        {/* CLUB's ekle */}
-                        <Pressable style={[styles.menuItem, { borderBottomColor: borderColor }]} onPress={handleClubsSelect}>
-                            <View style={styles.menuItemLeft}>
-                                <Users color={textColor} size={24} />
-                                <Text style={[styles.menuItemText, { color: textColor }]}>CLUB's ekle</Text>
                             </View>
-                            <ChevronRight color={subtextColor} size={20} />
-                        </Pressable>
+                        )}
 
-                        {/* Ticari İlişki Ekle (Zorunlu) */}
-                        <Pressable style={[styles.menuItem, { borderBottomColor: borderColor }]} onPress={handleCommercialTypeSelect}>
-                            <View style={styles.menuItemLeft}>
-                                <Tag color={textColor} size={24} />
-                                <Text style={[styles.menuItemText, { color: textColor }]}>
-                                    Ticari İlişki Ekle
-                                    <Text style={styles.requiredStar}> *</Text>
-                                </Text>
-                            </View>
-                            <View style={styles.menuItemRight}>
-                                {commercialType ? (
-                                    <Text style={[styles.selectedValueText, { color: subtextColor }]} numberOfLines={1}>
-                                        {commercialType}
-                                    </Text>
-                                ) : null}
+                        {/* Description Input */}
+                        <View style={[styles.descriptionSection, { backgroundColor: inputBg }]}>
+                            <TextInput
+                                style={[styles.descriptionInput, { color: textColor }]}
+                                placeholder="Bir açıklama yaz ve konu etiketleri ekle..."
+                                placeholderTextColor={subtextColor}
+                                value={description}
+                                onChangeText={setDescription}
+                                multiline
+                                maxLength={2200}
+                            />
+                        </View>
+
+                        {/* Topic Tags */}
+                        <View style={styles.section}>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tagsScroll}>
+                                {tags.map((tag, index) => (
+                                    <View key={index} style={[styles.tagChip, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.08)', borderColor: isDark ? 'rgba(255, 255, 255, 0.25)' : 'rgba(0, 0, 0, 0.1)' }]}>
+                                        <Text style={[styles.tagHashIcon, { color: textColor }]}>#</Text>
+                                        <Text style={[styles.tagText, { color: textColor }]}>{tag}</Text>
+                                        <Pressable onPress={() => handleRemoveTag(index)} hitSlop={8}>
+                                            <X size={14} color={subtextColor} />
+                                        </Pressable>
+                                    </View>
+                                ))}
+                                {tags.length < 5 && (
+                                    <Pressable onPress={handleAddTag} style={[styles.addTagButton, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.08)', borderColor: isDark ? 'rgba(255, 255, 255, 0.25)' : 'rgba(0, 0, 0, 0.1)' }]}>
+                                        <Text style={[styles.tagHashIcon, { color: textColor }]}>#</Text>
+                                        <PlusCircle size={16} color={isDark ? '#007AFF' : '#007AFF'} />
+                                    </Pressable>
+                                )}
+                            </ScrollView>
+                        </View>
+
+                        {/* Menu Items */}
+                        <View style={styles.menuSection}>
+                            {/* CLUB's ekle */}
+                            <Pressable style={[styles.menuItem, { borderBottomColor: borderColor }]} onPress={handleClubsSelect}>
+                                <View style={styles.menuItemLeft}>
+                                    <Users color={textColor} size={24} />
+                                    <Text style={[styles.menuItemText, { color: textColor }]}>CLUB's ekle</Text>
+                                </View>
                                 <ChevronRight color={subtextColor} size={20} />
-                            </View>
-                        </Pressable>
+                            </Pressable>
 
-                        {/* Yapay zeka etiketi ekle */}
-                        <View style={[styles.menuItem, { borderBottomColor: 'transparent' }]}>
-                            <View style={styles.menuItemLeft}>
-                                <Text style={styles.aiIcon}>🤖</Text>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={[styles.menuItemText, { color: textColor }]}>Yapay zeka etiketi ekle</Text>
-                                    <Text style={[styles.aiDescription, { color: subtextColor }]}>
-                                        Yapay zekayla oluşturulan belirli gerçekçi içerikleri etiketlemeni zorunlu tutuyoruz. Daha fazla bilgi al
+                            {/* Ticari İlişki Ekle (Zorunlu) */}
+                            <Pressable style={[styles.menuItem, { borderBottomColor: borderColor }]} onPress={handleCommercialTypeSelect}>
+                                <View style={styles.menuItemLeft}>
+                                    <Tag color={textColor} size={24} />
+                                    <Text style={[styles.menuItemText, { color: textColor }]}>
+                                        Ticari İlişki Ekle
+                                        <Text style={styles.requiredStar}> *</Text>
                                     </Text>
                                 </View>
-                            </View>
-                            <Switch
-                                value={useAILabel}
-                                onValueChange={setUseAILabel}
-                                trackColor={{ false: '#767577', true: '#3A8DFF' }}
-                                thumbColor={useAILabel ? '#FFFFFF' : '#F4F3F4'}
-                            />
-                        </View>
-                    </View>
-                </ScrollView>
-
-                {/* Bottom Buttons */}
-                <View style={[styles.bottomButtons, { backgroundColor: bgColor, borderTopColor: borderColor, paddingBottom: insets.bottom + 12 }]}>
-                    <Pressable
-                        style={[styles.draftButton, { backgroundColor: isDark ? '#2C2C2E' : '#F0F0F0' }]}
-                        onPress={handleSaveDraft}
-                    >
-                        <Text style={[styles.draftButtonText, { color: textColor }]}>Taslağı Kaydet</Text>
-                    </Pressable>
-                    <Pressable
-                        style={[styles.shareButton, !commercialType && styles.shareButtonDisabled]}
-                        onPress={handleShare}
-                        disabled={!commercialType}
-                    >
-                        <Text style={styles.shareButtonText}>Paylaş</Text>
-                    </Pressable>
-                </View>
-            </KeyboardAvoidingView>
-        </Modal>
-
-        {/* Commercial Type Selection Modal */}
-        <Modal
-            visible={showCommercialMenu}
-            transparent={true}
-            animationType="fade"
-            onRequestClose={() => setShowCommercialMenu(false)}
-        >
-            <Pressable
-                style={styles.modalOverlay}
-                onPress={() => setShowCommercialMenu(false)}
-            >
-                <View style={[styles.menuModal, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF' }]}>
-                    <View style={styles.menuHeader}>
-                        <Text style={[styles.menuTitle, { color: textColor }]}>Ticari İlişki Türü Seçin</Text>
-                    </View>
-                    <ScrollView style={styles.menuList}>
-                        {COMMERCIAL_TYPES.map((type, index) => (
-                            <Pressable
-                                key={type}
-                                style={[
-                                    styles.menuOptionItem,
-                                    { borderBottomColor: borderColor },
-                                    index === COMMERCIAL_TYPES.length - 1 && { borderBottomWidth: 0 }
-                                ]}
-                                onPress={() => selectCommercialType(type)}
-                            >
-                                <Text style={[
-                                    styles.menuOptionText,
-                                    { color: textColor },
-                                    commercialType === type && styles.menuOptionTextSelected
-                                ]}>
-                                    {type}
-                                </Text>
-                                {commercialType === type && (
-                                    <Text style={styles.checkmark}>✓</Text>
-                                )}
+                                <View style={styles.menuItemRight}>
+                                    {commercialType ? (
+                                        <Text style={[styles.selectedValueText, { color: subtextColor }]} numberOfLines={1}>
+                                            {commercialType}
+                                        </Text>
+                                    ) : null}
+                                    <ChevronRight color={subtextColor} size={20} />
+                                </View>
                             </Pressable>
-                        ))}
+
+                            {/* Yapay zeka etiketi ekle */}
+                            <View style={[styles.menuItem, { borderBottomColor: 'transparent' }]}>
+                                <View style={styles.menuItemLeft}>
+                                    <Text style={styles.aiIcon}>🤖</Text>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={[styles.menuItemText, { color: textColor }]}>Yapay zeka etiketi ekle</Text>
+                                        <Text style={[styles.aiDescription, { color: subtextColor }]}>
+                                            Yapay zekayla oluşturulan belirli gerçekçi içerikleri etiketlemeni zorunlu tutuyoruz. Daha fazla bilgi al
+                                        </Text>
+                                    </View>
+                                </View>
+                                <Switch
+                                    value={useAILabel}
+                                    onValueChange={setUseAILabel}
+                                    trackColor={{ false: '#767577', true: '#3A8DFF' }}
+                                    thumbColor={useAILabel ? '#FFFFFF' : '#F4F3F4'}
+                                />
+                            </View>
+                        </View>
                     </ScrollView>
-                </View>
-            </Pressable>
-        </Modal>
 
-        {/* Brand Info Modal */}
-        <Modal
-            visible={showBrandInfoModal}
-            transparent={true}
-            animationType="fade"
-            onRequestClose={() => setShowBrandInfoModal(false)}
-        >
-            <Pressable
-                style={styles.modalOverlay}
-                onPress={() => setShowBrandInfoModal(false)}
-            >
-                <View style={[styles.menuModal, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF' }]}>
-                    <View style={styles.menuHeader}>
-                        <Text style={[styles.menuTitle, { color: textColor }]}>{commercialType}</Text>
-                    </View>
-
-                    <View style={styles.brandFormSection}>
-                        <Text style={[styles.brandFormLabel, { color: textColor }]}>Marka Adı</Text>
-                        <TextInput
-                            style={[styles.brandFormInput, { backgroundColor: inputBg, color: textColor, borderColor: borderColor }]}
-                            placeholder="Marka adını giriniz"
-                            placeholderTextColor={subtextColor}
-                            value={brandName}
-                            onChangeText={setBrandName}
-                        />
-
-                        <Text style={[styles.brandFormLabel, { color: textColor, marginTop: 16 }]}>Marka URL'si</Text>
-                        <TextInput
-                            style={[styles.brandFormInput, { backgroundColor: inputBg, color: textColor, borderColor: borderColor }]}
-                            placeholder="https://marka.com (opsiyonel)"
-                            placeholderTextColor={subtextColor}
-                            value={brandUrl}
-                            onChangeText={setBrandUrl}
-                            keyboardType="url"
-                            autoCapitalize="none"
-                        />
-
+                    {/* Bottom Buttons */}
+                    <View style={[styles.bottomButtons, { backgroundColor: bgColor, borderTopColor: borderColor, paddingBottom: insets.bottom + 12 }]}>
                         <Pressable
-                            style={[styles.brandSaveButton, { backgroundColor: '#3A8DFF' }]}
-                            onPress={() => setShowBrandInfoModal(false)}
+                            style={[styles.draftButton, { backgroundColor: isDark ? '#2C2C2E' : '#F0F0F0' }]}
+                            onPress={handleSaveDraft}
                         >
-                            <Text style={styles.brandSaveButtonText}>Kaydet</Text>
+                            <Text style={[styles.draftButtonText, { color: textColor }]}>Taslağı Kaydet</Text>
+                        </Pressable>
+                        <Pressable
+                            style={[styles.shareButton, !commercialType && styles.shareButtonDisabled]}
+                            onPress={handleShare}
+                            disabled={!commercialType}
+                        >
+                            <Text style={styles.shareButtonText}>Paylaş</Text>
                         </Pressable>
                     </View>
-                </View>
-            </Pressable>
-        </Modal>
+                </KeyboardAvoidingView>
+            </Modal>
 
-        {/* Tag Input Modal */}
-        <Modal
-            visible={showTagInputModal}
-            transparent={true}
-            animationType="fade"
-            onRequestClose={() => setShowTagInputModal(false)}
-        >
-            <Pressable
-                style={styles.modalOverlay}
-                onPress={() => setShowTagInputModal(false)}
+            {/* Commercial Type Selection Modal */}
+            <Modal
+                visible={showCommercialMenu}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowCommercialMenu(false)}
             >
-                <View style={[styles.menuModal, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF' }]}>
-                    <View style={styles.menuHeader}>
-                        <Text style={[styles.menuTitle, { color: textColor }]}>Konu Etiketi Ekle</Text>
+                <Pressable
+                    style={styles.modalOverlay}
+                    onPress={() => setShowCommercialMenu(false)}
+                >
+                    <View style={[styles.menuModal, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF' }]}>
+                        <View style={styles.menuHeader}>
+                            <Text style={[styles.menuTitle, { color: textColor }]}>Ticari İlişki Türü Seçin</Text>
+                        </View>
+                        <ScrollView style={styles.menuList}>
+                            {COMMERCIAL_TYPES.map((type, index) => (
+                                <Pressable
+                                    key={type}
+                                    style={[
+                                        styles.menuOptionItem,
+                                        { borderBottomColor: borderColor },
+                                        index === COMMERCIAL_TYPES.length - 1 && { borderBottomWidth: 0 }
+                                    ]}
+                                    onPress={() => selectCommercialType(type)}
+                                >
+                                    <Text style={[
+                                        styles.menuOptionText,
+                                        { color: textColor },
+                                        commercialType === type && styles.menuOptionTextSelected
+                                    ]}>
+                                        {type}
+                                    </Text>
+                                    {commercialType === type && (
+                                        <Text style={styles.checkmark}>✓</Text>
+                                    )}
+                                </Pressable>
+                            ))}
+                        </ScrollView>
                     </View>
+                </Pressable>
+            </Modal>
 
-                    <View style={styles.brandFormSection}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <Text style={[styles.brandFormLabel, { color: textColor, fontSize: 18 }]}>#</Text>
-                            <TextInput
-                                style={[styles.brandFormInput, { flex: 1, backgroundColor: inputBg, color: textColor, borderColor: borderColor }]}
-                                placeholder="etiket giriniz"
-                                placeholderTextColor={subtextColor}
-                                value={currentTagInput}
-                                onChangeText={setCurrentTagInput}
-                                autoFocus
-                                maxLength={30}
-                            />
+            {/* Brand Info Modal */}
+            <Modal
+                visible={showBrandInfoModal}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowBrandInfoModal(false)}
+            >
+                <Pressable
+                    style={styles.modalOverlay}
+                    onPress={() => setShowBrandInfoModal(false)}
+                >
+                    <View style={[styles.menuModal, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF' }]}>
+                        <View style={styles.menuHeader}>
+                            <Text style={[styles.menuTitle, { color: textColor }]}>{commercialType}</Text>
                         </View>
 
-                        <Text style={[styles.tagHintText, { color: subtextColor }]}>
-                            En fazla 5 etiket ekleyebilirsiniz ({tags.length}/5)
-                        </Text>
+                        <View style={styles.brandFormSection}>
+                            <Text style={[styles.brandFormLabel, { color: textColor }]}>Marka Adı</Text>
+                            <TextInput
+                                style={[styles.brandFormInput, { backgroundColor: inputBg, color: textColor, borderColor: borderColor }]}
+                                placeholder="Marka adını giriniz"
+                                placeholderTextColor={subtextColor}
+                                value={brandName}
+                                onChangeText={setBrandName}
+                            />
 
-                        <Pressable
-                            style={[styles.brandSaveButton, { backgroundColor: '#3A8DFF' }]}
-                            onPress={handleSaveTag}
-                        >
-                            <Text style={styles.brandSaveButtonText}>Ekle</Text>
-                        </Pressable>
+                            <Text style={[styles.brandFormLabel, { color: textColor, marginTop: 16 }]}>Marka URL'si</Text>
+                            <TextInput
+                                style={[styles.brandFormInput, { backgroundColor: inputBg, color: textColor, borderColor: borderColor }]}
+                                placeholder="https://marka.com (opsiyonel)"
+                                placeholderTextColor={subtextColor}
+                                value={brandUrl}
+                                onChangeText={setBrandUrl}
+                                keyboardType="url"
+                                autoCapitalize="none"
+                            />
+
+                            <Pressable
+                                style={[styles.brandSaveButton, { backgroundColor: '#3A8DFF' }]}
+                                onPress={() => setShowBrandInfoModal(false)}
+                            >
+                                <Text style={styles.brandSaveButtonText}>Kaydet</Text>
+                            </Pressable>
+                        </View>
                     </View>
-                </View>
-            </Pressable>
-        </Modal>
+                </Pressable>
+            </Modal>
+
+            {/* Tag Input Modal */}
+            <Modal
+                visible={showTagInputModal}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowTagInputModal(false)}
+            >
+                <Pressable
+                    style={styles.modalOverlay}
+                    onPress={() => setShowTagInputModal(false)}
+                >
+                    <View style={[styles.menuModal, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF' }]}>
+                        <View style={styles.menuHeader}>
+                            <Text style={[styles.menuTitle, { color: textColor }]}>Konu Etiketi Ekle</Text>
+                        </View>
+
+                        <View style={styles.brandFormSection}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <Text style={[styles.brandFormLabel, { color: textColor, fontSize: 18 }]}>#</Text>
+                                <TextInput
+                                    style={[styles.brandFormInput, { flex: 1, backgroundColor: inputBg, color: textColor, borderColor: borderColor }]}
+                                    placeholder="etiket giriniz"
+                                    placeholderTextColor={subtextColor}
+                                    value={currentTagInput}
+                                    onChangeText={setCurrentTagInput}
+                                    autoFocus
+                                    maxLength={30}
+                                />
+                            </View>
+
+                            <Text style={[styles.tagHintText, { color: subtextColor }]}>
+                                En fazla 5 etiket ekleyebilirsiniz ({tags.length}/5)
+                            </Text>
+
+                            <Pressable
+                                style={[styles.brandSaveButton, { backgroundColor: '#3A8DFF' }]}
+                                onPress={handleSaveTag}
+                            >
+                                <Text style={styles.brandSaveButtonText}>Ekle</Text>
+                            </Pressable>
+                        </View>
+                    </View>
+                </Pressable>
+            </Modal>
         </>
     );
 }

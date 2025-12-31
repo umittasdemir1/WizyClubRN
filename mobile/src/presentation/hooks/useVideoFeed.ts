@@ -29,6 +29,7 @@ interface UseVideoFeedReturn {
     toggleShare: (videoId: string) => void;
     toggleShop: (videoId: string) => void;
     deleteVideo: (videoId: string) => Promise<void>;
+    prependVideo: (video: Video) => void;
 }
 
 export function useVideoFeed(): UseVideoFeedReturn {
@@ -364,16 +365,47 @@ export function useVideoFeed(): UseVideoFeedReturn {
     }, []);
 
     const deleteVideo = useCallback(async (videoId: string) => {
-        // 1. Snapshot for rollback
-        const previousVideos = [...videos];
+        // 1. Get current state
+        const currentVideos = [...videos];
+        const currentIndex = currentVideos.findIndex(v => v.id === videoId);
 
-        // 2. Optimistic Update
+        // 2. Calculate next active video BEFORE removing
+        let nextActiveId: string | null = null;
+        let nextActiveIndex = 0;
+
+        if (currentVideos.length > 1) {
+            // If not the last video, next video is at same index
+            // If last video, previous video becomes active
+            if (currentIndex < currentVideos.length - 1) {
+                nextActiveId = currentVideos[currentIndex + 1].id;
+                nextActiveIndex = currentIndex; // Same index after removal
+            } else {
+                nextActiveId = currentVideos[currentIndex - 1].id;
+                nextActiveIndex = currentIndex - 1;
+            }
+        }
+
+        // 3. Switch to next video IMMEDIATELY (before network call for instant UX)
+        const { setActiveVideo } = useActiveVideoStore.getState();
+        if (nextActiveId) {
+            console.log(`[Delete] 🎯 Switching to next video: ${nextActiveId} (index ${nextActiveIndex})`);
+            setActiveVideo(nextActiveId, nextActiveIndex);
+        }
+
+        // 4. Optimistic Update - Remove from list
         setVideos((prev) => prev.filter(v => v.id !== videoId));
 
+        // 5. Network call (background) with JWT authentication
         try {
             const { CONFIG } = require('../../core/config');
+            const token = useAuthStore.getState().session?.access_token;
+            console.log(`[Delete] 🔑 Auth token: ${token ? 'Present' : 'MISSING'}`);
+
             const response = await fetch(`${CONFIG.API_URL}/videos/${videoId}`, {
                 method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
             });
 
             if (!response.ok) {
@@ -383,16 +415,24 @@ export function useVideoFeed(): UseVideoFeedReturn {
             console.log('[useVideoFeed] Delete success:', videoId);
         } catch (error: any) {
             console.error('[useVideoFeed] Delete failed, rolling back:', error);
-            // 3. Rollback on failure
-            setVideos(previousVideos);
-            // Re-throw to let UI handle alert if needed, or handle here
-            // Alert here is better to ensure user sees it
-            // But we need Alert import. Assuming it's not imported in hook usually.
-            // Actually, index.tsx handles the UI part nicely? No, we want centralized logic.
-            // So we MUST alert them if it fails.
+            // Rollback on failure
+            setVideos(currentVideos);
             Alert.alert("Silme Başarısız", error.message || "Bilinmeyen hata");
         }
     }, [videos]);
+
+    // 🔥 Prepend a newly uploaded video to the top of the feed
+    const prependVideo = useCallback((newVideo: Video) => {
+        setVideos(current => {
+            // Prevent duplicates
+            if (current.some(v => v.id === newVideo.id)) {
+                console.log('[useVideoFeed] Video already exists, skipping prepend:', newVideo.id);
+                return current;
+            }
+            console.log('[useVideoFeed] Prepending new video:', newVideo.id);
+            return [newVideo, ...current];
+        });
+    }, []);
 
     useEffect(() => {
         fetchFeed();
@@ -414,5 +454,6 @@ export function useVideoFeed(): UseVideoFeedReturn {
         toggleShare,
         toggleShop,
         deleteVideo,
+        prependVideo,
     };
 }

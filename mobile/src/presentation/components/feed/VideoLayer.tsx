@@ -227,42 +227,8 @@ export const VideoLayer = memo(function VideoLayer({
         };
     }, []);
 
-    // 🎬 POSITION MEMORY: Save when leaving, restore when returning
-    const lastSavedPosition = useRef(0);
-    const hasRestoredPosition = useRef(false);
-
-    useEffect(() => {
-        if (isActive) {
-            // Returning to this video - restore position IMMEDIATELY
-            const savedPos = getVideoPosition(video.id);
-            if (savedPos > 0 && !hasRestoredPosition.current) {
-                console.log(`[Position] ▶️ Resuming ${video.id} at ${savedPos.toFixed(1)}s`);
-                hasRestoredPosition.current = true;
-                // Seek immediately without delay
-                videoRef.current?.seek(savedPos);
-            }
-        } else {
-            // Leaving this video - save current position
-            hasRestoredPosition.current = false; // Reset for next return
-            if (lastSavedPosition.current > 0.5 && duration > 0) {
-                // Don't save if near end (within 2 seconds of end)
-                if (lastSavedPosition.current < duration - 2) {
-                    saveVideoPosition(video.id, lastSavedPosition.current);
-                }
-            }
-        }
-    }, [isActive, video.id, duration]);
-
-    // Track current position for saving
-    useEffect(() => {
-        // Update lastSavedPosition from SharedValue periodically
-        const interval = setInterval(() => {
-            if (currentTimeSV.value > 0) {
-                lastSavedPosition.current = currentTimeSV.value;
-            }
-        }, 500);
-        return () => clearInterval(interval);
-    }, []);
+    // 🎬 POSITION MEMORY: REMOVED - Videos always start from beginning
+    // User requested: Video should restart when returning, not resume from saved position
 
     // Track if user toggled pause (for replay detection)
     const wasPausedBefore = useRef(isPausedGlobal);
@@ -399,7 +365,7 @@ export const VideoLayer = memo(function VideoLayer({
             {/* Only render Video component when source is ready */}
             {isSourceReady && videoSource && (
                 <Video
-                    key={key}
+                    key={`${video.id}-${key}`}
                     ref={videoRef}
                     source={videoSource}
                     style={[styles.video, { backgroundColor: '#000' }]} // Black bg to prevent white flash

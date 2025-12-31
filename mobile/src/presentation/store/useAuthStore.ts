@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 import { supabase } from '../../core/supabase';
-import type { User as SupabaseUser } from '@supabase/supabase-js';
+import type { User as SupabaseUser, Session } from '@supabase/supabase-js';
 
 interface AuthState {
   user: SupabaseUser | null;
+  session: Session | null;  // 🔥 JWT token access
   isLoading: boolean;
   isInitialized: boolean;
   error: string | null;
@@ -16,6 +17,7 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
+  session: null,
   isLoading: true,
   isInitialized: false,
   error: null,
@@ -29,12 +31,13 @@ export const useAuthStore = create<AuthState>((set) => ({
 
       if (error) {
         console.error('[AuthStore] Session error:', error);
-        set({ user: null, isLoading: false, isInitialized: true });
+        set({ user: null, session: null, isLoading: false, isInitialized: true });
         return;
       }
 
       set({
         user: session?.user ?? null,
+        session: session ?? null,
         isLoading: false,
         isInitialized: true
       });
@@ -42,11 +45,11 @@ export const useAuthStore = create<AuthState>((set) => ({
       // Listen for auth changes
       supabase.auth.onAuthStateChange((_event, session) => {
         console.log('[AuthStore] Auth state changed:', _event);
-        set({ user: session?.user ?? null });
+        set({ user: session?.user ?? null, session: session ?? null });
       });
     } catch (err) {
       console.error('[AuthStore] Initialize error:', err);
-      set({ user: null, isLoading: false, isInitialized: true });
+      set({ user: null, session: null, isLoading: false, isInitialized: true });
     }
   },
 
@@ -73,7 +76,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         return { success: false, error: errorMessage };
       }
 
-      set({ user: data.user, isLoading: false, error: null });
+      set({ user: data.user, session: data.session, isLoading: false, error: null });
       return { success: true };
     } catch (err: any) {
       console.error('[AuthStore] Sign in error:', err);

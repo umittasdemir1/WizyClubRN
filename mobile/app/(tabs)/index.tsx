@@ -217,12 +217,20 @@ export default function FeedScreen() {
         }
     }, [activeIndex, videos.length]);
 
+    // 🔥 CRITICAL: Ref to track active video ID OUTSIDE render cycle
+    const lastActiveIdRef = useRef<string | null>(activeVideoId);
+
+    // Keep ref in sync with state (one-way: state -> ref)
+    useEffect(() => {
+        lastActiveIdRef.current = activeVideoId;
+    }, [activeVideoId]);
+
     // Set initial active
     useEffect(() => {
-        if (videos.length > 0 && !activeVideoId) {
+        if (videos.length > 0 && !lastActiveIdRef.current) {
             setActiveVideo(videos[0].id, 0);
         }
-    }, [videos, activeVideoId, setActiveVideo]);
+    }, [videos, setActiveVideo]);
 
     const onViewableItemsChanged = useCallback(
         ({ viewableItems }: { viewableItems: ViewToken<Video>[] }) => {
@@ -230,15 +238,17 @@ export default function FeedScreen() {
                 const newIndex = viewableItems[0].index ?? 0;
                 const newId = viewableItems[0].item?.id ?? null;
 
-                if (newId !== activeVideoId) {
-                    lastInternalIndex.current = newIndex; // Mark as internal
+                // 🔥 Compare against REF, not state - breaks the loop!
+                if (newId && newId !== lastActiveIdRef.current) {
+                    console.log(`[Viewability] 👁️ Active video: ${newId} (index ${newIndex})`);
+                    lastInternalIndex.current = newIndex;
+                    lastActiveIdRef.current = newId; // Update ref immediately
                     setActiveVideo(newId, newIndex);
-                    // Video değişince story bar'ı kapat
                     setActiveTab('foryou');
                 }
             }
         },
-        [activeVideoId, setActiveVideo]
+        [setActiveVideo] // 🔥 NO activeVideoId here!
     );
 
     const viewabilityConfigCallbackPairs = useRef([

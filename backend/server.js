@@ -271,14 +271,38 @@ app.delete('/videos/:id', async (req, res) => {
     console.log(`   🛡️ Parsed Force Mode: ${force}`);
     console.log(`   👉 Decision: ${force ? 'HARD DELETE (Permanent)' : 'SOFT DELETE (Trash)'}`);
 
+    // 🔐 JWT Authentication
+    const authHeader = req.headers.authorization;
+    console.log(`   🔑 Auth Header: ${authHeader ? 'Present' : 'MISSING'}`);
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        console.log(`   ❌ No valid Authorization header`);
+        return res.status(401).json({ error: 'Authorization header required' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+
+    // Create authenticated Supabase client (respects RLS)
+    const dbClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY, {
+        global: { headers: { Authorization: `Bearer ${token}` } }
+    });
+
+    // Verify user
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    console.log(`   👤 Auth User: ${user?.id || 'NONE'} | Error: ${authError?.message || 'NONE'}`);
+
+    if (authError || !user) {
+        return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
     try {
         if (force) {
             // ============================================
             // HARD DELETE (Permanent)
             // ============================================
 
-            // 1. Get video info
-            const { data: video, error: fetchError } = await supabase
+            // 1. Get video info (using authenticated client)
+            const { data: video, error: fetchError } = await dbClient
                 .from('videos')
                 .select('*')
                 .eq('id', videoId)
@@ -289,18 +313,26 @@ app.delete('/videos/:id', async (req, res) => {
                 return res.status(404).json({ error: 'Video not found' });
             }
 
-            // 2. R2 Cleanup
-            let timestampId = null;
-            try {
-                const match = video.video_url.match(/videos\/(\d+)/);
-                if (match && match[1]) timestampId = match[1];
-            } catch (e) {
-                console.error('Error parsing video URL:', e);
+            // 2. R2 Cleanup - Support BOTH legacy and new URL formats
+            let folderPrefix = null;
+            const videoUrl = video.video_url;
+
+            // Try new format first: media/USER_ID/videos/UUID
+            const newFormatMatch = videoUrl.match(/media\/[^/]+\/videos\/[^/]+/);
+            if (newFormatMatch) {
+                folderPrefix = newFormatMatch[0];
+                console.log(`   📁 [NEW FORMAT] R2 Folder: ${folderPrefix}`);
+            } else {
+                // Legacy format: videos/TIMESTAMP
+                const legacyMatch = videoUrl.match(/videos\/(\d+)/);
+                if (legacyMatch && legacyMatch[1]) {
+                    folderPrefix = `videos/${legacyMatch[1]}`;
+                    console.log(`   📁 [LEGACY FORMAT] R2 Folder: ${folderPrefix}`);
+                }
             }
 
-            if (timestampId) {
+            if (folderPrefix) {
                 try {
-                    const folderPrefix = `videos/${timestampId}`;
                     console.log(`   👉 [HARD] Cleaning R2 Folder: ${folderPrefix}`);
 
                     const listCmd = new ListObjectsV2Command({
@@ -317,29 +349,40 @@ app.delete('/videos/:id', async (req, res) => {
                             }
                         };
                         await r2.send(new DeleteObjectsCommand(deleteParams));
-                        console.log('   ✅ R2 Folder Deleted.');
+                        console.log(`   ✅ R2 Folder Deleted (${listRes.Contents.length} files).`);
+                    } else {
+                        console.log(`   ⚠️ No files found in R2 folder.`);
                     }
 
-                    // Delete Thumbnail
-                    let thumbKey = `thumbs/${timestampId}.jpg`;
-                    try {
-                        await r2.send(new DeleteObjectCommand({
-                            Bucket: process.env.R2_BUCKET_NAME,
-                            Key: thumbKey
-                        }));
-                        console.log(`   ✅ R2 Thumbnail Deleted.`);
-                    } catch (e) { }
+                    // Delete Legacy Thumbnail (only for legacy format)
+                    if (videoUrl.includes('/videos/') && !videoUrl.includes('/media/')) {
+                        const legacyMatch = videoUrl.match(/videos\/(\d+)/);
+                        if (legacyMatch && legacyMatch[1]) {
+                            const thumbKey = `thumbs/${legacyMatch[1]}.jpg`;
+                            try {
+                                await r2.send(new DeleteObjectCommand({
+                                    Bucket: process.env.R2_BUCKET_NAME,
+                                    Key: thumbKey
+                                }));
+                                console.log(`   ✅ R2 Legacy Thumbnail Deleted.`);
+                            } catch (e) { }
+                        }
+                    }
 
                 } catch (r2Error) {
                     console.error('   ⚠️ R2 Cleanup Error:', r2Error.message);
                 }
+            } else {
+                console.log(`   ⚠️ Could not determine R2 folder from URL: ${videoUrl}`);
             }
 
-            // 3. DB Delete
-            const { error: deleteError } = await supabase
+            // 3. DB Delete (using authenticated client for RLS)
+            const { error: deleteError, count } = await dbClient
                 .from('videos')
                 .delete()
                 .eq('id', videoId);
+
+            console.log(`   📊 Delete Result: count=${count}, error=${deleteError?.message || 'NONE'}`);
 
             if (deleteError) throw deleteError;
 
@@ -351,7 +394,7 @@ app.delete('/videos/:id', async (req, res) => {
             // SOFT DELETE
             // ============================================
             console.log(`   👉 Attempting Soft Delete via RPC for ${videoId}`);
-            const { error } = await supabase.rpc('soft_delete_video', { video_id: videoId });
+            const { error } = await dbClient.rpc('soft_delete_video', { video_id: videoId });
 
             if (error) {
                 console.error('   ❌ Soft Delete RPC Error:', error);

@@ -81,6 +81,57 @@ function UploadButton({ onPress }: { onPress: () => void }) {
     );
 }
 
+// 🔥 Upload Thumbnail sub-component (9:16 with centered %)
+import { Image as ExpoImage } from 'expo-image';
+
+function UploadThumbnail() {
+    const thumbnailUri = useUploadStore(state => state.thumbnailUri);
+    const progress = useUploadStore(state => state.progress);
+    const status = useUploadStore(state => state.status);
+    const isProcessing = status === 'compressing' || status === 'uploading' || status === 'processing';
+
+    if (!thumbnailUri || !isProcessing) return null;
+
+    return (
+        <View style={thumbnailStyles.container}>
+            <ExpoImage
+                source={{ uri: thumbnailUri }}
+                style={thumbnailStyles.image}
+                contentFit="cover"
+            />
+            <View style={thumbnailStyles.overlay}>
+                <Text style={thumbnailStyles.percentText}>%{Math.round(progress)}</Text>
+            </View>
+        </View>
+    );
+}
+
+const thumbnailStyles = StyleSheet.create({
+    container: {
+        width: 36,
+        height: 64, // 9:16 ratio (36 * 16/9 = 64)
+        borderRadius: 6,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.3)',
+    },
+    image: {
+        width: '100%',
+        height: '100%',
+    },
+    overlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    percentText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '700',
+    },
+});
+
 interface HeaderOverlayProps {
     isMuted: boolean;
     onToggleMute: () => void;
@@ -136,10 +187,10 @@ export function HeaderOverlay({
             style={[styles.container, { paddingTop: headerTopPadding }]}
             pointerEvents="box-none"
         >
-            {/* Left Column: Upload & Delete */}
+            {/* Left Column: Upload & Thumbnail */}
             <View style={styles.leftColumn}>
                 {onUploadPress && <UploadButton onPress={onUploadPress} />}
-
+                <UploadThumbnail />
             </View>
 
             {/* Center: Tab Switcher (absolutely centered) */}
