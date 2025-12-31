@@ -189,22 +189,29 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
             const xhr = new XMLHttpRequest();
             xhr.open('POST', `${CONFIG.API_URL}/upload-hls`);
 
-            xhr.upload.onprogress = (event) => {
-                if (event.lengthComputable) {
-                    const progressPercent = Math.min((event.loaded / event.total) * 100, 100);
-                    console.log(`📤 [Upload] Progress: ${Math.round(progressPercent)}%`);
-                    setProgress(progressPercent);
-                    if (progressPercent >= 100) setStatus('processing');
-                    else setStatus('uploading');
+            // 🔥 SIMPLE: Linear progress from 0 to 95, then 100 on success
+            let currentProgress = 0;
+            const progressInterval = setInterval(() => {
+                if (currentProgress < 95) {
+                    currentProgress += 1;
+                    setProgress(currentProgress);
+
+                    // Update status based on progress
+                    if (currentProgress < 30) setStatus('compressing');
+                    else if (currentProgress < 80) setStatus('uploading');
+                    else setStatus('processing');
                 }
-            };
+            }, 200); // ~20 seconds to reach 95%
 
             xhr.onload = () => {
+                clearInterval(progressInterval);
+
                 if (xhr.status === 200) {
                     const response = JSON.parse(xhr.responseText);
                     console.log('Upload success:', response);
+                    setProgress(100);
                     setSuccess(response.data?.id || 'new-video');
-                    // Reset
+                    // Reset form
                     setSelectedMedia(null);
                     setDescription('');
                     setCommercialType(null);
@@ -219,8 +226,9 @@ export function UploadModal({ isVisible, onClose, initialVideo }: UploadModalPro
                 }
             };
 
-            xhr.onerror = (e) => {
-                console.error('Upload error:', e);
+            xhr.onerror = () => {
+                clearInterval(progressInterval);
+                console.error('Upload error');
                 setError('Ağ hatası oluştu.');
                 setStatus('error');
             };

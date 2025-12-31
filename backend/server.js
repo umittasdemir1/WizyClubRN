@@ -62,6 +62,24 @@ console.log('7. Initializing HlsService...');
 const hlsService = new HlsService(r2, process.env.R2_BUCKET_NAME);
 console.log('8. HlsService READY.');
 
+// 🔥 Upload Progress Tracking
+const uploadProgress = new Map(); // { uniqueId: { stage: string, percent: number } }
+
+// Endpoint: Get Upload Progress
+app.get('/upload-progress/:id', (req, res) => {
+    const progress = uploadProgress.get(req.params.id);
+    if (!progress) {
+        return res.json({ stage: 'unknown', percent: 0 });
+    }
+    res.json(progress);
+});
+
+// Helper: Update progress
+function setUploadProgress(id, stage, percent) {
+    uploadProgress.set(id, { stage, percent });
+    console.log(`📊 [PROGRESS] ${id}: ${stage} - ${percent}%`);
+}
+
 // Endpoint: HLS Video Upload
 app.post('/upload-hls', upload.single('video'), async (req, res) => {
     const file = req.file;
@@ -95,6 +113,7 @@ app.post('/upload-hls', upload.single('video'), async (req, res) => {
     // but in prod this should be a background job.
 
     try {
+        setUploadProgress(uniqueId, 'analyzing', 5);
         // Step 0: Extract Metadata (Width/Height)
         const metadata = await new Promise((resolve, reject) => {
             ffmpeg(inputPath).ffprobe((err, data) => {
@@ -116,6 +135,7 @@ app.post('/upload-hls', upload.single('video'), async (req, res) => {
         }
 
         console.log(`📏 [METADATA] Dimensions: ${width}x${height}`);
+        setUploadProgress(uniqueId, 'thumbnail', 15);
 
         const hasAudio = metadata.streams.some(s => s.codec_type === 'audio'); // Check if audio stream exists
 
@@ -135,6 +155,7 @@ app.post('/upload-hls', upload.single('video'), async (req, res) => {
 
         // Upload Thumbnail
         const thumbUrl = await uploadToR2(processedThumbPath, thumbFileName, 'image/jpeg');
+        setUploadProgress(uniqueId, 'video', 25);
 
         // FEATURE FLAG: Hybrid Engine Switch
         // true = HLS (Adaptive, Multi-bitrate) | false = MP4 (Direct, High Quality, Fast)
@@ -203,11 +224,13 @@ app.post('/upload-hls', upload.single('video'), async (req, res) => {
             // Cleanup optimized file
             if (fs.existsSync(optimizedPath)) fs.unlinkSync(optimizedPath);
         }
+        setUploadProgress(uniqueId, 'sprite', 70);
 
         // Step 2.5: Generate Sprite Sheet (2s intervals)
         console.log(`🖼️ [SPRITE] Generating sprite sheet for ${duration}s video...`);
         const spriteUrl = await hlsService.generateSpriteSheet(inputPath, tempOutputDir, uniqueId, duration);
         console.log(`🖼️ [SPRITE] Generated sprite URL: ${spriteUrl}`);
+        setUploadProgress(uniqueId, 'saving', 85);
 
         // Step 3: Save metadata to Supabase
         const { data, error } = await supabase
@@ -233,6 +256,7 @@ app.post('/upload-hls', upload.single('video'), async (req, res) => {
         if (error) throw error;
 
         console.log('🎉 [HLS] Upload & Processing successful!');
+        setUploadProgress(uniqueId, 'done', 100);
 
         res.json({
             success: true,

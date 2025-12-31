@@ -71,6 +71,7 @@ export default function FeedScreen() {
         refreshFeed,
         loadMore,
         deleteVideo,
+        prependVideo,
     } = useVideoFeed();
 
     const { stories: storyListData } = useStoryViewer();
@@ -100,12 +101,85 @@ export default function FeedScreen() {
     const uploadedVideoId = useUploadStore(state => state.uploadedVideoId);
     const resetUpload = useUploadStore(state => state.reset);
 
-    // 1. Watch for upload success -> Trigger Refresh
+    // 1. Watch for upload success -> Fetch new video and prepend to feed
     useEffect(() => {
-        if (uploadedVideoId && uploadStatus === 'success') {
-            console.log('🎉 Upload success detected, refreshing feed...');
-            refreshFeed();
-        }
+        const handleUploadSuccess = async () => {
+            if (uploadedVideoId && uploadStatus === 'success') {
+                console.log('🎉 Upload success detected, fetching video:', uploadedVideoId);
+
+                try {
+                    // Fetch the newly uploaded video from Supabase
+                    const { supabase } = require('../../src/core/supabase');
+                    const { data: videoData, error } = await supabase
+                        .from('videos')
+                        .select(`
+                            *,
+                            profiles:user_id (
+                                id,
+                                username,
+                                full_name,
+                                avatar_url
+                            )
+                        `)
+                        .eq('id', uploadedVideoId)
+                        .single();
+
+                    if (error || !videoData) {
+                        console.error('[Upload] Failed to fetch new video:', error);
+                        refreshFeed(); // Fallback to refresh
+                        return;
+                    }
+
+                    // Map to Video entity
+                    const newVideo = {
+                        id: videoData.id,
+                        videoUrl: videoData.video_url,
+                        thumbnailUrl: videoData.thumbnail_url,
+                        description: videoData.description || '',
+                        user: {
+                            id: videoData.profiles?.id || videoData.user_id,
+                            username: videoData.profiles?.username || 'unknown',
+                            fullName: videoData.profiles?.full_name || '',
+                            avatarUrl: videoData.profiles?.avatar_url || '',
+                            isFollowing: false,
+                        },
+                        likesCount: 0,
+                        savesCount: 0,
+                        sharesCount: 0,
+                        shopsCount: 0,
+                        commentsCount: 0,
+                        isLiked: false,
+                        isSaved: false,
+                        isFollowing: false,
+                        isCommercial: videoData.is_commercial || false,
+                        commercialType: videoData.commercial_type || null,
+                        brandName: videoData.brand_name || null,
+                        brandUrl: videoData.brand_url || null,
+                        createdAt: videoData.created_at,
+                    };
+
+                    // Prepend to feed
+                    prependVideo(newVideo);
+                    console.log('✅ [Upload] Video prepended to feed');
+
+                    // Scroll to top and activate
+                    setTimeout(() => {
+                        listRef.current?.scrollToIndex({ index: 0, animated: false });
+                        setActiveVideo(uploadedVideoId, 0);
+                        console.log('✅ [Upload] Video activated for playback');
+                    }, 100);
+
+                    // Reset upload state
+                    resetUpload();
+
+                } catch (err) {
+                    console.error('[Upload] Error handling success:', err);
+                    refreshFeed();
+                }
+            }
+        };
+
+        handleUploadSuccess();
     }, [uploadedVideoId, uploadStatus]);
 
     useEffect(() => {
