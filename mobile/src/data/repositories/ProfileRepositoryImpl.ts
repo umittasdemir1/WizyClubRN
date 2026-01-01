@@ -38,6 +38,10 @@ export class ProfileRepositoryImpl implements IProfileRepository {
         return await this.dataSource.uploadAvatar(userId, fileUri);
     }
 
+    async checkUsernameAvailability(username: string, currentUserId: string): Promise<boolean> {
+        return await this.dataSource.checkUsernameAvailability(username, currentUserId);
+    }
+
     private mapDtoToUser(dto: any): User {
         return {
             id: dto.id,
