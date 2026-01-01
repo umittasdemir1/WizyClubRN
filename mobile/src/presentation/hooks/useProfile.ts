@@ -9,10 +9,14 @@ export const useProfile = (userId: string, viewerId?: string) => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const loadProfile = useCallback(async () => {
-        setIsLoading(true);
+    const loadProfile = useCallback(async (silentRefresh = false) => {
+        // Only show loading skeleton if no data exists (Instagram/TikTok behavior)
+        if (!silentRefresh && !user) {
+            setIsLoading(true);
+        }
+
         try {
-            console.log('[useProfile] Loading profile for user ID:', userId);
+            console.log('[useProfile] Loading profile for user ID:', userId, silentRefresh ? '(silent)' : '');
             const profileData = await profileRepo.getProfile(userId, viewerId);
             console.log('[useProfile] Profile data loaded:', profileData ? 'Found' : 'Null');
             setUser(profileData);
@@ -22,7 +26,7 @@ export const useProfile = (userId: string, viewerId?: string) => {
         } finally {
             setIsLoading(false);
         }
-    }, [userId, viewerId]);
+    }, [userId, viewerId, user]);
 
     useEffect(() => {
         if (userId) {

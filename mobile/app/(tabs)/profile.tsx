@@ -121,8 +121,9 @@ export default function ProfileScreen() {
   useFocusEffect(
     useCallback(() => {
       RNStatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
-      reload();
-    }, [isDark, reload])
+      // Don't reload on every focus - Instagram/TikTok behavior
+      // Data loads on mount and via pull-to-refresh only
+    }, [isDark])
   );
 
   // Collapsible Header Logic
@@ -162,7 +163,8 @@ export default function ProfileScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([refreshFeed(), reload()]);
+    // Silent refresh - don't show skeleton, just update data
+    await Promise.all([refreshFeed(), reload(true)]);
     setRefreshing(false);
   }, [refreshFeed, reload]);
 
@@ -375,7 +377,7 @@ export default function ProfileScreen() {
         user={currentUser}
         onUpdateProfile={updateProfile}
         onUploadAvatar={uploadAvatar}
-        onUpdateCompleted={() => reload()}
+        onUpdateCompleted={() => reload(true)}
       />
       <DeletedContentSheet ref={deletedContentSheetRef} isDark={isDark} />
     </View>
