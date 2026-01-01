@@ -11,34 +11,33 @@ export const useProfile = (userId: string, viewerId?: string) => {
 
     const loadProfile = useCallback(async (silentRefresh = false) => {
         // Only show loading skeleton if no data exists (Instagram/TikTok behavior)
-        if (!silentRefresh && !user) {
+        if (!silentRefresh) {
             setIsLoading(true);
         }
 
         try {
-            console.log('[useProfile] Loading profile for user ID:', userId, silentRefresh ? '(silent)' : '');
             const profileData = await profileRepo.getProfile(userId, viewerId);
-            console.log('[useProfile] Profile data loaded:', profileData ? 'Found' : 'Null');
             setUser(profileData);
         } catch (err) {
             setError('Profil yüklenirken bir hata oluştu.');
             console.error('[useProfile] Load error:', err);
         } finally {
-            setIsLoading(false);
+            if (!silentRefresh) {
+                setIsLoading(false);
+            }
         }
-    }, [userId, viewerId, user]);
+    }, [userId, viewerId]);
 
     useEffect(() => {
         if (userId) {
             loadProfile();
         }
-    }, [loadProfile, userId]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [userId]); // ❌ REMOVED: loadProfile dependency - only load on mount/userId change
 
     const updateProfile = useCallback(async (updates: Partial<User>) => {
         try {
-            console.log('[useProfile] Updating profile with:', updates);
             const updatedUser = await profileRepo.updateProfile(userId, updates);
-            console.log('[useProfile] Update response:', updatedUser);
 
             // Force reload from database to ensure state is in sync
             await loadProfile();
