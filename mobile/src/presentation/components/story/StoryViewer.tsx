@@ -2,7 +2,7 @@ import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { View, StyleSheet, Dimensions, Pressable, ImageBackground } from 'react-native';
 import { BlurView } from 'expo-blur';
 import Video from 'react-native-video';
-import { useSharedValue, withTiming, Easing, cancelAnimation, runOnJS } from 'react-native-reanimated';
+import { useSharedValue, withTiming, Easing, cancelAnimation, runOnJS, useAnimatedReaction } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Story } from '../../../domain/entities/Story';
 import { StoryHeader } from './StoryHeader';
@@ -41,8 +41,45 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
     // 🔥 FIX: Track actual video duration
     const [videoDuration, setVideoDuration] = useState(0);
 
-    // Progress bar - managed at Viewer level for static UI
-    const progress = useSharedValue(0);
+    // Progress bar - smooth animation system (like feed seekbar)
+    const rawProgress = useSharedValue(0); // Raw progress from video
+    const progress = useSharedValue(0); // Smoothed progress for UI
+
+    // 🔥 Smooth progress animation (prevents stuttering)
+    useAnimatedReaction(
+        () => ({
+            raw: rawProgress.value,
+            paused: isPaused
+        }),
+        (result, prevResult) => {
+            if (result.paused) {
+                return; // Don't update when paused
+            }
+
+            const targetProgress = result.raw;
+
+            // Check if this is a continuous update (not a seek/jump)
+            let isContinuous = false;
+            if (prevResult && !prevResult.paused) {
+                const diff = Math.abs(targetProgress - prevResult.raw);
+                if (diff < 0.05) { // Small incremental change
+                    isContinuous = true;
+                }
+            }
+
+            if (isContinuous) {
+                // Smooth animation for continuous playback
+                progress.value = withTiming(targetProgress, {
+                    duration: 33, // ~30fps smoothing
+                    easing: Easing.linear
+                });
+            } else {
+                // Instant update for seeks/jumps
+                progress.value = targetProgress;
+            }
+        },
+        [isPaused]
+    );
 
     const handleNext = useCallback(() => {
         if (currentIndex < stories.length - 1) {
@@ -73,9 +110,9 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
     const handleVideoProgress = useCallback((data: any) => {
         if (videoDuration > 0 && !isPaused) {
             const currentProgress = data.currentTime / (videoDuration / 1000);
-            progress.value = Math.min(currentProgress, 1);
+            rawProgress.value = Math.min(currentProgress, 1); // Update raw, smoothing happens in reaction
         }
-    }, [videoDuration, isPaused, progress]);
+    }, [videoDuration, isPaused, rawProgress]);
 
     // 🔥 FIX: Handle video end
     const handleVideoEnd = useCallback(() => {
@@ -87,9 +124,10 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
         const newIndex = e.nativeEvent.position;
         setCurrentIndex(newIndex);
         setIsLiked(stories[newIndex]?.isLiked || false);
+        rawProgress.value = 0;
         progress.value = 0;
         setVideoDuration(0); // Reset for new video's duration
-    }, [stories, progress]);
+    }, [stories, rawProgress, progress]);
 
     // Tap handlers
     const handleHoldStart = useCallback(() => {
