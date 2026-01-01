@@ -65,6 +65,22 @@ export class SupabaseProfileDataSource {
         return data;
     }
 
+    async checkUsernameAvailability(username: string, currentUserId: string): Promise<boolean> {
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('username', username)
+            .maybeSingle();
+
+        if (error) {
+            console.error('[SupabaseDataSource] ❌ Username check error:', error);
+            throw error;
+        }
+
+        // Username is available if no data found, or if the found user is the current user
+        return !data || data.id === currentUserId;
+    }
+
     async uploadAvatar(userId: string, fileUri: string): Promise<string> {
         console.log(`🚀 [UPLOAD] Starting avatar upload for: ${userId}`);
 

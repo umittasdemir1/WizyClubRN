@@ -1,5 +1,5 @@
 import React, { forwardRef, useState, useMemo, useEffect } from 'react';
-import { Dimensions, ScrollView, View, Text, StyleSheet, TouchableOpacity, Image, Modal, Pressable } from 'react-native';
+import { Dimensions, ScrollView, View, Text, StyleSheet, TouchableOpacity, Image, Modal, Pressable, Alert } from 'react-native';
 import BottomSheet, { BottomSheetView, BottomSheetTextInput, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { RefreshCcw, XCircle, ChevronRight, PlusCircle, Trash2 } from 'lucide-react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -8,8 +8,11 @@ import * as ImagePicker from 'expo-image-picker';
 import { useThemeStore } from '../../store/useThemeStore';
 import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
 import { User } from '../../../domain/entities/User';
+import { ProfileRepositoryImpl } from '../../../data/repositories/ProfileRepositoryImpl';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+const profileRepo = new ProfileRepositoryImpl();
 
 interface EditProfileSheetProps {
   user: User;
@@ -33,6 +36,7 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
     const [currentAvatar, setCurrentAvatar] = useState(user.avatarUrl);
 
     const [isSaving, setIsSaving] = useState(false);
+    const [usernameError, setUsernameError] = useState<string | null>(null);
 
     // Form States
     const [tempName, setTempName] = useState(user.fullName || '');
@@ -77,18 +81,35 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
 
     const handleSaveAll = async () => {
       setIsSaving(true);
+      setUsernameError(null);
+
       try {
-        // 1. Upload avatar if changed
+        // 1. Check if username has changed and validate availability
+        const usernameChanged = tempUsername !== user.username;
+        if (usernameChanged) {
+          const isAvailable = await profileRepo.checkUsernameAvailability(tempUsername, user.id);
+          if (!isAvailable) {
+            Alert.alert(
+              'Kullanıcı Adı Kullanımda',
+              'Bu kullanıcı adı zaten kullanılıyor. Lütfen farklı bir kullanıcı adı seçin.',
+              [{ text: 'Tamam' }]
+            );
+            setUsernameError('Bu kullanıcı adı zaten kullanılıyor');
+            setIsSaving(false);
+            return;
+          }
+        }
+
+        // 2. Upload avatar if changed
         let avatarUrl = currentAvatar;
         if (currentAvatar !== user.avatarUrl && currentAvatar.startsWith('file://')) {
           const uploadedUrl = await onUploadAvatar(currentAvatar);
           if (uploadedUrl) avatarUrl = uploadedUrl;
         }
 
-        // 2. Update profile with all fields
-        await onUpdateProfile({
+        // 3. Build update object - only include username if it changed
+        const updates: Partial<User> = {
           fullName: tempName,
-          username: tempUsername,
           bio: tempBio,
           avatarUrl: avatarUrl,
           website: tempWebsite,
@@ -96,12 +117,25 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
           tiktokUrl: tempTiktok,
           youtubeUrl: tempYoutube,
           xUrl: tempX
-        });
+        };
+
+        // Only include username if it actually changed
+        if (usernameChanged) {
+          updates.username = tempUsername;
+        }
+
+        // 4. Update profile
+        await onUpdateProfile(updates);
 
         onUpdateCompleted?.();
         handleClose();
       } catch (error) {
         console.error('Error saving profile:', error);
+        Alert.alert(
+          'Hata',
+          'Profil kaydedilirken bir hata oluştu. Lütfen tekrar deneyin.',
+          [{ text: 'Tamam' }]
+        );
       } finally {
         setIsSaving(false);
       }
@@ -238,11 +272,11 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
     const renderUsernameEdit = () => (
       <Animated.View entering={FadeIn} exiting={FadeOut} style={{ flex: 1 }}>
         <View style={[styles.header, { borderBottomColor: borderColor }]}>
-          <TouchableOpacity onPress={() => setActiveSubView(null)} style={styles.closeButton}>
+          <TouchableOpacity onPress={() => { setActiveSubView(null); setUsernameError(null); }} style={styles.closeButton}>
             <Text style={{ color: textColor, fontSize: 16 }}>İptal</Text>
           </TouchableOpacity>
           <Text style={[styles.title, { color: textColor }]}>Kullanıcı Adı</Text>
-          <TouchableOpacity onPress={() => setActiveSubView(null)} style={styles.saveButton}>
+          <TouchableOpacity onPress={() => { setActiveSubView(null); setUsernameError(null); }} style={styles.saveButton}>
             <Text style={{ color: '#007AFF', fontSize: 16, fontWeight: '600' }}>Kaydet</Text>
           </TouchableOpacity>
         </View>
@@ -253,20 +287,23 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
             Kullanıcı adınızı 90 gün içerisinde yalnızca bir kez değiştirebilirsiniz. Kullanıcı adları yalnızca harf, rakam, alt çizgi ve nokta içerebilir.
           </Text>
 
-          <View style={[styles.inputWrapper, { borderBottomColor: borderColor }]}>
+          <View style={[styles.inputWrapper, { borderBottomColor: usernameError ? '#FF3B30' : borderColor }]}>
             <View style={styles.inputContainer}>
               <BottomSheetTextInput
                 style={[styles.subViewInput, { color: textColor }]}
                 value={tempUsername}
                 onChangeText={(text) => {
                   const filtered = text.replace(/[^a-zA-Z0-9_.]/g, '');
-                  if (filtered.length <= 35) setTempUsername(filtered.toLowerCase());
+                  if (filtered.length <= 35) {
+                    setTempUsername(filtered.toLowerCase());
+                    setUsernameError(null); // Clear error on change
+                  }
                 }}
                 autoFocus
                 autoCapitalize="none"
               />
               {tempUsername.length > 0 && (
-                <TouchableOpacity onPress={() => setTempUsername('')}>
+                <TouchableOpacity onPress={() => { setTempUsername(''); setUsernameError(null); }}>
                   <XCircle size={18} color={secondaryTextColor} />
                 </TouchableOpacity>
               )}
@@ -277,6 +314,11 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
               </Text>
               <Text style={[styles.charCountBottom, { color: secondaryTextColor }]}>{tempUsername.length}/35</Text>
             </View>
+            {usernameError && (
+              <Text style={styles.errorText}>
+                {usernameError}
+              </Text>
+            )}
           </View>
         </View>
       </Animated.View>
@@ -480,6 +522,7 @@ const styles = StyleSheet.create({
   charCountBottom: { fontSize: 12, marginTop: 4, textAlign: 'right' },
   usernameFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   urlPreview: { fontSize: 12, marginTop: 4, flex: 1 },
+  errorText: { fontSize: 12, marginTop: 4, color: '#FF3B30' },
   linksHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   linksList: { marginTop: 16 },
   linkRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 0.5 },
