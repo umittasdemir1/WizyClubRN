@@ -62,7 +62,7 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
             let isContinuous = false;
             if (prevResult && !prevResult.paused) {
                 const diff = Math.abs(targetProgress - prevResult.raw);
-                if (diff < 0.05) { // Small incremental change
+                if (diff < 0.1) { // Small incremental change = smooth it
                     isContinuous = true;
                 }
             }
@@ -70,7 +70,7 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
             if (isContinuous) {
                 // Smooth animation for continuous playback
                 progress.value = withTiming(targetProgress, {
-                    duration: 33, // ~30fps smoothing
+                    duration: 100, // Smooth interpolation between updates
                     easing: Easing.linear
                 });
             } else {
@@ -207,6 +207,7 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
                                 repeat={false}
                                 paused={isPaused || index !== currentIndex}
                                 muted={false}
+                                progressUpdateInterval={50}
                                 onLoad={index === currentIndex ? handleVideoLoad : undefined}
                                 onProgress={index === currentIndex ? handleVideoProgress : undefined}
                                 onEnd={index === currentIndex ? handleVideoEnd : undefined}
