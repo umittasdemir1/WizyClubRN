@@ -38,12 +38,23 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
     const [flyingEmojis, setFlyingEmojis] = useState<FlyingEmojiData[]>([]);
     const holdTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    // 🔥 FIX: Track actual video duration
+    // 🔥 FIX: Track video durations for each story
+    const videoDurationsRef = useRef<{ [storyId: string]: number }>({});
     const [videoDuration, setVideoDuration] = useState(0);
 
     // Progress bar - smooth animation system (like feed seekbar)
     const rawProgress = useSharedValue(0); // Raw progress from video
     const progress = useSharedValue(0); // Smoothed progress for UI
+
+    // 🔥 Initialize duration for initial story if already cached
+    useEffect(() => {
+        const initialStory = stories[currentIndex];
+        const cachedDuration = videoDurationsRef.current[initialStory?.id];
+        if (cachedDuration && videoDuration === 0) {
+            console.log(`[StoryViewer] Initial story has cached duration: ${cachedDuration}ms`);
+            setVideoDuration(cachedDuration);
+        }
+    }, [currentIndex, stories, videoDuration]);
 
     // 🔥 Smooth progress animation (prevents stuttering)
     useAnimatedReaction(
@@ -100,11 +111,18 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
     }, [router]);
 
     // 🔥 FIX: Handle video load to get actual duration
-    const handleVideoLoad = useCallback((data: any) => {
+    const handleVideoLoad = useCallback((storyId: string, storyIndex: number) => (data: any) => {
         const durationMs = (data.duration || 10) * 1000; // Convert to ms
-        console.log(`[StoryViewer] Video loaded, duration: ${durationMs}ms`);
-        setVideoDuration(durationMs);
-    }, []);
+        console.log(`[StoryViewer] Video loaded for story ${storyId}, duration: ${durationMs}ms`);
+
+        // Cache duration for this story
+        videoDurationsRef.current[storyId] = durationMs;
+
+        // If this is the current story, update state
+        if (storyIndex === currentIndex) {
+            setVideoDuration(durationMs);
+        }
+    }, [currentIndex]);
 
     // 🔥 FIX: Sync progress with video playback
     const handleVideoProgress = useCallback((data: any) => {
@@ -122,11 +140,22 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
 
     const handlePageSelected = useCallback((e: any) => {
         const newIndex = e.nativeEvent.position;
+        const newStory = stories[newIndex];
+
         setCurrentIndex(newIndex);
-        setIsLiked(stories[newIndex]?.isLiked || false);
+        setIsLiked(newStory?.isLiked || false);
         rawProgress.value = 0;
         progress.value = 0;
-        setVideoDuration(0); // Reset for new video's duration
+
+        // Check if we already have cached duration for this story
+        const cachedDuration = videoDurationsRef.current[newStory.id];
+        if (cachedDuration) {
+            console.log(`[StoryViewer] Using cached duration for story ${newStory.id}: ${cachedDuration}ms`);
+            setVideoDuration(cachedDuration);
+        } else {
+            console.log(`[StoryViewer] No cached duration for story ${newStory.id}, waiting for onLoad`);
+            setVideoDuration(0);
+        }
     }, [stories, rawProgress, progress]);
 
     // Tap handlers
@@ -201,6 +230,7 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
                     {stories.map((story, index) => (
                         <View key={story.id} style={styles.page}>
                             <Video
+                                key={`video-${story.id}`}
                                 source={{ uri: story.videoUrl }}
                                 style={styles.video}
                                 resizeMode="contain"
@@ -208,7 +238,7 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
                                 paused={isPaused || index !== currentIndex}
                                 muted={false}
                                 progressUpdateInterval={50}
-                                onLoad={index === currentIndex ? handleVideoLoad : undefined}
+                                onLoad={handleVideoLoad(story.id, index)}
                                 onProgress={index === currentIndex ? handleVideoProgress : undefined}
                                 onEnd={index === currentIndex ? handleVideoEnd : undefined}
                             />
