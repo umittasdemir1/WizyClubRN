@@ -1,5 +1,5 @@
 import React, { forwardRef, useState, useMemo, useEffect } from 'react';
-import { Dimensions, ScrollView, View, Text, StyleSheet, TouchableOpacity, Image, Modal, Pressable, Alert } from 'react-native';
+import { Dimensions, ScrollView, View, Text, StyleSheet, TouchableOpacity, Image, Modal, Pressable } from 'react-native';
 import BottomSheet, { BottomSheetView, BottomSheetTextInput, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { RefreshCcw, XCircle, ChevronRight, PlusCircle, Trash2 } from 'lucide-react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -94,11 +94,6 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
       try {
         const isAvailable = await profileRepo.checkUsernameAvailability(tempUsername, user.id);
         if (!isAvailable) {
-          Alert.alert(
-            'Kullanıcı Adı Kullanımda',
-            'Bu kullanıcı adı zaten kullanılıyor. Lütfen farklı bir kullanıcı adı seçin.',
-            [{ text: 'Tamam' }]
-          );
           setUsernameError('Bu kullanıcı adı zaten kullanılıyor');
           setIsSaving(false);
           return;
@@ -109,11 +104,7 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
         setUsernameError(null);
       } catch (error) {
         console.error('Error checking username:', error);
-        Alert.alert(
-          'Hata',
-          'Kullanıcı adı kontrol edilirken bir hata oluştu. Lütfen tekrar deneyin.',
-          [{ text: 'Tamam' }]
-        );
+        setUsernameError('Kullanıcı adı kontrol edilirken bir hata oluştu');
       } finally {
         setIsSaving(false);
       }
@@ -154,11 +145,6 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
         handleClose();
       } catch (error) {
         console.error('Error saving profile:', error);
-        Alert.alert(
-          'Hata',
-          'Profil kaydedilirken bir hata oluştu. Lütfen tekrar deneyin.',
-          [{ text: 'Tamam' }]
-        );
       } finally {
         setIsSaving(false);
       }
