@@ -79,35 +79,58 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
       }
     };
 
-    const handleSaveAll = async () => {
+    const handleSaveUsername = async () => {
+      // Check if username has changed
+      const usernameChanged = tempUsername !== user.username;
+      if (!usernameChanged) {
+        setActiveSubView(null);
+        setUsernameError(null);
+        return;
+      }
+
       setIsSaving(true);
       setUsernameError(null);
 
       try {
-        // 1. Check if username has changed and validate availability
-        const usernameChanged = tempUsername !== user.username;
-        if (usernameChanged) {
-          const isAvailable = await profileRepo.checkUsernameAvailability(tempUsername, user.id);
-          if (!isAvailable) {
-            Alert.alert(
-              'Kullanıcı Adı Kullanımda',
-              'Bu kullanıcı adı zaten kullanılıyor. Lütfen farklı bir kullanıcı adı seçin.',
-              [{ text: 'Tamam' }]
-            );
-            setUsernameError('Bu kullanıcı adı zaten kullanılıyor');
-            setIsSaving(false);
-            return;
-          }
+        const isAvailable = await profileRepo.checkUsernameAvailability(tempUsername, user.id);
+        if (!isAvailable) {
+          Alert.alert(
+            'Kullanıcı Adı Kullanımda',
+            'Bu kullanıcı adı zaten kullanılıyor. Lütfen farklı bir kullanıcı adı seçin.',
+            [{ text: 'Tamam' }]
+          );
+          setUsernameError('Bu kullanıcı adı zaten kullanılıyor');
+          setIsSaving(false);
+          return;
         }
 
-        // 2. Upload avatar if changed
+        // Username is available, close the subview
+        setActiveSubView(null);
+        setUsernameError(null);
+      } catch (error) {
+        console.error('Error checking username:', error);
+        Alert.alert(
+          'Hata',
+          'Kullanıcı adı kontrol edilirken bir hata oluştu. Lütfen tekrar deneyin.',
+          [{ text: 'Tamam' }]
+        );
+      } finally {
+        setIsSaving(false);
+      }
+    };
+
+    const handleSaveAll = async () => {
+      setIsSaving(true);
+
+      try {
+        // 1. Upload avatar if changed
         let avatarUrl = currentAvatar;
         if (currentAvatar !== user.avatarUrl && currentAvatar.startsWith('file://')) {
           const uploadedUrl = await onUploadAvatar(currentAvatar);
           if (uploadedUrl) avatarUrl = uploadedUrl;
         }
 
-        // 3. Build update object - only include username if it changed
+        // 2. Build update object - only include username if it changed
         const updates: Partial<User> = {
           fullName: tempName,
           bio: tempBio,
@@ -120,11 +143,11 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
         };
 
         // Only include username if it actually changed
-        if (usernameChanged) {
+        if (tempUsername !== user.username) {
           updates.username = tempUsername;
         }
 
-        // 4. Update profile
+        // 3. Update profile
         await onUpdateProfile(updates);
 
         onUpdateCompleted?.();
@@ -276,8 +299,8 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
             <Text style={{ color: textColor, fontSize: 16 }}>İptal</Text>
           </TouchableOpacity>
           <Text style={[styles.title, { color: textColor }]}>Kullanıcı Adı</Text>
-          <TouchableOpacity onPress={() => { setActiveSubView(null); setUsernameError(null); }} style={styles.saveButton}>
-            <Text style={{ color: '#007AFF', fontSize: 16, fontWeight: '600' }}>Kaydet</Text>
+          <TouchableOpacity onPress={handleSaveUsername} style={styles.saveButton} disabled={isSaving}>
+            <Text style={{ color: isSaving ? '#999' : '#007AFF', fontSize: 16, fontWeight: '600' }}>Kaydet</Text>
           </TouchableOpacity>
         </View>
 
