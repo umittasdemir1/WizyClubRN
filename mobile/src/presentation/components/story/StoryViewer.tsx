@@ -42,6 +42,9 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
     const videoDurationsRef = useRef<{ [storyId: string]: number }>({});
     const [videoDuration, setVideoDuration] = useState(0);
 
+    // 🔥 FIX: Track video refs for seeking
+    const videoRefs = useRef<{ [storyId: string]: any }>({});
+
     // Progress bar - smooth animation system (like feed seekbar)
     const rawProgress = useSharedValue(0); // Raw progress from video
     const progress = useSharedValue(0); // Smoothed progress for UI
@@ -141,6 +144,21 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
     const handlePageSelected = useCallback((e: any) => {
         const newIndex = e.nativeEvent.position;
         const newStory = stories[newIndex];
+        const prevStory = stories[currentIndex];
+
+        // 🔥 Reset previous video to start (prevents memory buildup)
+        if (prevStory && videoRefs.current[prevStory.id]) {
+            console.log(`[StoryViewer] Seeking previous story ${prevStory.id} to 0`);
+            videoRefs.current[prevStory.id]?.seek(0);
+        }
+
+        // 🔥 Reset new story to start (ensures fresh playback)
+        setTimeout(() => {
+            if (newStory && videoRefs.current[newStory.id]) {
+                console.log(`[StoryViewer] Seeking new story ${newStory.id} to 0`);
+                videoRefs.current[newStory.id]?.seek(0);
+            }
+        }, 100); // Small delay to ensure video ref is ready
 
         setCurrentIndex(newIndex);
         setIsLiked(newStory?.isLiked || false);
@@ -156,7 +174,7 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
             console.log(`[StoryViewer] No cached duration for story ${newStory.id}, waiting for onLoad`);
             setVideoDuration(0);
         }
-    }, [stories, rawProgress, progress]);
+    }, [stories, currentIndex, rawProgress, progress]);
 
     // Tap handlers
     const handleHoldStart = useCallback(() => {
@@ -230,6 +248,7 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
                     {stories.map((story, index) => (
                         <View key={story.id} style={styles.page}>
                             <Video
+                                ref={(ref) => { videoRefs.current[story.id] = ref; }}
                                 key={`video-${story.id}`}
                                 source={{ uri: story.videoUrl }}
                                 style={styles.video}
