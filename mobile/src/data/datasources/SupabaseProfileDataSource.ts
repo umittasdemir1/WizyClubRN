@@ -4,21 +4,20 @@ import { CONFIG } from '../../core/config';
 
 export class SupabaseProfileDataSource {
     async getProfile(userId: string, viewerId?: string): Promise<any> {
-        console.log('[SupabaseDataSource] 🔍 Fetching profile for ID:', userId);
         const { data, error } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', userId)
-            .single();
+            .maybeSingle(); // Use maybeSingle instead of single to handle missing profiles gracefully
 
         if (error) {
-            console.error('[SupabaseDataSource] ❌ Profile fetch error:', {
-                message: error.message,
-                details: error.details,
-                hint: error.hint,
-                code: error.code
-            });
+            console.error('[SupabaseDataSource] ❌ Profile fetch error:', error);
             throw error;
+        }
+
+        if (!data) {
+            // Profile doesn't exist - return null instead of throwing
+            return null;
         }
 
         if (viewerId) {

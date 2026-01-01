@@ -54,7 +54,6 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
         const initialStory = stories[currentIndex];
         const cachedDuration = videoDurationsRef.current[initialStory?.id];
         if (cachedDuration && videoDuration === 0) {
-            console.log(`[StoryViewer] Initial story has cached duration: ${cachedDuration}ms`);
             setVideoDuration(cachedDuration);
         }
     }, [currentIndex, stories, videoDuration]);
@@ -116,7 +115,6 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
     // 🔥 FIX: Handle video load to get actual duration
     const handleVideoLoad = useCallback((storyId: string, storyIndex: number) => (data: any) => {
         const durationMs = (data.duration || 10) * 1000; // Convert to ms
-        console.log(`[StoryViewer] Video loaded for story ${storyId}, duration: ${durationMs}ms`);
 
         // Cache duration for this story
         videoDurationsRef.current[storyId] = durationMs;
@@ -137,7 +135,6 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
 
     // 🔥 FIX: Handle video end
     const handleVideoEnd = useCallback(() => {
-        console.log('[StoryViewer] Video ended, going to next');
         handleNext();
     }, [handleNext]);
 
@@ -148,14 +145,12 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
 
         // 🔥 Reset previous video to start (prevents memory buildup)
         if (prevStory && videoRefs.current[prevStory.id]) {
-            console.log(`[StoryViewer] Seeking previous story ${prevStory.id} to 0`);
             videoRefs.current[prevStory.id]?.seek(0);
         }
 
         // 🔥 Reset new story to start (ensures fresh playback)
         setTimeout(() => {
             if (newStory && videoRefs.current[newStory.id]) {
-                console.log(`[StoryViewer] Seeking new story ${newStory.id} to 0`);
                 videoRefs.current[newStory.id]?.seek(0);
             }
         }, 100); // Small delay to ensure video ref is ready
@@ -168,10 +163,8 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
         // Check if we already have cached duration for this story
         const cachedDuration = videoDurationsRef.current[newStory.id];
         if (cachedDuration) {
-            console.log(`[StoryViewer] Using cached duration for story ${newStory.id}: ${cachedDuration}ms`);
             setVideoDuration(cachedDuration);
         } else {
-            console.log(`[StoryViewer] No cached duration for story ${newStory.id}, waiting for onLoad`);
             setVideoDuration(0);
         }
     }, [stories, currentIndex, rawProgress, progress]);
