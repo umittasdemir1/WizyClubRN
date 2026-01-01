@@ -110,11 +110,6 @@ export default function ProfileScreen() {
 
   const { videos, refreshFeed } = useVideoFeed();
 
-  // Debug logging
-  useEffect(() => {
-    console.log('[Profile] Auth user:', authUser?.id);
-    console.log('[Profile] Current user ID:', currentUserId);
-  }, [authUser, currentUserId]);
 
   const { user: profileUser, isLoading, reload, updateProfile, uploadAvatar } = useProfile(currentUserId);
 

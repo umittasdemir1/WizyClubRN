@@ -12,16 +12,15 @@ export class ProfileRepositoryImpl implements IProfileRepository {
     async getProfile(userId: string, viewerId?: string): Promise<User | null> {
         try {
             const data = await this.dataSource.getProfile(userId, viewerId);
-            console.log('[ProfileRepository] ✅ Mapping profile data to domain entity');
+
+            if (!data) {
+                // Profile doesn't exist - return null gracefully
+                return null;
+            }
+
             return this.mapDtoToUser(data);
         } catch (error: any) {
-            console.error('[ProfileRepository] ❌ getProfile error:', {
-                message: error?.message,
-                details: error?.details,
-                hint: error?.hint,
-                code: error?.code,
-                fullError: error
-            });
+            console.error('[ProfileRepository] ❌ getProfile error:', error);
             return null;
         }
     }

@@ -29,11 +29,12 @@ export const useProfile = (userId: string, viewerId?: string) => {
     }, [userId, viewerId]);
 
     useEffect(() => {
-        if (userId) {
+        // Only load if userId is valid (not a fallback or invalid ID)
+        if (userId && userId.length > 0) {
             loadProfile();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [userId]); // ❌ REMOVED: loadProfile dependency - only load on mount/userId change
+    }, [userId]); // Only load on mount/userId change
 
     const updateProfile = useCallback(async (updates: Partial<User>) => {
         try {
