@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
     },
     item: {
         width: '100%',
-        borderRadius: 4,
+        borderRadius: 0,
         overflow: 'hidden',
         backgroundColor: '#1a1a1a',
         position: 'relative',

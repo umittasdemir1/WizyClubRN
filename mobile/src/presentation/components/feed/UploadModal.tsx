@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
 import { CONFIG } from '../../../core/config';
 import { router } from 'expo-router';
+import { useStoryStore } from '../../store/useStoryStore';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -64,6 +65,8 @@ export function UploadModal({ isVisible, onClose, initialVideo, uploadMode = 'vi
     const [showBrandInfoModal, setShowBrandInfoModal] = useState(false);
     const [showTagInputModal, setShowTagInputModal] = useState(false);
     const [currentTagInput, setCurrentTagInput] = useState('');
+
+    const triggerStoryRefresh = useStoryStore(state => state.triggerRefresh);
 
     // Set StatusBar when modal opens
     useEffect(() => {
@@ -225,6 +228,11 @@ export function UploadModal({ isVisible, onClose, initialVideo, uploadMode = 'vi
                                 // 🔥 For stories, don't pass ID (avoids video fetch error in feed)
                                 // For videos, pass ID so feed can prepend the new video
                                 setSuccess(uploadMode === 'story' ? '' : (response.data?.id || 'new-video'));
+                                
+                                if (uploadMode === 'story') {
+                                    triggerStoryRefresh(); // 🔥 REFRESH STORIES
+                                }
+
                                 // Reset form
                                 setSelectedMedia(null);
                                 setDescription('');

@@ -30,6 +30,16 @@ export class SupabaseProfileDataSource {
             data.is_following = count ? count > 0 : false;
         }
 
+        // Check for active stories
+        const now = new Date().toISOString();
+        const { count: storiesCount } = await supabase
+            .from('stories')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .gt('expires_at', now);
+
+        data.has_stories = storiesCount ? storiesCount > 0 : false;
+
         console.log('[SupabaseDataSource] ✅ Profile fetched successfully:', data?.username);
         return data;
     }

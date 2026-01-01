@@ -53,29 +53,8 @@ export class InteractionDataSource {
             following_id: followingId
         });
 
-        // 2. Update follower's following_count
-        const { data: followerProfile } = await supabase
-            .from('profiles')
-            .select('following_count')
-            .eq('id', followerId)
-            .single();
-
-        await supabase
-            .from('profiles')
-            .update({ following_count: (followerProfile?.following_count || 0) + 1 })
-            .eq('id', followerId);
-
-        // 3. Update following's followers_count
-        const { data: followingProfile } = await supabase
-            .from('profiles')
-            .select('followers_count')
-            .eq('id', followingId)
-            .single();
-
-        await supabase
-            .from('profiles')
-            .update({ followers_count: (followingProfile?.followers_count || 0) + 1 })
-            .eq('id', followingId);
+        // 2. & 3. Manual count updates REMOVED to prevent double counting.
+        // DB triggers should handle 'following_count' and 'followers_count' updates.
     }
 
     async unfollow(followerId: string, followingId: string): Promise<void> {
@@ -85,28 +64,7 @@ export class InteractionDataSource {
             .eq('follower_id', followerId)
             .eq('following_id', followingId);
 
-        // 2. Update follower's following_count
-        const { data: followerProfile } = await supabase
-            .from('profiles')
-            .select('following_count')
-            .eq('id', followerId)
-            .single();
-
-        await supabase
-            .from('profiles')
-            .update({ following_count: Math.max(0, (followerProfile?.following_count || 0) - 1) })
-            .eq('id', followerId);
-
-        // 3. Update following's followers_count
-        const { data: followingProfile } = await supabase
-            .from('profiles')
-            .select('followers_count')
-            .eq('id', followingId)
-            .single();
-
-        await supabase
-            .from('profiles')
-            .update({ followers_count: Math.max(0, (followingProfile?.followers_count || 0) - 1) })
-            .eq('id', followingId);
+        // 2. & 3. Manual count updates REMOVED to prevent double counting.
+        // DB triggers should handle 'following_count' and 'followers_count' updates.
     }
 }

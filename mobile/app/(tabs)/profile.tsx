@@ -108,7 +108,7 @@ export default function ProfileScreen() {
     }
   }, [isInitialized, initialize]);
 
-  const { videos, refreshFeed } = useVideoFeed();
+  const { videos, refreshFeed } = useVideoFeed(currentUserId);
 
 
   const { user: profileUser, isLoading, reload, updateProfile, uploadAvatar } = useProfile(currentUserId);
@@ -285,7 +285,20 @@ export default function ProfileScreen() {
             <ProfileSkeleton />
           ) : (
             <View style={styles.profileContainer}>
-              <ProfileStats followingCount={user.followingCount} followersCount={user.followersCount} mainAvatarUrl={user.avatarUrl} isDark={isDark} />
+              <ProfileStats
+                userId={user.entity.id}
+                followingCount={user.followingCount}
+                followersCount={user.followersCount}
+                mainAvatarUrl={user.avatarUrl}
+                isDark={isDark}
+                hasStories={user.entity.hasStories}
+                onAvatarPress={() => {
+                  if (user.entity.hasStories) {
+                    // Navigate to story viewer with user ID
+                    router.push(`/story/${user.entity.id}`);
+                  }
+                }}
+              />
 
               <View style={styles.userNameRow}>
                 <Text style={[styles.userNameText, { color: textPrimary }]}>{user.name}</Text>

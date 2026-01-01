@@ -186,12 +186,18 @@ export default function UserProfileScreen() {
   const [isNotificationsOn, setIsNotificationsOn] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [isUserOptionsVisible, setIsUserOptionsVisible] = useState(false);
-  const { videos, refreshFeed } = useVideoFeed();
-  const [refreshing, setRefreshing] = useState(false);
   const [previewItem, setPreviewItem] = useState<{ id: string; thumbnail: string; videoUrl: string } | null>(null);
 
   const bioSheetRef = useRef<BottomSheet>(null);
   const clubsSheetRef = useRef<BottomSheet>(null);
+
+  const { user: authUser } = useAuthStore();
+  const currentUserId = authUser?.id;
+
+  const userId = (typeof id === 'string' ? id : '') || '';
+  const { videos, refreshFeed } = useVideoFeed(userId);
+  const [refreshing, setRefreshing] = useState(false);
+  const { user: profileUser, isLoading, reload } = useProfile(userId, currentUserId);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -209,13 +215,6 @@ export default function UserProfileScreen() {
   const btnFollowBg = isDark ? '#ffffff' : '#000000';
   const btnFollowText = isDark ? '#000000' : '#ffffff';
   const btnSecondaryBg = themeColors.card;
-
-  // --- Real Data Fetching ---
-  const { user: authUser } = useAuthStore();
-  const currentUserId = authUser?.id;
-
-  const userId = (typeof id === 'string' ? id : '') || '';
-  const { user: profileUser, isLoading, reload } = useProfile(userId, currentUserId);
 
   // Sync isFollowing from profile data
   useEffect(() => {
@@ -331,7 +330,19 @@ export default function UserProfileScreen() {
           <ProfileSkeleton />
         ) : (
           <View style={styles.profileContainer}>
-            <ProfileStats followingCount={user.followingCount} followersCount={user.followersCount} mainAvatarUrl={user.avatarUrl} isDark={isDark} />
+            <ProfileStats
+              userId={userId}
+              followingCount={user.followingCount}
+              followersCount={user.followersCount}
+              mainAvatarUrl={user.avatarUrl}
+              isDark={isDark}
+              hasStories={profileUser?.hasStories}
+              onAvatarPress={() => {
+                if (profileUser?.hasStories) {
+                  router.push(`/story/${userId}`);
+                }
+              }}
+            />
 
             <View style={styles.userNameRow}>
               <Text style={[styles.userNameText, { color: textPrimary }]}>{user.name}</Text>

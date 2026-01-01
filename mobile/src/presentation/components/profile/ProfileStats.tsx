@@ -1,23 +1,40 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Avatar } from '../shared/Avatar';
+import { AdvancedStoryRing } from '../shared/AdvancedStoryRing';
+import { useStoryStore } from '../../store/useStoryStore';
 
 interface ProfileStatsProps {
+  userId?: string;
   followingCount: string | number;
   followersCount: string | number;
   mainAvatarUrl: string;
   isDark: boolean;
+  hasStories?: boolean;
+  onAvatarPress?: () => void;
 }
 
 export const ProfileStats: React.FC<ProfileStatsProps> = ({
+  userId,
   followingCount,
   followersCount,
   mainAvatarUrl,
   isDark,
+  hasStories = false,
+  onAvatarPress,
 }) => {
   const textColor = isDark ? '#fff' : '#000';
   const labelColor = isDark ? '#888' : '#555';
   const cardBg = isDark ? '#1c1c1e' : '#f0f0f0';
+  const avatarSize = 90;
+  // Desired specs: 3px thickness, 3px gap
+  const THICKNESS = 3;
+  const GAP = 3;
+  const RING_SIZE = avatarSize + (THICKNESS * 2) + (GAP * 2);
+  
+  // Reactive selector: re-renders only when this specific condition changes
+  const isViewedLocal = useStoryStore(state => userId ? state.viewedUserIds.has(userId) : false);
+  const isViewed = isViewedLocal;
 
   return (
     <View style={styles.container}>
@@ -30,9 +47,17 @@ export const ProfileStats: React.FC<ProfileStatsProps> = ({
       </View>
 
       {/* Main Avatar (Center) */}
-      <View style={[styles.avatarBox, { borderColor: cardBg }]}>
-        <Avatar url={mainAvatarUrl} size={90} />
-      </View>
+      <Pressable onPress={onAvatarPress} style={styles.avatarWrapper}>
+        {hasStories ? (
+          <AdvancedStoryRing size={RING_SIZE} thickness={THICKNESS} gap={GAP} viewed={isViewed}>
+            <Avatar url={mainAvatarUrl} size={avatarSize} />
+          </AdvancedStoryRing>
+        ) : (
+          <View style={[styles.avatarBox, { borderColor: cardBg, borderWidth: 2 }]}>
+            <Avatar url={mainAvatarUrl} size={avatarSize} />
+          </View>
+        )}
+      </Pressable>
 
       {/* Takipte (Right) */}
       <View style={styles.statBox}>
@@ -73,12 +98,16 @@ const styles = StyleSheet.create({
     fontSize: 11,
     textTransform: 'uppercase',
   },
+  avatarWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
   avatarBox: {
     width: 90,
     height: 90,
     borderRadius: 45,
     overflow: 'hidden',
-    borderWidth: 2,
     elevation: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },

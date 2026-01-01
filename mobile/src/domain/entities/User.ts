@@ -12,6 +12,7 @@ export interface User {
     followersCount?: number;
     followingCount?: number;
     postsCount?: number;
+    hasStories?: boolean;
     // Social Links
     instagramUrl?: string;
     tiktokUrl?: string;

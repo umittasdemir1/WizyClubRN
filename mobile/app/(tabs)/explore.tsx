@@ -65,12 +65,20 @@ export default function ExploreScreen() {
         comments: '1.1k'
     }));
 
-    const creators = videos.slice(0, 10).map(v => ({
-        id: v.id,
-        username: v.user.username,
-        avatarUrl: v.user.avatarUrl,
-        hasUnseen: Math.random() > 0.5
-    }));
+    // 🔥 FIX: Deduplicate users and use User ID instead of Video ID
+    const uniqueUsers = new Map();
+    videos.forEach(v => {
+        if (!uniqueUsers.has(v.user.id)) {
+            uniqueUsers.set(v.user.id, {
+                id: v.user.id, // User ID used for navigation
+                username: v.user.username,
+                avatarUrl: v.user.avatarUrl,
+                hasUnseen: Math.random() > 0.5 // Mock data kept as is
+            });
+        }
+    });
+
+    const creators = Array.from(uniqueUsers.values()).slice(0, 10);
 
     const discoveryItems = videos.map((v, i) => ({
         id: v.id,

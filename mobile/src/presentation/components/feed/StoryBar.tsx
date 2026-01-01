@@ -1,5 +1,5 @@
 import React, { memo, useEffect, useMemo, useState } from 'react';
-import { View, StyleSheet, ScrollView, Dimensions } from 'react-native';
+import { View, StyleSheet, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
     useSharedValue,
@@ -9,7 +9,6 @@ import Animated, {
 } from 'react-native-reanimated';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { StoryAvatar } from './StoryAvatar';
-import { BlurView } from 'expo-blur';
 
 const BAR_HEIGHT = 110;
 
@@ -34,7 +33,7 @@ export const StoryBar = memo(function StoryBar({
     onClose,
 }: StoryBarProps) {
     const insets = useSafeAreaInsets();
-    const translateY = useSharedValue(-BAR_HEIGHT);
+    const translateY = useSharedValue(-BAR_HEIGHT - insets.top);
     const opacity = useSharedValue(0);
     const [shouldRender, setShouldRender] = useState(false);
 
@@ -47,13 +46,13 @@ export const StoryBar = memo(function StoryBar({
         } else {
             // Kapanırken bitiş callback'i kullanıyoruz
             opacity.value = withTiming(0, { duration: 200 });
-            translateY.value = withTiming(-BAR_HEIGHT, { duration: 250 }, (finished) => {
+            translateY.value = withTiming(-BAR_HEIGHT - insets.top, { duration: 250 }, (finished) => {
                 if (finished) {
                     runOnJS(setShouldRender)(false);
                 }
             });
         }
-    }, [isVisible]);
+    }, [isVisible, insets.top]);
 
     const panGesture = Gesture.Pan()
         .onUpdate((event) => {
@@ -66,7 +65,7 @@ export const StoryBar = memo(function StoryBar({
             if (event.translationY < -30 || event.velocityY < -500) {
                 // Kapanma animasyonunu başlat
                 opacity.value = withTiming(0, { duration: 200 });
-                translateY.value = withTiming(-BAR_HEIGHT, { duration: 250 }, (finished) => {
+                translateY.value = withTiming(-BAR_HEIGHT - insets.top, { duration: 250 }, (finished) => {
                     if (finished) {
                         runOnJS(setShouldRender)(false);
                         runOnJS(onClose)(); // Video ancak şimdi başlayabilir
@@ -106,7 +105,6 @@ export const StoryBar = memo(function StoryBar({
                 ]}
                 pointerEvents={isVisible ? 'auto' : 'none'}
             >
-                <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
                 <View style={styles.content}>
                     <ScrollView
                         horizontal
@@ -117,6 +115,7 @@ export const StoryBar = memo(function StoryBar({
                         {sortedUsers.map((user) => (
                             <StoryAvatar
                                 key={user.id}
+                                userId={user.id}
                                 username={user.username}
                                 avatarUrl={user.avatarUrl}
                                 hasUnseenStory={user.hasUnseenStory}
@@ -137,7 +136,7 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         zIndex: 1000,
-        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        backgroundColor: '#000000', // Solid black
         borderBottomWidth: 0.5,
         borderBottomColor: 'rgba(255, 255, 255, 0.1)',
     },

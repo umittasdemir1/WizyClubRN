@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
     width: ITEM_WIDTH,
     aspectRatio: 1, // Square format (1:1)
     position: 'relative',
-    borderRadius: 4,
+    borderRadius: 0,
     overflow: 'hidden',
     backgroundColor: '#1a1a1a',
   },

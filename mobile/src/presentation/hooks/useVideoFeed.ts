@@ -32,7 +32,7 @@ interface UseVideoFeedReturn {
     prependVideo: (video: Video) => void;
 }
 
-export function useVideoFeed(): UseVideoFeedReturn {
+export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
     // Repository & UseCases (Memoized to prevent recreation)
     const videoRepository = useRef(new VideoRepositoryImpl()).current;
     const interactionRepository = useRef(new InteractionRepositoryImpl()).current;
@@ -126,7 +126,7 @@ export function useVideoFeed(): UseVideoFeedReturn {
         try {
             setIsLoading(true);
             setError(null);
-            const fetchedVideos = await getVideoFeedUseCase.execute(1, 10, currentUserId);
+            const fetchedVideos = await getVideoFeedUseCase.execute(1, 10, currentUserId, filterUserId);
 
             if (isMounted.current) {
                 setVideos(fetchedVideos);
@@ -143,7 +143,7 @@ export function useVideoFeed(): UseVideoFeedReturn {
                 setIsLoading(false);
             }
         }
-    }, [getVideoFeedUseCase, currentUserId]);
+    }, [getVideoFeedUseCase, currentUserId, filterUserId]);
 
     const refreshFeed = useCallback(async () => {
         if (isRefreshing) return;
@@ -154,7 +154,7 @@ export function useVideoFeed(): UseVideoFeedReturn {
             // Clear cache on refresh to resolve any persistence issues with same-named files
             await VideoCacheService.clearCache();
             // Reset to page 1
-            const fetchedVideos = await getVideoFeedUseCase.execute(1, 10, currentUserId);
+            const fetchedVideos = await getVideoFeedUseCase.execute(1, 10, currentUserId, filterUserId);
 
             if (isMounted.current) {
                 setVideos(fetchedVideos);
@@ -171,14 +171,14 @@ export function useVideoFeed(): UseVideoFeedReturn {
                 setIsRefreshing(false);
             }
         }
-    }, [isRefreshing, getVideoFeedUseCase, currentUserId]);
+    }, [isRefreshing, getVideoFeedUseCase, currentUserId, filterUserId]);
 
     const loadMore = useCallback(async () => {
         if (isLoadingMore || !hasMore || isLoading) return;
 
         try {
             setIsLoadingMore(true);
-            const fetchedVideos = await getVideoFeedUseCase.execute(page, 10, currentUserId);
+            const fetchedVideos = await getVideoFeedUseCase.execute(page, 10, currentUserId, filterUserId);
 
             if (isMounted.current) {
                 if (fetchedVideos.length > 0) {
@@ -196,7 +196,7 @@ export function useVideoFeed(): UseVideoFeedReturn {
                 setIsLoadingMore(false);
             }
         }
-    }, [isLoadingMore, hasMore, isLoading, page, getVideoFeedUseCase, currentUserId]);
+    }, [isLoadingMore, hasMore, isLoading, page, getVideoFeedUseCase, currentUserId, filterUserId]);
 
     // Optimistic Update with Rollback
     const toggleLike = useCallback(async (videoId: string) => {

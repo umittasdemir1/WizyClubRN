@@ -11,6 +11,7 @@ import { FlyingEmoji } from './FlyingEmoji';
 import { useRouter } from 'expo-router';
 import PagerView from 'react-native-pager-view';
 import { COLORS } from '../../../core/constants';
+import { useStoryStore } from '../../store/useStoryStore';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('screen');
 const DEFAULT_STORY_DURATION = 10000; // 10 seconds for images
@@ -26,9 +27,11 @@ interface FlyingEmojiData {
 interface StoryViewerProps {
     stories: Story[];
     initialIndex?: number;
+    onNext?: () => void;
+    onPrev?: () => void;
 }
 
-export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
+export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: StoryViewerProps) {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const pagerRef = useRef<PagerView>(null);
@@ -37,6 +40,8 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
     const [isLiked, setIsLiked] = useState(stories[initialIndex]?.isLiked || false);
     const [flyingEmojis, setFlyingEmojis] = useState<FlyingEmojiData[]>([]);
     const holdTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    const markUserAsViewed = useStoryStore((state) => state.markUserAsViewed);
 
     // 🔥 FIX: Track video durations for each story
     const videoDurationsRef = useRef<{ [storyId: string]: number }>({});
@@ -52,11 +57,17 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
     // 🔥 Initialize duration for initial story if already cached
     useEffect(() => {
         const initialStory = stories[currentIndex];
+        
+        // Mark user as viewed immediately when story opens
+        if (initialStory?.user?.id) {
+            markUserAsViewed(initialStory.user.id);
+        }
+
         const cachedDuration = videoDurationsRef.current[initialStory?.id];
         if (cachedDuration && videoDuration === 0) {
             setVideoDuration(cachedDuration);
         }
-    }, [currentIndex, stories, videoDuration]);
+    }, [currentIndex, stories, videoDuration, markUserAsViewed]);
 
     // 🔥 Smooth progress animation (prevents stuttering)
     useAnimatedReaction(
@@ -98,15 +109,25 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
         if (currentIndex < stories.length - 1) {
             pagerRef.current?.setPage(currentIndex + 1);
         } else {
-            router.back();
+            // End of stories for this user -> Go to next user
+            if (onNext) {
+                onNext();
+            } else {
+                router.back();
+            }
         }
-    }, [currentIndex, stories.length, router]);
+    }, [currentIndex, stories.length, router, onNext]);
 
     const handlePrev = useCallback(() => {
         if (currentIndex > 0) {
             pagerRef.current?.setPage(currentIndex - 1);
+        } else {
+            // Start of stories -> Go to prev user or close
+            if (onPrev) {
+                onPrev();
+            }
         }
-    }, [currentIndex]);
+    }, [currentIndex, onPrev]);
 
     const handleClose = useCallback(() => {
         router.back();
@@ -143,6 +164,11 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
         const newStory = stories[newIndex];
         const prevStory = stories[currentIndex];
 
+        // Mark user as viewed when sliding to next story
+        if (newStory?.user?.id) {
+            markUserAsViewed(newStory.user.id);
+        }
+
         // 🔥 Reset previous video to start (prevents memory buildup)
         if (prevStory && videoRefs.current[prevStory.id]) {
             videoRefs.current[prevStory.id]?.seek(0);
@@ -167,7 +193,7 @@ export function StoryViewer({ stories, initialIndex = 0 }: StoryViewerProps) {
         } else {
             setVideoDuration(0);
         }
-    }, [stories, currentIndex, rawProgress, progress]);
+    }, [stories, currentIndex, rawProgress, progress, markUserAsViewed]);
 
     // Tap handlers
     const handleHoldStart = useCallback(() => {

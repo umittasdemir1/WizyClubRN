@@ -1,19 +1,17 @@
-import React, { memo, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, Dimensions } from 'react-native';
-import Animated, {
-    useSharedValue,
-    useAnimatedStyle,
-    withRepeat,
-    withTiming,
-    Easing,
-} from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
+import React, { memo } from 'react';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Avatar } from '../shared/Avatar';
+import { AdvancedStoryRing } from '../shared/AdvancedStoryRing';
+import { useStoryStore } from '../../store/useStoryStore';
 
 const AVATAR_SIZE = 64;
-const RING_SIZE = AVATAR_SIZE + 6;
+// Desired specs: 3px thickness, 3px gap
+const THICKNESS = 3;
+const GAP = 3;
+const RING_SIZE = AVATAR_SIZE + (THICKNESS * 2) + (GAP * 2); // 64 + 6 + 6 = 76
 
 interface StoryAvatarProps {
+    userId: string;
     username: string;
     avatarUrl: string;
     hasUnseenStory: boolean;
@@ -21,61 +19,30 @@ interface StoryAvatarProps {
 }
 
 export const StoryAvatar = memo(function StoryAvatar({
+    userId,
     username,
     avatarUrl,
     hasUnseenStory,
     onPress,
 }: StoryAvatarProps) {
-    const rotation = useSharedValue(0);
-
-    // Renkli halka dönme animasyonu (sadece izlenmemişler için)
-    useEffect(() => {
-        if (hasUnseenStory) {
-            rotation.value = withRepeat(
-                withTiming(360, {
-                    duration: 3000,
-                    easing: Easing.linear,
-                }),
-                -1, // Sonsuz döngü
-                false
-            );
-        } else {
-            rotation.value = 0;
-        }
-    }, [hasUnseenStory]);
-
-    const animatedRingStyle = useAnimatedStyle(() => ({
-        transform: [{ rotate: `${rotation.value}deg` }],
-    }));
+    // Reactive selector: re-renders only when this specific user's status changes
+    const isViewedLocal = useStoryStore((state) => state.viewedUserIds.has(userId));
+    
+    // If hasUnseenStory is false (backend says viewed), it's viewed.
+    // If local store says viewed (just watched), it's viewed.
+    const isViewed = !hasUnseenStory || isViewedLocal;
 
     return (
         <Pressable onPress={onPress} style={styles.container}>
             <View style={styles.avatarContainer}>
-                {hasUnseenStory ? (
-                    // Renkli gradient ring (Instagram benzeri) - SADECE HALKA DÖNER
-                    <View style={styles.ring}>
-                        <Animated.View style={[styles.gradientRotate, animatedRingStyle]}>
-                            <LinearGradient
-                                colors={['#F58529', '#DD2A7B', '#8134AF', '#515BD4']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={styles.gradient}
-                            />
-                        </Animated.View>
-                        <View style={styles.innerWhiteRing}>
-                            <Avatar url={avatarUrl} size={AVATAR_SIZE} />
-                        </View>
-                    </View>
-                ) : (
-                    // Gri ring (izlenmiş hikayeler)
-                    <View style={styles.ring}>
-                        <View style={[styles.gradient, styles.grayGradient]}>
-                            <View style={styles.innerWhiteRing}>
-                                <Avatar url={avatarUrl} size={AVATAR_SIZE} />
-                            </View>
-                        </View>
-                    </View>
-                )}
+                <AdvancedStoryRing 
+                    size={RING_SIZE} 
+                    thickness={THICKNESS} 
+                    gap={GAP} 
+                    viewed={isViewed}
+                >
+                    <Avatar url={avatarUrl} size={AVATAR_SIZE} />
+                </AdvancedStoryRing>
             </View>
             <Text style={styles.username} numberOfLines={1}>
                 {username}
@@ -91,41 +58,6 @@ const styles = StyleSheet.create({
     },
     avatarContainer: {
         marginBottom: 6,
-    },
-    ring: {
-        width: RING_SIZE,
-        height: RING_SIZE,
-        borderRadius: RING_SIZE / 2,
-        justifyContent: 'center',
-        alignItems: 'center',
-        position: 'relative',
-    },
-    gradientRotate: {
-        position: 'absolute',
-        width: RING_SIZE,
-        height: RING_SIZE,
-        borderRadius: RING_SIZE / 2,
-    },
-    gradient: {
-        width: RING_SIZE,
-        height: RING_SIZE,
-        borderRadius: RING_SIZE / 2,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    grayGradient: {
-        backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    },
-    innerWhiteRing: {
-        width: RING_SIZE - 3,
-        height: RING_SIZE - 3,
-        borderRadius: (RING_SIZE - 3) / 2,
-        backgroundColor: '#000',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 2,
-        position: 'relative',
-        zIndex: 1,
     },
     username: {
         color: 'white',

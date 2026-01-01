@@ -1,7 +1,8 @@
 import React from 'react';
 import { ScrollView, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
+import { AdvancedStoryRing } from '../shared/AdvancedStoryRing';
+import { useStoryStore } from '../../store/useStoryStore';
 
 interface StoryCreator {
     id: string;
@@ -18,6 +19,13 @@ interface StoryRailProps {
 
 export function StoryRail({ creators, onCreatorPress, isDark = true }: StoryRailProps) {
     const textColor = isDark ? '#FFFFFF' : '#000000';
+    const avatarSize = 62;
+    const THICKNESS = 3;
+    const GAP = 3;
+    const RING_SIZE = avatarSize + (THICKNESS * 2) + (GAP * 2); // 74
+
+    // Subscribe to the Set of viewed user IDs for reactivity
+    const viewedUserIds = useStoryStore((state) => state.viewedUserIds);
 
     return (
         <View style={styles.container}>
@@ -26,35 +34,37 @@ export function StoryRail({ creators, onCreatorPress, isDark = true }: StoryRail
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
             >
-                {creators.map((creator) => (
-                    <TouchableOpacity
-                        key={creator.id}
-                        style={styles.creatorItem}
-                        onPress={() => onCreatorPress(creator.id)}
-                    >
-                        <View style={styles.avatarWrapper}>
-                            {creator.hasUnseen && (
-                                <LinearGradient
-                                    colors={['#FF3B30', '#FF8C00', '#FF3B30']}
-                                    style={styles.borderGradient}
-                                />
-                            )}
-                            <View style={[styles.avatarContainer, !creator.hasUnseen && styles.noStoryBorder]}>
-                                <Image
-                                    source={{ uri: creator.avatarUrl }}
-                                    style={styles.avatar}
-                                    contentFit="cover"
-                                />
-                            </View>
-                        </View>
-                        <Text
-                            style={[styles.username, { color: textColor }]}
-                            numberOfLines={1}
+                {creators.map((creator) => {
+                    const isViewed = !creator.hasUnseen || viewedUserIds.has(creator.id);
+                    return (
+                        <TouchableOpacity
+                            key={creator.id}
+                            style={styles.creatorItem}
+                            onPress={() => onCreatorPress(creator.id)}
                         >
-                            {creator.username}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
+                            <View style={styles.avatarWrapper}>
+                                <AdvancedStoryRing
+                                    size={RING_SIZE}
+                                    thickness={THICKNESS}
+                                    gap={GAP}
+                                    viewed={isViewed}
+                                >
+                                    <Image
+                                        source={{ uri: creator.avatarUrl }}
+                                        style={{ width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 }}
+                                        contentFit="cover"
+                                    />
+                                </AdvancedStoryRing>
+                            </View>
+                            <Text
+                                style={[styles.username, { color: textColor }]}
+                                numberOfLines={1}
+                            >
+                                {creator.username}
+                            </Text>
+                        </TouchableOpacity>
+                    );
+                })}
             </ScrollView>
         </View>
     );
@@ -62,7 +72,7 @@ export function StoryRail({ creators, onCreatorPress, isDark = true }: StoryRail
 
 const styles = StyleSheet.create({
     container: {
-        height: 110,
+        height: 120, // Increased height for larger ring
         marginVertical: 10,
     },
     scrollContent: {
@@ -72,36 +82,11 @@ const styles = StyleSheet.create({
     },
     creatorItem: {
         alignItems: 'center',
-        width: 70,
+        width: 76, // Adjusted width
     },
     avatarWrapper: {
-        width: 68,
-        height: 68,
         alignItems: 'center',
         justifyContent: 'center',
-        position: 'relative',
-    },
-    borderGradient: {
-        position: 'absolute',
-        width: 68,
-        height: 68,
-        borderRadius: 34,
-    },
-    avatarContainer: {
-        width: 62,
-        height: 62,
-        borderRadius: 31,
-        backgroundColor: '#000',
-        padding: 2,
-        zIndex: 1,
-    },
-    noStoryBorder: {
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
-    },
-    avatar: {
-        flex: 1,
-        borderRadius: 30,
     },
     username: {
         marginTop: 6,

@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
     width: ITEM_WIDTH,
     aspectRatio: 9 / 16, // Video format
     position: 'relative',
-    borderRadius: 4,
+    borderRadius: 0,
     overflow: 'hidden',
     backgroundColor: '#1a1a1a',
   },

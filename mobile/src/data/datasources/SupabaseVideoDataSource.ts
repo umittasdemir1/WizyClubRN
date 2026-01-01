@@ -79,16 +79,22 @@ interface SupabaseVideo {
 }
 
 export class SupabaseVideoDataSource {
-    async getVideos(page: number, limit: number, userId?: string): Promise<Video[]> {
+    async getVideos(page: number, limit: number, userId?: string, authorId?: string): Promise<Video[]> {
         const offset = (page - 1) * limit;
-        console.log(`[DataSource] Fetching videos: page=${page}, offset=${offset}, limit=${limit}, userId=${userId}`);
+        console.log(`[DataSource] Fetching videos: page=${page}, offset=${offset}, limit=${limit}, userId=${userId}, authorId=${authorId}`);
 
-        const { data, error } = await supabase
+        let query = supabase
             .from('videos')
             .select('*, profiles(*)')
             .is('deleted_at', null)
             .order('created_at', { ascending: false })
             .range(offset, offset + limit - 1);
+
+        if (authorId) {
+            query = query.eq('user_id', authorId);
+        }
+
+        const { data, error } = await query;
 
         if (error) {
             console.error('[DataSource] Supabase error:', error);
