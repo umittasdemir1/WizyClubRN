@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
     },
     commercialTag: {
         position: 'absolute',  // 👈 Bunu ekle
-        bottom: -30,           // 👈 Negatif = aşağı, Pozitif = yukarı
+        bottom: -40,           // 👈 Negatif = aşağı, Pozitif = yukarı
         left: 0,               // 👈 Bunu ekle
         backgroundColor: 'rgba(255, 255, 255, 0.9)',
         paddingHorizontal: 8,
