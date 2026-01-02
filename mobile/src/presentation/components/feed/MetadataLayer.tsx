@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
         left: 0,               // 👈 Bunu ekle
         backgroundColor: 'rgba(255, 255, 255, 0.9)',
         paddingHorizontal: 8,
-        paddingVertical: 2,
+        paddingVertical: 0,
         borderRadius: 2,
     },
     commercialText: {
