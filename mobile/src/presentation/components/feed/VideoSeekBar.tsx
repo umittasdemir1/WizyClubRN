@@ -23,7 +23,7 @@ import { SpritePreview } from './SpritePreview';
 import { useWindowDimensions } from 'react-native';
 
 // Usage Configuration
-const HORIZONTAL_PADDING = 0;
+const HORIZONTAL_PADDING = 10;
 const TOUCH_AREA_HEIGHT = 80;
 const THUMB_SIZE = 12; // Height of the vertical bar
 const THUMB_WIDTH = 2; // Width of the vertical bar
