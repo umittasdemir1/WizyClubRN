@@ -11,6 +11,7 @@ interface ProfileStatsProps {
   mainAvatarUrl: string;
   isDark: boolean;
   hasStories?: boolean;
+  hasUnseenStory?: boolean;
   onAvatarPress?: () => void;
 }
 
@@ -21,6 +22,7 @@ export const ProfileStats: React.FC<ProfileStatsProps> = ({
   mainAvatarUrl,
   isDark,
   hasStories = false,
+  hasUnseenStory,
   onAvatarPress,
 }) => {
   const textColor = isDark ? '#fff' : '#000';
@@ -31,10 +33,19 @@ export const ProfileStats: React.FC<ProfileStatsProps> = ({
   const THICKNESS = 3;
   const GAP = 3;
   const RING_SIZE = avatarSize + (THICKNESS * 2) + (GAP * 2);
-  
+
   // Reactive selector: re-renders only when this specific condition changes
   const isViewedLocal = useStoryStore(state => userId ? state.viewedUserIds.has(userId) : false);
-  const isViewed = isViewedLocal;
+
+  // If we have backend data (hasUnseenStory), rely on that (combined with local).
+  // If hasUnseenStory is undefined (e.g. older usage without this prop), fallback to local logic.
+  let isViewed = isViewedLocal;
+
+  if (typeof hasUnseenStory !== 'undefined') {
+    // If backend says hasUnseenStory=false, it means all read.
+    // If backend says true, check local store too (maybe we just watched it)
+    isViewed = !hasUnseenStory || isViewedLocal;
+  }
 
   return (
     <View style={styles.container}>

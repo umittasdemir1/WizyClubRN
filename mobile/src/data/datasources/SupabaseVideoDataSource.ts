@@ -132,20 +132,56 @@ export class SupabaseVideoDataSource {
 
     async getStories(): Promise<Story[]> {
         const now = new Date().toISOString();
-        const { data, error } = await supabase
+        const { data: { user } } = await supabase.auth.getUser();
+
+        let query = supabase
             .from('stories')
             .select('*, profiles(*)')
             .gt('expires_at', now) // Only show unexpired stories
             .order('created_at', { ascending: false })
-            .limit(20);
+            .limit(50);
+
+        const { data, error } = await query;
 
         if (error) {
             console.error('Supabase stories error:', error);
             return [];
         }
 
+        let viewedStoryIds = new Set<string>();
+        if (user) {
+            const { data: views } = await supabase
+                .from('story_views')
+                .select('story_id')
+                .eq('user_id', user.id);
+
+            if (views) {
+                views.forEach(v => viewedStoryIds.add(v.story_id));
+            }
+        }
+
         console.log('[Stories] Fetched', data?.length || 0, 'active stories');
-        return (data as any[]).map(this.mapToStory);
+        return (data as any[]).map(dto => this.mapToStory(dto, viewedStoryIds.has(dto.id)));
+    }
+
+    async markStoryAsViewed(storyId: string, userId: string): Promise<void> {
+        if (!userId) return;
+
+        const { error } = await supabase
+            .from('story_views')
+            .insert({
+                user_id: userId,
+                story_id: storyId
+            }); // Conflicts (duplicates) are handled by ON CONFLICT DO NOTHING implicit or we should explicit it?
+        // The table has UNIQUE(user_id, story_id). Insert will fail if exists.
+        // We should use upsert or ignore error.
+
+        if (error) {
+            // Ignore unique violation (code 23505)
+            if (error.code !== '23505') {
+                console.error('Error marking story as viewed:', error);
+            }
+        }
     }
 
     async getVideoById(videoId: string): Promise<Video | null> {
@@ -206,14 +242,14 @@ export class SupabaseVideoDataSource {
         };
     }
 
-    private mapToStory(dto: any): Story {
+    private mapToStory(dto: any, isViewed = false): Story {
         return {
             id: dto.id,
             videoUrl: dto.video_url,
             thumbnailUrl: dto.thumbnail_url,
             createdAt: dto.created_at,
             expiresAt: dto.expires_at || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-            isViewed: false,
+            isViewed: isViewed,
             user: dto.profiles ? {
                 id: dto.user_id,
                 username: dto.profiles.username,

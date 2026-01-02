@@ -3,6 +3,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
+import { useStoryViewer } from '../../src/presentation/hooks/useStoryViewer';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 
 // New Components
@@ -65,20 +66,24 @@ export default function ExploreScreen() {
         comments: '1.1k'
     }));
 
-    // 🔥 FIX: Deduplicate users and use User ID instead of Video ID
-    const uniqueUsers = new Map();
-    videos.forEach(v => {
-        if (!uniqueUsers.has(v.user.id)) {
-            uniqueUsers.set(v.user.id, {
-                id: v.user.id, // User ID used for navigation
-                username: v.user.username,
-                avatarUrl: v.user.avatarUrl,
-                hasUnseen: Math.random() > 0.5 // Mock data kept as is
+    // 🔥 FIX: Use real story data from useStoryViewer
+    const { stories: storyListData } = useStoryViewer();
+
+    // Group stories by user
+    const storyCreatorsMap = new Map();
+    storyListData.forEach(story => {
+        if (!storyCreatorsMap.has(story.user.id)) {
+            storyCreatorsMap.set(story.user.id, {
+                id: story.user.id,
+                username: story.user.username,
+                avatarUrl: story.user.avatarUrl,
+                hasUnseen: !story.isViewed // Correct backend status
             });
         }
     });
 
-    const creators = Array.from(uniqueUsers.values()).slice(0, 10);
+    // If we have stories, show them.
+    let creators = Array.from(storyCreatorsMap.values());
 
     const discoveryItems = videos.map((v, i) => ({
         id: v.id,
@@ -122,11 +127,13 @@ export default function ExploreScreen() {
                     />
 
                     {/* 3. Stories Row */}
-                    <StoryRail
-                        creators={creators}
-                        onCreatorPress={handleStoryPress}
-                        isDark={isDark}
-                    />
+                    {creators.length > 0 && (
+                        <StoryRail
+                            creators={creators}
+                            onCreatorPress={handleStoryPress}
+                            isDark={isDark}
+                        />
+                    )}
 
                     {/* 4. Masonry Grid */}
                     <MasonryFeed

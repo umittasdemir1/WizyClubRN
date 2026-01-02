@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 import PagerView from 'react-native-pager-view';
 import { COLORS } from '../../../core/constants';
 import { useStoryStore } from '../../store/useStoryStore';
+import { StoryRepositoryImpl } from '../../../data/repositories/StoryRepositoryImpl';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('screen');
 const DEFAULT_STORY_DURATION = 10000; // 10 seconds for images
@@ -57,10 +58,12 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
     // 🔥 Initialize duration for initial story if already cached
     useEffect(() => {
         const initialStory = stories[currentIndex];
-        
+
         // Mark user as viewed immediately when story opens
         if (initialStory?.user?.id) {
             markUserAsViewed(initialStory.user.id);
+            // Also mark as viewed in backend
+            new StoryRepositoryImpl().markAsViewed(initialStory.id).catch(err => console.error('Failed to mark view', err));
         }
 
         const cachedDuration = videoDurationsRef.current[initialStory?.id];
@@ -167,6 +170,7 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
         // Mark user as viewed when sliding to next story
         if (newStory?.user?.id) {
             markUserAsViewed(newStory.user.id);
+            new StoryRepositoryImpl().markAsViewed(newStory.id).catch(console.error);
         }
 
         // 🔥 Reset previous video to start (prevents memory buildup)

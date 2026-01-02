@@ -16,7 +16,9 @@ export class StoryRepositoryImpl implements IStoryRepository {
     }
 
     async markAsViewed(storyId: string): Promise<void> {
-        // Simulate API call
-        return;
+        const { data: { user } } = await import('../../core/supabase').then(m => m.supabase.auth.getUser());
+        if (user) {
+            await this.dataSource.markStoryAsViewed(storyId, user.id);
+        }
     }
 }

@@ -292,6 +292,7 @@ export default function ProfileScreen() {
                 mainAvatarUrl={user.avatarUrl}
                 isDark={isDark}
                 hasStories={user.entity.hasStories}
+                hasUnseenStory={user.entity.hasUnseenStory}
                 onAvatarPress={() => {
                   if (user.entity.hasStories) {
                     // Navigate to story viewer with user ID

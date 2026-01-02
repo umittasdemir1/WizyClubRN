@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
     },
     commercialTag: {
         position: 'absolute',
-        bottom: -40,
+        bottom: -30,
         left: 0,
         backgroundColor: 'rgba(255, 255, 255, 0.9)',
         paddingHorizontal: 8,

@@ -32,15 +32,42 @@ export class SupabaseProfileDataSource {
 
         // Check for active stories
         const now = new Date().toISOString();
-        const { count: storiesCount } = await supabase
+        // Check for active stories and if they are unseen
+        const { data: stories } = await supabase
             .from('stories')
-            .select('*', { count: 'exact', head: true })
+            .select('id')
             .eq('user_id', userId)
             .gt('expires_at', now);
 
-        data.has_stories = storiesCount ? storiesCount > 0 : false;
+        const storyIds = stories?.map(s => s.id) || [];
+        const hasStories = storyIds.length > 0;
 
-        console.log('[SupabaseDataSource] ✅ Profile fetched successfully:', data?.username);
+        let hasUnseenStory = false;
+
+        if (hasStories) {
+            // Check if ALL these stories are viewed by the viewer (or current user if viewerId not provided)
+            // If viewerId is provided use it, otherwise use current auth user
+            const checkerId = viewerId || (await supabase.auth.getUser()).data.user?.id;
+
+            if (checkerId) {
+                const { count: viewedCount } = await supabase
+                    .from('story_views')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('user_id', checkerId)
+                    .in('story_id', storyIds);
+
+                // If viewed count is less than total story count, there are unseen stories
+                hasUnseenStory = (viewedCount || 0) < storyIds.length;
+            } else {
+                // If no user logged in, assume all are unseen
+                hasUnseenStory = true;
+            }
+        }
+
+        data.has_stories = hasStories;
+        data.has_unseen_story = hasUnseenStory;
+
+        console.log('[SupabaseDataSource] ✅ Profile fetched:', { username: data?.username, hasStories, hasUnseenStory });
         return data;
     }
 

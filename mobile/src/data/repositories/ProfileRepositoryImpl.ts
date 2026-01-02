@@ -58,6 +58,7 @@ export class ProfileRepositoryImpl implements IProfileRepository {
             followingCount: dto.following_count,
             postsCount: dto.posts_count,
             hasStories: !!dto.has_stories,
+            hasUnseenStory: !!dto.has_unseen_story,
             // New Social Fields
             instagramUrl: dto.instagram_url,
             tiktokUrl: dto.tiktok_url,
