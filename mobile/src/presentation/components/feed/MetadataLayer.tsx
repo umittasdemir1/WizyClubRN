@@ -168,11 +168,11 @@ const styles = StyleSheet.create({
     },
     commercialTag: {
         position: 'absolute',  // 👈 Bunu ekle
-        bottom: -20,           // 👈 Negatif = aşağı, Pozitif = yukarı
+        bottom: -30,           // 👈 Negatif = aşağı, Pozitif = yukarı
         left: 0,               // 👈 Bunu ekle
         backgroundColor: 'rgba(255, 255, 255, 0.9)',
         paddingHorizontal: 8,
-        paddingVertical: 0,
+        paddingVertical: 2,
         borderRadius: 2,
     },
     commercialText: {
