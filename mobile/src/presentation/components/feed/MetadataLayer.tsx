@@ -31,6 +31,9 @@ export function MetadataLayer({
     // 2. It's the user's own video
     const showFollowButton = !video.user.isFollowing && video.user.id !== currentUserId;
 
+    // Check if description exists and is not empty
+    const hasDescription = video.description && video.description.trim().length > 0;
+
     return (
         <View style={[styles.container, { bottom }]} pointerEvents="box-none">
             {/* User Row */}
@@ -63,25 +66,27 @@ export function MetadataLayer({
                 )}
             </View>
 
-            {/* Description Row - inline text with read more */}
-            <Pressable
-                style={styles.descriptionRow}
-                onPress={onReadMorePress}
-                hitSlop={{ top: 10, bottom: 10, left: 0, right: 0 }}
-            >
-                <Text style={styles.descriptionText}>
-                    {video.description.length > 70
-                        ? video.description.substring(0, 70)
-                        : video.description}
-                    {video.description.length > 70 && (
-                        <Text style={styles.readMoreInline}>
-                            {'...Daha fazla'}
-                        </Text>
-                    )}
-                </Text>
-            </Pressable>
+            {/* Description Row - Only show if description exists - Positioned between user and commercial tag */}
+            {hasDescription && (
+                <Pressable
+                    style={styles.descriptionRow}
+                    onPress={onReadMorePress}
+                    hitSlop={{ top: 10, bottom: 10, left: 0, right: 0 }}
+                >
+                    <Text style={styles.descriptionText}>
+                        {video.description.length > 70
+                            ? video.description.substring(0, 70)
+                            : video.description}
+                        {video.description.length > 70 && (
+                            <Text style={styles.readMoreInline}>
+                                {'...Daha fazla'}
+                            </Text>
+                        )}
+                    </Text>
+                </Pressable>
+            )}
 
-            {/* Commercial Tag */}
+            {/* Commercial Tag - Always at bottom: -40 */}
             {video.isCommercial && (
                 <Pressable
                     style={styles.commercialTag}
@@ -167,9 +172,9 @@ const styles = StyleSheet.create({
         marginLeft: 2,
     },
     commercialTag: {
-        position: 'absolute',  // 👈 Bunu ekle
-        bottom: -40,           // 👈 Negatif = aşağı, Pozitif = yukarı
-        left: 0,               // 👈 Bunu ekle
+        position: 'absolute',
+        bottom: -40,
+        left: 0,
         backgroundColor: 'rgba(255, 255, 255, 0.9)',
         paddingHorizontal: 8,
         paddingVertical: 2,
