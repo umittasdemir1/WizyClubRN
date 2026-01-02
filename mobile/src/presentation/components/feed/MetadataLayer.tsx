@@ -12,7 +12,7 @@ interface MetadataLayerProps {
     currentUserId?: string; // Add currentUserId prop
 }
 
-const BASE_BOTTOM_POSITION = 80; // Aligned exactly with seekbar center (80px touch area / 2)
+const BASE_BOTTOM_POSITION = 60; // Aligned exactly with seekbar center (80px touch area / 2)
 const SAFE_AREA_OFFSET = 0; // No extra offset needed as seekbar is also at 0
 
 export function MetadataLayer({
