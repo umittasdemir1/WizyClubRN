@@ -79,13 +79,19 @@ export default function FeedScreen() {
 
     // Group stories by user for StoryBar
     const storyUsers = storyListData.reduce((acc: any[], story) => {
-        if (!acc.find(u => u.id === story.user.id)) {
+        const existing = acc.find(u => u.id === story.user.id);
+        if (!existing) {
             acc.push({
                 id: story.user.id,
                 username: story.user.username,
                 avatarUrl: story.user.avatarUrl,
                 hasUnseenStory: !story.isViewed
             });
+        } else {
+            // If ANY story is unseen, mark hasUnseenStory as true
+            if (!story.isViewed) {
+                existing.hasUnseenStory = true;
+            }
         }
         return acc;
     }, []);

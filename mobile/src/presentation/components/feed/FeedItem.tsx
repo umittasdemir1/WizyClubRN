@@ -4,6 +4,7 @@ import * as Haptics from 'expo-haptics';
 import Animated from 'react-native-reanimated';
 import { SharedValue } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { VideoLayer } from './VideoLayer';
 import { ActionButtons } from './ActionButtons';
@@ -56,6 +57,7 @@ export const FeedItem = memo(function FeedItem({
     onOpenDescription,
 }: FeedItemProps) {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const doubleTapRef = useRef<DoubleTapLikeRef>(null);
 
     const handleLikePress = useCallback(() => {
@@ -80,7 +82,7 @@ export const FeedItem = memo(function FeedItem({
                 onDoubleTap={() => onDoubleTapLike(video.id)}
                 onSingleTap={onFeedTap}
             >
-                <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]}>
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', paddingTop: insets.top }]}>
                     <VideoLayer
                         video={video}
                         isActive={isActive}
@@ -94,7 +96,7 @@ export const FeedItem = memo(function FeedItem({
 
             {/* Layer 2: UI Overlays (Foreground) - Animate Opacity */}
             <Animated.View
-                style={[StyleSheet.absoluteFill, { zIndex: 50 }, uiOpacityStyle]}
+                style={[StyleSheet.absoluteFill, { zIndex: 50, paddingTop: insets.top }, uiOpacityStyle]}
                 pointerEvents={isSeeking ? 'none' : 'box-none'}
             >
                 <ActionButtons

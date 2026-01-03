@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
         marginVertical: 10,
     },
     scrollContent: {
-        paddingHorizontal: 20,
+        paddingHorizontal: 12,
         alignItems: 'center',
         gap: 10,
     },

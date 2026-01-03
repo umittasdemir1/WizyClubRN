@@ -1,10 +1,11 @@
-import { View, StyleSheet, ScrollView, StatusBar as RNStatusBar, RefreshControl } from 'react-native';
+import { View, StyleSheet, ScrollView, StatusBar as RNStatusBar, RefreshControl, Text, Pressable } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import { useStoryViewer } from '../../src/presentation/hooks/useStoryViewer';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
+import Video from 'react-native-video';
 
 // New Components
 import { TrendingHeader } from '../../src/presentation/components/explore/TrendingHeader';
@@ -18,6 +19,24 @@ import { LIGHT_COLORS, DARK_COLORS } from '../../src/core/constants';
 
 const CATEGORIES = ['Senin İçin', 'Takip Edilen', 'Popüler'];
 
+// Preview Modal Component
+const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: string; videoUrl: string }; onClose: () => void }) => {
+  return (
+    <Pressable style={styles.previewOverlay} onPress={onClose}>
+      <View style={styles.previewCard}>
+        <Video
+          source={{ uri: item.videoUrl }}
+          style={styles.previewVideo}
+          resizeMode="cover"
+          repeat={true}
+          paused={false}
+          muted={true}
+        />
+      </View>
+    </Pressable>
+  );
+};
+
 export default function ExploreScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
@@ -29,6 +48,7 @@ export default function ExploreScreen() {
 
     const [selectedCategory, setSelectedCategory] = useState('Senin İçin');
     const [refreshing, setRefreshing] = useState(false);
+    const [previewItem, setPreviewItem] = useState<{ id: string; thumbnailUrl: string; videoUrl: string } | null>(null);
 
     // Imperative StatusBar Control
     useFocusEffect(
@@ -56,12 +76,16 @@ export default function ExploreScreen() {
         router.push(`/story/${id}`);
     };
 
+    const showPreview = (item: any) => setPreviewItem(item);
+    const hidePreview = () => setPreviewItem(null);
+
     const trendingData = videos.slice(0, 5).map(v => ({
         id: v.id,
         title: v.description || "Video Başlığı",
         username: v.user.username,
         avatarUrl: v.user.avatarUrl,
         thumbnailUrl: v.thumbnailUrl,
+        videoUrl: v.videoUrl,
         views: '1.6k',
         comments: '1.1k'
     }));
@@ -72,13 +96,19 @@ export default function ExploreScreen() {
     // Group stories by user
     const storyCreatorsMap = new Map();
     storyListData.forEach(story => {
-        if (!storyCreatorsMap.has(story.user.id)) {
+        const existing = storyCreatorsMap.get(story.user.id);
+        if (!existing) {
             storyCreatorsMap.set(story.user.id, {
                 id: story.user.id,
                 username: story.user.username,
                 avatarUrl: story.user.avatarUrl,
-                hasUnseen: !story.isViewed // Correct backend status
+                hasUnseen: !story.isViewed
             });
+        } else {
+            // If ANY story is unseen, mark hasUnseen as true
+            if (!story.isViewed) {
+                existing.hasUnseen = true;
+            }
         }
     });
 
@@ -88,11 +118,13 @@ export default function ExploreScreen() {
     const discoveryItems = videos.map((v, i) => ({
         id: v.id,
         thumbnailUrl: v.thumbnailUrl,
+        videoUrl: v.videoUrl,
         views: '1.2k',
         isLarge: i % 3 === 0
     }));
 
     return (
+        <>
         <SwipeWrapper
             onSwipeLeft={() => router.push('/deals')}
             onSwipeRight={() => router.push('/')}
@@ -111,14 +143,7 @@ export default function ExploreScreen() {
                         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={isDark ? "#fff" : "#000"} />
                     }
                 >
-                    {/* 1. Featured Carousel */}
-                    <TrendingCarousel
-                        data={trendingData}
-                        onItemPress={handleVideoPress}
-                        isDark={isDark}
-                    />
-
-                    {/* 2. Filter Bar */}
+                    {/* Filter Bar */}
                     <FilterBar
                         categories={CATEGORIES}
                         selectedCategory={selectedCategory}
@@ -126,29 +151,81 @@ export default function ExploreScreen() {
                         isDark={isDark}
                     />
 
-                    {/* 3. Stories Row */}
+                    {/* 1. Featured Carousel Section */}
+                    <Text style={[styles.carouselTitle, { color: themeColors.textPrimary }]}>
+                        Önerilenler
+                    </Text>
+                    <TrendingCarousel
+                        data={trendingData}
+                        onItemPress={handleVideoPress}
+                        isDark={isDark}
+                    />
+
+                    {/* 2. Stories Section */}
                     {creators.length > 0 && (
-                        <StoryRail
-                            creators={creators}
-                            onCreatorPress={handleStoryPress}
-                            isDark={isDark}
-                        />
+                        <>
+                            <Text style={[styles.sectionTitle, { color: themeColors.textPrimary }]}>
+                                Hikayeler
+                            </Text>
+                            <StoryRail
+                                creators={creators}
+                                onCreatorPress={handleStoryPress}
+                                isDark={isDark}
+                            />
+                        </>
                     )}
 
-                    {/* 4. Masonry Grid */}
+                    {/* 3. Masonry Grid */}
                     <MasonryFeed
                         data={discoveryItems}
                         onItemPress={handleVideoPress}
+                        onPreview={showPreview}
+                        onPreviewEnd={hidePreview}
                         isDark={isDark}
                     />
                 </ScrollView>
             </View>
         </SwipeWrapper>
+
+        {previewItem && <PreviewModal item={previewItem} onClose={hidePreview} />}
+        </>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+    },
+    carouselTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        marginTop: 0,
+        marginBottom: 8,
+        paddingHorizontal: 12,
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        marginTop: 0,
+        marginBottom: 8,
+        paddingHorizontal: 12,
+    },
+    previewOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.85)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 999,
+    },
+    previewCard: {
+        width: '80%',
+        height: 480,
+        borderRadius: 30,
+        overflow: 'hidden',
+        backgroundColor: '#000',
+    },
+    previewVideo: {
+        width: '100%',
+        height: '100%',
     },
 });

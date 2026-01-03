@@ -4,6 +4,7 @@ import { GetStoriesUseCase } from '../../domain/usecases/GetStoriesUseCase';
 import { StoryRepositoryImpl } from '../../data/repositories/StoryRepositoryImpl';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useStoryStore } from '../store/useStoryStore';
+import { useAuthStore } from '../store/useAuthStore';
 
 export function useStoryViewer(userId?: string) {
     const [stories, setStories] = useState<Story[]>([]);
@@ -16,6 +17,7 @@ export function useStoryViewer(userId?: string) {
 
     const refreshTrigger = useStoryStore(state => state.refreshTrigger);
     const viewedUserIds = useStoryStore(state => state.viewedUserIds);
+    const currentUser = useAuthStore(state => state.user);
 
     const storyRepository = new StoryRepositoryImpl();
     const getStoriesUseCase = new GetStoriesUseCase(storyRepository);
@@ -94,7 +96,7 @@ export function useStoryViewer(userId?: string) {
             setIsLoading(false);
         };
         fetchStories();
-    }, [userId, refreshTrigger, viewedUserIds, initial]);
+    }, [userId, refreshTrigger, viewedUserIds, initial, currentUser?.id]);
 
     const goToNext = useCallback(() => {
         if (nextUserId) {

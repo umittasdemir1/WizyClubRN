@@ -1,7 +1,7 @@
 import React from 'react';
 import { ScrollView, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
-import { AdvancedStoryRing } from '../shared/AdvancedStoryRing';
+import { RectangularStoryRing } from '../shared/RectangularStoryRing';
 import { useStoryStore } from '../../store/useStoryStore';
 
 interface StoryCreator {
@@ -19,10 +19,12 @@ interface StoryRailProps {
 
 export function StoryRail({ creators, onCreatorPress, isDark = true }: StoryRailProps) {
     const textColor = isDark ? '#FFFFFF' : '#000000';
-    const avatarSize = 62;
-    const THICKNESS = 3;
-    const GAP = 3;
-    const RING_SIZE = avatarSize + (THICKNESS * 2) + (GAP * 2); // 74
+
+    // 9:16 aspect ratio dimensions
+    const thumbnailWidth = 85;
+    const thumbnailHeight = 151; // 85 * (16/9) = 151
+    const THICKNESS = 2;
+    const GAP = 0;
 
     // Subscribe to the Set of viewed user IDs for reactivity
     const viewedUserIds = useStoryStore((state) => state.viewedUserIds);
@@ -36,26 +38,29 @@ export function StoryRail({ creators, onCreatorPress, isDark = true }: StoryRail
             >
                 {creators.map((creator) => {
                     const isViewed = !creator.hasUnseen || viewedUserIds.has(creator.id);
+
                     return (
                         <TouchableOpacity
                             key={creator.id}
                             style={styles.creatorItem}
                             onPress={() => onCreatorPress(creator.id)}
                         >
-                            <View style={styles.avatarWrapper}>
-                                <AdvancedStoryRing
-                                    size={RING_SIZE}
-                                    thickness={THICKNESS}
-                                    gap={GAP}
-                                    viewed={isViewed}
-                                >
-                                    <Image
-                                        source={{ uri: creator.avatarUrl }}
-                                        style={{ width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 }}
-                                        contentFit="cover"
-                                    />
-                                </AdvancedStoryRing>
-                            </View>
+                            <RectangularStoryRing
+                                width={thumbnailWidth}
+                                height={thumbnailHeight}
+                                thickness={THICKNESS}
+                                gap={GAP}
+                                viewed={isViewed}
+                            >
+                                <Image
+                                    source={{ uri: creator.avatarUrl }}
+                                    style={{
+                                        width: '100%',
+                                        height: '100%',
+                                    }}
+                                    contentFit="cover"
+                                />
+                            </RectangularStoryRing>
                             <Text
                                 style={[styles.username, { color: textColor }]}
                                 numberOfLines={1}
@@ -72,21 +77,18 @@ export function StoryRail({ creators, onCreatorPress, isDark = true }: StoryRail
 
 const styles = StyleSheet.create({
     container: {
-        height: 120, // Increased height for larger ring
-        marginVertical: 10,
+        height: 180, // Increased height for wider 9:16 thumbnails
+        marginTop: 0,
+        marginBottom: 10,
     },
     scrollContent: {
-        paddingHorizontal: 20,
+        paddingHorizontal: 12,
         alignItems: 'center',
-        gap: 15,
     },
     creatorItem: {
         alignItems: 'center',
-        width: 76, // Adjusted width
-    },
-    avatarWrapper: {
-        alignItems: 'center',
-        justifyContent: 'center',
+        width: 93,
+        marginRight: 0,
     },
     username: {
         marginTop: 6,

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { Eye } from 'lucide-react-native';
 
@@ -19,15 +19,18 @@ interface DiscoveryItem {
     thumbnailUrl: string;
     views: string;
     isLarge?: boolean;
+    videoUrl: string;
 }
 
 interface MasonryFeedProps {
     data: DiscoveryItem[];
     onItemPress: (id: string) => void;
+    onPreview?: (item: DiscoveryItem) => void;
+    onPreviewEnd?: () => void;
     isDark?: boolean;
 }
 
-export function MasonryFeed({ data, onItemPress, isDark = true }: MasonryFeedProps) {
+export function MasonryFeed({ data, onItemPress, onPreview, onPreviewEnd, isDark = true }: MasonryFeedProps) {
 
     // Chunk data into groups of 5 (1 Large + 2 Small + 2 Small)
     const chunks = [];
@@ -36,10 +39,12 @@ export function MasonryFeed({ data, onItemPress, isDark = true }: MasonryFeedPro
     }
 
     const renderLargeItem = (item: DiscoveryItem) => (
-        <TouchableOpacity
+        <Pressable
             key={item.id}
             style={[styles.item, { width: COLUMN_WIDTH, height: LARGE_HEIGHT }]}
             onPress={() => onItemPress(item.id)}
+            onLongPress={() => onPreview?.(item)}
+            onPressOut={onPreviewEnd}
         >
             <Image
                 source={{ uri: item.thumbnailUrl }}
@@ -50,14 +55,16 @@ export function MasonryFeed({ data, onItemPress, isDark = true }: MasonryFeedPro
                 <Eye size={10} color="white" />
                 <Text style={styles.statsText}>{item.views}</Text>
             </View>
-        </TouchableOpacity>
+        </Pressable>
     );
 
     const renderSmallItem = (item: DiscoveryItem) => (
-        <TouchableOpacity
+        <Pressable
             key={item.id}
             style={[styles.item, { width: COLUMN_WIDTH, height: SMALL_HEIGHT }]}
             onPress={() => onItemPress(item.id)}
+            onLongPress={() => onPreview?.(item)}
+            onPressOut={onPreviewEnd}
         >
             <Image
                 source={{ uri: item.thumbnailUrl }}
@@ -68,7 +75,7 @@ export function MasonryFeed({ data, onItemPress, isDark = true }: MasonryFeedPro
                 <Eye size={10} color="white" />
                 <Text style={styles.statsText}>{item.views}</Text>
             </View>
-        </TouchableOpacity>
+        </Pressable>
     );
 
     const SmallColumn = ({ items }: { items: DiscoveryItem[] }) => (
