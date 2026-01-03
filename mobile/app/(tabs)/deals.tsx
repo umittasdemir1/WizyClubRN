@@ -8,6 +8,7 @@ import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrap
 import { Search } from 'lucide-react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { COLORS } from '../../src/core/constants';
+import { TrendingHeader } from '../../src/presentation/components/explore/TrendingHeader';
 import {
     HeroBannerCarousel,
     CategoryCard,
@@ -85,14 +86,13 @@ export default function DealsScreen() {
             onSwipeLeft={() => router.push('/notifications')}
             onSwipeRight={() => router.push('/explore')}
         >
-            <View style={[styles.container, { paddingTop: insets.top, backgroundColor: bgBody }]}>
-                {/* Header */}
-                <View style={styles.header}>
-                    <Text style={[styles.headerTitle, { color: textColor }]}>Fırsatlar</Text>
-                    <TouchableOpacity style={styles.searchButton}>
-                        <Search size={20} color={textColor} />
-                    </TouchableOpacity>
-                </View>
+            <View style={[styles.container, { backgroundColor: bgBody }]}>
+                {/* Unified Header */}
+                <TrendingHeader
+                    title="Fırsatlar"
+                    isDark={isDark}
+                    showSearch={false}
+                />
 
                 <ScrollView
                     showsVerticalScrollIndicator={false}
@@ -220,24 +220,7 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingVertical: 16,
-    },
-    headerTitle: {
-        fontSize: 24,
-        fontWeight: '500',
-        letterSpacing: 0.3,
-    },
-    searchButton: {
-        width: 24,
-        height: 24,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
+    // Removed old header styles
     scrollContent: {
         paddingHorizontal: 16,
     },

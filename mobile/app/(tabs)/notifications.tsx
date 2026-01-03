@@ -7,6 +7,7 @@ import { ShoppingBag, User, Heart, Bell } from 'lucide-react-native';
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import { COLORS } from '../../src/core/constants';
+import { TrendingHeader } from '../../src/presentation/components/explore/TrendingHeader';
 
 interface Notification {
     id: string;
@@ -134,16 +135,18 @@ export default function NotificationsScreen() {
             onSwipeLeft={() => router.push('/profile')}
             onSwipeRight={() => router.push('/deals')}
         >
-            <View style={[styles.container, { paddingTop: insets.top, backgroundColor: bgBody }]}>
-                {/* Header */}
-                <View style={styles.header}>
-                    <Text style={[styles.headerTitle, { color: textColor }]}>Bildirimler</Text>
-                    {unreadCount > 0 && (
+            <View style={[styles.container, { backgroundColor: bgBody }]}>
+                {/* Unified Header */}
+                <TrendingHeader
+                    title="Bildirimler"
+                    isDark={isDark}
+                    showSearch={false}
+                    rightElement={unreadCount > 0 ? (
                         <View style={styles.badge}>
                             <Text style={styles.badgeText}>{unreadCount} Yeni</Text>
                         </View>
-                    )}
-                </View>
+                    ) : undefined}
+                />
 
                 {/* List */}
                 <FlashList
@@ -167,20 +170,8 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        paddingHorizontal: 20,
     },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 24,
-        marginTop: 12,
-    },
-    headerTitle: {
-        fontSize: 24,
-        fontWeight: '500',
-        letterSpacing: 0.3,
-    },
+    // Removed old header styles
     badge: {
         backgroundColor: '#dc2626',
         paddingHorizontal: 8,
@@ -194,6 +185,7 @@ const styles = StyleSheet.create({
     },
     listContent: {
         paddingBottom: 24,
+        paddingHorizontal: 20,
     },
     notificationCard: {
         flexDirection: 'row',

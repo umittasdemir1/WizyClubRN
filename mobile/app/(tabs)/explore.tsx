@@ -132,8 +132,9 @@ export default function ExploreScreen() {
         >
             <View style={[styles.container, { backgroundColor: bgBody }]}>
                 <TrendingHeader
+                    title="Şimdi Keşfet"
                     isDark={isDark}
-                    onSearchPress={() => console.log('Search')}
+                    showSearch={false}
                 />
 
                 <ScrollView
