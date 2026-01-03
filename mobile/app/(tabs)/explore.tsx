@@ -1,4 +1,4 @@
-import { View, StyleSheet, ScrollView, StatusBar as RNStatusBar, RefreshControl, Text, Pressable } from 'react-native';
+import { View, StyleSheet, StatusBar as RNStatusBar, Text, Pressable } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,26 +15,27 @@ import { TrendingCarousel } from '../../src/presentation/components/explore/Tren
 import { MasonryFeed } from '../../src/presentation/components/explore/MasonryFeed';
 import { useActiveVideoStore } from '../../src/presentation/store/useActiveVideoStore';
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
+import { CustomRefreshScrollView } from '../../src/presentation/components/shared/CustomRefreshScrollView';
 import { LIGHT_COLORS, DARK_COLORS } from '../../src/core/constants';
 
 const CATEGORIES = ['Senin İçin', 'Takip Edilen', 'Popüler'];
 
 // Preview Modal Component
 const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: string; videoUrl: string }; onClose: () => void }) => {
-  return (
-    <Pressable style={styles.previewOverlay} onPress={onClose}>
-      <View style={styles.previewCard}>
-        <Video
-          source={{ uri: item.videoUrl }}
-          style={styles.previewVideo}
-          resizeMode="cover"
-          repeat={true}
-          paused={false}
-          muted={true}
-        />
-      </View>
-    </Pressable>
-  );
+    return (
+        <Pressable style={styles.previewOverlay} onPress={onClose}>
+            <View style={styles.previewCard}>
+                <Video
+                    source={{ uri: item.videoUrl }}
+                    style={styles.previewVideo}
+                    resizeMode="cover"
+                    repeat={true}
+                    paused={false}
+                    muted={true}
+                />
+            </View>
+        </Pressable>
+    );
 };
 
 export default function ExploreScreen() {
@@ -125,70 +126,70 @@ export default function ExploreScreen() {
 
     return (
         <>
-        <SwipeWrapper
-            onSwipeLeft={() => router.push('/deals')}
-            onSwipeRight={() => router.push('/')}
-            edgeOnly={true}
-        >
-            <View style={[styles.container, { backgroundColor: bgBody }]}>
-                <TrendingHeader
-                    title="Şimdi Keşfet"
-                    isDark={isDark}
-                    showSearch={false}
-                />
-
-                <ScrollView
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
-                    refreshControl={
-                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={isDark ? "#fff" : "#000"} />
-                    }
-                >
-                    {/* Filter Bar */}
-                    <FilterBar
-                        categories={CATEGORIES}
-                        selectedCategory={selectedCategory}
-                        onSelect={setSelectedCategory}
+            <SwipeWrapper
+                onSwipeLeft={() => router.push('/deals')}
+                onSwipeRight={() => router.push('/')}
+                edgeOnly={true}
+            >
+                <View style={[styles.container, { backgroundColor: bgBody }]}>
+                    <TrendingHeader
+                        title="Şimdi Keşfet"
                         isDark={isDark}
+                        showSearch={false}
                     />
 
-                    {/* 1. Featured Carousel Section */}
-                    <Text style={[styles.carouselTitle, { color: themeColors.textPrimary }]}>
-                        Önerilenler
-                    </Text>
-                    <TrendingCarousel
-                        data={trendingData}
-                        onItemPress={handleVideoPress}
+                    <CustomRefreshScrollView
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
                         isDark={isDark}
-                    />
+                        showsVerticalScrollIndicator={false}
+                        contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
+                    >
+                        {/* Filter Bar */}
+                        <FilterBar
+                            categories={CATEGORIES}
+                            selectedCategory={selectedCategory}
+                            onSelect={setSelectedCategory}
+                            isDark={isDark}
+                        />
 
-                    {/* 2. Stories Section */}
-                    {creators.length > 0 && (
-                        <>
-                            <Text style={[styles.sectionTitle, { color: themeColors.textPrimary }]}>
-                                Hikayeler
-                            </Text>
-                            <StoryRail
-                                creators={creators}
-                                onCreatorPress={handleStoryPress}
-                                isDark={isDark}
-                            />
-                        </>
-                    )}
+                        {/* 1. Stories Section */}
+                        {creators.length > 0 && (
+                            <>
+                                <Text style={[styles.sectionTitle, { color: themeColors.textPrimary }]}>
+                                    Hikayeler
+                                </Text>
+                                <StoryRail
+                                    creators={creators}
+                                    onCreatorPress={handleStoryPress}
+                                    isDark={isDark}
+                                />
+                            </>
+                        )}
 
-                    {/* 3. Masonry Grid */}
-                    <MasonryFeed
-                        data={discoveryItems}
-                        onItemPress={handleVideoPress}
-                        onPreview={showPreview}
-                        onPreviewEnd={hidePreview}
-                        isDark={isDark}
-                    />
-                </ScrollView>
-            </View>
-        </SwipeWrapper>
+                        {/* 2. Featured Carousel Section */}
+                        <Text style={[styles.carouselTitle, { color: themeColors.textPrimary }]}>
+                            Önerilenler
+                        </Text>
+                        <TrendingCarousel
+                            data={trendingData}
+                            onItemPress={handleVideoPress}
+                            isDark={isDark}
+                        />
 
-        {previewItem && <PreviewModal item={previewItem} onClose={hidePreview} />}
+                        {/* 3. Masonry Grid */}
+                        <MasonryFeed
+                            data={discoveryItems}
+                            onItemPress={handleVideoPress}
+                            onPreview={showPreview}
+                            onPreviewEnd={hidePreview}
+                            isDark={isDark}
+                        />
+                    </CustomRefreshScrollView>
+                </View>
+            </SwipeWrapper>
+
+            {previewItem && <PreviewModal item={previewItem} onClose={hidePreview} />}
         </>
     );
 }

@@ -34,12 +34,12 @@ export const LIGHT_COLORS = {
 export const DARK_COLORS = {
     primary: '#FF3B30',
     accent: '#7C3AED',
-    background: '#000000',       // True Black
-    videoBackground: '#000000',
-    card: '#121212',
+    background: '#181818',       // Lighter dark background
+    videoBackground: '#000000',  // Videos stay true black
+    card: '#222222',             // Cards slightly lighter
     white: '#FFFFFF',
     black: '#000000',
-    border: '#262626',
+    border: '#333333',           // Visible borders
     textPrimary: '#FFFFFF',
     textSecondary: 'rgba(255, 255, 255, 0.6)',
     textMuted: '#8E8E93',

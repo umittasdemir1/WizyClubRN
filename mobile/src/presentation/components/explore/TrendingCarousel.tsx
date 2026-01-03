@@ -15,8 +15,9 @@ import Animated, {
     runOnJS
 } from 'react-native-reanimated';
 import LikeIcon from '../../../../assets/icons/like.svg';
-import { Eye } from 'lucide-react-native';
+import { Play } from 'lucide-react-native';
 import Video from 'react-native-video';
+import { VideoCacheService } from '../../../data/services/VideoCacheService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ITEM_WIDTH = SCREEN_WIDTH * 0.48; // 2 items visible per screen, slightly wider to reduce gap
@@ -49,12 +50,13 @@ interface TrendingCardProps {
     onPress: (id: string) => void;
     activeIndex: number;
     onVideoEnd?: () => void;
+    isMuted: boolean;
+    onMuteToggle: () => void;
 }
 
-const TrendingCard = ({ item, index, scrollX, onPress, activeIndex, onVideoEnd }: TrendingCardProps) => {
+const TrendingCard = ({ item, index, scrollX, onPress, activeIndex, onVideoEnd, isMuted, onMuteToggle }: TrendingCardProps) => {
     const [isLiked, setIsLiked] = React.useState(item.isLiked || false);
     const [isPaused, setIsPaused] = useState(false);
-    const [isMuted, setIsMuted] = useState(true);
     const [lastTap, setLastTap] = useState(0);
     const [isVideoReady, setIsVideoReady] = useState(false);
     const likeScale = useSharedValue(1);
@@ -125,7 +127,7 @@ const TrendingCard = ({ item, index, scrollX, onPress, activeIndex, onVideoEnd }
 
     const handleMuteToggle = (e: any) => {
         e.stopPropagation();
-        setIsMuted(!isMuted);
+        onMuteToggle();
     };
 
     return (
@@ -161,15 +163,22 @@ const TrendingCard = ({ item, index, scrollX, onPress, activeIndex, onVideoEnd }
                     pointerEvents="none"
                 />
 
+                {/* Tap Area - Behind overlays so buttons work */}
+                <Pressable
+                    style={StyleSheet.absoluteFillObject}
+                    onPress={handleVideoPress}
+                />
+
                 {/* Top Overlay: User & Mute Icon */}
-                <View style={styles.topOverlay} pointerEvents="box-none">
-                    <View style={styles.userInfo}>
+                <View style={[styles.topOverlay, { zIndex: 10 }]} pointerEvents="box-none">
+                    <View style={styles.userInfo} pointerEvents="none">
                         <Image source={{ uri: item.avatarUrl }} style={styles.avatar} />
                         <Text style={styles.username}>@{item.username}</Text>
                     </View>
                     <TouchableOpacity
                         style={styles.actionIcon}
                         onPress={handleMuteToggle}
+                        activeOpacity={0.7}
                     >
                         {isMuted ? (
                             <VolumeX size={18} color="white" />
@@ -180,13 +189,13 @@ const TrendingCard = ({ item, index, scrollX, onPress, activeIndex, onVideoEnd }
                 </View>
 
                 {/* Bottom Overlay: Title, Stats & Like */}
-                <View style={styles.bottomOverlay} pointerEvents="box-none">
+                <View style={[styles.bottomOverlay, { zIndex: 10 }]} pointerEvents="box-none">
                     <View style={styles.bottomRow} pointerEvents="box-none">
                         <View style={styles.bottomLeft} pointerEvents="none">
                             <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
                             <View style={styles.statsRow}>
                                 <View style={styles.stat}>
-                                    <Eye size={12} color="rgba(255,255,255,0.8)" />
+                                    <Play size={12} color="rgba(255,255,255,0.8)" fill="rgba(255,255,255,0.8)" />
                                     <Text style={styles.statText}>{item.views}</Text>
                                 </View>
                             </View>
@@ -194,6 +203,7 @@ const TrendingCard = ({ item, index, scrollX, onPress, activeIndex, onVideoEnd }
                         <TouchableOpacity
                             style={styles.likeButton}
                             onPress={handleLike}
+                            activeOpacity={0.7}
                         >
                             <Animated.View style={likeAnimatedStyle}>
                                 <LikeIcon
@@ -205,12 +215,6 @@ const TrendingCard = ({ item, index, scrollX, onPress, activeIndex, onVideoEnd }
                         </TouchableOpacity>
                     </View>
                 </View>
-
-                {/* Tap Area - Must be on top */}
-                <Pressable
-                    style={StyleSheet.absoluteFillObject}
-                    onPress={handleVideoPress}
-                />
             </View>
         </Animated.View>
     );
@@ -219,11 +223,66 @@ const TrendingCard = ({ item, index, scrollX, onPress, activeIndex, onVideoEnd }
 export function TrendingCarousel({ data, onItemPress, isDark = true }: TrendingCarouselProps) {
     const scrollX = useSharedValue(0);
     const [activeIndex, setActiveIndex] = useState(0);
+    const [isMuted, setIsMuted] = useState(true);
     const scrollViewRef = useRef<ScrollView>(null);
+
+    // ============================================
+    // PREFETCH MECHANISM (TikTok-style)
+    // ============================================
+
+    // 1. Initial Prefetch: When carousel loads, prefetch first 3 videos
+    const hasInitialPrefetched = useRef(false);
+    useEffect(() => {
+        if (data.length > 0 && !hasInitialPrefetched.current) {
+            hasInitialPrefetched.current = true;
+            console.log('[Carousel Prefetch] 🚀 Initial prefetch starting...');
+
+            data.slice(0, 3).forEach((item, i) => {
+                // Video prefetch (background download)
+                VideoCacheService.cacheVideo(item.videoUrl).then(path => {
+                    if (path) console.log(`[Carousel Prefetch] ✅ Video ${i + 1} cached`);
+                });
+                // Thumbnail prefetch
+                if (item.thumbnailUrl) {
+                    Image.prefetch(item.thumbnailUrl);
+                }
+            });
+        }
+    }, [data.length > 0]);
+
+    // 2. Scroll Prefetch: When active index changes, prefetch next 2 videos
+    const lastPrefetchedIndex = useRef(-1);
+    useEffect(() => {
+        if (data.length === 0) return;
+        if (activeIndex === lastPrefetchedIndex.current) return;
+
+        lastPrefetchedIndex.current = activeIndex;
+
+        // Prefetch next 2 videos (if they exist)
+        const nextItems = data.slice(activeIndex + 1, activeIndex + 3);
+        if (nextItems.length > 0) {
+            console.log(`[Carousel Prefetch] 📥 Prefetching ${nextItems.length} upcoming videos...`);
+
+            nextItems.forEach((item, i) => {
+                VideoCacheService.cacheVideo(item.videoUrl).then(path => {
+                    if (path) console.log(`[Carousel Prefetch] ✅ Next video ${i + 1} cached`);
+                });
+                if (item.thumbnailUrl) {
+                    Image.prefetch(item.thumbnailUrl);
+                }
+            });
+        }
+    }, [activeIndex, data]);
+
+    // ============================================
 
     const updateActiveIndex = (index: number) => {
         setActiveIndex(index);
     };
+
+    const handleMuteToggle = useCallback(() => {
+        setIsMuted(prev => !prev);
+    }, []);
 
     const scrollToNext = useCallback(() => {
         const nextIndex = activeIndex + 1;
@@ -266,6 +325,8 @@ export function TrendingCarousel({ data, onItemPress, isDark = true }: TrendingC
                         onPress={onItemPress}
                         activeIndex={activeIndex}
                         onVideoEnd={scrollToNext}
+                        isMuted={isMuted}
+                        onMuteToggle={handleMuteToggle}
                     />
                 ))}
             </Animated.ScrollView>

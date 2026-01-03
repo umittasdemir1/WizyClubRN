@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
     useSharedValue,
@@ -10,12 +10,11 @@ import Animated, {
     Easing,
     cancelAnimation,
 } from 'react-native-reanimated';
-import { Plus, Loader, Trash2 } from 'lucide-react-native';
+import { Plus, Loader, Trash2, Volume2, VolumeX } from 'lucide-react-native';
 import { useBrightnessStore } from '../../store/useBrightnessStore';
 import { useUploadStore } from '../../store/useUploadStore';
 
 // Import SVGs
-import VoiceOnIcon from '../../../../assets/icons/voice_on.svg';
 import SunIcon from '../../../../assets/icons/sun.svg';
 import MoreIcon from '../../../../assets/icons/more.svg';
 
@@ -220,17 +219,17 @@ export function HeaderOverlay({
             <View style={styles.rightButtons}>
                 {showBrightnessButton && <BrightnessButton />}
 
-                <AnimatedPressable
+                <TouchableOpacity
                     onPress={onToggleMute}
-                    style={[styles.iconButton, voiceAnimatedStyle]}
-                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    style={[styles.iconButton, { marginRight: -6 }]}
+                    activeOpacity={0.7}
                 >
-                    <VoiceOnIcon
-                        width={24}
-                        height={24}
-                        color={isMuted ? "#6B7280" : "#FFFFFF"}
-                    />
-                </AnimatedPressable>
+                    {isMuted ? (
+                        <VolumeX size={24} color="#FFFFFF" />
+                    ) : (
+                        <Volume2 size={24} color="#FFFFFF" />
+                    )}
+                </TouchableOpacity>
 
                 <Pressable
                     style={styles.iconButton}
@@ -311,7 +310,7 @@ const styles = StyleSheet.create({
     rightButtons: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 2,
+        gap: 0,
         minWidth: 120,
         justifyContent: 'flex-end',
     },

@@ -1,13 +1,26 @@
-import { View, Text, StyleSheet, StatusBar as RNStatusBar, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, StatusBar as RNStatusBar, ScrollView } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { FlashList } from '@shopify/flash-list';
+import { useCallback, useState, useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ShoppingBag, User, Heart, Bell } from 'lucide-react-native';
+import { ShoppingBag, User, Heart, Bell, RotateCw } from 'lucide-react-native';
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
+import { useNotificationStore } from '../../src/presentation/store/useNotificationStore';
 import { COLORS } from '../../src/core/constants';
 import { TrendingHeader } from '../../src/presentation/components/explore/TrendingHeader';
+import Animated, {
+    useSharedValue,
+    useAnimatedStyle,
+    withSpring,
+    withTiming,
+    withRepeat,
+    interpolate,
+    Extrapolation,
+    runOnJS,
+    Easing,
+    cancelAnimation,
+} from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 interface Notification {
     id: string;
@@ -21,20 +34,31 @@ interface Notification {
 const MOCK_NOTIFICATIONS: Notification[] = [
     { id: '1', type: 'deal', title: 'Zara İndirimi Başladı!', desc: 'Favori ürünlerinde %40 indirim seni bekliyor.', time: '2dk', read: false },
     { id: '2', type: 'social', title: '@karennne seni takip etti', desc: 'Senin videolarını beğeniyor olabilir.', time: '15dk', read: false },
-    { id: '3', type: 'like', title: 'Videon 10k izlendi!', desc: 'Tebrikler, bu hafta çok popülersin.', time: '1sa', read: true },
-    { id: '4', type: 'deal', title: 'Kupon Süresi Doluyor', desc: 'Starbucks kodunu kullanmak için son 2 saat.', time: '3sa', read: true },
-    { id: '5', type: 'social', title: '@umit bir video paylaştı', desc: 'İlgini çekebilecek yeni bir içerik.', time: '5sa', read: true },
+    { id: '3', type: 'like', title: 'Videon 10k izlendi!', desc: 'Tebrikler, bu hafta çok popülersin.', time: '1sa', read: false },
+    { id: '4', type: 'deal', title: 'Kupon Süresi Doluyor', desc: 'Starbucks kodunu kullanmak için son 2 saat.', time: '3sa', read: false },
+    { id: '5', type: 'social', title: '@umit bir video paylaştı', desc: 'İlgini çekebilecek yeni bir içerik.', time: '5sa', read: false },
+    { id: '6', type: 'like', title: '500 yeni takipçi!', desc: 'Bu hafta harika gidiyorsun.', time: '6sa', read: false },
+    { id: '7', type: 'deal', title: 'Nike Flash Sale', desc: 'Sadece 24 saat, %60 indirim.', time: '7sa', read: false },
+    { id: '8', type: 'social', title: '@moda seni takip etti', desc: 'Yeni bir hayranın var!', time: '8sa', read: false },
+    { id: '9', type: 'like', title: 'Yorumuna 100 beğeni!', desc: 'İnsanlar seni seviyor.', time: '9sa', read: false },
+    { id: '10', type: 'deal', title: 'H&M Özel Fırsat', desc: 'Üye olanlara %30 ekstra.', time: '10sa', read: false },
+    { id: '11', type: 'social', title: '@style seni etiketledi', desc: 'Bir gönderide bahsedildin.', time: '11sa', read: true },
 ];
+
+const PULL_THRESHOLD = 60; // Reduced threshold
 
 export default function NotificationsScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
     const isDark = useThemeStore((state) => state.isDark);
+    const setUnreadCount = useNotificationStore((state) => state.setUnreadCount);
     const [refreshing, setRefreshing] = useState(false);
     const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
-
     const bgBody = isDark ? COLORS.background : '#f9fafb';
-    const textColor = isDark ? COLORS.textPrimary : '#000000';
+
+    const pullDistance = useSharedValue(0);
+    const isAtTop = useSharedValue(true);
+    const rotation = useSharedValue(0);
 
     useFocusEffect(
         useCallback(() => {
@@ -42,12 +66,69 @@ export default function NotificationsScreen() {
         }, [isDark])
     );
 
-    const onRefresh = useCallback(() => {
+    // Start spinning when refreshing
+    useEffect(() => {
+        if (refreshing) {
+            rotation.value = withRepeat(
+                withTiming(360, { duration: 800, easing: Easing.linear }),
+                -1,
+                false
+            );
+        } else {
+            cancelAnimation(rotation);
+            rotation.value = withTiming(0, { duration: 200 });
+        }
+    }, [refreshing]);
+
+    const triggerRefresh = useCallback(() => {
         setRefreshing(true);
         setTimeout(() => {
             setRefreshing(false);
-        }, 1000);
+            pullDistance.value = withSpring(0, { damping: 15 });
+        }, 1500);
     }, []);
+
+    const panGesture = Gesture.Pan()
+        .onUpdate((e) => {
+            if (isAtTop.value && e.translationY > 0 && !refreshing) {
+                // Reduced multiplier: 0.25 instead of 0.5
+                pullDistance.value = Math.min(e.translationY * 0.25, 80);
+            }
+        })
+        .onEnd(() => {
+            if (pullDistance.value >= PULL_THRESHOLD && !refreshing) {
+                runOnJS(triggerRefresh)();
+            } else {
+                pullDistance.value = withSpring(0, { damping: 15 });
+            }
+        });
+
+    const contentAnimatedStyle = useAnimatedStyle(() => ({
+        transform: [{ translateY: pullDistance.value }],
+    }));
+
+    const indicatorAnimatedStyle = useAnimatedStyle(() => {
+        const opacity = interpolate(
+            pullDistance.value,
+            [0, 30, PULL_THRESHOLD],
+            [0, 0.5, 1],
+            Extrapolation.CLAMP
+        );
+        const scale = interpolate(
+            pullDistance.value,
+            [0, PULL_THRESHOLD],
+            [0.5, 1],
+            Extrapolation.CLAMP
+        );
+        return {
+            opacity,
+            transform: [{ scale }]
+        };
+    });
+
+    const spinAnimatedStyle = useAnimatedStyle(() => ({
+        transform: [{ rotate: `${rotation.value}deg` }],
+    }));
 
     const getIcon = (type: Notification['type']) => {
         const iconSize = 24;
@@ -65,13 +146,19 @@ export default function NotificationsScreen() {
 
     const unreadCount = notifications.filter(n => !n.read).length;
 
-    const renderItem = ({ item }: { item: Notification }) => {
+    // Sync unread count with global store
+    useEffect(() => {
+        setUnreadCount(unreadCount);
+    }, [unreadCount, setUnreadCount]);
+
+    const renderItem = (item: Notification) => {
         const cardBg = item.read ? 'transparent' : (isDark ? 'rgba(255, 255, 255, 0.05)' : '#FFFFFF');
         const borderColor = item.read ? 'transparent' : (isDark ? 'rgba(255, 255, 255, 0.05)' : '#e5e7eb');
         const iconBg = item.read ? (isDark ? 'rgba(255, 255, 255, 0.05)' : '#e5e7eb') : (isDark ? 'rgba(255, 255, 255, 0.1)' : '#f3f4f6');
 
         return (
             <View
+                key={item.id}
                 style={[
                     styles.notificationCard,
                     {
@@ -82,12 +169,9 @@ export default function NotificationsScreen() {
                     }
                 ]}
             >
-                {/* Icon Container */}
                 <View style={[styles.iconContainer, { backgroundColor: iconBg }]}>
                     {getIcon(item.type)}
                 </View>
-
-                {/* Content */}
                 <View style={styles.contentContainer}>
                     <View style={styles.headerRow}>
                         <Text
@@ -121,11 +205,7 @@ export default function NotificationsScreen() {
                         {item.desc}
                     </Text>
                 </View>
-
-                {/* Unread Indicator */}
-                {!item.read && (
-                    <View style={styles.unreadDot} />
-                )}
+                {!item.read && <View style={styles.unreadDot} />}
             </View>
         );
     };
@@ -136,32 +216,38 @@ export default function NotificationsScreen() {
             onSwipeRight={() => router.push('/deals')}
         >
             <View style={[styles.container, { backgroundColor: bgBody }]}>
-                {/* Unified Header */}
                 <TrendingHeader
                     title="Bildirimler"
                     isDark={isDark}
                     showSearch={false}
                     rightElement={unreadCount > 0 ? (
-                        <View style={styles.badge}>
-                            <Text style={styles.badgeText}>{unreadCount} Yeni</Text>
+                        <View style={[styles.headerBadge, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#F3F4F6' }]}>
+                            <Text style={[styles.headerBadgeText, { color: isDark ? 'rgba(255, 255, 255, 0.7)' : '#6B7280' }]}>{unreadCount} Okunmamış</Text>
                         </View>
                     ) : undefined}
                 />
 
-                {/* List */}
-                <FlashList
-                    data={notifications}
-                    renderItem={renderItem}
-                    estimatedItemSize={90}
-                    contentContainerStyle={styles.listContent}
-                    refreshControl={
-                        <RefreshControl
-                            refreshing={refreshing}
-                            onRefresh={onRefresh}
-                            tintColor={isDark ? "#fff" : "#000"}
-                        />
-                    }
-                />
+                {/* Spinning Refresh Icon */}
+                <Animated.View style={[styles.refreshContainer, indicatorAnimatedStyle]}>
+                    <Animated.View style={spinAnimatedStyle}>
+                        <RotateCw size={24} color={isDark ? '#FFFFFF' : '#000000'} strokeWidth={2} />
+                    </Animated.View>
+                </Animated.View>
+
+                <GestureDetector gesture={panGesture}>
+                    <Animated.View style={[styles.contentWrapper, contentAnimatedStyle]}>
+                        <ScrollView
+                            contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 80 }]}
+                            showsVerticalScrollIndicator={false}
+                            scrollEventThrottle={16}
+                            onScroll={(e) => {
+                                isAtTop.value = e.nativeEvent.contentOffset.y <= 0;
+                            }}
+                        >
+                            {notifications.map(renderItem)}
+                        </ScrollView>
+                    </Animated.View>
+                </GestureDetector>
             </View>
         </SwipeWrapper>
     );
@@ -171,21 +257,35 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-    // Removed old header styles
     badge: {
         backgroundColor: '#dc2626',
         paddingHorizontal: 8,
         paddingVertical: 2,
         borderRadius: 9999,
     },
-    badgeText: {
-        color: '#FFFFFF',
-        fontSize: 10,
-        fontWeight: '600',
+    headerBadge: {
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    headerBadgeText: {
+        fontSize: 12,
+        fontWeight: '500',
+    },
+    refreshContainer: {
+        position: 'absolute',
+        top: 100,
+        left: 0,
+        right: 0,
+        alignItems: 'center',
+        zIndex: 10,
+    },
+    contentWrapper: {
+        flex: 1,
     },
     listContent: {
-        paddingBottom: 24,
         paddingHorizontal: 20,
+        paddingTop: 8,
     },
     notificationCard: {
         flexDirection: 'row',
@@ -218,7 +318,6 @@ const styles = StyleSheet.create({
     },
     timeText: {
         fontSize: 10,
-        whiteSpace: 'nowrap',
     },
     descText: {
         fontSize: 12,

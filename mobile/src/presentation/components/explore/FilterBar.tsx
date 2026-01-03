@@ -1,12 +1,65 @@
 import React from 'react';
 import { ScrollView, Text, TouchableOpacity, StyleSheet, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface FilterBarProps {
     categories: string[];
     selectedCategory: string;
     onSelect: (category: string) => void;
     isDark?: boolean;
+}
+
+// Simple Glass Chip - No animations, no reflections
+function GlassChip({
+    category,
+    isActive,
+    onPress,
+    isDark,
+}: {
+    category: string;
+    isActive: boolean;
+    onPress: () => void;
+    isDark: boolean;
+}) {
+    if (isActive) {
+        return (
+            <TouchableOpacity
+                onPress={onPress}
+                activeOpacity={0.8}
+                style={styles.chip}
+            >
+                <LinearGradient
+                    colors={['#FF4D4D', '#FF3B30', '#E63329']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.activeGradient}
+                >
+                    <Text style={styles.activeText}>{category}</Text>
+                </LinearGradient>
+            </TouchableOpacity>
+        );
+    }
+
+    return (
+        <TouchableOpacity
+            onPress={onPress}
+            activeOpacity={0.7}
+            style={styles.chip}
+        >
+            <View style={[
+                styles.glassContainer,
+                isDark ? styles.darkGlass : styles.lightGlass
+            ]}>
+                <Text style={[
+                    styles.glassText,
+                    isDark ? styles.darkText : styles.lightText
+                ]}>
+                    {category}
+                </Text>
+            </View>
+        </TouchableOpacity>
+    );
 }
 
 export function FilterBar({
@@ -16,8 +69,10 @@ export function FilterBar({
     isDark = true,
 }: FilterBarProps) {
     const handleSelect = (category: string) => {
-        onSelect(category);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        if (category !== selectedCategory) {
+            onSelect(category);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
     };
 
     return (
@@ -27,33 +82,15 @@ export function FilterBar({
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
             >
-                {categories.map((category) => {
-                    const isActive = selectedCategory === category;
-                    return (
-                        <TouchableOpacity
-                            key={category}
-                            onPress={() => handleSelect(category)}
-                            style={[
-                                styles.pill,
-                                isActive ? styles.activePill : styles.inactivePill,
-                                isDark ? styles.darkPill : styles.lightPill,
-                            ]}
-                        >
-                            {category === 'Live' && (
-                                <View style={styles.liveDot} />
-                            )}
-                            <Text
-                                style={[
-                                    styles.pillText,
-                                    isActive ? styles.activeText : styles.inactiveText,
-                                    isDark ? styles.darkText : styles.lightText,
-                                ]}
-                            >
-                                {category}
-                            </Text>
-                        </TouchableOpacity>
-                    );
-                })}
+                {categories.map((category) => (
+                    <GlassChip
+                        key={category}
+                        category={category}
+                        isActive={selectedCategory === category}
+                        onPress={() => handleSelect(category)}
+                        isDark={isDark}
+                    />
+                ))}
             </ScrollView>
         </View>
     );
@@ -61,57 +98,71 @@ export function FilterBar({
 
 const styles = StyleSheet.create({
     container: {
-        height: 60,
-        marginVertical: 10,
+        height: 56,
+        marginTop: 8,
+        marginBottom: 12,
     },
     scrollContent: {
         paddingHorizontal: 12,
         alignItems: 'center',
         gap: 10,
     },
-    pill: {
-        paddingHorizontal: 18,
-        paddingVertical: 10,
-        borderRadius: 25,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        borderWidth: 1.5,
+    chip: {
+        borderRadius: 22,
+        overflow: 'hidden',
     },
-    activePill: {
-        borderColor: '#FF3B30',
-        backgroundColor: 'rgba(255, 59, 48, 0.15)',
-    },
-    inactivePill: {
-        borderColor: 'rgba(255, 255, 255, 0.2)',
-        backgroundColor: 'transparent',
-    },
-    darkPill: {
-        // Additional dark styles
-    },
-    lightPill: {
-        borderColor: 'rgba(0, 0, 0, 0.1)',
-    },
-    pillText: {
-        fontSize: 14,
-        fontWeight: '600',
+
+    // Active State - Gradient with Glow
+    activeGradient: {
+        paddingHorizontal: 22,
+        paddingVertical: 12,
+        borderRadius: 22,
+        // Glow effect
+        shadowColor: '#FF3B30',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.45,
+        shadowRadius: 12,
+        elevation: 8,
     },
     activeText: {
         color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: '700',
+        letterSpacing: 0.4,
     },
-    inactiveText: {
-        color: 'rgba(255, 255, 255, 0.6)',
+
+    // Glass Effect Container
+    glassContainer: {
+        paddingHorizontal: 22,
+        paddingVertical: 12,
+        borderRadius: 22,
+    },
+    darkGlass: {
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.12)',
+    },
+    lightGlass: {
+        backgroundColor: 'rgba(255, 255, 255, 0.7)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.9)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 3,
+    },
+
+    // Text Styles
+    glassText: {
+        fontSize: 14,
+        fontWeight: '600',
+        letterSpacing: 0.3,
     },
     darkText: {
-        // Additional dark text styles
+        color: 'rgba(255, 255, 255, 0.85)',
     },
     lightText: {
-        color: 'rgba(0, 0, 0, 0.6)',
-    },
-    liveDot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        backgroundColor: '#FF3B30',
+        color: 'rgba(0, 0, 0, 0.7)',
     },
 });

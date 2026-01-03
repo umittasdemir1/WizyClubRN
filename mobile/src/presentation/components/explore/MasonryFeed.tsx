@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Dimensions, Pressable } from 'react-native';
 import { Image } from 'expo-image';
-import { Eye } from 'lucide-react-native';
+import { Play } from 'lucide-react-native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const GAP = 2;
@@ -52,7 +52,7 @@ export function MasonryFeed({ data, onItemPress, onPreview, onPreviewEnd, isDark
                 contentFit="cover"
             />
             <View style={styles.statsBadge}>
-                <Eye size={10} color="white" />
+                <Play size={10} color="white" fill="white" />
                 <Text style={styles.statsText}>{item.views}</Text>
             </View>
         </Pressable>
@@ -72,7 +72,7 @@ export function MasonryFeed({ data, onItemPress, onPreview, onPreviewEnd, isDark
                 contentFit="cover"
             />
             <View style={styles.statsBadge}>
-                <Eye size={10} color="white" />
+                <Play size={10} color="white" fill="white" />
                 <Text style={styles.statsText}>{item.views}</Text>
             </View>
         </Pressable>
