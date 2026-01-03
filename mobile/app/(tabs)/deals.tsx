@@ -1,11 +1,10 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCallback, useState } from 'react';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import { StatusBar as RNStatusBar } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
-import { CustomRefreshScrollView } from '../../src/presentation/components/shared/CustomRefreshScrollView';
 import { Search } from 'lucide-react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { COLORS } from '../../src/core/constants';
@@ -95,12 +94,16 @@ export default function DealsScreen() {
                     showSearch={false}
                 />
 
-                <CustomRefreshScrollView
-                    refreshing={refreshing}
-                    onRefresh={onRefresh}
-                    isDark={isDark}
+                <ScrollView
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={styles.scrollContent}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                            tintColor={isDark ? '#fff' : '#000'}
+                        />
+                    }
                 >
                     {/* Ad Banner Carousel */}
                     <HeroBannerCarousel banners={adBanners} />
@@ -207,7 +210,7 @@ export default function DealsScreen() {
                     </View>
 
                     <View style={{ height: insets.bottom + 80 }} />
-                </CustomRefreshScrollView>
+                </ScrollView>
             </View>
         </SwipeWrapper>
     );

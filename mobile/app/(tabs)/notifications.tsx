@@ -1,26 +1,13 @@
-import { View, Text, StyleSheet, StatusBar as RNStatusBar, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, StatusBar as RNStatusBar, ScrollView, RefreshControl } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState, useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ShoppingBag, User, Heart, Bell, RotateCw } from 'lucide-react-native';
+import { ShoppingBag, User, Heart, Bell } from 'lucide-react-native';
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import { useNotificationStore } from '../../src/presentation/store/useNotificationStore';
 import { COLORS } from '../../src/core/constants';
 import { TrendingHeader } from '../../src/presentation/components/explore/TrendingHeader';
-import Animated, {
-    useSharedValue,
-    useAnimatedStyle,
-    withSpring,
-    withTiming,
-    withRepeat,
-    interpolate,
-    Extrapolation,
-    runOnJS,
-    Easing,
-    cancelAnimation,
-} from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 interface Notification {
     id: string;
@@ -45,8 +32,6 @@ const MOCK_NOTIFICATIONS: Notification[] = [
     { id: '11', type: 'social', title: '@style seni etiketledi', desc: 'Bir gönderide bahsedildin.', time: '11sa', read: true },
 ];
 
-const PULL_THRESHOLD = 60; // Reduced threshold
-
 export default function NotificationsScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
@@ -56,79 +41,18 @@ export default function NotificationsScreen() {
     const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
     const bgBody = isDark ? COLORS.background : '#f9fafb';
 
-    const pullDistance = useSharedValue(0);
-    const isAtTop = useSharedValue(true);
-    const rotation = useSharedValue(0);
-
     useFocusEffect(
         useCallback(() => {
             RNStatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
         }, [isDark])
     );
 
-    // Start spinning when refreshing
-    useEffect(() => {
-        if (refreshing) {
-            rotation.value = withRepeat(
-                withTiming(360, { duration: 800, easing: Easing.linear }),
-                -1,
-                false
-            );
-        } else {
-            cancelAnimation(rotation);
-            rotation.value = withTiming(0, { duration: 200 });
-        }
-    }, [refreshing]);
-
-    const triggerRefresh = useCallback(() => {
+    const pullToRefresh = useCallback(async () => {
         setRefreshing(true);
-        setTimeout(() => {
-            setRefreshing(false);
-            pullDistance.value = withSpring(0, { damping: 15 });
-        }, 1500);
+        // Simulate refresh
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        setRefreshing(false);
     }, []);
-
-    const panGesture = Gesture.Pan()
-        .onUpdate((e) => {
-            if (isAtTop.value && e.translationY > 0 && !refreshing) {
-                // Reduced multiplier: 0.25 instead of 0.5
-                pullDistance.value = Math.min(e.translationY * 0.25, 80);
-            }
-        })
-        .onEnd(() => {
-            if (pullDistance.value >= PULL_THRESHOLD && !refreshing) {
-                runOnJS(triggerRefresh)();
-            } else {
-                pullDistance.value = withSpring(0, { damping: 15 });
-            }
-        });
-
-    const contentAnimatedStyle = useAnimatedStyle(() => ({
-        transform: [{ translateY: pullDistance.value }],
-    }));
-
-    const indicatorAnimatedStyle = useAnimatedStyle(() => {
-        const opacity = interpolate(
-            pullDistance.value,
-            [0, 30, PULL_THRESHOLD],
-            [0, 0.5, 1],
-            Extrapolation.CLAMP
-        );
-        const scale = interpolate(
-            pullDistance.value,
-            [0, PULL_THRESHOLD],
-            [0.5, 1],
-            Extrapolation.CLAMP
-        );
-        return {
-            opacity,
-            transform: [{ scale }]
-        };
-    });
-
-    const spinAnimatedStyle = useAnimatedStyle(() => ({
-        transform: [{ rotate: `${rotation.value}deg` }],
-    }));
 
     const getIcon = (type: Notification['type']) => {
         const iconSize = 24;
@@ -227,27 +151,19 @@ export default function NotificationsScreen() {
                     ) : undefined}
                 />
 
-                {/* Spinning Refresh Icon */}
-                <Animated.View style={[styles.refreshContainer, indicatorAnimatedStyle]}>
-                    <Animated.View style={spinAnimatedStyle}>
-                        <RotateCw size={24} color={isDark ? '#FFFFFF' : '#000000'} strokeWidth={2} />
-                    </Animated.View>
-                </Animated.View>
-
-                <GestureDetector gesture={panGesture}>
-                    <Animated.View style={[styles.contentWrapper, contentAnimatedStyle]}>
-                        <ScrollView
-                            contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 80 }]}
-                            showsVerticalScrollIndicator={false}
-                            scrollEventThrottle={16}
-                            onScroll={(e) => {
-                                isAtTop.value = e.nativeEvent.contentOffset.y <= 0;
-                            }}
-                        >
-                            {notifications.map(renderItem)}
-                        </ScrollView>
-                    </Animated.View>
-                </GestureDetector>
+                <ScrollView
+                    contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 80 }]}
+                    showsVerticalScrollIndicator={false}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={pullToRefresh}
+                            tintColor={isDark ? '#fff' : '#000'}
+                        />
+                    }
+                >
+                    {notifications.map(renderItem)}
+                </ScrollView>
             </View>
         </SwipeWrapper>
     );
@@ -271,17 +187,6 @@ const styles = StyleSheet.create({
     headerBadgeText: {
         fontSize: 12,
         fontWeight: '500',
-    },
-    refreshContainer: {
-        position: 'absolute',
-        top: 100,
-        left: 0,
-        right: 0,
-        alignItems: 'center',
-        zIndex: 10,
-    },
-    contentWrapper: {
-        flex: 1,
     },
     listContent: {
         paddingHorizontal: 20,

@@ -1,4 +1,4 @@
-import { View, StyleSheet, StatusBar as RNStatusBar, Text, Pressable } from 'react-native';
+import { View, StyleSheet, ScrollView, StatusBar as RNStatusBar, RefreshControl, Text, Pressable } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,7 +15,6 @@ import { TrendingCarousel } from '../../src/presentation/components/explore/Tren
 import { MasonryFeed } from '../../src/presentation/components/explore/MasonryFeed';
 import { useActiveVideoStore } from '../../src/presentation/store/useActiveVideoStore';
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
-import { CustomRefreshScrollView } from '../../src/presentation/components/shared/CustomRefreshScrollView';
 import { LIGHT_COLORS, DARK_COLORS } from '../../src/core/constants';
 
 const CATEGORIES = ['Senin İçin', 'Takip Edilen', 'Popüler'];
@@ -138,12 +137,12 @@ export default function ExploreScreen() {
                         showSearch={false}
                     />
 
-                    <CustomRefreshScrollView
-                        refreshing={refreshing}
-                        onRefresh={onRefresh}
-                        isDark={isDark}
+                    <ScrollView
                         showsVerticalScrollIndicator={false}
                         contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
+                        refreshControl={
+                            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={isDark ? "#fff" : "#000"} />
+                        }
                     >
                         {/* Filter Bar */}
                         <FilterBar
@@ -185,7 +184,7 @@ export default function ExploreScreen() {
                             onPreviewEnd={hidePreview}
                             isDark={isDark}
                         />
-                    </CustomRefreshScrollView>
+                    </ScrollView>
                 </View>
             </SwipeWrapper>
 
