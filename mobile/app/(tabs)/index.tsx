@@ -291,10 +291,12 @@ export default function FeedScreen() {
         }, [setScreenFocused, setActiveVideo])
     );
 
-    // Watch for late arrival of videos while focused
+    // Watch for late arrival of videos - AGGRESSIVE INIT for instant playback
     useEffect(() => {
-        if (isScreenFocusedRef.current && videos.length > 0 && !activeVideoId) {
-             console.log('[FeedScreen] Videos arrived while focused - Starting first video');
+        // If we have videos but no active video, set the first one immediately.
+        // We don't wait for focus check because FeedScreen is the entry point.
+        if (videos.length > 0 && !activeVideoId) {
+             console.log('[FeedScreen] 🚀 Fast init: Starting first video immediately');
              setActiveVideo(videos[0].id, 0);
         }
     }, [videos, activeVideoId, setActiveVideo]);

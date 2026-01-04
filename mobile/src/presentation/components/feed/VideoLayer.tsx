@@ -221,6 +221,10 @@ export const VideoLayer = memo(function VideoLayer({
             videoRef.current?.seek(0);
             currentTimeSV.value = 0;
             setIsFinished(false);
+            // Force resume if it was paused (for instant playback fix)
+            if (isPausedGlobal) {
+                setPaused(false);
+            }
         }
     }, [isActive, video.id]);
 
