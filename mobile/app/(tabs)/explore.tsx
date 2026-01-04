@@ -55,8 +55,8 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: str
             onPressOut={onClose}
         >
             <View style={styles.previewCard}>
-                {/* Top Info Section - Avatar + Name + Username + More */}
-                <View style={[styles.previewInfoSection, styles.previewTopHeader]}>
+                {/* Top Info Section - Strictly Aligned */}
+                <View style={styles.previewHeader}>
                     <View style={styles.previewUserHeader}>
                         {item.avatarUrl && (
                             <Image source={{ uri: item.avatarUrl }} style={styles.previewAvatar} />
@@ -70,10 +70,7 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: str
                             </Text>
                         </View>
                     </View>
-                    {/* More Icon - Strictly positioned at the right corner and vertical */}
-                    <View style={styles.previewMoreContainer}>
-                        <MoreIcon width={24} height={24} color="#fff" style={{ transform: [{ rotate: '90deg' }] }} />
-                    </View>
+                    <MoreIcon width={32} height={32} color="#fff" style={{ transform: [{ rotate: '90deg' }] }} />
                 </View>
 
                 {/* Video Area - 0 border internally, clipped by container */}
@@ -324,16 +321,14 @@ const styles = StyleSheet.create({
         paddingHorizontal: 15,
         backgroundColor: '#1a1a1a',
     },
-    previewTopHeader: {
+    previewHeader: {
+        width: '100%',
+        height: 56,
         flexDirection: 'row',
+        alignItems: 'center',
         justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    previewMoreContainer: {
-        width: 32,
-        height: 32,
-        justifyContent: 'center',
-        alignItems: 'center',
+        paddingHorizontal: 15,
+        backgroundColor: '#1a1a1a',
     },
     previewActionRow: {
         flexDirection: 'row',
@@ -353,7 +348,6 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.1)',
     },
-
     previewNameContainer: {
         flex: 1,
     },
@@ -364,7 +358,8 @@ const styles = StyleSheet.create({
     },
     previewUserHandle: {
         color: 'rgba(255,255,255,0.6)',
-        fontSize: 12,
+        fontSize: 13, // Slightly larger for readability
         fontWeight: '500',
     },
 });
+
