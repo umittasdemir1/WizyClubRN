@@ -141,6 +141,7 @@ const TrendingCard = ({ item, index, scrollX, onPress, onPreview, onPreviewEnd, 
                     style={StyleSheet.absoluteFillObject}
                     onPress={handleVideoPress}
                     onLongPress={() => onPreview?.(item)}
+                    delayLongPress={300}
                     onPressOut={onPreviewEnd}
                 />
 

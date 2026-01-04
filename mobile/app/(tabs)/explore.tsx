@@ -42,7 +42,11 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: str
     }, [item.videoUrl]);
 
     return (
-        <Pressable style={styles.previewOverlay} onPress={onClose}>
+        <Pressable 
+            style={styles.previewOverlay} 
+            onPress={onClose} 
+            onPressOut={onClose} // 🔥 CRITICAL: Close when finger is lifted, even if modal captured focus
+        >
             <View style={styles.previewCard}>
                 {/* Poster: Visible until video is truly ready */}
                 {showPoster && (

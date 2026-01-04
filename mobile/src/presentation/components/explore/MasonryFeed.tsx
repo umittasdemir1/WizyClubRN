@@ -44,6 +44,7 @@ export function MasonryFeed({ data, onItemPress, onPreview, onPreviewEnd, isDark
             style={[styles.item, { width: COLUMN_WIDTH, height: LARGE_HEIGHT }]}
             onPress={() => onItemPress(item.id)}
             onLongPress={() => onPreview?.(item)}
+            delayLongPress={300}
             onPressOut={onPreviewEnd}
         >
             <Image
@@ -64,6 +65,7 @@ export function MasonryFeed({ data, onItemPress, onPreview, onPreviewEnd, isDark
             style={[styles.item, { width: COLUMN_WIDTH, height: SMALL_HEIGHT }]}
             onPress={() => onItemPress(item.id)}
             onLongPress={() => onPreview?.(item)}
+            delayLongPress={300}
             onPressOut={onPreviewEnd}
         >
             <Image
