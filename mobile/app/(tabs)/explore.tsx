@@ -1,6 +1,6 @@
-import { View, StyleSheet, ScrollView, StatusBar as RNStatusBar, RefreshControl, Text, Pressable, Dimensions } from 'react-native';
+import { View, StyleSheet, ScrollView, StatusBar as RNStatusBar, RefreshControl, Text, Pressable, Dimensions, PanResponder } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import { useStoryViewer } from '../../src/presentation/hooks/useStoryViewer';
@@ -8,6 +8,7 @@ import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import Video from 'react-native-video';
 import { Image } from 'expo-image';
 import { VideoCacheService } from '../../src/data/services/VideoCacheService';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 
 // Icons
 import LikeIcon from '../../assets/icons/like.svg';
@@ -25,19 +26,35 @@ import { useActiveVideoStore } from '../../src/presentation/store/useActiveVideo
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
 import { LIGHT_COLORS, DARK_COLORS } from '../../src/core/constants';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CATEGORIES = ['Senin İçin', 'Takip Edilen', 'Popüler'];
 
+interface PreviewModalProps {
+    item: { 
+        id: string; 
+        thumbnailUrl: string; 
+        videoUrl: string; 
+        username?: string; 
+        fullName?: string; 
+        avatarUrl?: string 
+    };
+    onClose: () => void;
+    onAction?: (type: 'like' | 'save' | 'share' | 'shop', id: string) => void;
+}
+
 // Preview Modal Component
-const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: string; videoUrl: string; username?: string; fullName?: string; avatarUrl?: string }; onClose: () => void }) => {
+const PreviewModal = ({ item, onClose, onAction }: PreviewModalProps) => {
     const [videoSource, setVideoSource] = useState<any>(null);
     const [isReady, setIsReady] = useState(false);
     const [showPoster, setShowPoster] = useState(true);
+    const [activeAction, setActiveAction] = useState<'like' | 'save' | 'share' | 'shop' | null>(null);
+    
+    // Store button layout coordinates for hit detection
+    const layouts = useRef<Record<string, { x: number, y: number, width: number, height: number }>>({});
 
     useEffect(() => {
         let isCancelled = false;
         const initSource = async () => {
-            // Check cache first for instant load
             const cachedPath = await VideoCacheService.getCachedVideoPath(item.videoUrl);
             if (!isCancelled) {
                 setVideoSource(cachedPath ? { uri: cachedPath } : { uri: item.videoUrl });
@@ -47,13 +64,48 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: str
         return () => { isCancelled = true; };
     }, [item.videoUrl]);
 
+    // PanResponder to track sliding finger
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: () => true,
+            onPanResponderMove: (evt, gestureState) => {
+                const { moveX, moveY } = gestureState;
+                let foundAction: any = null;
+
+                // Simple hit detection
+                Object.entries(layouts.current).forEach(([type, layout]) => {
+                    if (
+                        moveX >= layout.x && 
+                        moveX <= layout.x + layout.width &&
+                        moveY >= layout.y && 
+                        moveY <= layout.y + layout.height
+                    ) {
+                        foundAction = type;
+                    }
+                });
+                setActiveAction(foundAction);
+            },
+            onPanResponderRelease: (evt, gestureState) => {
+                if (activeAction) {
+                    onAction?.(activeAction, item.id);
+                }
+                onClose();
+            },
+            onPanResponderTerminate: onClose,
+        })
+    ).current;
+
+    const handleLayout = (type: string) => (event: any) => {
+        // Measure position relative to screen for accurate tracking
+        event.target.measure((x: number, y: number, width: number, height: number, pageX: number, pageY: number) => {
+            layouts.current[type] = { x: pageX, y: pageY, width, height };
+        });
+    };
+
     return (
-        <Pressable 
-            style={styles.previewOverlay} 
-            onPress={onClose} 
-            onPressOut={onClose}
-        >
-            <View style={styles.previewCard}>
+        <View style={styles.previewOverlay} {...panResponder.panHandlers}>
+            <Animated.View style={styles.previewCard}>
                 {/* Top Info Section */}
                 <View style={styles.previewHeader}>
                     <View style={styles.previewUserHeader}>
@@ -71,7 +123,7 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: str
                     </View>
                 </View>
 
-                {/* Video Area - 0 border internally, clipped by container */}
+                {/* Video Area */}
                 <View style={styles.videoContainer}>
                     {showPoster && (
                         <Image
@@ -98,22 +150,42 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: str
                     )}
                 </View>
 
-                {/* Bottom Info Section - Action Buttons */}
+                {/* Action Row - Detects slide-over */}
                 <View style={[styles.previewInfoSection, styles.previewActionRow]}>
-                    <LikeIcon width={32} height={32} color="#fff" />
-                    <SaveIcon width={32} height={32} color="#fff" />
-                    <ShareIcon width={32} height={32} color="#fff" />
-                    <ShoppingIcon width={32} height={32} color="#fff" />
+                    <View 
+                        onLayout={handleLayout('like')} 
+                        style={[styles.iconWrapper, activeAction === 'like' && styles.activeIcon]}
+                    >
+                        <LikeIcon width={32} height={32} color={activeAction === 'like' ? '#FF2146' : '#fff'} />
+                    </View>
+                    <View 
+                        onLayout={handleLayout('save')} 
+                        style={[styles.iconWrapper, activeAction === 'save' && styles.activeIcon]}
+                    >
+                        <SaveIcon width={32} height={32} color={activeAction === 'save' ? '#FFD700' : '#fff'} />
+                    </View>
+                    <View 
+                        onLayout={handleLayout('share')} 
+                        style={[styles.iconWrapper, activeAction === 'share' && styles.activeIcon]}
+                    >
+                        <ShareIcon width={32} height={32} color={activeAction === 'share' ? '#00C6FF' : '#fff'} />
+                    </View>
+                    <View 
+                        onLayout={handleLayout('shop')} 
+                        style={[styles.iconWrapper, activeAction === 'shop' && styles.activeIcon]}
+                    >
+                        <ShoppingIcon width={32} height={32} color={activeAction === 'shop' ? '#4CD964' : '#fff'} />
+                    </View>
                 </View>
-            </View>
-        </Pressable>
+            </Animated.View>
+        </View>
     );
 };
 
 export default function ExploreScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
-    const { videos, refreshFeed } = useVideoFeed();
+    const { videos, refreshFeed, toggleLike, toggleSave, toggleShare, toggleShop } = useVideoFeed();
     const isDark = useThemeStore((state) => state.isDark);
     const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
     const bgBody = themeColors.background;
@@ -137,7 +209,6 @@ export default function ExploreScreen() {
     }, [refreshFeed]);
 
     const handleVideoPress = (id: string) => {
-        // Encontra o index do vídeo no feed
         const index = videos.findIndex(v => v.id === id);
         if (index !== -1) {
             setActiveVideo(id, index);
@@ -152,6 +223,15 @@ export default function ExploreScreen() {
     const showPreview = (item: any) => setPreviewItem(item);
     const hidePreview = () => setPreviewItem(null);
 
+    const handlePreviewAction = (type: 'like' | 'save' | 'share' | 'shop', id: string) => {
+        switch (type) {
+            case 'like': toggleLike(id); break;
+            case 'save': toggleSave(id); break;
+            case 'share': toggleShare(id); break;
+            case 'shop': toggleShop?.(id); break;
+        }
+    };
+
     const trendingData = videos.slice(0, 5).map(v => ({
         id: v.id,
         title: v.description || "Video Başlığı",
@@ -164,10 +244,8 @@ export default function ExploreScreen() {
         comments: '1.1k'
     }));
 
-    // 🔥 FIX: Use real story data from useStoryViewer
     const { stories: storyListData } = useStoryViewer();
 
-    // Group stories by user
     const storyCreatorsMap = new Map();
     storyListData.forEach(story => {
         const existing = storyCreatorsMap.get(story.user.id);
@@ -179,14 +257,12 @@ export default function ExploreScreen() {
                 hasUnseen: !story.isViewed
             });
         } else {
-            // If ANY story is unseen, mark hasUnseen as true
             if (!story.isViewed) {
                 existing.hasUnseen = true;
             }
         }
     });
 
-    // If we have stories, show them.
     let creators = Array.from(storyCreatorsMap.values());
 
     const discoveryItems = videos.map((v, i) => ({
@@ -267,7 +343,13 @@ export default function ExploreScreen() {
                 </View>
             </SwipeWrapper>
 
-            {previewItem && <PreviewModal item={previewItem} onClose={hidePreview} />}
+            {previewItem && (
+                <PreviewModal 
+                    item={previewItem} 
+                    onClose={hidePreview} 
+                    onAction={handlePreviewAction}
+                />
+            )}
         </>
     );
 }
@@ -314,7 +396,7 @@ const styles = StyleSheet.create({
     },
     previewInfoSection: {
         width: '100%',
-        height: 56, // Fixed height matching top avatar (32) + 12px padding on each side
+        height: 56,
         justifyContent: 'center',
         paddingHorizontal: 15,
         backgroundColor: '#1a1a1a',
@@ -325,14 +407,25 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 15, // Perfect 15px symmetry for both sides
+        paddingHorizontal: 15,
         backgroundColor: '#1a1a1a',
     },
     previewActionRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 35, // Increased padding to prevent touching edges but keep icons far apart
+        paddingHorizontal: 35,
+    },
+    iconWrapper: {
+        width: 44,
+        height: 44,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 22,
+    },
+    activeIcon: {
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        transform: [{ scale: 1.2 }],
     },
     previewUserHeader: {
         flexDirection: 'row',
@@ -356,7 +449,7 @@ const styles = StyleSheet.create({
     },
     previewUserHandle: {
         color: 'rgba(255,255,255,0.6)',
-        fontSize: 13, // Slightly larger for readability
+        fontSize: 13,
         fontWeight: '500',
     },
 });
