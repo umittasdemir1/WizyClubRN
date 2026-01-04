@@ -9,6 +9,12 @@ import Video from 'react-native-video';
 import { Image } from 'expo-image';
 import { VideoCacheService } from '../../src/data/services/VideoCacheService';
 
+// Icons
+import LikeIcon from '../../assets/icons/like.svg';
+import SaveIcon from '../../assets/icons/save.svg';
+import ShareIcon from '../../assets/icons/share.svg';
+import ShoppingIcon from '../../assets/icons/shopping.svg';
+
 // New Components
 import { TrendingHeader } from '../../src/presentation/components/explore/TrendingHeader';
 import { FilterBar } from '../../src/presentation/components/explore/FilterBar';
@@ -92,11 +98,12 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: str
                     )}
                 </View>
 
-                {/* Bottom Info Section - Fixed Height for Symmetry */}
-                <View style={styles.previewInfoSection}>
-                    <Text style={styles.previewStatusText}>
-                        Hızlı Önizleme Modu
-                    </Text>
+                {/* Bottom Info Section - Action Buttons */}
+                <View style={[styles.previewInfoSection, styles.previewActionRow]}>
+                    <LikeIcon width={40} height={40} color="#fff" />
+                    <SaveIcon width={40} height={40} color="#fff" />
+                    <ShareIcon width={40} height={40} color="#fff" />
+                    <ShoppingIcon width={40} height={40} color="#fff" />
                 </View>
             </View>
         </Pressable>
@@ -311,6 +318,11 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         paddingHorizontal: 15,
         backgroundColor: '#1a1a1a',
+    },
+    previewActionRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        alignItems: 'center',
     },
     previewUserHeader: {
         flexDirection: 'row',
