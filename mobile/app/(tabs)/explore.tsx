@@ -1,11 +1,13 @@
-import { View, StyleSheet, ScrollView, StatusBar as RNStatusBar, RefreshControl, Text, Pressable } from 'react-native';
+import { View, StyleSheet, ScrollView, StatusBar as RNStatusBar, RefreshControl, Text, Pressable, Dimensions } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import { useStoryViewer } from '../../src/presentation/hooks/useStoryViewer';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import Video from 'react-native-video';
+import { Image } from 'expo-image';
+import { VideoCacheService } from '../../src/data/services/VideoCacheService';
 
 // New Components
 import { TrendingHeader } from '../../src/presentation/components/explore/TrendingHeader';
@@ -17,21 +19,56 @@ import { useActiveVideoStore } from '../../src/presentation/store/useActiveVideo
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
 import { LIGHT_COLORS, DARK_COLORS } from '../../src/core/constants';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CATEGORIES = ['Senin İçin', 'Takip Edilen', 'Popüler'];
 
 // Preview Modal Component
 const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: string; videoUrl: string }; onClose: () => void }) => {
+    const [videoSource, setVideoSource] = useState<any>(null);
+    const [isReady, setIsReady] = useState(false);
+    const [showPoster, setShowPoster] = useState(true);
+
+    useEffect(() => {
+        let isCancelled = false;
+        const initSource = async () => {
+            // Check cache first for instant load
+            const cachedPath = await VideoCacheService.getCachedVideoPath(item.videoUrl);
+            if (!isCancelled) {
+                setVideoSource(cachedPath ? { uri: cachedPath } : { uri: item.videoUrl });
+            }
+        };
+        initSource();
+        return () => { isCancelled = true; };
+    }, [item.videoUrl]);
+
     return (
         <Pressable style={styles.previewOverlay} onPress={onClose}>
             <View style={styles.previewCard}>
-                <Video
-                    source={{ uri: item.videoUrl }}
-                    style={styles.previewVideo}
-                    resizeMode="cover"
-                    repeat={true}
-                    paused={false}
-                    muted={true}
-                />
+                {/* Poster: Visible until video is truly ready */}
+                {showPoster && (
+                    <Image
+                        source={{ uri: item.thumbnailUrl }}
+                        style={StyleSheet.absoluteFill}
+                        contentFit="cover"
+                        priority="high"
+                    />
+                )}
+                
+                {videoSource && (
+                    <Video
+                        source={videoSource}
+                        style={[styles.previewVideo, { opacity: isReady ? 1 : 0 }]}
+                        resizeMode="cover"
+                        repeat={true}
+                        paused={false}
+                        muted={true}
+                        onReadyForDisplay={() => {
+                            setIsReady(true);
+                            // Hide poster after a frame to ensure smooth transition
+                            requestAnimationFrame(() => setShowPoster(false));
+                        }}
+                    />
+                )}
             </View>
         </Pressable>
     );
