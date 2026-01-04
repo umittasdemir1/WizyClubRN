@@ -41,22 +41,6 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: str
         return () => { isCancelled = true; };
     }, [item.videoUrl]);
 
-    const UserHeader = () => (
-        <View style={styles.previewUserHeader}>
-            {item.avatarUrl && (
-                <Image source={{ uri: item.avatarUrl }} style={styles.previewAvatar} />
-            )}
-            <View style={styles.previewNameContainer}>
-                <Text style={styles.previewFullName} numberOfLines={1}>
-                    {item.fullName || 'WizyClub User'}
-                </Text>
-                <Text style={styles.previewUserHandle} numberOfLines={1}>
-                    @{item.username || 'wizyclub'}
-                </Text>
-            </View>
-        </View>
-    );
-
     return (
         <Pressable 
             style={styles.previewOverlay} 
@@ -64,9 +48,21 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: str
             onPressOut={onClose}
         >
             <View style={styles.previewCard}>
-                {/* Top Info Section */}
+                {/* Top Info Section - Avatar + Name + Username */}
                 <View style={styles.previewInfoSection}>
-                    <UserHeader />
+                    <View style={styles.previewUserHeader}>
+                        {item.avatarUrl && (
+                            <Image source={{ uri: item.avatarUrl }} style={styles.previewAvatar} />
+                        )}
+                        <View style={styles.previewNameContainer}>
+                            <Text style={styles.previewFullName} numberOfLines={1}>
+                                {item.fullName || 'WizyClub User'}
+                            </Text>
+                            <Text style={styles.previewUserHandle} numberOfLines={1}>
+                                @{item.username || 'wizyclub'}
+                            </Text>
+                        </View>
+                    </View>
                 </View>
 
                 {/* Video Area - 0 border internally, clipped by container */}
@@ -96,9 +92,11 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: str
                     )}
                 </View>
 
-                {/* Bottom Info Section - Mirror of top */}
+                {/* Bottom Info Section - Same padding, different content */}
                 <View style={styles.previewInfoSection}>
-                    <UserHeader />
+                    <Text style={styles.previewStatusText}>
+                        Hızlı Önizleme Modu
+                    </Text>
                 </View>
             </View>
         </Pressable>
