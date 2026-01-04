@@ -48,6 +48,13 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: str
             onPressOut={onClose}
         >
             <View style={styles.previewCard}>
+                {/* Top Info Section - 20px padding top/bottom */}
+                <View style={styles.previewInfoSection}>
+                    <Text style={styles.previewUserText}>
+                        @{item.username || 'wizyclub'}
+                    </Text>
+                </View>
+
                 {/* Video Area - 0 border internally, clipped by container */}
                 <View style={styles.videoContainer}>
                     {showPoster && (
@@ -76,9 +83,9 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: str
                 </View>
 
                 {/* Bottom Info Section - 20px padding top/bottom */}
-                <View style={styles.previewBottomInfo}>
-                    <Text style={styles.previewUserText}>
-                        @{item.username || 'wizyclub'}
+                <View style={styles.previewInfoSection}>
+                    <Text style={styles.previewStatusText}>
+                        Önizleme Modu
                     </Text>
                 </View>
             </View>
@@ -272,7 +279,7 @@ const styles = StyleSheet.create({
     },
     previewCard: {
         width: '90%',
-        borderRadius: 10,
+        borderRadius: 20,
         overflow: 'hidden',
         backgroundColor: '#1a1a1a',
     },
@@ -285,7 +292,7 @@ const styles = StyleSheet.create({
         width: '100%',
         height: '100%',
     },
-    previewBottomInfo: {
+    previewInfoSection: {
         width: '100%',
         paddingVertical: 20,
         paddingHorizontal: 15,
@@ -295,5 +302,11 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 16,
         fontWeight: '600',
+    },
+    previewStatusText: {
+        color: 'rgba(255,255,255,0.5)',
+        fontSize: 12,
+        fontWeight: '500',
+        textAlign: 'center',
     },
 });
