@@ -281,10 +281,7 @@ export default function FeedScreen() {
             // Set initial active video when tab is focused
             if (videosRef.current.length > 0 && !lastActiveIdRef.current) {
                 console.log('[FeedScreen] Tab focused - Starting first video');
-                // Small delay to ensure UI is ready
-                setTimeout(() => {
-                    setActiveVideo(videosRef.current[0].id, 0);
-                }, 100);
+                setActiveVideo(videosRef.current[0].id, 0);
             }
 
             return () => {
@@ -298,10 +295,7 @@ export default function FeedScreen() {
     useEffect(() => {
         if (isScreenFocusedRef.current && videos.length > 0 && !activeVideoId) {
              console.log('[FeedScreen] Videos arrived while focused - Starting first video');
-             // Small delay to ensure UI is ready
-             setTimeout(() => {
-                 setActiveVideo(videos[0].id, 0);
-             }, 100);
+             setActiveVideo(videos[0].id, 0);
         }
     }, [videos, activeVideoId, setActiveVideo]);
 
