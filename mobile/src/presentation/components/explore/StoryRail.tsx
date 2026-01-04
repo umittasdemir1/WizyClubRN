@@ -1,7 +1,7 @@
 import React from 'react';
 import { ScrollView, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
-import { RectangularStoryRing } from '../shared/RectangularStoryRing';
+import { AdvancedStoryRing } from '../shared/AdvancedStoryRing';
 import { useStoryStore } from '../../store/useStoryStore';
 
 interface StoryCreator {
@@ -20,11 +20,10 @@ interface StoryRailProps {
 export function StoryRail({ creators, onCreatorPress, isDark = true }: StoryRailProps) {
     const textColor = isDark ? '#FFFFFF' : '#000000';
 
-    // 9:16 aspect ratio dimensions
-    const thumbnailWidth = 85;
-    const thumbnailHeight = 151; // 85 * (16/9) = 151
-    const THICKNESS = 2;
-    const GAP = 0;
+    // Circular dimensions
+    const size = 80;
+    const THICKNESS = 2.5;
+    const GAP = 2.5;
 
     // Subscribe to the Set of viewed user IDs for reactivity
     const viewedUserIds = useStoryStore((state) => state.viewedUserIds);
@@ -45,9 +44,8 @@ export function StoryRail({ creators, onCreatorPress, isDark = true }: StoryRail
                             style={styles.creatorItem}
                             onPress={() => onCreatorPress(creator.id)}
                         >
-                            <RectangularStoryRing
-                                width={thumbnailWidth}
-                                height={thumbnailHeight}
+                            <AdvancedStoryRing
+                                size={size}
                                 thickness={THICKNESS}
                                 gap={GAP}
                                 viewed={isViewed}
@@ -60,7 +58,7 @@ export function StoryRail({ creators, onCreatorPress, isDark = true }: StoryRail
                                     }}
                                     contentFit="cover"
                                 />
-                            </RectangularStoryRing>
+                            </AdvancedStoryRing>
                             <Text
                                 style={[styles.username, { color: textColor }]}
                                 numberOfLines={1}
@@ -77,7 +75,7 @@ export function StoryRail({ creators, onCreatorPress, isDark = true }: StoryRail
 
 const styles = StyleSheet.create({
     container: {
-        height: 180, // Increased height for wider 9:16 thumbnails
+        height: 120, // Reduced height for circular avatars
         marginTop: 0,
         marginBottom: 10,
     },
@@ -87,7 +85,7 @@ const styles = StyleSheet.create({
     },
     creatorItem: {
         alignItems: 'center',
-        width: 93,
+        width: 90,
         marginRight: 0,
     },
     username: {
