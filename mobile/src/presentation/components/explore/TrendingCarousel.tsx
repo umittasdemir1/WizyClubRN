@@ -143,13 +143,12 @@ const TrendingCard = ({ item, index, scrollX, onPress, onPreview, onPreviewEnd, 
                     onPress={handleVideoPress}
                     onLongPress={() => onPreview?.(item)}
                     delayLongPress={300}
-                    onPressOut={onPreviewEnd}
                 />
 
                 {/* Overlay: User Avatar & Username */}
                 <View style={[styles.topOverlay, { zIndex: 10 }]} pointerEvents="box-none">
                     <View style={styles.userInfo} pointerEvents="none">
-                        <Image source={{ uri: item.avatarUrl }} style={styles.previewAvatar} />
+                        <Image source={{ uri: item.avatarUrl }} style={styles.avatar} />
                         <Text style={styles.username}>@{item.username}</Text>
                     </View>
                 </View>

@@ -1,6 +1,6 @@
-import { View, StyleSheet, ScrollView, StatusBar as RNStatusBar, RefreshControl, Text, Pressable, Dimensions, PanResponder, Modal } from 'react-native';
+import { View, StyleSheet, ScrollView, StatusBar as RNStatusBar, RefreshControl, Text, Pressable, Dimensions, Modal } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { useCallback, useState, useEffect, useRef } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import { useStoryViewer } from '../../src/presentation/hooks/useStoryViewer';
@@ -8,7 +8,6 @@ import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import Video from 'react-native-video';
 import { Image } from 'expo-image';
 import { VideoCacheService } from '../../src/data/services/VideoCacheService';
-import Animated from 'react-native-reanimated';
 import { useMuteControls } from '../../src/presentation/store/useActiveVideoStore';
 import { Volume2, VolumeX } from 'lucide-react-native';
 import { LIGHT_COLORS, DARK_COLORS } from '../../src/core/constants';
@@ -33,29 +32,26 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CATEGORIES = ['Senin İçin', 'Takip Edilen', 'Popüler'];
 
 interface PreviewModalProps {
-    item: { 
-        id: string; 
-        thumbnailUrl: string; 
-        videoUrl: string; 
-        username?: string; 
-        fullName?: string; 
-        avatarUrl?: string 
+    item: {
+        id: string;
+        thumbnailUrl: string;
+        videoUrl: string;
+        username?: string;
+        fullName?: string;
+        avatarUrl?: string
     };
     onClose: () => void;
     onAction?: (type: 'like' | 'save' | 'share' | 'shop', id: string) => void;
 }
 
-// Preview Modal Component
+// Preview Modal Component - Tap outside to close, tap buttons to action
 const PreviewModal = ({ item, onClose, onAction }: PreviewModalProps) => {
     const [videoSource, setVideoSource] = useState<any>(null);
     const [isReady, setIsReady] = useState(false);
     const [showPoster, setShowPoster] = useState(true);
-    const [activeAction, setActiveAction] = useState<'like' | 'save' | 'share' | 'shop' | null>(null);
+    const [likeActive, setLikeActive] = useState(false);
+    const [saveActive, setSaveActive] = useState(false);
     const { isMuted, toggleMute } = useMuteControls();
-    
-    // Store button layout coordinates for hit detection
-    const layouts = useRef<Record<string, { x: number, y: number, width: number, height: number }>>({});
-    const activeActionRef = useRef<string | null>(null);
 
     useEffect(() => {
         let isCancelled = false;
@@ -69,58 +65,27 @@ const PreviewModal = ({ item, onClose, onAction }: PreviewModalProps) => {
         return () => { isCancelled = true; };
     }, [item.videoUrl]);
 
-    // PanResponder to track sliding finger
-    const panResponder = useRef(
-        PanResponder.create({
-            onStartShouldSetPanResponder: () => true,
-            onStartShouldSetPanResponderCapture: () => true,
-            onMoveShouldSetPanResponder: () => true,
-            onMoveShouldSetPanResponderCapture: () => true,
-            onPanResponderMove: (evt, gestureState) => {
-                const { moveX, moveY } = gestureState;
-                let foundAction: any = null;
+    // Action button handler with haptic feedback and Feed-style animation
+    const handleAction = useCallback((type: 'like' | 'save' | 'share' | 'shop') => {
+        try {
+            require('expo-haptics').impactAsync(
+                require('expo-haptics').ImpactFeedbackStyle.Medium
+            );
+        } catch { }
 
-                // Simple hit detection logic using page-relative coordinates
-                Object.entries(layouts.current).forEach(([type, layout]) => {
-                    if (
-                        moveX >= layout.x && 
-                        moveX <= layout.x + layout.width &&
-                        moveY >= layout.y && 
-                        moveY <= layout.y + layout.height
-                    ) {
-                        foundAction = type;
-                    }
-                });
-                
-                if (activeActionRef.current !== foundAction) {
-                    activeActionRef.current = foundAction;
-                    setActiveAction(foundAction);
-                }
-            },
-            onPanResponderRelease: (evt, gestureState) => {
-                if (activeActionRef.current) {
-                    onAction?.(activeActionRef.current as any, item.id);
-                }
-                onClose();
-            },
-            onPanResponderTerminate: onClose,
-        })
-    ).current;
+        // Toggle active state for like/save
+        if (type === 'like') setLikeActive(prev => !prev);
+        if (type === 'save') setSaveActive(prev => !prev);
 
-    const handleLayout = (type: string) => (event: any) => {
-        // We need to measure relative to screen for accurate PanResponder hit detection
-        event.target.measure((x: number, y: number, width: number, height: number, pageX: number, pageY: number) => {
-            layouts.current[type] = { x: pageX, y: pageY, width, height };
-        });
-    };
+        onAction?.(type, item.id);
+    }, [item.id, onAction]);
 
     return (
         <Modal transparent visible={true} animationType="fade" onRequestClose={onClose}>
-            <View 
-                style={styles.previewOverlay} 
-                {...panResponder.panHandlers}
-            >
-                <View style={styles.previewCard}>
+            {/* Tap overlay to close */}
+            <Pressable style={styles.previewOverlay} onPress={onClose}>
+                {/* Card - prevent tap from closing */}
+                <Pressable style={styles.previewCard} onPress={(e) => e.stopPropagation()}>
                     {/* Top Info Section */}
                     <View style={styles.previewHeader}>
                         <View style={styles.previewUserHeader}>
@@ -136,8 +101,9 @@ const PreviewModal = ({ item, onClose, onAction }: PreviewModalProps) => {
                                 </Text>
                             </View>
                         </View>
-                        {/* More Button - Perfectly Aligned Right */}
-                        <MoreIcon width={32} height={32} color="#fff" />
+                        <Pressable onPress={onClose}>
+                            <MoreIcon width={32} height={32} color="#fff" />
+                        </Pressable>
                     </View>
 
                     {/* Video Area */}
@@ -150,7 +116,7 @@ const PreviewModal = ({ item, onClose, onAction }: PreviewModalProps) => {
                                 priority="high"
                             />
                         )}
-                        
+
                         {videoSource && (
                             <Video
                                 source={videoSource}
@@ -167,12 +133,9 @@ const PreviewModal = ({ item, onClose, onAction }: PreviewModalProps) => {
                         )}
 
                         {/* Volume Control Button */}
-                        <Pressable 
+                        <Pressable
                             style={styles.previewVolumeBtn}
-                            onPress={(e) => {
-                                e.stopPropagation();
-                                toggleMute();
-                            }}
+                            onPress={toggleMute}
                         >
                             {isMuted ? (
                                 <VolumeX size={20} color="#FFFFFF" />
@@ -182,35 +145,38 @@ const PreviewModal = ({ item, onClose, onAction }: PreviewModalProps) => {
                         </Pressable>
                     </View>
 
-                    {/* Action Row - Detects slide-over */}
+                    {/* Action Row - Plain icons with color change on press */}
                     <View style={[styles.previewInfoSection, styles.previewActionRow]}>
-                        <View 
-                            onLayout={handleLayout('like')} 
-                            style={[styles.iconWrapper, activeAction === 'like' && styles.activeIcon]}
+                        <Pressable
+                            style={styles.iconWrapper}
+                            onPress={() => handleAction('like')}
                         >
-                            <LikeIcon width={32} height={32} color={activeAction === 'like' ? '#FF2146' : '#fff'} />
-                        </View>
-                        <View 
-                            onLayout={handleLayout('save')} 
-                            style={[styles.iconWrapper, activeAction === 'save' && styles.activeIcon]}
+                            <LikeIcon width={32} height={32} color={likeActive ? '#FF2146' : '#fff'} />
+                        </Pressable>
+
+                        <Pressable
+                            style={styles.iconWrapper}
+                            onPress={() => handleAction('save')}
                         >
-                            <SaveIcon width={32} height={32} color={activeAction === 'save' ? '#FFD700' : '#fff'} />
-                        </View>
-                        <View 
-                            onLayout={handleLayout('share')} 
-                            style={[styles.iconWrapper, activeAction === 'share' && styles.activeIcon]}
+                            <SaveIcon width={32} height={32} color={saveActive ? '#FFD700' : '#fff'} />
+                        </Pressable>
+
+                        <Pressable
+                            style={styles.iconWrapper}
+                            onPress={() => handleAction('share')}
                         >
-                            <ShareIcon width={32} height={32} color={activeAction === 'share' ? '#00C6FF' : '#fff'} />
-                        </View>
-                        <View 
-                            onLayout={handleLayout('shop')} 
-                            style={[styles.iconWrapper, activeAction === 'shop' && styles.activeIcon]}
+                            <ShareIcon width={32} height={32} color="#fff" />
+                        </Pressable>
+
+                        <Pressable
+                            style={styles.iconWrapper}
+                            onPress={() => handleAction('shop')}
                         >
-                            <ShoppingIcon width={32} height={32} color={activeAction === 'shop' ? '#4CD964' : '#fff'} />
-                        </View>
+                            <ShoppingIcon width={32} height={32} color="#fff" />
+                        </Pressable>
                     </View>
-                </View>
-            </View>
+                </Pressable>
+            </Pressable>
         </Modal>
     );
 };
@@ -379,9 +345,9 @@ export default function ExploreScreen() {
             </SwipeWrapper>
 
             {previewItem && (
-                <PreviewModal 
-                    item={previewItem} 
-                    onClose={hidePreview} 
+                <PreviewModal
+                    item={previewItem}
+                    onClose={hidePreview}
                     onAction={handlePreviewAction}
                 />
             )}
@@ -495,7 +461,29 @@ const styles = StyleSheet.create({
     },
     previewUserHandle: {
         color: 'rgba(255,255,255,0.6)',
-        fontSize: 13, // Slightly larger for readability
+        fontSize: 13,
         fontWeight: '500',
+    },
+    actionButton: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    actionLabel: {
+        color: '#fff',
+        fontSize: 10,
+        fontWeight: '600',
+        marginTop: 4,
+        textAlign: 'center' as const,
+    },
+    hintText: {
+        color: 'rgba(255,255,255,0.5)',
+        fontSize: 13,
+        fontWeight: '500',
+        marginTop: 20,
+        textAlign: 'center' as const,
     },
 });

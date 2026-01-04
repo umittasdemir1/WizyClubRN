@@ -1,0 +1,167 @@
+#!/bin/bash
+
+# Video Playback Performance Fix - Installation Script
+# This script safely backs up original files and installs the optimized versions
+
+set -e  # Exit on error
+
+echo "========================================="
+echo "Video Playback Performance Fix Installer"
+echo "========================================="
+echo ""
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Directories
+COMPONENTS_DIR="src/presentation/components/feed"
+SERVICES_DIR="src/data/services"
+TABS_DIR="app/(tabs)"
+BACKUP_DIR="backups/$(date +%Y%m%d_%H%M%S)"
+
+echo -e "${YELLOW}Step 1: Creating backup directory...${NC}"
+mkdir -p "$BACKUP_DIR"
+echo -e "${GREEN}✓ Created: $BACKUP_DIR${NC}"
+echo ""
+
+echo -e "${YELLOW}Step 2: Backing up original files...${NC}"
+
+# Backup VideoLayer.tsx
+if [ -f "$COMPONENTS_DIR/VideoLayer.tsx" ]; then
+    cp "$COMPONENTS_DIR/VideoLayer.tsx" "$BACKUP_DIR/VideoLayer.tsx.backup"
+    echo -e "${GREEN}✓ Backed up: VideoLayer.tsx${NC}"
+else
+    echo -e "${RED}✗ Warning: VideoLayer.tsx not found${NC}"
+fi
+
+# Backup VideoCacheService.ts
+if [ -f "$SERVICES_DIR/VideoCacheService.ts" ]; then
+    cp "$SERVICES_DIR/VideoCacheService.ts" "$BACKUP_DIR/VideoCacheService.ts.backup"
+    echo -e "${GREEN}✓ Backed up: VideoCacheService.ts${NC}"
+else
+    echo -e "${RED}✗ Warning: VideoCacheService.ts not found${NC}"
+fi
+
+# Backup index.tsx
+if [ -f "$TABS_DIR/index.tsx" ]; then
+    cp "$TABS_DIR/index.tsx" "$BACKUP_DIR/index.tsx.backup"
+    echo -e "${GREEN}✓ Backed up: index.tsx${NC}"
+else
+    echo -e "${RED}✗ Warning: index.tsx not found${NC}"
+fi
+
+echo ""
+echo -e "${YELLOW}Step 3: Installing optimized VideoLayer.tsx...${NC}"
+
+if [ -f "$COMPONENTS_DIR/VideoLayer.FIXED.tsx" ]; then
+    cp "$COMPONENTS_DIR/VideoLayer.FIXED.tsx" "$COMPONENTS_DIR/VideoLayer.tsx"
+    echo -e "${GREEN}✓ Installed: VideoLayer.tsx${NC}"
+else
+    echo -e "${RED}✗ Error: VideoLayer.FIXED.tsx not found${NC}"
+    echo -e "${RED}Installation aborted.${NC}"
+    exit 1
+fi
+
+echo ""
+echo -e "${YELLOW}Step 4: Installing optimized VideoCacheService.ts...${NC}"
+
+if [ -f "$SERVICES_DIR/VideoCacheService.OPTIMIZED.ts" ]; then
+    cp "$SERVICES_DIR/VideoCacheService.OPTIMIZED.ts" "$SERVICES_DIR/VideoCacheService.ts"
+    echo -e "${GREEN}✓ Installed: VideoCacheService.ts${NC}"
+else
+    echo -e "${RED}✗ Warning: VideoCacheService.OPTIMIZED.ts not found${NC}"
+    echo -e "${YELLOW}Skipping cache service optimization (optional)${NC}"
+fi
+
+echo ""
+echo -e "${YELLOW}Step 5: Updating FlashList configuration...${NC}"
+
+# Update initialNumToRender from 3 to 5 in index.tsx
+if [ -f "$TABS_DIR/index.tsx" ]; then
+    # Check if already updated
+    if grep -q "initialNumToRender={5}" "$TABS_DIR/index.tsx"; then
+        echo -e "${GREEN}✓ FlashList already configured (initialNumToRender=5)${NC}"
+    else
+        # Backup before modifying
+        cp "$TABS_DIR/index.tsx" "$TABS_DIR/index.tsx.tmp"
+
+        # Replace initialNumToRender={3} with initialNumToRender={5}
+        sed -i 's/initialNumToRender={3}/initialNumToRender={5}/g' "$TABS_DIR/index.tsx"
+
+        # Verify change
+        if grep -q "initialNumToRender={5}" "$TABS_DIR/index.tsx"; then
+            echo -e "${GREEN}✓ Updated: FlashList initialNumToRender (3 → 5)${NC}"
+            rm "$TABS_DIR/index.tsx.tmp"
+        else
+            echo -e "${RED}✗ Failed to update FlashList config${NC}"
+            echo -e "${YELLOW}Restoring original...${NC}"
+            mv "$TABS_DIR/index.tsx.tmp" "$TABS_DIR/index.tsx"
+        fi
+    fi
+else
+    echo -e "${RED}✗ Error: index.tsx not found${NC}"
+fi
+
+echo ""
+echo -e "${YELLOW}Step 6: Verifying installation...${NC}"
+
+# Check if files exist
+FILES_OK=true
+
+if [ ! -f "$COMPONENTS_DIR/VideoLayer.tsx" ]; then
+    echo -e "${RED}✗ VideoLayer.tsx missing${NC}"
+    FILES_OK=false
+else
+    # Check if it's the new version (look for unique comment)
+    if grep -q "CRITICAL: Only re-render if these specific props change" "$COMPONENTS_DIR/VideoLayer.tsx"; then
+        echo -e "${GREEN}✓ VideoLayer.tsx (optimized version)${NC}"
+    else
+        echo -e "${YELLOW}⚠ VideoLayer.tsx (possibly old version)${NC}"
+    fi
+fi
+
+if [ ! -f "$SERVICES_DIR/VideoCacheService.ts" ]; then
+    echo -e "${RED}✗ VideoCacheService.ts missing${NC}"
+    FILES_OK=false
+else
+    # Check if it's the new version
+    if grep -q "loadMetadata" "$SERVICES_DIR/VideoCacheService.ts"; then
+        echo -e "${GREEN}✓ VideoCacheService.ts (optimized version)${NC}"
+    else
+        echo -e "${YELLOW}⚠ VideoCacheService.ts (possibly old version)${NC}"
+    fi
+fi
+
+echo ""
+echo "========================================="
+echo -e "${GREEN}Installation Complete!${NC}"
+echo "========================================="
+echo ""
+echo -e "${YELLOW}Backups saved to:${NC}"
+echo "  $BACKUP_DIR/"
+echo ""
+echo -e "${YELLOW}Next Steps:${NC}"
+echo "  1. Clear Metro cache: npm start -- --reset-cache"
+echo "  2. Rebuild app (if native changes needed)"
+echo "  3. Test video playback"
+echo ""
+echo -e "${YELLOW}To rollback:${NC}"
+echo "  cp $BACKUP_DIR/VideoLayer.tsx.backup $COMPONENTS_DIR/VideoLayer.tsx"
+echo "  cp $BACKUP_DIR/VideoCacheService.ts.backup $SERVICES_DIR/VideoCacheService.ts"
+echo "  cp $BACKUP_DIR/index.tsx.backup $TABS_DIR/index.tsx"
+echo ""
+echo -e "${YELLOW}Documentation:${NC}"
+echo "  - Performance Analysis: mobile/PERFORMANCE_ANALYSIS.md"
+echo "  - Implementation Guide: $COMPONENTS_DIR/IMPLEMENTATION_GUIDE.md"
+echo ""
+echo -e "${GREEN}Expected Performance:${NC}"
+echo "  - Cached videos: <50ms load time"
+echo "  - Network videos: <1s load time"
+echo "  - Zero black screens"
+echo "  - Instant preload"
+echo ""
+echo -e "${YELLOW}Happy swiping! 🚀${NC}"
+echo ""

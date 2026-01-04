@@ -45,7 +45,6 @@ export function MasonryFeed({ data, onItemPress, onPreview, onPreviewEnd, isDark
             onPress={() => onItemPress(item.id)}
             onLongPress={() => onPreview?.(item)}
             delayLongPress={300}
-            onPressOut={onPreviewEnd}
         >
             <Image
                 source={{ uri: item.thumbnailUrl }}
@@ -66,7 +65,6 @@ export function MasonryFeed({ data, onItemPress, onPreview, onPreviewEnd, isDark
             onPress={() => onItemPress(item.id)}
             onLongPress={() => onPreview?.(item)}
             delayLongPress={300}
-            onPressOut={onPreviewEnd}
         >
             <Image
                 source={{ uri: item.thumbnailUrl }}

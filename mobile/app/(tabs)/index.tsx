@@ -296,8 +296,8 @@ export default function FeedScreen() {
         // If we have videos but no active video, set the first one immediately.
         // We don't wait for focus check because FeedScreen is the entry point.
         if (videos.length > 0 && !activeVideoId) {
-             console.log('[FeedScreen] 🚀 Fast init: Starting first video immediately');
-             setActiveVideo(videos[0].id, 0);
+            console.log('[FeedScreen] 🚀 Fast init: Starting first video immediately');
+            setActiveVideo(videos[0].id, 0);
         }
     }, [videos, activeVideoId, setActiveVideo]);
 
@@ -607,9 +607,9 @@ export default function FeedScreen() {
                     onEndReachedThreshold={0.5}
                     ListFooterComponent={renderFooter}
                     removeClippedSubviews={false} // 🔥 CRITICAL: Keep videos mounted to prevent re-decode delay
-                    maxToRenderPerBatch={3}
-                    windowSize={7} // Increased buffer for smoother scroll
-                    initialNumToRender={1}
+                    maxToRenderPerBatch={5}  // 🔥 PERF: Render more items per batch
+                    windowSize={21}          // 🔥 PERF: Keep 21 videos alive (10 before + current + 10 after)
+                    initialNumToRender={5}   // 🔥 PERF: Mount 5 videos at start (current + 2 next + 2 prev)
                     bounces={false}
                     overScrollMode="never"
                     onScrollBeginDrag={() => {
