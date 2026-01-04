@@ -15,6 +15,7 @@ import { VideoCacheService } from '../../../data/services/VideoCacheService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ITEM_WIDTH = SCREEN_WIDTH * 0.48; // 2 items visible per screen, slightly wider to reduce gap
+const ITEM_HEIGHT = ITEM_WIDTH * (16 / 9); // Exact 9:16 aspect ratio
 const ITEM_SPACING = 0;
 
 interface TrendingItem {
@@ -259,7 +260,7 @@ export function TrendingCarousel({ data, onItemPress, isDark = true }: TrendingC
 
 const styles = StyleSheet.create({
     container: {
-        height: 320,
+        height: 380,
         marginTop: -10,
     },
     scrollContent: {
@@ -268,7 +269,7 @@ const styles = StyleSheet.create({
     },
     cardContainer: {
         width: ITEM_WIDTH,
-        height: 280,
+        height: ITEM_HEIGHT,
         marginRight: 0,
     },
     card: {
