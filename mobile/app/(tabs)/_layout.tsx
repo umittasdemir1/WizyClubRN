@@ -77,8 +77,8 @@ export default function TabLayout() {
                 name="deals"
                 options={{
                     tabBarIcon: ({ color }) => (
-                        <View style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}>
-                            <DealIcon width={28} height={28} color={color} />
+                        <View style={{ width: 52, height: 52, justifyContent: 'center', alignItems: 'center', marginTop: -4 }}>
+                            <DealIcon width={45} height={45} color={color} />
                         </View>
                     ),
                 }}
