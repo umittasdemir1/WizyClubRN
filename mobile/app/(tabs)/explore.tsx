@@ -324,6 +324,17 @@ const styles = StyleSheet.create({
         paddingHorizontal: 15,
         backgroundColor: '#1a1a1a',
     },
+    previewTopHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    previewMoreContainer: {
+        width: 32,
+        height: 32,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     previewActionRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -342,6 +353,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.1)',
     },
+
     previewNameContainer: {
         flex: 1,
     },
