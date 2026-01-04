@@ -14,7 +14,6 @@ import LikeIcon from '../../assets/icons/like.svg';
 import SaveIcon from '../../assets/icons/save.svg';
 import ShareIcon from '../../assets/icons/share.svg';
 import ShoppingIcon from '../../assets/icons/shopping.svg';
-import MoreIcon from '../../assets/icons/more.svg';
 
 // New Components
 import { TrendingHeader } from '../../src/presentation/components/explore/TrendingHeader';
@@ -55,7 +54,7 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: str
             onPressOut={onClose}
         >
             <View style={styles.previewCard}>
-                {/* Top Info Section - Symmetric Alignment */}
+                {/* Top Info Section */}
                 <View style={styles.previewHeader}>
                     <View style={styles.previewUserHeader}>
                         {item.avatarUrl && (
@@ -70,13 +69,6 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: str
                             </Text>
                         </View>
                     </View>
-                    
-                    {/* More Icon - Vertical orientation, shifted significantly to the left */}
-                    <MoreIcon 
-                        width={32} 
-                        height={32} 
-                        color="#fff" 
-                    />
                 </View>
 
                 {/* Video Area - 0 border internally, clipped by container */}
