@@ -14,7 +14,7 @@ import Video from 'react-native-video';
 import { VideoCacheService } from '../../../data/services/VideoCacheService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const ITEM_WIDTH = SCREEN_WIDTH * 0.48; // 2 items visible per screen, slightly wider to reduce gap
+const ITEM_WIDTH = SCREEN_WIDTH * 0.44; // Slightly smaller
 const ITEM_HEIGHT = ITEM_WIDTH * (16 / 9); // Exact 9:16 aspect ratio
 const ITEM_SPACING = 0;
 

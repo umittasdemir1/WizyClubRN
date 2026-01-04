@@ -23,7 +23,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CATEGORIES = ['Senin İçin', 'Takip Edilen', 'Popüler'];
 
 // Preview Modal Component
-const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: string; videoUrl: string }; onClose: () => void }) => {
+const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: string; videoUrl: string; username?: string }; onClose: () => void }) => {
     const [videoSource, setVideoSource] = useState<any>(null);
     const [isReady, setIsReady] = useState(false);
     const [showPoster, setShowPoster] = useState(true);
@@ -45,34 +45,42 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: str
         <Pressable 
             style={styles.previewOverlay} 
             onPress={onClose} 
-            onPressOut={onClose} // 🔥 CRITICAL: Close when finger is lifted, even if modal captured focus
+            onPressOut={onClose}
         >
             <View style={styles.previewCard}>
-                {/* Poster: Visible until video is truly ready */}
-                {showPoster && (
-                    <Image
-                        source={{ uri: item.thumbnailUrl }}
-                        style={StyleSheet.absoluteFill}
-                        contentFit="cover"
-                        priority="high"
-                    />
-                )}
-                
-                {videoSource && (
-                    <Video
-                        source={videoSource}
-                        style={[styles.previewVideo, { opacity: isReady ? 1 : 0 }]}
-                        resizeMode="cover"
-                        repeat={true}
-                        paused={false}
-                        muted={true}
-                        onReadyForDisplay={() => {
-                            setIsReady(true);
-                            // Hide poster after a frame to ensure smooth transition
-                            requestAnimationFrame(() => setShowPoster(false));
-                        }}
-                    />
-                )}
+                {/* Video Area - 0 border internally, clipped by container */}
+                <View style={styles.videoContainer}>
+                    {showPoster && (
+                        <Image
+                            source={{ uri: item.thumbnailUrl }}
+                            style={StyleSheet.absoluteFill}
+                            contentFit="cover"
+                            priority="high"
+                        />
+                    )}
+                    
+                    {videoSource && (
+                        <Video
+                            source={videoSource}
+                            style={[styles.previewVideo, { opacity: isReady ? 1 : 0 }]}
+                            resizeMode="cover"
+                            repeat={true}
+                            paused={false}
+                            muted={true}
+                            onReadyForDisplay={() => {
+                                setIsReady(true);
+                                requestAnimationFrame(() => setShowPoster(false));
+                            }}
+                        />
+                    )}
+                </View>
+
+                {/* Bottom Info Section - 20px padding top/bottom */}
+                <View style={styles.previewBottomInfo}>
+                    <Text style={styles.previewUserText}>
+                        @{item.username || 'wizyclub'}
+                    </Text>
+                </View>
             </View>
         </Pressable>
     );
@@ -89,7 +97,7 @@ export default function ExploreScreen() {
 
     const [selectedCategory, setSelectedCategory] = useState('Senin İçin');
     const [refreshing, setRefreshing] = useState(false);
-    const [previewItem, setPreviewItem] = useState<{ id: string; thumbnailUrl: string; videoUrl: string } | null>(null);
+    const [previewItem, setPreviewItem] = useState<{ id: string; thumbnailUrl: string; videoUrl: string; username?: string } | null>(null);
 
     // Imperative StatusBar Control
     useFocusEffect(
@@ -161,6 +169,7 @@ export default function ExploreScreen() {
         thumbnailUrl: v.thumbnailUrl,
         videoUrl: v.videoUrl,
         views: '1.2k',
+        username: v.user.username,
         isLarge: i % 3 === 0
     }));
 
@@ -263,13 +272,28 @@ const styles = StyleSheet.create({
     },
     previewCard: {
         width: '90%',
-        height: 600,
         borderRadius: 10,
         overflow: 'hidden',
+        backgroundColor: '#1a1a1a',
+    },
+    videoContainer: {
+        width: '100%',
+        height: 500, // Fixed video height
         backgroundColor: '#000',
     },
     previewVideo: {
         width: '100%',
         height: '100%',
+    },
+    previewBottomInfo: {
+        width: '100%',
+        paddingVertical: 20,
+        paddingHorizontal: 15,
+        backgroundColor: '#1a1a1a',
+    },
+    previewUserText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
     },
 });
