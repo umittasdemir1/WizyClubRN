@@ -54,8 +54,8 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: str
             onPressOut={onClose}
         >
             <View style={styles.previewCard}>
-                {/* Top Info Section - Fixed Height for Symmetry */}
-                <View style={styles.previewInfoSection}>
+                {/* Top Info Section - Avatar + Name + Username + More */}
+                <View style={[styles.previewInfoSection, styles.previewTopHeader]}>
                     <View style={styles.previewUserHeader}>
                         {item.avatarUrl && (
                             <Image source={{ uri: item.avatarUrl }} style={styles.previewAvatar} />
