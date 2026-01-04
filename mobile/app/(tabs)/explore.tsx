@@ -76,7 +76,6 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: str
                         width={32} 
                         height={32} 
                         color="#fff" 
-                        style={{ marginRight: 50 }} 
                     />
                 </View>
 
