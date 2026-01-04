@@ -100,10 +100,10 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: str
 
                 {/* Bottom Info Section - Action Buttons */}
                 <View style={[styles.previewInfoSection, styles.previewActionRow]}>
-                    <LikeIcon width={40} height={40} color="#fff" />
-                    <SaveIcon width={40} height={40} color="#fff" />
-                    <ShareIcon width={40} height={40} color="#fff" />
-                    <ShoppingIcon width={40} height={40} color="#fff" />
+                    <LikeIcon width={32} height={32} color="#fff" />
+                    <SaveIcon width={32} height={32} color="#fff" />
+                    <ShareIcon width={32} height={32} color="#fff" />
+                    <ShoppingIcon width={32} height={32} color="#fff" />
                 </View>
             </View>
         </Pressable>
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     },
     previewInfoSection: {
         width: '100%',
-        height: 64, // Fixed height matching top avatar (40) + 12px padding on each side
+        height: 56, // Fixed height matching top avatar (32) + 12px padding on each side
         justifyContent: 'center',
         paddingHorizontal: 15,
         backgroundColor: '#1a1a1a',
@@ -330,9 +330,9 @@ const styles = StyleSheet.create({
         gap: 12,
     },
     previewAvatar: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.1)',
     },
@@ -341,18 +341,12 @@ const styles = StyleSheet.create({
     },
     previewFullName: {
         color: '#fff',
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: '700',
     },
     previewUserHandle: {
         color: 'rgba(255,255,255,0.6)',
-        fontSize: 13,
-        fontWeight: '500',
-    },
-    previewStatusText: {
-        color: 'rgba(255,255,255,0.5)',
         fontSize: 12,
         fontWeight: '500',
-        textAlign: 'center',
     },
 });
