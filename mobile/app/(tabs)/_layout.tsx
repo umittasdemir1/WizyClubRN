@@ -12,7 +12,6 @@ import Animated, {
     Easing,
 } from 'react-native-reanimated';
 import { useEffect } from 'react';
-import { LinearGradient } from 'expo-linear-gradient';
 
 // Import SVGs
 import HomeIcon from '../../assets/icons/home.svg';
@@ -85,6 +84,7 @@ export default function TabLayout() {
             backBehavior="history"
             screenOptions={{
                 headerShown: false,
+                lazy: false,
                 tabBarStyle: {
                     backgroundColor: isDark ? COLORS.background : '#fefefe',
                     borderTopWidth: 0.5,

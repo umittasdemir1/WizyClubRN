@@ -37,7 +37,7 @@ function RootNavigator() {
     }, [user]);
 
     return (
-        <Stack screenOptions={{ headerShown: false }}>
+        <Stack screenOptions={{ headerShown: false, lazy: false }}>
             {/* Auth screens */}
             <Stack.Screen name="login" options={{ headerShown: false }} />
             <Stack.Screen name="signup" options={{ headerShown: false }} />

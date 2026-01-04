@@ -256,6 +256,12 @@ export default function FeedScreen() {
     // Calculate video height - full screen for proper paging
     const ITEM_HEIGHT = Dimensions.get('window').height;
 
+    // Ref to hold latest videos array
+    const videosRef = useRef(videos);
+    useEffect(() => {
+        videosRef.current = videos;
+    }, [videos]);
+
     // Imperative StatusBar Control (Feed is ALWAYS Black -> White Text)
     useFocusEffect(
         useCallback(() => {
@@ -267,10 +273,17 @@ export default function FeedScreen() {
         useCallback(() => {
             setScreenFocused(true);
             setActiveTab('foryou'); // Reset to 'Sana Özel' when returning to feed
+
+            // Set initial active video when tab is focused
+            if (videosRef.current.length > 0 && !lastActiveIdRef.current) {
+                console.log('[FeedScreen] Tab focused - Starting first video');
+                setActiveVideo(videosRef.current[0].id, 0);
+            }
+
             return () => {
                 setScreenFocused(false);
             };
-        }, [setScreenFocused])
+        }, [setScreenFocused, setActiveVideo])
     );
 
     const hasUnseenStories = true;
@@ -306,13 +319,6 @@ export default function FeedScreen() {
     useEffect(() => {
         lastActiveIdRef.current = activeVideoId;
     }, [activeVideoId]);
-
-    // Set initial active
-    useEffect(() => {
-        if (videos.length > 0 && !lastActiveIdRef.current) {
-            setActiveVideo(videos[0].id, 0);
-        }
-    }, [videos, setActiveVideo]);
 
     const onViewableItemsChanged = useCallback(
         ({ viewableItems }: { viewableItems: ViewToken<Video>[] }) => {
