@@ -23,7 +23,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CATEGORIES = ['Senin İçin', 'Takip Edilen', 'Popüler'];
 
 // Preview Modal Component
-const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: string; videoUrl: string; username?: string }; onClose: () => void }) => {
+const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: string; videoUrl: string; username?: string; fullName?: string; avatarUrl?: string }; onClose: () => void }) => {
     const [videoSource, setVideoSource] = useState<any>(null);
     const [isReady, setIsReady] = useState(false);
     const [showPoster, setShowPoster] = useState(true);
@@ -48,11 +48,21 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: str
             onPressOut={onClose}
         >
             <View style={styles.previewCard}>
-                {/* Top Info Section - 20px padding top/bottom */}
+                {/* Top Info Section - Avatar + Name + Username */}
                 <View style={styles.previewInfoSection}>
-                    <Text style={styles.previewUserText}>
-                        @{item.username || 'wizyclub'}
-                    </Text>
+                    <View style={styles.previewUserHeader}>
+                        {item.avatarUrl && (
+                            <Image source={{ uri: item.avatarUrl }} style={styles.previewAvatar} />
+                        )}
+                        <View style={styles.previewNameContainer}>
+                            <Text style={styles.previewFullName} numberOfLines={1}>
+                                {item.fullName || 'WizyClub User'}
+                            </Text>
+                            <Text style={styles.previewUserHandle} numberOfLines={1}>
+                                @{item.username || 'wizyclub'}
+                            </Text>
+                        </View>
+                    </View>
                 </View>
 
                 {/* Video Area - 0 border internally, clipped by container */}
@@ -85,7 +95,7 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: str
                 {/* Bottom Info Section - 20px padding top/bottom */}
                 <View style={styles.previewInfoSection}>
                     <Text style={styles.previewStatusText}>
-                        Önizleme Modu
+                        Hızlı Önizleme Modu
                     </Text>
                 </View>
             </View>
@@ -104,7 +114,7 @@ export default function ExploreScreen() {
 
     const [selectedCategory, setSelectedCategory] = useState('Senin İçin');
     const [refreshing, setRefreshing] = useState(false);
-    const [previewItem, setPreviewItem] = useState<{ id: string; thumbnailUrl: string; videoUrl: string; username?: string } | null>(null);
+    const [previewItem, setPreviewItem] = useState<{ id: string; thumbnailUrl: string; videoUrl: string; username?: string; fullName?: string; avatarUrl?: string } | null>(null);
 
     // Imperative StatusBar Control
     useFocusEffect(
@@ -139,6 +149,7 @@ export default function ExploreScreen() {
         id: v.id,
         title: v.description || "Video Başlığı",
         username: v.user.username,
+        fullName: v.user.fullName,
         avatarUrl: v.user.avatarUrl,
         thumbnailUrl: v.thumbnailUrl,
         videoUrl: v.videoUrl,
@@ -177,6 +188,8 @@ export default function ExploreScreen() {
         videoUrl: v.videoUrl,
         views: '1.2k',
         username: v.user.username,
+        fullName: v.user.fullName,
+        avatarUrl: v.user.avatarUrl,
         isLarge: i % 3 === 0
     }));
 
@@ -298,10 +311,30 @@ const styles = StyleSheet.create({
         paddingHorizontal: 15,
         backgroundColor: '#1a1a1a',
     },
-    previewUserText: {
+    previewUserHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    previewAvatar: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+    },
+    previewNameContainer: {
+        flex: 1,
+    },
+    previewFullName: {
         color: '#fff',
-        fontSize: 16,
-        fontWeight: '600',
+        fontSize: 15,
+        fontWeight: '700',
+    },
+    previewUserHandle: {
+        color: 'rgba(255,255,255,0.6)',
+        fontSize: 13,
+        fontWeight: '500',
     },
     previewStatusText: {
         color: 'rgba(255,255,255,0.5)',
