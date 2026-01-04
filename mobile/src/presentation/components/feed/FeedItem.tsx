@@ -82,7 +82,7 @@ export const FeedItem = memo(function FeedItem({
                 onDoubleTap={() => onDoubleTapLike(video.id)}
                 onSingleTap={onFeedTap}
             >
-                <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', paddingTop: insets.top }]}>
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]}>
                     <VideoLayer
                         video={video}
                         isActive={isActive}

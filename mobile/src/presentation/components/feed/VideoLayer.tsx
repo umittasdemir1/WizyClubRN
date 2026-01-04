@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useCallback, memo } from 'react';
-import { StyleSheet, View, Text, Pressable, Platform, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, Text, Pressable, Platform, ActivityIndicator, Dimensions } from 'react-native';
 import Video, { OnProgressData, OnLoadData, VideoRef, OnVideoErrorData } from 'react-native-video';
 import { Video as VideoEntity } from '../../../domain/entities/Video';
 import PlayIcon from '../../../../assets/icons/play.svg';
@@ -16,6 +16,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { VideoCacheService } from '../../../data/services/VideoCacheService';
 import { Image } from 'expo-image';
 import { PerformanceLogger } from '../../../core/services/PerformanceLogger';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // Optional: Screen orientation (requires native build)
 let ScreenOrientation: any = null;
@@ -74,12 +76,6 @@ export const VideoLayer = memo(function VideoLayer({
     const defaultBufferConfig = getBufferConfig(networkType);
 
     const [isFinished, setIsFinished] = useState(false);
-    // ... (unchanged lines)
-    // ...
-    // ...
-    // ...
-
-    // ... skipping directly to shouldPlay
     const [duration, setDuration] = useState(0);
     const [hasError, setHasError] = useState(false);
     const [retryCount, setRetryCount] = useState(0);
@@ -241,9 +237,6 @@ export const VideoLayer = memo(function VideoLayer({
         };
     }, []);
 
-    // 🎬 POSITION MEMORY: REMOVED - Videos always start from beginning
-    // User requested: Video should restart when returning, not resume from saved position
-
     // Track if user toggled pause (for replay detection)
     const wasPausedBefore = useRef(isPausedGlobal);
 
@@ -264,14 +257,12 @@ export const VideoLayer = memo(function VideoLayer({
         }
     }, [isPausedGlobal, isFinished, isActive, video.id]);
 
-    // shouldPlay logic moved to top of component to include isScreenFocused
-    // const shouldPlay = isActive && isAppActive && !isSeeking && !isPausedGlobal && !isFinished && !hasError;
-
     const handleLoad = useCallback((data: OnLoadData) => {
         setDuration(data.duration);
         durationSV.value = data.duration;
         setHasError(false);
-        setShowPoster(false);
+        // Delay hiding poster slightly to ensure surface is stretched
+        requestAnimationFrame(() => setShowPoster(false));
 
         // Performance logging
         const source = videoSource?.uri?.startsWith('file://')
@@ -281,8 +272,6 @@ export const VideoLayer = memo(function VideoLayer({
         PerformanceLogger.endTransition(video.id, source);
         console.log(`[TIMING] ✅ VIDEO LOADED: ${video.id} | Source: ${source.toUpperCase()}`);
 
-        // Note: resizeMode is pre-calculated from video.width/height in useState
-        // onResizeModeChange is called if parent needs to know
         if (data.naturalSize) {
             const aspectRatio = data.naturalSize.width / data.naturalSize.height;
             onResizeModeChange?.(aspectRatio < 0.8 ? 'cover' : 'contain');
@@ -291,11 +280,6 @@ export const VideoLayer = memo(function VideoLayer({
 
     const handleVideoError = useCallback(async (error: OnVideoErrorData) => {
         console.error(`[VideoLayer] Error playing video ${video.id}:`, error);
-
-        // Auto-Remove Logic: If 404 or max retries
-        // Note: react-native-video error structure varies. Check payload.
-        // If it's a 404 or access denied, no point retrying.
-        // For now, let's rely on MAX_RETRIES + 1 or specific error codes if available.
 
         if (retryCount >= MAX_RETRIES) {
             console.log(`[VideoLayer] Max retries (${MAX_RETRIES}) reached for ${video.id}. Removing from feed.`);
@@ -306,11 +290,7 @@ export const VideoLayer = memo(function VideoLayer({
         // Fallback Logic: Cache -> Network
         if (videoSource?.uri?.startsWith('file://')) {
             console.warn(`[VideoLayer] Cache file failed for ${video.id}. Deleting corrupt cache and falling back to Network.`);
-
-            // Delete corrupt cache file
             await VideoCacheService.deleteCachedVideo(video.videoUrl);
-
-            // Switch to network
             setVideoSource(typeof video.videoUrl === 'string' ? { uri: video.videoUrl } : video.videoUrl);
             setHasError(false);
             setKey(prev => prev + 1);
@@ -320,9 +300,6 @@ export const VideoLayer = memo(function VideoLayer({
         console.error(`[VideoLayer] Faulty URL:`, video.videoUrl);
         console.error(`[VideoLayer] Current Source:`, videoSource);
         setHasError(true);
-
-        // Auto-retry via handleRetry (which user usually presses, but we can also auto-trigger if needed,
-        // but let's stick to manual retry for UI feedback, UNLESS it's a critical 'Not Found' error)
     }, [video.id, video.videoUrl, videoSource, retryCount, onRemoveVideo]);
 
     const handleRetry = useCallback(() => {
@@ -335,7 +312,6 @@ export const VideoLayer = memo(function VideoLayer({
     const handleProgress = useCallback((data: OnProgressData) => {
         onProgressUpdate?.(data.currentTime, duration);
         currentTimeSV.value = data.currentTime;
-        // Update durationSV only once when duration is available (avoid reading .value)
         if (duration > 0) {
             durationSV.value = duration;
         }
@@ -364,7 +340,6 @@ export const VideoLayer = memo(function VideoLayer({
         }
     }, [isFinished, setPaused]);
 
-    // Provide seek function to parent when active (NO auto-reset - position memory handles it)
     useEffect(() => {
         if (isActive && !hasError) {
             onSeekReady?.(seekTo);
@@ -383,7 +358,7 @@ export const VideoLayer = memo(function VideoLayer({
                     key={`${video.id}-${key}`}
                     ref={videoRef}
                     source={videoSource}
-                    style={[styles.video, { backgroundColor: '#000' }]} // Black bg to prevent white flash
+                    style={styles.video} 
                     resizeMode={resizeMode}
                     repeat={false}
                     controls={false}
@@ -392,7 +367,6 @@ export const VideoLayer = memo(function VideoLayer({
                     bufferConfig={bufferConfig}
                     onLoad={handleLoad}
                     onReadyForDisplay={() => {
-                        // 🔥 CRITICAL: Hide poster ONLY when first frame is ready
                         console.log(`[TIMING] 🎬 READY FOR DISPLAY: ${video.id}`);
                         setShowPoster(false);
                     }}
@@ -412,7 +386,7 @@ export const VideoLayer = memo(function VideoLayer({
             {showPoster && video.thumbnailUrl && (
                 <Image
                     source={{ uri: video.thumbnailUrl }}
-                    style={[StyleSheet.absoluteFill, { zIndex: 1 }]}
+                    style={StyleSheet.absoluteFill}
                     contentFit="cover" // Always use cover for poster
                     priority="high"
                     cachePolicy="memory-disk"
@@ -486,13 +460,15 @@ export const VideoLayer = memo(function VideoLayer({
 
 const styles = StyleSheet.create({
     container: {
-        flex: 1,
+        width: SCREEN_WIDTH,
+        height: SCREEN_HEIGHT,
         backgroundColor: '#000000',
-        paddingTop: 0,
-        paddingBottom: 25,
     },
     video: {
-        flex: 1, // Respects container padding for black bars
+        position: 'absolute',
+        width: SCREEN_WIDTH,
+        height: SCREEN_HEIGHT,
+        backgroundColor: '#000',
     },
     touchArea: {
         ...StyleSheet.absoluteFillObject,
@@ -542,26 +518,5 @@ const styles = StyleSheet.create({
         color: '#9CA3AF',
         fontSize: 12,
         marginTop: 12,
-    },
-    fullScreenButton: {
-        position: 'absolute',
-        top: '50%',
-        left: '50%',
-        transform: [{ translateX: -60 }, { translateY: -20 }], // Half width/height
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.6)',
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 20,
-        gap: 8,
-        zIndex: 50,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.2)'
-    },
-    fullScreenText: {
-        color: '#FFFFFF',
-        fontWeight: '600',
-        fontSize: 14
     }
 });
