@@ -55,7 +55,7 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: str
             onPressOut={onClose}
         >
             <View style={styles.previewCard}>
-                {/* Top Info Section - Strictly Aligned */}
+                {/* Top Info Section - Symmetric Alignment */}
                 <View style={styles.previewHeader}>
                     <View style={styles.previewUserHeader}>
                         {item.avatarUrl && (
@@ -71,12 +71,12 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: str
                         </View>
                     </View>
                     
-                    {/* More Icon - Shifted significantly to the left */}
+                    {/* More Icon - Mirrored position to left avatar */}
                     <MoreIcon 
-                        width={28} 
-                        height={28} 
+                        width={32} 
+                        height={32} 
                         color="#fff" 
-                        style={{ transform: [{ rotate: '90deg' }], marginRight: 40 }} 
+                        style={{ transform: [{ rotate: '90deg' }] }} 
                     />
                 </View>
 
@@ -334,8 +334,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingLeft: 15,
-        paddingRight: 20, // Increased padding to shift icon left
+        paddingHorizontal: 15, // Perfect 15px symmetry for both sides
         backgroundColor: '#1a1a1a',
     },
     previewActionRow: {
