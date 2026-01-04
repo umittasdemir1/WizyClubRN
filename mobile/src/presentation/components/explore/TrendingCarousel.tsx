@@ -35,6 +35,7 @@ interface TrendingCarouselProps {
     onPreview?: (item: any) => void;
     onPreviewEnd?: () => void;
     isDark?: boolean;
+    scrollEnabled?: boolean; // ADDED
 }
 
 interface TrendingCardProps {
@@ -122,7 +123,7 @@ const TrendingCard = ({ item, index, scrollX, onPress, onPreview, onPreviewEnd, 
                             { opacity: isVideoReady ? 1 : 0 }
                         ]}
                         resizeMode="cover"
-                        repeat={false}
+                        repeat={true}
                         paused={!isActive || isPaused}
                         muted={isMuted}
                         onEnd={onVideoEnd}
@@ -144,12 +145,20 @@ const TrendingCard = ({ item, index, scrollX, onPress, onPreview, onPreviewEnd, 
                     delayLongPress={300}
                     onPressOut={onPreviewEnd}
                 />
+
+                {/* Overlay: User Avatar & Username */}
+                <View style={[styles.topOverlay, { zIndex: 10 }]} pointerEvents="box-none">
+                    <View style={styles.userInfo} pointerEvents="none">
+                        <Image source={{ uri: item.avatarUrl }} style={styles.previewAvatar} />
+                        <Text style={styles.username}>@{item.username}</Text>
+                    </View>
+                </View>
             </View>
         </Animated.View>
     );
 };
 
-export function TrendingCarousel({ data, onItemPress, onPreview, onPreviewEnd, isDark = true }: TrendingCarouselProps) {
+export function TrendingCarousel({ data, onItemPress, onPreview, onPreviewEnd, isDark = true, scrollEnabled = true }: TrendingCarouselProps) {
     const scrollX = useSharedValue(0);
     const [activeIndex, setActiveIndex] = useState(0);
     const scrollViewRef = useRef<ScrollView>(null);
@@ -238,6 +247,7 @@ export function TrendingCarousel({ data, onItemPress, onPreview, onPreviewEnd, i
                 showsHorizontalScrollIndicator={false}
                 onScroll={onScroll}
                 scrollEventThrottle={16}
+                scrollEnabled={scrollEnabled}
                 contentContainerStyle={styles.scrollContent}
             >
                 {data.map((item, index) => (
