@@ -71,12 +71,12 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: str
                         </View>
                     </View>
                     
-                    {/* More Icon - Strictly positioned at the far right corner */}
+                    {/* More Icon - Shifted slightly to the left for better positioning */}
                     <MoreIcon 
-                        width={32} 
-                        height={32} 
+                        width={28} 
+                        height={28} 
                         color="#fff" 
-                        style={{ transform: [{ rotate: '90deg' }] }} 
+                        style={{ transform: [{ rotate: '90deg' }], marginRight: 5 }} 
                     />
                 </View>
 
@@ -334,7 +334,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 15,
+        paddingLeft: 15,
+        paddingRight: 20, // Increased padding to shift icon left
         backgroundColor: '#1a1a1a',
     },
     previewActionRow: {
