@@ -71,11 +71,12 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: str
                         </View>
                     </View>
                     
-                    {/* More Icon - Natural vertical orientation, no rotation needed */}
+                    {/* More Icon - Vertical orientation, shifted significantly to the left */}
                     <MoreIcon 
                         width={32} 
                         height={32} 
                         color="#fff" 
+                        style={{ marginRight: 50 }} 
                     />
                 </View>
 
