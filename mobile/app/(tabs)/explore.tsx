@@ -71,12 +71,12 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: str
                         </View>
                     </View>
                     
-                    {/* More Icon - Shifted slightly to the left for better positioning */}
+                    {/* More Icon - Shifted further to the left for better positioning */}
                     <MoreIcon 
                         width={28} 
                         height={28} 
                         color="#fff" 
-                        style={{ transform: [{ rotate: '90deg' }], marginRight: 5 }} 
+                        style={{ transform: [{ rotate: '90deg' }], marginRight: 15 }} 
                     />
                 </View>
 
