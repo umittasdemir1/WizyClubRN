@@ -2,20 +2,14 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, Dimensions, TouchableOpacity, Pressable, ScrollView } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { User, MessageCircle, Heart, Volume2, VolumeX } from 'lucide-react-native';
 import Animated, {
     useSharedValue,
     useAnimatedScrollHandler,
     useAnimatedStyle,
     interpolate,
     SharedValue,
-    withSequence,
-    withTiming,
-    Easing,
     runOnJS
 } from 'react-native-reanimated';
-import LikeIcon from '../../../../assets/icons/like.svg';
-import { Play } from 'lucide-react-native';
 import Video from 'react-native-video';
 import { VideoCacheService } from '../../../data/services/VideoCacheService';
 
@@ -182,7 +176,7 @@ export function TrendingCarousel({ data, onItemPress, isDark = true }: TrendingC
                 }
             });
         }
-    }, [data.length > 0]);
+    }, [data.length]);
 
     // 2. Scroll Prefetch: When active index changes, prefetch next 2 videos
     const lastPrefetchedIndex = useRef(-1);
@@ -315,234 +309,6 @@ const styles = StyleSheet.create({
         borderColor: 'white',
     },
     username: {
-        color: 'white',
-        fontSize: 10,
-        fontWeight: '600',
-    },
-});
-
-export function TrendingCarousel({ data, onItemPress, isDark = true }: TrendingCarouselProps) {
-    const scrollX = useSharedValue(0);
-    const [activeIndex, setActiveIndex] = useState(0);
-    const [isMuted, setIsMuted] = useState(true);
-    const scrollViewRef = useRef<ScrollView>(null);
-
-    // ============================================
-    // PREFETCH MECHANISM (TikTok-style)
-    // ============================================
-
-    // 1. Initial Prefetch: When carousel loads, prefetch first 3 videos
-    const hasInitialPrefetched = useRef(false);
-    useEffect(() => {
-        if (data.length > 0 && !hasInitialPrefetched.current) {
-            hasInitialPrefetched.current = true;
-            console.log('[Carousel Prefetch] 🚀 Initial prefetch starting...');
-
-            data.slice(0, 3).forEach((item, i) => {
-                // Video prefetch (background download)
-                VideoCacheService.cacheVideo(item.videoUrl).then(path => {
-                    if (path) console.log(`[Carousel Prefetch] ✅ Video ${i + 1} cached`);
-                });
-                // Thumbnail prefetch
-                if (item.thumbnailUrl) {
-                    Image.prefetch(item.thumbnailUrl);
-                }
-            });
-        }
-    }, [data.length > 0]);
-
-    // 2. Scroll Prefetch: When active index changes, prefetch next 2 videos
-    const lastPrefetchedIndex = useRef(-1);
-    useEffect(() => {
-        if (data.length === 0) return;
-        if (activeIndex === lastPrefetchedIndex.current) return;
-
-        lastPrefetchedIndex.current = activeIndex;
-
-        // Prefetch next 2 videos (if they exist)
-        const nextItems = data.slice(activeIndex + 1, activeIndex + 3);
-        if (nextItems.length > 0) {
-            console.log(`[Carousel Prefetch] 📥 Prefetching ${nextItems.length} upcoming videos...`);
-
-            nextItems.forEach((item, i) => {
-                VideoCacheService.cacheVideo(item.videoUrl).then(path => {
-                    if (path) console.log(`[Carousel Prefetch] ✅ Next video ${i + 1} cached`);
-                });
-                if (item.thumbnailUrl) {
-                    Image.prefetch(item.thumbnailUrl);
-                }
-            });
-        }
-    }, [activeIndex, data]);
-
-    // ============================================
-
-    const updateActiveIndex = (index: number) => {
-        setActiveIndex(index);
-    };
-
-    const handleMuteToggle = useCallback(() => {
-        setIsMuted(prev => !prev);
-    }, []);
-
-    const scrollToNext = useCallback(() => {
-        const nextIndex = activeIndex + 1;
-        if (nextIndex < data.length && scrollViewRef.current) {
-            setTimeout(() => {
-                scrollViewRef.current?.scrollTo({
-                    x: nextIndex * (ITEM_WIDTH + ITEM_SPACING),
-                    animated: true,
-                });
-            }, 300);
-        }
-    }, [activeIndex, data.length]);
-
-    const onScroll = useAnimatedScrollHandler((event) => {
-        scrollX.value = event.contentOffset.x;
-        const index = Math.round(event.contentOffset.x / (ITEM_WIDTH + ITEM_SPACING));
-        runOnJS(updateActiveIndex)(index);
-    });
-
-    return (
-        <View style={styles.container}>
-            <Animated.ScrollView
-                // @ts-ignore - ref type issue with Animated.ScrollView
-                ref={scrollViewRef}
-                horizontal
-                pagingEnabled={false}
-                decelerationRate="fast"
-                snapToInterval={ITEM_WIDTH + ITEM_SPACING}
-                showsHorizontalScrollIndicator={false}
-                onScroll={onScroll}
-                scrollEventThrottle={16}
-                contentContainerStyle={styles.scrollContent}
-            >
-                {data.map((item, index) => (
-                    <TrendingCard
-                        key={item.id}
-                        item={item}
-                        index={index}
-                        scrollX={scrollX}
-                        onPress={onItemPress}
-                        activeIndex={activeIndex}
-                        onVideoEnd={scrollToNext}
-                        isMuted={isMuted}
-                        onMuteToggle={handleMuteToggle}
-                    />
-                ))}
-            </Animated.ScrollView>
-        </View>
-    );
-}
-
-const styles = StyleSheet.create({
-    container: {
-        height: 320,
-        marginTop: -10,
-    },
-    scrollContent: {
-        paddingHorizontal: 12,
-        alignItems: 'center',
-    },
-    cardContainer: {
-        width: ITEM_WIDTH,
-        height: 280,
-        marginRight: 0,
-    },
-    card: {
-        flex: 1,
-        borderRadius: 16,
-        overflow: 'hidden',
-        backgroundColor: '#1a1a1a',
-    },
-    thumbnail: {
-        ...StyleSheet.absoluteFillObject,
-    },
-    gradient: {
-        ...StyleSheet.absoluteFillObject,
-    },
-    topOverlay: {
-        position: 'absolute',
-        top: 12,
-        left: 12,
-        right: 12,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    userInfo: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        backgroundColor: 'rgba(0,0,0,0.3)',
-        padding: 3,
-        paddingRight: 8,
-        borderRadius: 16,
-    },
-    avatar: {
-        width: 20,
-        height: 20,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: 'white',
-    },
-    username: {
-        color: 'white',
-        fontSize: 10,
-        fontWeight: '600',
-    },
-    actionIcon: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    bottomOverlay: {
-        position: 'absolute',
-        bottom: 12,
-        left: 12,
-        right: 12,
-    },
-    bottomRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-end',
-    },
-    bottomLeft: {
-        flex: 1,
-        marginRight: 8,
-    },
-    title: {
-        color: 'white',
-        fontSize: 13,
-        fontWeight: '700',
-        marginBottom: 8,
-        lineHeight: 16,
-    },
-    statsRow: {
-        flexDirection: 'row',
-        gap: 8,
-    },
-    likeButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    stat: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        backgroundColor: 'rgba(255,255,255,0.15)',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-    },
-    statText: {
         color: 'white',
         fontSize: 10,
         fontWeight: '600',
