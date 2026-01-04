@@ -48,7 +48,7 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: str
             onPressOut={onClose}
         >
             <View style={styles.previewCard}>
-                {/* Top Info Section - Avatar + Name + Username */}
+                {/* Top Info Section - Fixed Height for Symmetry */}
                 <View style={styles.previewInfoSection}>
                     <View style={styles.previewUserHeader}>
                         {item.avatarUrl && (
@@ -92,7 +92,7 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: str
                     )}
                 </View>
 
-                {/* Bottom Info Section - Same padding, different content */}
+                {/* Bottom Info Section - Fixed Height for Symmetry */}
                 <View style={styles.previewInfoSection}>
                     <Text style={styles.previewStatusText}>
                         Hızlı Önizleme Modu
@@ -307,7 +307,8 @@ const styles = StyleSheet.create({
     },
     previewInfoSection: {
         width: '100%',
-        paddingVertical: 12,
+        height: 64, // Fixed height matching top avatar (40) + 12px padding on each side
+        justifyContent: 'center',
         paddingHorizontal: 15,
         backgroundColor: '#1a1a1a',
     },
