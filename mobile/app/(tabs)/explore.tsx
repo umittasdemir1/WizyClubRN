@@ -321,9 +321,9 @@ const styles = StyleSheet.create({
     },
     previewActionRow: {
         flexDirection: 'row',
-        justifyContent: 'space-evenly', // Spreads them out more evenly than space-around
+        justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 20, // Increased horizontal padding
+        paddingHorizontal: 35, // Increased padding to prevent touching edges but keep icons far apart
     },
     previewUserHeader: {
         flexDirection: 'row',
