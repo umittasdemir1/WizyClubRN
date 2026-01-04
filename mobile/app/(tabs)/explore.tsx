@@ -70,7 +70,10 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnailUrl: str
                             </Text>
                         </View>
                     </View>
-                    <MoreIcon width={32} height={32} color="#fff" style={{ transform: [{ rotate: '90deg' }] }} />
+                    {/* More Icon - Strictly positioned at the right corner and vertical */}
+                    <View style={styles.previewMoreContainer}>
+                        <MoreIcon width={24} height={24} color="#fff" style={{ transform: [{ rotate: '90deg' }] }} />
+                    </View>
                 </View>
 
                 {/* Video Area - 0 border internally, clipped by container */}
