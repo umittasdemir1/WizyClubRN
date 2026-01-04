@@ -221,9 +221,9 @@ const styles = StyleSheet.create({
         zIndex: 999,
     },
     previewCard: {
-        width: '80%',
-        height: 480,
-        borderRadius: 30,
+        width: '90%',
+        height: 600,
+        borderRadius: 10,
         overflow: 'hidden',
         backgroundColor: '#000',
     },
