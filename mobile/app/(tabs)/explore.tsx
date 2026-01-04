@@ -173,6 +173,8 @@ export default function ExploreScreen() {
                         <TrendingCarousel
                             data={trendingData}
                             onItemPress={handleVideoPress}
+                            onPreview={showPreview}
+                            onPreviewEnd={hidePreview}
                             isDark={isDark}
                         />
 

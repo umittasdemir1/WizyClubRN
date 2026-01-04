@@ -32,6 +32,8 @@ interface TrendingItem {
 interface TrendingCarouselProps {
     data: TrendingItem[];
     onItemPress: (id: string) => void;
+    onPreview?: (item: any) => void;
+    onPreviewEnd?: () => void;
     isDark?: boolean;
 }
 
@@ -40,12 +42,14 @@ interface TrendingCardProps {
     index: number;
     scrollX: SharedValue<number>;
     onPress: (id: string) => void;
+    onPreview?: (item: any) => void;
+    onPreviewEnd?: () => void;
     activeIndex: number;
     onVideoEnd?: () => void;
     isMuted: boolean;
 }
 
-const TrendingCard = ({ item, index, scrollX, onPress, activeIndex, onVideoEnd, isMuted }: TrendingCardProps) => {
+const TrendingCard = ({ item, index, scrollX, onPress, onPreview, onPreviewEnd, activeIndex, onVideoEnd, isMuted }: TrendingCardProps) => {
     const [isPaused, setIsPaused] = useState(false);
     const [lastTap, setLastTap] = useState(0);
     const [isVideoReady, setIsVideoReady] = useState(false);
@@ -136,6 +140,8 @@ const TrendingCard = ({ item, index, scrollX, onPress, activeIndex, onVideoEnd, 
                 <Pressable
                     style={StyleSheet.absoluteFillObject}
                     onPress={handleVideoPress}
+                    onLongPress={() => onPreview?.(item)}
+                    onPressOut={onPreviewEnd}
                 />
 
                 {/* Overlay: User Avatar & Username */}
@@ -150,7 +156,7 @@ const TrendingCard = ({ item, index, scrollX, onPress, activeIndex, onVideoEnd, 
     );
 };
 
-export function TrendingCarousel({ data, onItemPress, isDark = true }: TrendingCarouselProps) {
+export function TrendingCarousel({ data, onItemPress, onPreview, onPreviewEnd, isDark = true }: TrendingCarouselProps) {
     const scrollX = useSharedValue(0);
     const [activeIndex, setActiveIndex] = useState(0);
     const scrollViewRef = useRef<ScrollView>(null);
@@ -248,6 +254,8 @@ export function TrendingCarousel({ data, onItemPress, isDark = true }: TrendingC
                         index={index}
                         scrollX={scrollX}
                         onPress={onItemPress}
+                        onPreview={onPreview}
+                        onPreviewEnd={onPreviewEnd}
                         activeIndex={activeIndex}
                         onVideoEnd={scrollToNext}
                         isMuted={true}
