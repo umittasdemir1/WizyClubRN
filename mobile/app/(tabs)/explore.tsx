@@ -14,6 +14,7 @@ import LikeIcon from '../../assets/icons/like.svg';
 import SaveIcon from '../../assets/icons/save.svg';
 import ShareIcon from '../../assets/icons/share.svg';
 import ShoppingIcon from '../../assets/icons/shopping.svg';
+import MoreIcon from '../../assets/icons/more.svg';
 
 // New Components
 import { TrendingHeader } from '../../src/presentation/components/explore/TrendingHeader';
