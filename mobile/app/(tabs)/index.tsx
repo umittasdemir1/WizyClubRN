@@ -268,9 +268,13 @@ export default function FeedScreen() {
             RNStatusBar.setBarStyle('light-content', true);
         }, [])
     );
+
+    const isScreenFocusedRef = useRef(false);
+
     // Screen Focus Control (Pause videos when navigating away)
     useFocusEffect(
         useCallback(() => {
+            isScreenFocusedRef.current = true;
             setScreenFocused(true);
             setActiveTab('foryou'); // Reset to 'Sana Özel' when returning to feed
 
@@ -281,10 +285,20 @@ export default function FeedScreen() {
             }
 
             return () => {
+                isScreenFocusedRef.current = false;
                 setScreenFocused(false);
             };
         }, [setScreenFocused, setActiveVideo])
     );
+
+    // Watch for late arrival of videos while focused
+    useEffect(() => {
+        if (isScreenFocusedRef.current && videos.length > 0 && !activeVideoId) {
+             console.log('[FeedScreen] Videos arrived while focused - Starting first video');
+             setActiveVideo(videos[0].id, 0);
+        }
+    }, [videos, activeVideoId, setActiveVideo]);
+
 
     const hasUnseenStories = true;
 
