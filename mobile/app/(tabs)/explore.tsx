@@ -1,4 +1,4 @@
-import { View, StyleSheet, ScrollView, StatusBar as RNStatusBar, RefreshControl, Text, Pressable, Dimensions, PanResponder } from 'react-native';
+import { View, StyleSheet, ScrollView, StatusBar as RNStatusBar, RefreshControl, Text, Pressable, Dimensions, PanResponder, Modal } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,13 +8,17 @@ import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import Video from 'react-native-video';
 import { Image } from 'expo-image';
 import { VideoCacheService } from '../../src/data/services/VideoCacheService';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
+import { useMuteControls } from '../../src/presentation/store/useActiveVideoStore';
+import { Volume2, VolumeX } from 'lucide-react-native';
+import { LIGHT_COLORS, DARK_COLORS } from '../../src/core/constants';
 
 // Icons
 import LikeIcon from '../../assets/icons/like.svg';
 import SaveIcon from '../../assets/icons/save.svg';
 import ShareIcon from '../../assets/icons/share.svg';
 import ShoppingIcon from '../../assets/icons/shopping.svg';
+import MoreIcon from '../../assets/icons/more.svg';
 
 // New Components
 import { TrendingHeader } from '../../src/presentation/components/explore/TrendingHeader';
@@ -24,7 +28,6 @@ import { TrendingCarousel } from '../../src/presentation/components/explore/Tren
 import { MasonryFeed } from '../../src/presentation/components/explore/MasonryFeed';
 import { useActiveVideoStore } from '../../src/presentation/store/useActiveVideoStore';
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
-import { LIGHT_COLORS, DARK_COLORS } from '../../src/core/constants';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CATEGORIES = ['Senin İçin', 'Takip Edilen', 'Popüler'];
@@ -48,9 +51,11 @@ const PreviewModal = ({ item, onClose, onAction }: PreviewModalProps) => {
     const [isReady, setIsReady] = useState(false);
     const [showPoster, setShowPoster] = useState(true);
     const [activeAction, setActiveAction] = useState<'like' | 'save' | 'share' | 'shop' | null>(null);
+    const { isMuted, toggleMute } = useMuteControls();
     
     // Store button layout coordinates for hit detection
     const layouts = useRef<Record<string, { x: number, y: number, width: number, height: number }>>({});
+    const activeActionRef = useRef<string | null>(null);
 
     useEffect(() => {
         let isCancelled = false;
@@ -68,12 +73,14 @@ const PreviewModal = ({ item, onClose, onAction }: PreviewModalProps) => {
     const panResponder = useRef(
         PanResponder.create({
             onStartShouldSetPanResponder: () => true,
+            onStartShouldSetPanResponderCapture: () => true,
             onMoveShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponderCapture: () => true,
             onPanResponderMove: (evt, gestureState) => {
                 const { moveX, moveY } = gestureState;
                 let foundAction: any = null;
 
-                // Simple hit detection
+                // Simple hit detection logic using page-relative coordinates
                 Object.entries(layouts.current).forEach(([type, layout]) => {
                     if (
                         moveX >= layout.x && 
@@ -84,11 +91,15 @@ const PreviewModal = ({ item, onClose, onAction }: PreviewModalProps) => {
                         foundAction = type;
                     }
                 });
-                setActiveAction(foundAction);
+                
+                if (activeActionRef.current !== foundAction) {
+                    activeActionRef.current = foundAction;
+                    setActiveAction(foundAction);
+                }
             },
             onPanResponderRelease: (evt, gestureState) => {
-                if (activeAction) {
-                    onAction?.(activeAction, item.id);
+                if (activeActionRef.current) {
+                    onAction?.(activeActionRef.current as any, item.id);
                 }
                 onClose();
             },
@@ -97,88 +108,110 @@ const PreviewModal = ({ item, onClose, onAction }: PreviewModalProps) => {
     ).current;
 
     const handleLayout = (type: string) => (event: any) => {
-        // Measure position relative to screen for accurate tracking
+        // We need to measure relative to screen for accurate PanResponder hit detection
         event.target.measure((x: number, y: number, width: number, height: number, pageX: number, pageY: number) => {
             layouts.current[type] = { x: pageX, y: pageY, width, height };
         });
     };
 
     return (
-        <View style={styles.previewOverlay} {...panResponder.panHandlers}>
-            <Animated.View style={styles.previewCard}>
-                {/* Top Info Section */}
-                <View style={styles.previewHeader}>
-                    <View style={styles.previewUserHeader}>
-                        {item.avatarUrl && (
-                            <Image source={{ uri: item.avatarUrl }} style={styles.previewAvatar} />
+        <Modal transparent visible={true} animationType="fade" onRequestClose={onClose}>
+            <View 
+                style={styles.previewOverlay} 
+                {...panResponder.panHandlers}
+            >
+                <View style={styles.previewCard}>
+                    {/* Top Info Section */}
+                    <View style={styles.previewHeader}>
+                        <View style={styles.previewUserHeader}>
+                            {item.avatarUrl && (
+                                <Image source={{ uri: item.avatarUrl }} style={styles.previewAvatar} />
+                            )}
+                            <View style={styles.previewNameContainer}>
+                                <Text style={styles.previewFullName} numberOfLines={1}>
+                                    {item.fullName || 'WizyClub User'}
+                                </Text>
+                                <Text style={styles.previewUserHandle} numberOfLines={1}>
+                                    @{item.username || 'wizyclub'}
+                                </Text>
+                            </View>
+                        </View>
+                        {/* More Button - Perfectly Aligned Right */}
+                        <MoreIcon width={32} height={32} color="#fff" />
+                    </View>
+
+                    {/* Video Area */}
+                    <View style={styles.videoContainer}>
+                        {showPoster && (
+                            <Image
+                                source={{ uri: item.thumbnailUrl }}
+                                style={StyleSheet.absoluteFill}
+                                contentFit="cover"
+                                priority="high"
+                            />
                         )}
-                        <View style={styles.previewNameContainer}>
-                            <Text style={styles.previewFullName} numberOfLines={1}>
-                                {item.fullName || 'WizyClub User'}
-                            </Text>
-                            <Text style={styles.previewUserHandle} numberOfLines={1}>
-                                @{item.username || 'wizyclub'}
-                            </Text>
+                        
+                        {videoSource && (
+                            <Video
+                                source={videoSource}
+                                style={[styles.previewVideo, { opacity: isReady ? 1 : 0 }]}
+                                resizeMode="cover"
+                                repeat={true}
+                                paused={false}
+                                muted={isMuted}
+                                onReadyForDisplay={() => {
+                                    setIsReady(true);
+                                    requestAnimationFrame(() => setShowPoster(false));
+                                }}
+                            />
+                        )}
+
+                        {/* Volume Control Button */}
+                        <Pressable 
+                            style={styles.previewVolumeBtn}
+                            onPress={(e) => {
+                                e.stopPropagation();
+                                toggleMute();
+                            }}
+                        >
+                            {isMuted ? (
+                                <VolumeX size={20} color="#FFFFFF" />
+                            ) : (
+                                <Volume2 size={20} color="#FFFFFF" />
+                            )}
+                        </Pressable>
+                    </View>
+
+                    {/* Action Row - Detects slide-over */}
+                    <View style={[styles.previewInfoSection, styles.previewActionRow]}>
+                        <View 
+                            onLayout={handleLayout('like')} 
+                            style={[styles.iconWrapper, activeAction === 'like' && styles.activeIcon]}
+                        >
+                            <LikeIcon width={32} height={32} color={activeAction === 'like' ? '#FF2146' : '#fff'} />
+                        </View>
+                        <View 
+                            onLayout={handleLayout('save')} 
+                            style={[styles.iconWrapper, activeAction === 'save' && styles.activeIcon]}
+                        >
+                            <SaveIcon width={32} height={32} color={activeAction === 'save' ? '#FFD700' : '#fff'} />
+                        </View>
+                        <View 
+                            onLayout={handleLayout('share')} 
+                            style={[styles.iconWrapper, activeAction === 'share' && styles.activeIcon]}
+                        >
+                            <ShareIcon width={32} height={32} color={activeAction === 'share' ? '#00C6FF' : '#fff'} />
+                        </View>
+                        <View 
+                            onLayout={handleLayout('shop')} 
+                            style={[styles.iconWrapper, activeAction === 'shop' && styles.activeIcon]}
+                        >
+                            <ShoppingIcon width={32} height={32} color={activeAction === 'shop' ? '#4CD964' : '#fff'} />
                         </View>
                     </View>
                 </View>
-
-                {/* Video Area */}
-                <View style={styles.videoContainer}>
-                    {showPoster && (
-                        <Image
-                            source={{ uri: item.thumbnailUrl }}
-                            style={StyleSheet.absoluteFill}
-                            contentFit="cover"
-                            priority="high"
-                        />
-                    )}
-                    
-                    {videoSource && (
-                        <Video
-                            source={videoSource}
-                            style={[styles.previewVideo, { opacity: isReady ? 1 : 0 }]}
-                            resizeMode="cover"
-                            repeat={true}
-                            paused={false}
-                            muted={true}
-                            onReadyForDisplay={() => {
-                                setIsReady(true);
-                                requestAnimationFrame(() => setShowPoster(false));
-                            }}
-                        />
-                    )}
-                </View>
-
-                {/* Action Row - Detects slide-over */}
-                <View style={[styles.previewInfoSection, styles.previewActionRow]}>
-                    <View 
-                        onLayout={handleLayout('like')} 
-                        style={[styles.iconWrapper, activeAction === 'like' && styles.activeIcon]}
-                    >
-                        <LikeIcon width={32} height={32} color={activeAction === 'like' ? '#FF2146' : '#fff'} />
-                    </View>
-                    <View 
-                        onLayout={handleLayout('save')} 
-                        style={[styles.iconWrapper, activeAction === 'save' && styles.activeIcon]}
-                    >
-                        <SaveIcon width={32} height={32} color={activeAction === 'save' ? '#FFD700' : '#fff'} />
-                    </View>
-                    <View 
-                        onLayout={handleLayout('share')} 
-                        style={[styles.iconWrapper, activeAction === 'share' && styles.activeIcon]}
-                    >
-                        <ShareIcon width={32} height={32} color={activeAction === 'share' ? '#00C6FF' : '#fff'} />
-                    </View>
-                    <View 
-                        onLayout={handleLayout('shop')} 
-                        style={[styles.iconWrapper, activeAction === 'shop' && styles.activeIcon]}
-                    >
-                        <ShoppingIcon width={32} height={32} color={activeAction === 'shop' ? '#4CD964' : '#fff'} />
-                    </View>
-                </View>
-            </Animated.View>
-        </View>
+            </View>
+        </Modal>
     );
 };
 
@@ -279,9 +312,9 @@ export default function ExploreScreen() {
     return (
         <>
             <SwipeWrapper
-                onSwipeLeft={() => router.push('/deals')}
-                onSwipeRight={() => router.push('/')}
-                edgeOnly={true}
+                onSwipeLeft={previewItem ? undefined : () => router.push('/deals')}
+                onSwipeRight={previewItem ? undefined : () => router.push('/')}
+                edgeOnly={!!previewItem}
             >
                 <View style={[styles.container, { backgroundColor: bgBody }]}>
                     <TrendingHeader
@@ -291,6 +324,7 @@ export default function ExploreScreen() {
                     />
 
                     <ScrollView
+                        scrollEnabled={!previewItem}
                         showsVerticalScrollIndicator={false}
                         contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
                         refreshControl={
@@ -329,6 +363,7 @@ export default function ExploreScreen() {
                             onPreview={showPreview}
                             onPreviewEnd={hidePreview}
                             isDark={isDark}
+                            scrollEnabled={!previewItem}
                         />
 
                         {/* 3. Masonry Grid */}
@@ -380,23 +415,33 @@ const styles = StyleSheet.create({
         zIndex: 999,
     },
     previewCard: {
-        width: '90%',
+        width: '95%',
         borderRadius: 20,
         overflow: 'hidden',
         backgroundColor: '#1a1a1a',
     },
     videoContainer: {
         width: '100%',
-        height: 500, // Fixed video height
+        height: 600,
         backgroundColor: '#000',
+        position: 'relative',
     },
     previewVideo: {
         width: '100%',
         height: '100%',
     },
+    previewVolumeBtn: {
+        position: 'absolute',
+        bottom: 15,
+        right: 15,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        padding: 8,
+        borderRadius: 20,
+        zIndex: 10,
+    },
     previewInfoSection: {
         width: '100%',
-        height: 56,
+        height: 56, // Fixed height matching top avatar (32) + 12px padding on each side
         justifyContent: 'center',
         paddingHorizontal: 15,
         backgroundColor: '#1a1a1a',
@@ -414,7 +459,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 35,
+        paddingHorizontal: 35, // Increased padding to prevent touching edges but keep icons far apart
     },
     iconWrapper: {
         width: 44,
@@ -428,6 +473,7 @@ const styles = StyleSheet.create({
         transform: [{ scale: 1.2 }],
     },
     previewUserHeader: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
@@ -449,8 +495,7 @@ const styles = StyleSheet.create({
     },
     previewUserHandle: {
         color: 'rgba(255,255,255,0.6)',
-        fontSize: 13,
+        fontSize: 13, // Slightly larger for readability
         fontWeight: '500',
     },
 });
-
