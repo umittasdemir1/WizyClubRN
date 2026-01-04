@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
     },
     previewInfoSection: {
         width: '100%',
-        paddingVertical: 20,
+        paddingVertical: 12,
         paddingHorizontal: 15,
         backgroundColor: '#1a1a1a',
     },
