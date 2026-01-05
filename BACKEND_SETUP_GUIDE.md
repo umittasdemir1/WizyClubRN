@@ -29,6 +29,7 @@ nano .env
 # EXPO_PUBLIC_API_URL=<NGROK_URL_BURAYA>
 # Kaydet: CTRL+X, Y, Enter
 
+cd ~/WizyClubRN/mobile
 npx expo start --dev-client --tunnel
 ```
 
