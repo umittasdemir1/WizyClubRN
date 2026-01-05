@@ -56,9 +56,20 @@ const PreviewModal = ({ item, onClose, onAction }: PreviewModalProps) => {
     useEffect(() => {
         let isCancelled = false;
         const initSource = async () => {
+            // First check if it's already cached
             const cachedPath = await VideoCacheService.getCachedVideoPath(item.videoUrl);
             if (!isCancelled) {
-                setVideoSource(cachedPath ? { uri: cachedPath } : { uri: item.videoUrl });
+                if (cachedPath) {
+                    setVideoSource({ uri: cachedPath });
+                } else {
+                    // Start full download if not cached, but stream in the meantime
+                    setVideoSource({ uri: item.videoUrl });
+                    VideoCacheService.cacheVideo(item.videoUrl).then(newPath => {
+                        if (!isCancelled && newPath) {
+                            setVideoSource({ uri: newPath });
+                        }
+                    });
+                }
             }
         };
         initSource();
