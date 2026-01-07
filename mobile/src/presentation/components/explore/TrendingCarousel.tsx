@@ -11,12 +11,12 @@ import Animated, {
     withTiming
 } from 'react-native-reanimated';
 import Video from 'react-native-video';
-import { VideoCacheService } from '../../../data/services/VideoCacheService';
+import MoreIcon from '../../../../assets/icons/more.svg';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const ITEM_WIDTH = SCREEN_WIDTH * 0.44; 
-const ITEM_HEIGHT = ITEM_WIDTH * (16 / 9); 
-const ITEM_SPACING = 0;
+const ITEM_WIDTH = SCREEN_WIDTH * 0.44;
+const ITEM_HEIGHT = ITEM_WIDTH * (16 / 9);
+const ITEM_SPACING = 16;
 
 interface TrendingItem {
     id: string;
@@ -54,8 +54,8 @@ const TrendingCard = memo(({ item, index, scrollX, onPress, onPreview, onPreview
     const [isPaused, setIsPaused] = useState(false);
     const [lastTap, setLastTap] = useState(0);
     const isActive = activeIndex === index;
-    const shouldLoad = index >= activeIndex && index <= activeIndex + 2;
-    
+    const shouldLoad = index >= activeIndex - 1 && index <= activeIndex + 2;
+
     const thumbnailOpacity = useSharedValue(1);
     const hasTriggeredEnd = useRef(false);
 
@@ -75,13 +75,8 @@ const TrendingCard = memo(({ item, index, scrollX, onPress, onPreview, onPreview
     }, [isActive, onVideoEnd]);
 
     const animatedCardStyle = useAnimatedStyle(() => {
-        const inputRange = [
-            (index - 1) * (ITEM_WIDTH + ITEM_SPACING),
-            index * (ITEM_WIDTH + ITEM_SPACING),
-            (index + 1) * (ITEM_WIDTH + ITEM_SPACING),
-        ];
-        const scale = interpolate(scrollX.value, inputRange, [0.9, 1, 0.9], 'clamp');
-        return { transform: [{ scale }] };
+        // Uniform size: scale 1 for all items
+        return { transform: [{ scale: 1 }] };
     });
 
     const animatedThumbnailStyle = useAnimatedStyle(() => ({
@@ -101,7 +96,7 @@ const TrendingCard = memo(({ item, index, scrollX, onPress, onPreview, onPreview
     return (
         <Animated.View style={[styles.cardContainer, animatedCardStyle]}>
             <View style={styles.card}>
-                {/* 1. Video is ALWAYS at 100% opacity in the background */}
+                {/* 1. Video Layer */}
                 {shouldLoad && (
                     <View style={StyleSheet.absoluteFill}>
                         <Video
@@ -114,8 +109,7 @@ const TrendingCard = memo(({ item, index, scrollX, onPress, onPreview, onPreview
                             onEnd={triggerEnd}
                             onReadyForDisplay={() => {
                                 if (isActive) {
-                                    // Smoothly fade out the cover (thumbnail) to reveal the video
-                                    thumbnailOpacity.value = withTiming(0, { duration: 200 });
+                                    thumbnailOpacity.value = withTiming(0, { duration: 250 });
                                 }
                             }}
                             onProgress={({ currentTime }) => {
@@ -133,7 +127,7 @@ const TrendingCard = memo(({ item, index, scrollX, onPress, onPreview, onPreview
                     </View>
                 )}
 
-                {/* 2. Thumbnail is ON TOP and fades out */}
+                {/* 2. Thumbnail Overlay */}
                 <Animated.View style={[StyleSheet.absoluteFill, animatedThumbnailStyle]} pointerEvents="none">
                     <Image
                         source={{ uri: item.thumbnailUrl }}
@@ -141,6 +135,11 @@ const TrendingCard = memo(({ item, index, scrollX, onPress, onPreview, onPreview
                         contentFit="cover"
                     />
                 </Animated.View>
+
+                {/* More Icon - Top Right */}
+                <View style={styles.moreIconContainer}>
+                    <MoreIcon width={24} height={24} color="#fff" />
+                </View>
 
                 <Pressable
                     style={StyleSheet.absoluteFillObject}
@@ -159,24 +158,10 @@ export function TrendingCarousel({ data, onItemPress, onPreview, onPreviewEnd, i
     const scrollViewRef = useRef<ScrollView>(null);
     const lastScrollTriggered = useRef(-1);
 
-    useEffect(() => {
-        if (data.length > 0) {
-            data.slice(0, 3).forEach((item) => {
-                if (item.thumbnailUrl) Image.prefetch(item.thumbnailUrl);
-            });
-        }
-    }, [data.length]);
-
-    useEffect(() => {
-        if (data.length === 0) return;
-        const nextItems = data.slice(activeIndex + 1, activeIndex + 3);
-        nextItems.forEach((item) => {
-            if (item.thumbnailUrl) Image.prefetch(item.thumbnailUrl);
-        });
-    }, [activeIndex, data]);
-
     const updateActiveIndex = (index: number) => {
-        setActiveIndex(index);
+        if (index !== activeIndex) {
+            setActiveIndex(index);
+        }
     };
 
     const scrollToNext = useCallback(() => {
@@ -220,7 +205,7 @@ export function TrendingCarousel({ data, onItemPress, onPreview, onPreviewEnd, i
                         index={index}
                         scrollX={scrollX}
                         onPress={onItemPress}
-                        onPreview={showPreview => onPreview?.(showPreview)}
+                        onPreview={onPreview}
                         onPreviewEnd={onPreviewEnd}
                         activeIndex={activeIndex}
                         onVideoEnd={scrollToNext}
@@ -239,13 +224,13 @@ const styles = StyleSheet.create({
         marginTop: -10,
     },
     scrollContent: {
-        paddingHorizontal: 12,
+        paddingHorizontal: 16,
         alignItems: 'center',
     },
     cardContainer: {
         width: ITEM_WIDTH,
         height: ITEM_HEIGHT,
-        marginRight: 0,
+        marginRight: ITEM_SPACING,
     },
     card: {
         flex: 1,
@@ -255,5 +240,11 @@ const styles = StyleSheet.create({
     },
     thumbnail: {
         ...StyleSheet.absoluteFillObject,
+    },
+    moreIconContainer: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
+        zIndex: 10,
     },
 });

@@ -44,6 +44,7 @@ import { UserOptionsModal } from '../../src/presentation/components/profile/User
 import { useAuthStore } from '../../src/presentation/store/useAuthStore';
 import { InteractionRepositoryImpl } from '../../src/data/repositories/InteractionRepositoryImpl';
 import { ToggleFollowUseCase } from '../../src/domain/usecases/ToggleFollowUseCase';
+import { useSocialStore } from '../../src/presentation/store/useSocialStore';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -182,7 +183,7 @@ export default function UserProfileScreen() {
     }, [isDark])
   );
 
-  const [isFollowing, setIsFollowing] = useState(false);
+  const { toggleFollow: globalToggleFollow } = useSocialStore();
   const [isNotificationsOn, setIsNotificationsOn] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [isUserOptionsVisible, setIsUserOptionsVisible] = useState(false);
@@ -216,36 +217,18 @@ export default function UserProfileScreen() {
   const btnFollowText = isDark ? '#000000' : '#ffffff';
   const btnSecondaryBg = themeColors.card;
 
-  // Sync isFollowing from profile data
-  useEffect(() => {
-    if (profileUser) {
-      setIsFollowing(profileUser.isFollowing);
-    }
-  }, [profileUser]);
-
-  // Use Case
-  const interactionRepository = useRef(new InteractionRepositoryImpl()).current;
-  const toggleFollowUseCase = useRef(new ToggleFollowUseCase(interactionRepository)).current;
+  // Derive follow state from profile user (which is already synced with global store)
+  const isFollowing = profileUser?.isFollowing ?? false;
 
   const handleToggleFollow = async () => {
     if (!currentUserId) {
-      // Alert if not logged in (though typically shouldn't be here if not logged in? Or public view allowed?)
       return;
     }
 
-    // Optimistic Update
-    const newState = !isFollowing;
-    setIsFollowing(newState);
-
     try {
-      await toggleFollowUseCase.execute(userId, currentUserId);
-
-      // Update local profile stats optimistically
-      // Note: exact count update might require reload, but usually +/- 1 is enough for UI
-      // We are not updating 'user.followersCount' here in UI state, but we could.
+      await globalToggleFollow(userId, currentUserId);
     } catch (err) {
       console.error('Follow toggle failed', err);
-      setIsFollowing(!newState); // Rollback
     }
   };
 
@@ -360,7 +343,7 @@ export default function UserProfileScreen() {
             <View style={styles.actionsContainer}>
               <TouchableOpacity
                 style={[styles.btnFollow, { backgroundColor: isFollowing ? btnSecondaryBg : btnFollowBg, borderColor: isFollowing ? textSecondary : 'transparent' }]}
-                onPress={() => setIsFollowing(!isFollowing)}
+                onPress={handleToggleFollow}
               >
                 <Text style={[styles.btnFollowText, { color: isFollowing ? textPrimary : btnFollowText }]}>{isFollowing ? 'Takipte' : 'Takip Et'}</Text>
               </TouchableOpacity>

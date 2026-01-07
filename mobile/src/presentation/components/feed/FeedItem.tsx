@@ -1,17 +1,15 @@
 import React, { memo, useRef, useCallback } from 'react';
-import { View, StyleSheet, Dimensions, Platform } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import { View, StyleSheet, Dimensions } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { SharedValue } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { VideoLayer } from './VideoLayer';
-import { ActionButtons } from './ActionButtons';
+import { ActionButtons, ActionButtonsRef } from './ActionButtons';
 import { MetadataLayer } from './MetadataLayer';
 import { DoubleTapLike, DoubleTapLikeRef } from './DoubleTapLike';
 import { Video } from '../../../domain/entities/Video';
-import { useActiveVideoStore } from '../../store/useActiveVideoStore';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const ITEM_HEIGHT = Dimensions.get('window').height;
@@ -33,10 +31,9 @@ interface FeedItemProps {
     onToggleFollow: (videoId: string) => void;
     onOpenShopping: () => void;
     onOpenDescription: () => void;
-    currentUserId?: string; // Add currentUserId prop
+    currentUserId?: string;
 }
 
-// 🔥 CRITICAL: Component defined OUTSIDE render function for proper memoization
 export const FeedItem = memo(function FeedItem({
     video,
     isActive,
@@ -59,27 +56,32 @@ export const FeedItem = memo(function FeedItem({
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const doubleTapRef = useRef<DoubleTapLikeRef>(null);
+    const actionButtonsRef = useRef<ActionButtonsRef>(null);
+
+    const handleDoubleTap = useCallback(() => {
+        // DoubleTapLike already handles the center heart animation
+        // We just need to trigger the BUTTON animation
+        actionButtonsRef.current?.animateLike();
+
+        // 🔥 DELAY state update (like button press does it immediately, but double-tap needs delay)
+        setTimeout(() => {
+            onDoubleTapLike(video.id);
+        }, 16); // Single frame delay
+    }, [video.id, onDoubleTapLike]);
 
     const handleLikePress = useCallback(() => {
         if (!video.isLiked) {
             doubleTapRef.current?.animateLike();
-            if (Platform.OS !== 'web') {
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            }
-            requestAnimationFrame(() => {
-                onToggleLike(video.id);
-            });
-        } else {
-            onToggleLike(video.id);
         }
+        // 🔥 IMMEDIATE: No delay, no InteractionManager
+        onToggleLike(video.id);
     }, [video.isLiked, video.id, onToggleLike]);
 
     return (
         <View style={[styles.itemContainer, { height: ITEM_HEIGHT }]}>
-            {/* Layer 1: Content & Gestures (Background) */}
             <DoubleTapLike
                 ref={doubleTapRef}
-                onDoubleTap={() => onDoubleTapLike(video.id)}
+                onDoubleTap={handleDoubleTap}
                 onSingleTap={onFeedTap}
             >
                 <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', paddingTop: insets.top }]}>
@@ -94,18 +96,19 @@ export const FeedItem = memo(function FeedItem({
                 </View>
             </DoubleTapLike>
 
-            {/* Layer 2: UI Overlays (Foreground) - Animate Opacity */}
             <Animated.View
                 style={[StyleSheet.absoluteFill, { zIndex: 50, paddingTop: insets.top }, uiOpacityStyle]}
                 pointerEvents={isSeeking ? 'none' : 'box-none'}
             >
                 <ActionButtons
+                    ref={actionButtonsRef}
                     isLiked={video.isLiked}
                     likesCount={video.likesCount}
                     isSaved={video.isSaved}
                     savesCount={video.savesCount || 0}
                     sharesCount={video.sharesCount}
                     shopsCount={video.shopsCount || 0}
+                    videoId={video.id}
                     onLike={handleLikePress}
                     onSave={() => onToggleSave(video.id)}
                     onShare={() => onToggleShare(video.id)}
@@ -125,8 +128,6 @@ export const FeedItem = memo(function FeedItem({
         </View>
     );
 }, (prevProps, nextProps) => {
-    // Custom comparison - only re-render if critical props change
-    // This prevents re-render when other videos become active
     return (
         prevProps.video.id === nextProps.video.id &&
         prevProps.isActive === nextProps.isActive &&

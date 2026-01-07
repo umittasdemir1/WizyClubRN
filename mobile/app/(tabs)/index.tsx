@@ -298,8 +298,23 @@ export default function FeedScreen() {
         if (videos.length > 0 && !activeVideoId) {
             console.log('[FeedScreen] 🚀 Fast init: Starting first video immediately');
             setActiveVideo(videos[0].id, 0);
+            // Force immediate ref update for synchronous checks
+            lastActiveIdRef.current = videos[0].id;
         }
     }, [videos, activeVideoId, setActiveVideo]);
+
+    // 🔥 CRITICAL: Ensure first video plays on cold start
+    useEffect(() => {
+        if (videos.length > 0 && !isLoading) {
+            // On initial load, ensure first video is active and playing
+            const currentActive = useActiveVideoStore.getState().activeVideoId;
+            if (!currentActive) {
+                console.log('[FeedScreen] ⚡ Cold start: Activating first video');
+                setActiveVideo(videos[0].id, 0);
+                lastActiveIdRef.current = videos[0].id;
+            }
+        }
+    }, [isLoading]);
 
 
     const hasUnseenStories = true;
@@ -364,9 +379,6 @@ export default function FeedScreen() {
 
     const handleToggleMute = useCallback(() => {
         toggleMute();
-        if (Platform.OS !== 'web') {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        }
     }, [toggleMute]);
 
     const handleMorePress = useCallback(() => {
@@ -441,9 +453,6 @@ export default function FeedScreen() {
             const video = videos.find((v) => v.id === videoId);
             if (video && !video.isLiked) {
                 toggleLike(videoId);
-                if (Platform.OS !== 'web') {
-                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                }
             }
         },
         [videos, toggleLike]

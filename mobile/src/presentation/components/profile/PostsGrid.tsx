@@ -68,7 +68,7 @@ export const PostsGrid: React.FC<PostsGridProps> = ({
           {/* Stats */}
           <View style={styles.stats}>
             {post.type === 'video' ? (
-              <Play size={12} color="#fff" fill="#fff" />
+              <Play size={12} color="#fff" strokeWidth={2.5} />
             ) : (
               <Eye size={12} color="#fff" />
             )}

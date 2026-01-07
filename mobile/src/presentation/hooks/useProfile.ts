@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { User } from '../../domain/entities';
 import { ProfileRepositoryImpl } from '../../data/repositories/ProfileRepositoryImpl';
+import { useSocialStore } from '../store/useSocialStore';
 
 const profileRepo = new ProfileRepositoryImpl();
 
@@ -8,6 +9,19 @@ export const useProfile = (userId: string, viewerId?: string) => {
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    const followingMap = useSocialStore((state) => state.followingMap);
+    const followerCounts = useSocialStore((state) => state.followerCounts);
+    const followingCounts = useSocialStore((state) => state.followingCounts);
+    const syncSocialData = useSocialStore((state) => state.syncSocialData);
+
+    // Sync current user object with global store data
+    const syncedUser = user ? {
+        ...user,
+        isFollowing: followingMap[user.id] ?? user.isFollowing,
+        followersCount: followerCounts[user.id] ?? user.followersCount,
+        followingCount: followingCounts[user.id] ?? user.followingCount
+    } : null;
 
     const loadProfile = useCallback(async (silentRefresh = false) => {
         // Only show loading skeleton if no data exists (Instagram/TikTok behavior)
@@ -17,7 +31,16 @@ export const useProfile = (userId: string, viewerId?: string) => {
 
         try {
             const profileData = await profileRepo.getProfile(userId, viewerId);
-            setUser(profileData);
+            if (profileData) {
+                setUser(profileData);
+                // Sync to global store
+                syncSocialData(
+                    profileData.id,
+                    profileData.isFollowing,
+                    profileData.followersCount || 0,
+                    profileData.followingCount || 0
+                );
+            }
         } catch (err) {
             setError('Profil yüklenirken bir hata oluştu.');
             console.error('[useProfile] Load error:', err);
@@ -26,7 +49,7 @@ export const useProfile = (userId: string, viewerId?: string) => {
                 setIsLoading(false);
             }
         }
-    }, [userId, viewerId]);
+    }, [userId, viewerId, syncSocialData]);
 
     useEffect(() => {
         // Only load if userId is valid (not a fallback or invalid ID)
@@ -64,7 +87,7 @@ export const useProfile = (userId: string, viewerId?: string) => {
     }, [userId, updateProfile]);
 
     return {
-        user,
+        user: syncedUser,
         isLoading,
         error,
         updateProfile,

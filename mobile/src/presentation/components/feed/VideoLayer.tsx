@@ -5,7 +5,6 @@ import { Video as VideoEntity } from '../../../domain/entities/Video';
 import PlayIcon from '../../../../assets/icons/play.svg';
 import ReplayIcon from '../../../../assets/icons/replay.svg';
 import { useActiveVideoStore, saveVideoPosition, getVideoPosition, clearVideoPosition } from '../../store/useActiveVideoStore';
-import * as Haptics from 'expo-haptics';
 import { BrightnessOverlay } from './BrightnessOverlay';
 import { RefreshCcw, AlertCircle } from 'lucide-react-native';
 import { useNetInfo } from '@react-native-community/netinfo';
@@ -250,9 +249,14 @@ export const VideoLayer = memo(function VideoLayer({
             loopCount.current = 0;
             clearVideoPosition(video.id);
             videoRef.current?.seek(0);
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         }
-    }, [isPausedGlobal, isFinished, isActive, video.id]);
+
+        // Fallback: If not playing but should be, and active - force mount
+        if (isActive && isScreenFocused && isAppActive && !isPausedGlobal && !shouldPlay) {
+            console.log(`[VideoLayer] ⚠️ Stalled state detected for ${video.id}, forcing refresh`);
+            setKey(prev => prev + 1);
+        }
+    }, [isPausedGlobal, isFinished, isActive, video.id, isScreenFocused, isAppActive, shouldPlay]);
 
     // shouldPlay logic moved to top of component to include isScreenFocused
     // const shouldPlay = isActive && isAppActive && !isSeeking && !isPausedGlobal && !isFinished && !hasError;
@@ -319,7 +323,6 @@ export const VideoLayer = memo(function VideoLayer({
         setRetryCount(prev => prev + 1);
         setHasError(false);
         setKey(prev => prev + 1); // Force re-mount of video component
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }, []);
 
     const handleProgress = useCallback((data: OnProgressData) => {

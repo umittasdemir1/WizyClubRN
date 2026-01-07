@@ -1,6 +1,5 @@
 import React from 'react';
 import { ScrollView, Text, TouchableOpacity, StyleSheet, View } from 'react-native';
-import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 
 interface FilterBarProps {
@@ -71,7 +70,6 @@ export function FilterBar({
     const handleSelect = (category: string) => {
         if (category !== selectedCategory) {
             onSelect(category);
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
     };
 

@@ -66,7 +66,7 @@ export const VideoGrid: React.FC<VideoGridProps> = ({
           <View style={styles.gradientOverlay} />
           {/* Stats */}
           <View style={styles.stats}>
-            <Play size={12} color="#fff" fill="#fff" />
+            <Play size={12} color="#fff" strokeWidth={2.5} />
             <Text style={styles.viewsText}>{formatViews(video.views)}</Text>
           </View>
         </Pressable>

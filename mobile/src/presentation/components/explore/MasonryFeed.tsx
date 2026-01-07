@@ -52,7 +52,7 @@ export function MasonryFeed({ data, onItemPress, onPreview, onPreviewEnd, isDark
                 contentFit="cover"
             />
             <View style={styles.statsBadge}>
-                <Play size={10} color="white" fill="white" />
+                <Play size={10} color="white" strokeWidth={2.5} />
                 <Text style={styles.statsText}>{item.views}</Text>
             </View>
         </Pressable>
@@ -72,7 +72,7 @@ export function MasonryFeed({ data, onItemPress, onPreview, onPreviewEnd, isDark
                 contentFit="cover"
             />
             <View style={styles.statsBadge}>
-                <Play size={10} color="white" fill="white" />
+                <Play size={10} color="white" strokeWidth={2.5} />
                 <Text style={styles.statsText}>{item.views}</Text>
             </View>
         </Pressable>

@@ -40,7 +40,7 @@ export const HighlightPills: React.FC<HighlightPillsProps> = ({
               contentFit="cover"
             />
             <View style={styles.playIconOverlay}>
-              <Play size={10} color="#fff" fill="#fff" />
+              <Play size={10} color="#fff" strokeWidth={2.5} />
             </View>
           </View>
           <Text style={[styles.text, { color: textColor }]}>{highlight.title}</Text>

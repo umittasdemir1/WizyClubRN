@@ -331,9 +331,12 @@ export default function ExploreScreen() {
                         )}
 
                         {/* 2. Featured Carousel Section */}
-                        <Text style={[styles.carouselTitle, { color: themeColors.textPrimary }]}>
-                            Önerilenler
-                        </Text>
+                        <View style={styles.sectionHeader}>
+                            <Text style={[styles.carouselTitle, { color: themeColors.textPrimary }]}>
+                                Önerilenler
+                            </Text>
+                            <MoreIcon width={24} height={24} color={isDark ? '#FFFFFF' : '#000000'} />
+                        </View>
                         <TrendingCarousel
                             data={trendingData}
                             onItemPress={handleVideoPress}
@@ -370,12 +373,18 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
+    sectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 12,
+        marginBottom: 8,
+    },
     carouselTitle: {
         fontSize: 18,
         fontWeight: '700',
         marginTop: 0,
-        marginBottom: 8,
-        paddingHorizontal: 12,
+        marginBottom: 0,
     },
     sectionTitle: {
         fontSize: 18,

@@ -11,7 +11,6 @@ import Animated, {
     interpolate,
     Extrapolation,
 } from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
 import { useBrightnessStore } from '../../store/useBrightnessStore';
 import SunIcon from '../../../../assets/icons/sun.svg';
 
@@ -52,17 +51,12 @@ export function BrightnessController({ }: BrightnessControllerProps) {
         setBrightness(value);
     }, [setBrightness]);
 
-    const triggerHaptic = useCallback(() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }, []);
-
     // Pan gesture for slider
     const panGesture = Gesture.Pan()
         .onStart(() => {
             'worklet';
             isDragging.value = true;
             startPosition.value = thumbPosition.value;
-            runOnJS(triggerHaptic)();
         })
         .onUpdate((event) => {
             'worklet';
@@ -89,7 +83,6 @@ export function BrightnessController({ }: BrightnessControllerProps) {
 
             const newBrightness = 1 - (newPosition / SLIDER_HEIGHT);
             runOnJS(updateBrightness)(newBrightness);
-            runOnJS(triggerHaptic)();
         });
 
     const composedGesture = Gesture.Simultaneous(panGesture, tapGesture);

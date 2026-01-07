@@ -15,7 +15,6 @@ import Animated, {
     Extrapolation,
     Easing,
 } from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
 import { useActiveVideoStore, ActiveVideoState } from '../../store/useActiveVideoStore';
 import { SpritePreview } from './SpritePreview';
 
@@ -117,9 +116,6 @@ export function VideoSeekBar({
         }
     );
 
-    const triggerHaptic = useCallback(() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }, []);
 
     const startScrubbing = useCallback(() => {
         setSeeking(true);
@@ -156,7 +152,6 @@ export function VideoSeekBar({
             currentTime.value = newProgress * duration.value;
 
             runOnJS(startScrubbing)();
-            runOnJS(triggerHaptic)();
         })
         .onUpdate((event) => {
             'worklet';
@@ -173,7 +168,6 @@ export function VideoSeekBar({
 
             // Pass seekTime directly (already calculated in currentTime during pan)
             runOnJS(endScrubbing)(currentTime.value);
-            runOnJS(triggerHaptic)();
         })
         .onFinalize(() => {
             'worklet';
@@ -193,7 +187,6 @@ export function VideoSeekBar({
             const newProgress = Math.max(0, Math.min(absoluteX / BAR_WIDTH, 1));
             const seekTime = newProgress * duration.value; // Calculate in worklet
             runOnJS(updateSeek)(seekTime);
-            runOnJS(triggerHaptic)();
         });
 
     const composedGesture = Gesture.Race(pan, tap);

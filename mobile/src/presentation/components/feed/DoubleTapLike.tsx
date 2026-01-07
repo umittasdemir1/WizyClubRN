@@ -5,9 +5,10 @@ import Animated, {
     useAnimatedStyle,
     withSpring,
     withTiming,
-    withDelay,
 } from 'react-native-reanimated';
 import LikeIcon from '../../../../assets/icons/doubletablike.svg';
+
+const AnimatedLikeIcon = Animated.createAnimatedComponent(LikeIcon);
 
 interface DoubleTapLikeProps {
     children: React.ReactNode;
@@ -20,7 +21,7 @@ export interface DoubleTapLikeRef {
 }
 
 const HEART_COLOR = '#FF2146';
-const DOUBLE_TAP_DELAY = 250; // 250ms window for double tap
+const DOUBLE_TAP_DELAY = 250;
 
 const DoubleTapLikeComponent = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
     ({ children, onDoubleTap, onSingleTap }, ref) => {
@@ -30,60 +31,42 @@ const DoubleTapLikeComponent = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
         const tapCount = useRef(0);
         const tapTimer = useRef<NodeJS.Timeout | null>(null);
 
-        // Ortak Tetikleyici Fonksiyon (Instagram-Style Bouncy Animation)
         const performAnimation = useCallback(() => {
-            // 1. Rastgele Eğim (-15 ile +15 derece arası organik his için)
             const randomAngle = Math.random() * 30 - 15;
             rotation.value = randomAngle;
-
             opacity.value = 1;
-            scale.value = 0; // Reset
+            scale.value = 0;
 
-            // 2. Instagram Tarzı "Bouncy" Spring Fiziği
-            scale.value = withSpring(
-                1.2,
-                {
-                    mass: 1,
-                    damping: 10, // Düşük sürtünme = çok sallanma
-                    stiffness: 250, // Yüksek sertlik = hızlı tepki
-                },
-                (finished) => {
-                    if (finished) {
-                        // Animasyon bitince HIZLI kaybol
-                        scale.value = withTiming(0, { duration: 80 });
-                        opacity.value = withTiming(0, { duration: 80 });
-                    }
+            scale.value = withSpring(1.2, { mass: 0.8, damping: 12, stiffness: 300 }, (finished) => {
+                if (finished) {
+                    scale.value = withTiming(0, { duration: 150 });
+                    opacity.value = withTiming(0, { duration: 150 });
                 }
-            );
+            });
         }, [scale, opacity, rotation]);
 
-        // Expose animateLike method via ref
         useImperativeHandle(ref, () => ({
             animateLike: performAnimation,
         }));
 
-        // Handle tap with double tap detection
         const handlePress = useCallback(() => {
             tapCount.current += 1;
 
             if (tapCount.current === 1) {
-                // First tap - wait for potential second tap
                 tapTimer.current = setTimeout(() => {
-                    // Single tap confirmed - toggle play/pause
                     if (tapCount.current === 1 && onSingleTap) {
                         onSingleTap();
                     }
                     tapCount.current = 0;
                 }, DOUBLE_TAP_DELAY);
             } else if (tapCount.current === 2) {
-                // Double tap detected!
                 if (tapTimer.current) {
                     clearTimeout(tapTimer.current);
                     tapTimer.current = null;
                 }
                 tapCount.current = 0;
 
-                // Trigger like animation
+                // 🔥 Animation FIRST, then callback
                 performAnimation();
                 onDoubleTap();
             }
@@ -99,18 +82,15 @@ const DoubleTapLikeComponent = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
 
         return (
             <View style={styles.container}>
-                {/* Children rendered first */}
                 {children}
 
-                {/* Tap detection layer - absolute overlay */}
                 <TouchableWithoutFeedback onPress={handlePress}>
                     <View style={styles.tapLayer} />
                 </TouchableWithoutFeedback>
 
-                {/* Heart Icon with Deep Shadow */}
                 <View style={styles.iconContainer} pointerEvents="none">
                     <Animated.View style={[styles.heartWrapper, animatedStyle]}>
-                        <LikeIcon width={100} height={100} color={HEART_COLOR} />
+                        <AnimatedLikeIcon width={100} height={100} color={HEART_COLOR} />
                     </Animated.View>
                 </View>
             </View>
@@ -128,8 +108,8 @@ const styles = StyleSheet.create({
     },
     tapLayer: {
         ...StyleSheet.absoluteFillObject,
-        zIndex: 5, // Below UI buttons but above video
-        bottom: 100, // Leave space for Seekbar (80px + margin)
+        zIndex: 5,
+        bottom: 100,
     },
     iconContainer: {
         ...StyleSheet.absoluteFillObject,
@@ -138,7 +118,6 @@ const styles = StyleSheet.create({
         zIndex: 999,
     },
     heartWrapper: {
-        // Deep Shadow (drop-shadow-2xl equivalent)
         shadowColor: '#000000',
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.5,

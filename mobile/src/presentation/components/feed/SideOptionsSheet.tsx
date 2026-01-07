@@ -11,7 +11,6 @@ import Animated, {
     withTiming,
     Easing
 } from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
 import SunIcon from '../../../../assets/icons/sun.svg';
 import { useBrightnessStore } from '../../store/useBrightnessStore';
 import { useThemeStore } from '../../store/useThemeStore';
@@ -45,9 +44,6 @@ const BrightnessSlider = ({
         setDisplayPercent(Math.round(val * 100)); // Also update display
     }, [onValueChange]);
 
-    const triggerHaptic = useCallback(() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }, []);
 
     const pan = Gesture.Pan()
         .onStart((e) => {
@@ -58,7 +54,6 @@ const BrightnessSlider = ({
                 progress.value = newProgress;
                 const newValue = 0.3 + (newProgress * 0.7);
                 runOnJS(syncToStore)(newValue);
-                runOnJS(triggerHaptic)();
             }
         })
         .onUpdate((e) => {
@@ -81,7 +76,6 @@ const BrightnessSlider = ({
                 progress.value = withTiming(newProgress, { duration: 100, easing: Easing.out(Easing.ease) });
                 const newValue = 0.3 + (newProgress * 0.7);
                 runOnJS(syncToStore)(newValue);
-                runOnJS(triggerHaptic)();
             }
         });
 
