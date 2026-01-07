@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import { useNotificationStore } from '../../src/presentation/store/useNotificationStore';
 import { COLORS } from '../../src/core/constants';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 // Import SVGs
 import HomeIcon from '../../assets/icons/home.svg';
@@ -16,14 +16,26 @@ import ProfileIcon from '../../assets/icons/profile.svg';
 // Notification Icon with Badge
 function NotificationTabIcon({ color }: { color: string }) {
     const unreadCount = useNotificationStore((state) => state.unreadCount);
+    const [showCount, setShowCount] = useState(true);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setShowCount(false);
+        }, 20000);
+        return () => clearTimeout(timer);
+    }, []);
+
     const displayCount = unreadCount > 9 ? '9+' : unreadCount.toString();
 
     return (
         <View style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}>
             <NotificationIcon width={28} height={28} color={color} />
             {unreadCount > 0 && (
-                <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{displayCount}</Text>
+                <View style={[
+                    styles.badge,
+                    !showCount && styles.badgeDot
+                ]}>
+                    {showCount && <Text style={styles.badgeText}>{displayCount}</Text>}
                 </View>
             )}
         </View>
@@ -115,6 +127,14 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         paddingHorizontal: 4,
+    },
+    badgeDot: {
+        minWidth: 8,
+        height: 8,
+        borderRadius: 4,
+        top: 10,
+        right: 12,
+        paddingHorizontal: 0,
     },
     badgeText: {
         color: '#FFFFFF',

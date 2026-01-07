@@ -299,9 +299,9 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255, 255, 255, 0.2)',
     },
     badge: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
+        width: 8,
+        height: 8,
+        borderRadius: 4,
         backgroundColor: '#FF3B30',
         position: 'absolute',
         top: 10,
