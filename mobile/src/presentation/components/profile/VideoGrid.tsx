@@ -19,6 +19,7 @@ interface VideoItem {
 interface VideoGridProps {
   videos: VideoItem[];
   isDark: boolean;
+  onPress?: (video: VideoItem, index: number) => void;
   onPreview?: (video: VideoItem) => void;
   onPreviewEnd?: () => void;
 }
@@ -26,6 +27,7 @@ interface VideoGridProps {
 export const VideoGrid: React.FC<VideoGridProps> = ({
   videos,
   isDark,
+  onPress,
   onPreview,
   onPreviewEnd,
 }) => {
@@ -55,6 +57,7 @@ export const VideoGrid: React.FC<VideoGridProps> = ({
             { marginBottom: GAP }, // Gap between rows
           ]}
           onLongPress={() => onPreview?.(video)}
+          onPress={() => onPress?.(video, index)}
           onPressOut={onPreviewEnd}
         >
           <Image

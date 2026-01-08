@@ -59,6 +59,8 @@ interface SupabaseVideo {
     commercial_type?: string;
     music_name?: string;
     music_author?: string;
+    media_urls?: any[];
+    post_type?: 'video' | 'carousel';
     profiles?: {
         username: string;
         full_name: string;
@@ -198,6 +200,45 @@ export class SupabaseVideoDataSource {
         return this.mapToVideo(data as SupabaseVideo);
     }
 
+    async getVideosByIds(videoIds: string[], userId?: string): Promise<Video[]> {
+        if (!videoIds.length) return [];
+
+        const { data, error } = await supabase
+            .from('videos')
+            .select('*, profiles(*)')
+            .in('id', videoIds)
+            .is('deleted_at', null);
+
+        if (error || !data) {
+            console.error('[DataSource] getVideosByIds error:', error);
+            return [];
+        }
+
+        const videos = data as SupabaseVideo[];
+
+        // If no user, just map without personalization
+        if (!userId) {
+            return videos.map(v => this.mapToVideo(v));
+        }
+
+        // Fetch interactions for these videos
+        const [likes, saves, follows] = await Promise.all([
+            supabase.from('likes').select('video_id').eq('user_id', userId).in('video_id', videoIds),
+            supabase.from('saves').select('video_id').eq('user_id', userId).in('video_id', videoIds),
+            supabase.from('follows').select('following_id').eq('follower_id', userId).in('following_id', videos.map(v => v.user_id))
+        ]);
+
+        const likedVideoIds = new Set(likes.data?.map(l => l.video_id) || []);
+        const savedVideoIds = new Set(saves.data?.map(s => s.video_id) || []);
+        const followedUserIds = new Set(follows.data?.map(f => f.following_id) || []);
+
+        return videos.map(v => this.mapToVideo(v, {
+            isLiked: likedVideoIds.has(v.id),
+            isSaved: savedVideoIds.has(v.id),
+            isFollowing: followedUserIds.has(v.user_id)
+        }));
+    }
+
     private mapToVideo(dto: SupabaseVideo, interactions?: { isLiked: boolean; isSaved: boolean; isFollowing: boolean }): Video {
         return {
             id: dto.id,
@@ -239,6 +280,8 @@ export class SupabaseVideoDataSource {
             brandName: dto.brand_name,
             brandUrl: dto.brand_url,
             commercialType: dto.commercial_type,
+            mediaUrls: dto.media_urls,
+            postType: dto.post_type,
         };
     }
 
@@ -271,6 +314,8 @@ export class SupabaseVideoDataSource {
             brandUrl: dto.brand_url,
             commercialType: dto.commercial_type,
             likesCount: dto.likes_count || 0,
+            mediaUrls: dto.media_urls,
+            postType: dto.post_type,
         };
     }
 }

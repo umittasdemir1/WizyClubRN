@@ -22,8 +22,10 @@ export class VideoRepositoryImpl implements IVideoRepository {
     }
 
     async getVideoById(videoId: string): Promise<Video | null> {
-        const videos = await this.dataSource.getVideos(1, 100);
-        const video = videos.find((v) => v.id === videoId);
-        return video || null;
+        return this.dataSource.getVideoById(videoId);
+    }
+
+    async getVideosByIds(videoIds: string[], userId?: string): Promise<Video[]> {
+        return this.dataSource.getVideosByIds(videoIds, userId);
     }
 }

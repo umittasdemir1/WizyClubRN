@@ -33,7 +33,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 interface UploadModalProps {
     isVisible: boolean;
     onClose: () => void;
-    initialVideo?: ImagePicker.ImagePickerAsset | null;
+    initialAssets?: ImagePicker.ImagePickerAsset[];
     uploadMode?: 'story' | 'video'; // 'story' = stories table, 'video' = videos/feed table
 }
 
@@ -50,11 +50,11 @@ const COMMERCIAL_TYPES = [
     'Kendi Markam'
 ];
 
-export function UploadModal({ isVisible, onClose, initialVideo, uploadMode = 'video' }: UploadModalProps) {
+export function UploadModal({ isVisible, onClose, initialAssets, uploadMode = 'video' }: UploadModalProps) {
     const { isDark } = useThemeStore();
     const { user } = useAuthStore();
     const insets = useSafeAreaInsets();
-    const [selectedMedia, setSelectedMedia] = useState<ImagePicker.ImagePickerAsset | null>(initialVideo || null);
+    const [selectedAssets, setSelectedAssets] = useState<ImagePicker.ImagePickerAsset[]>(initialAssets || []);
     const [description, setDescription] = useState('');
     const [tags, setTags] = useState<string[]>([]);
     const [selectedClubs, setSelectedClubs] = useState<string[]>([]);
@@ -77,12 +77,12 @@ export function UploadModal({ isVisible, onClose, initialVideo, uploadMode = 'vi
         }
     }, [isVisible, isDark]);
 
-    // Sync with initialVideo when it changes
+    // Sync with initialAssets when it changes
     useEffect(() => {
-        if (initialVideo) {
-            setSelectedMedia(initialVideo);
+        if (initialAssets && initialAssets.length > 0) {
+            setSelectedAssets(initialAssets);
         }
-    }, [initialVideo]);
+    }, [initialAssets]);
 
     const { startUpload, setProgress, setStatus, setSuccess, setError, setThumbnailUri } = useUploadStore();
     const { createDraft } = useDraftStore();
@@ -95,7 +95,7 @@ export function UploadModal({ isVisible, onClose, initialVideo, uploadMode = 'vi
     const inputBg = isDark ? '#1C1C1E' : '#F5F5F5';
 
     const handleSaveDraft = async () => {
-        if (!selectedMedia) {
+        if (selectedAssets.length === 0) {
             Alert.alert('Medya Seçilmedi', 'Taslak kaydetmek için bir fotoğraf veya video seçin.');
             return;
         }
@@ -108,22 +108,22 @@ export function UploadModal({ isVisible, onClose, initialVideo, uploadMode = 'vi
         try {
             await createDraft({
                 userId: user.id,
-                mediaUri: selectedMedia.uri,
-                mediaType: selectedMedia.type === 'video' ? 'video' : 'image',
-                thumbnailUri: selectedMedia.uri,
+                mediaUri: selectedAssets[0].uri,
+                mediaType: selectedAssets[0].type === 'video' ? 'video' : 'image',
+                thumbnailUri: selectedAssets[0].uri,
                 description,
-                commercialType,
+                commercialType: commercialType || undefined,
                 brandName,
                 brandUrl,
                 tags,
                 useAILabel,
-                uploadMode,
+                uploadMode: uploadMode as 'video' | 'story',
             });
 
             Alert.alert('Taslak Kaydedildi', 'Videonuz taslak olarak kaydedildi. Profil sayfanızdan erişebilirsiniz.');
 
             // Reset form
-            setSelectedMedia(null);
+            setSelectedAssets([]);
             setDescription('');
             setCommercialType(null);
             setBrandName('');
@@ -179,7 +179,7 @@ export function UploadModal({ isVisible, onClose, initialVideo, uploadMode = 'vi
     };
 
     const handleShare = async () => {
-        if (!selectedMedia) {
+        if (selectedAssets.length === 0) {
             Alert.alert('Medya Seçilmedi', 'Lütfen yüklemek için bir fotoğraf veya video seçin.');
             return;
         }
@@ -200,8 +200,8 @@ export function UploadModal({ isVisible, onClose, initialVideo, uploadMode = 'vi
         startUpload();
 
         // 🔥 Set thumbnail for header display during upload
-        if (selectedMedia?.uri) {
-            setThumbnailUri(selectedMedia.uri);
+        if (selectedAssets[0]?.uri) {
+            setThumbnailUri(selectedAssets[0].uri);
         }
 
         // 🔥 CRITICAL: Navigate back to Feed without reload - upload continues in background
@@ -218,22 +218,26 @@ export function UploadModal({ isVisible, onClose, initialVideo, uploadMode = 'vi
             if (brandUrl) formData.append('brandUrl', brandUrl);
         }
 
-        // IMPORTANT: File must be appended LAST for Multer to process body fields first!
-        const isVideo = selectedMedia.type === 'video';
-        const fileExtension = isVideo ? 'mp4' : 'jpg';
-        const mimeType = isVideo ? 'video/mp4' : 'image/jpeg';
+        // Append all assets
+        selectedAssets.forEach((asset, index) => {
+            const isVideo = asset.type === 'video';
+            const fileExtension = isVideo ? 'mp4' : 'jpg';
+            const mimeType = isVideo ? 'video/mp4' : 'image/jpeg';
 
-        formData.append('video', {
-            uri: selectedMedia.uri,
-            type: mimeType,
-            name: `upload.${fileExtension}`,
-        } as any);
+            formData.append('video', {
+                uri: asset.uri,
+                type: mimeType,
+                name: `upload_${index}.${fileExtension}`,
+            } as any);
+        });
 
         try {
             const xhr = new XMLHttpRequest();
             // 🔥 CONDITIONAL: Story goes to /upload-story, Video goes to /upload-hls
             const endpoint = uploadMode === 'story' ? '/upload-story' : '/upload-hls';
-            xhr.open('POST', `${CONFIG.API_URL}${endpoint}`);
+            const uploadUrl = `${CONFIG.API_URL}${endpoint}`;
+            console.log('🚀 [UPLOAD] Target URL:', uploadUrl);
+            xhr.open('POST', uploadUrl);
 
             // 🔥 SIMPLE: Linear progress from 0 to 95, then 100 on success
             let currentProgress = 0;
@@ -268,13 +272,13 @@ export function UploadModal({ isVisible, onClose, initialVideo, uploadMode = 'vi
                                 // 🔥 For stories, don't pass ID (avoids video fetch error in feed)
                                 // For videos, pass ID so feed can prepend the new video
                                 setSuccess(uploadMode === 'story' ? '' : (response.data?.id || 'new-video'));
-                                
+
                                 if (uploadMode === 'story') {
                                     triggerStoryRefresh(); // 🔥 REFRESH STORIES
                                 }
 
                                 // Reset form
-                                setSelectedMedia(null);
+                                setSelectedAssets([]);
                                 setDescription('');
                                 setCommercialType(null);
                                 setBrandName('');
@@ -294,10 +298,11 @@ export function UploadModal({ isVisible, onClose, initialVideo, uploadMode = 'vi
                 }
             };
 
-            xhr.onerror = () => {
+            xhr.onerror = (e) => {
                 clearInterval(progressInterval);
-                console.error('Upload error');
-                setError('Ağ hatası oluştu.');
+                console.error('❌ [UPLOAD] Network Error Details:', e);
+                console.error('❌ [UPLOAD] XHR Status:', xhr.status);
+                setError('Ağ hatası oluştu. Sunucuya ulaşılamıyor.');
                 setStatus('error');
             };
 
@@ -339,30 +344,42 @@ export function UploadModal({ isVisible, onClose, initialVideo, uploadMode = 'vi
                     </View>
 
                     <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-                        {/* Video/Photo Preview */}
-                        {selectedMedia && (
+                        {/* Multi-Media Preview */}
+                        {selectedAssets.length > 0 && (
                             <View style={styles.previewSection}>
-                                <View style={styles.previewContainer}>
-                                    {selectedMedia.type === 'video' ? (
-                                        <Video
-                                            source={{ uri: selectedMedia.uri }}
-                                            style={styles.previewImage}
-                                            resizeMode={ResizeMode.COVER}
-                                            shouldPlay={false}
-                                            isLooping={false}
-                                            isMuted={true}
-                                            useNativeControls={false}
-                                        />
-                                    ) : (
-                                        <Image
-                                            source={{ uri: selectedMedia.uri }}
-                                            style={styles.previewImage}
-                                            resizeMode="cover"
-                                        />
-                                    )}
-                                    <Pressable style={styles.coverEditButton} onPress={handleCoverEdit}>
-                                        <Text style={styles.coverEditText}>Kapağı düzenle</Text>
-                                    </Pressable>
+                                <ScrollView
+                                    horizontal
+                                    showsHorizontalScrollIndicator={false}
+                                    pagingEnabled
+                                    style={styles.previewScroll}
+                                    contentContainerStyle={styles.previewScrollContent}
+                                >
+                                    {selectedAssets.map((asset, index) => (
+                                        <View key={index} style={styles.previewContainer}>
+                                            {asset.type === 'video' ? (
+                                                <Video
+                                                    source={{ uri: asset.uri }}
+                                                    style={styles.previewImage}
+                                                    resizeMode={ResizeMode.COVER}
+                                                    shouldPlay={false}
+                                                    isLooping={false}
+                                                    isMuted={true}
+                                                    useNativeControls={false}
+                                                />
+                                            ) : (
+                                                <Image
+                                                    source={{ uri: asset.uri }}
+                                                    style={styles.previewImage}
+                                                    resizeMode="cover"
+                                                />
+                                            )}
+                                        </View>
+                                    ))}
+                                </ScrollView>
+                                <View style={styles.carouselIndicator}>
+                                    <Text style={styles.carouselIndicatorText}>
+                                        {selectedAssets.length} Parça
+                                    </Text>
                                 </View>
                             </View>
                         )}
@@ -611,6 +628,26 @@ export function UploadModal({ isVisible, onClose, initialVideo, uploadMode = 'vi
 }
 
 const styles = StyleSheet.create({
+    previewScroll: {
+        width: SCREEN_WIDTH,
+        flexGrow: 0,
+    },
+    previewScrollContent: {
+        paddingHorizontal: (SCREEN_WIDTH - (SCREEN_WIDTH * 0.5)) / 2,
+        alignItems: 'center',
+    },
+    carouselIndicator: {
+        marginTop: 12,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    carouselIndicatorText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '600',
+    },
     container: {
         flex: 1,
     },

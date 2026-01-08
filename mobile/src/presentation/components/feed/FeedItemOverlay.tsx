@@ -157,6 +157,7 @@ export const FeedItemOverlay = memo(function FeedItemOverlay({
                 )}
 
                 <ActionButtons
+                    videoId={video.id}
                     isLiked={video.isLiked}
                     likesCount={video.likesCount}
                     isSaved={video.isSaved}

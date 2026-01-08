@@ -22,6 +22,7 @@ interface PostItem {
 interface PostsGridProps {
   posts: PostItem[];
   isDark: boolean;
+  onPress?: (post: PostItem, index: number) => void;
   onPreview?: (post: PostItem) => void;
   onPreviewEnd?: () => void;
   showDraftsFolder?: boolean;
@@ -33,6 +34,7 @@ export const PostsGrid: React.FC<PostsGridProps> = ({
   posts,
   isDark,
   onPreview,
+  onPress,
   onPreviewEnd,
   showDraftsFolder = false,
   drafts = [],
@@ -79,6 +81,7 @@ export const PostsGrid: React.FC<PostsGridProps> = ({
               { marginBottom: GAP }, // Gap between rows
             ]}
             onLongPress={() => onPreview?.(post)}
+            onPress={() => onPress?.(post, index)}
             onPressOut={onPreviewEnd}
           >
             <Image

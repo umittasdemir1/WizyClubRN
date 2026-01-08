@@ -31,7 +31,7 @@ export default function CameraScreen() {
 
     // Upload Modal state
     const [showUploadModal, setShowUploadModal] = useState(false);
-    const [selectedVideoForUpload, setSelectedVideoForUpload] = useState<ImagePicker.ImagePickerAsset | null>(null);
+    const [selectedAssetsForUpload, setSelectedAssetsForUpload] = useState<ImagePicker.ImagePickerAsset[]>([]);
 
     // Recording state
     const [isRecording, setIsRecording] = useState(false);
@@ -81,14 +81,14 @@ export default function CameraScreen() {
 
     const openGallery = async () => {
         const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.All, // Support both photos and videos
-            allowsEditing: true,
+            mediaTypes: ImagePicker.MediaTypeOptions.All,
+            allowsMultipleSelection: true,
+            selectionLimit: 10,
             quality: 1,
         });
 
         if (!result.canceled) {
-            // Pass selected media to upload modal
-            setSelectedVideoForUpload(result.assets[0]);
+            setSelectedAssetsForUpload(result.assets);
             setShowUploadModal(true);
         }
     };
@@ -112,7 +112,7 @@ export default function CameraScreen() {
                     exif: null,
                     mimeType: 'image/jpeg'
                 };
-                setSelectedVideoForUpload(photoAsset);
+                setSelectedAssetsForUpload([photoAsset]);
                 setShowUploadModal(true);
             } catch (error) {
                 console.error('Error taking picture:', error);
@@ -151,7 +151,7 @@ export default function CameraScreen() {
                     exif: null,
                     mimeType: 'video/mp4'
                 };
-                setSelectedVideoForUpload(videoAsset);
+                setSelectedAssetsForUpload([videoAsset]);
                 setShowUploadModal(true);
                 setIsRecording(false);
             } catch (error) {
@@ -260,9 +260,9 @@ export default function CameraScreen() {
                 isVisible={showUploadModal}
                 onClose={() => {
                     setShowUploadModal(false);
-                    setSelectedVideoForUpload(null);
+                    setSelectedAssetsForUpload([]);
                 }}
-                initialVideo={selectedVideoForUpload}
+                initialAssets={selectedAssetsForUpload}
                 uploadMode={selectedMode === 'HİKAYE' ? 'story' : 'video'}
             />
         </View>

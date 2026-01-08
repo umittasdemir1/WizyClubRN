@@ -24,4 +24,11 @@ export interface Video {
     commercialType?: string | null;
     width?: number;
     height?: number;
+    createdAt?: string;
+    mediaUrls?: {
+        url: string;
+        type: 'video' | 'image';
+        thumbnail?: string;
+    }[];
+    postType?: 'video' | 'carousel';
 }

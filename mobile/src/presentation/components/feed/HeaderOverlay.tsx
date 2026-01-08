@@ -10,7 +10,7 @@ import Animated, {
     Easing,
     cancelAnimation,
 } from 'react-native-reanimated';
-import { Plus, Loader, Trash2, Volume2, VolumeX } from 'lucide-react-native';
+import { Plus, Loader, Trash2, Volume2, VolumeX, ChevronLeft } from 'lucide-react-native';
 import { useBrightnessStore } from '../../store/useBrightnessStore';
 import { useUploadStore } from '../../store/useUploadStore';
 
@@ -122,6 +122,8 @@ interface HeaderOverlayProps {
     showBrightnessButton?: boolean;
     activeTab?: 'stories' | 'foryou';
     onTabChange?: (tab: 'stories' | 'foryou') => void;
+    showBack?: boolean;
+    onBack?: () => void;
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -136,6 +138,8 @@ export function HeaderOverlay({
     showBrightnessButton = true,
     activeTab = 'foryou',
     onTabChange,
+    showBack = false,
+    onBack,
 }: HeaderOverlayProps) {
     const insets = useSafeAreaInsets();
     const pulseOpacity = useSharedValue(1);
@@ -169,7 +173,17 @@ export function HeaderOverlay({
         >
             {/* Left Column: Upload & Thumbnail */}
             <View style={styles.leftColumn}>
-                {onUploadPress && <UploadButton onPress={onUploadPress} />}
+                {showBack ? (
+                    <Pressable
+                        style={styles.iconButton}
+                        onPress={onBack}
+                        hitSlop={12}
+                    >
+                        <ChevronLeft width={28} height={28} color="#FFFFFF" />
+                    </Pressable>
+                ) : (
+                    onUploadPress && <UploadButton onPress={onUploadPress} />
+                )}
                 <UploadThumbnail />
             </View>
 

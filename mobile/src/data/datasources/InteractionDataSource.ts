@@ -5,43 +5,86 @@ export class InteractionDataSource {
         const column = targetType === 'video' ? 'video_id' : 'story_id';
 
         // Önce beğeni var mı kontrol et
-        const { data: existing } = await supabase
+        const { data: existing, error } = await supabase
             .from('likes')
             .select('id')
             .eq('user_id', userId)
             .eq(column, targetId)
-            .single();
+            .maybeSingle();
+
+        if (error) {
+            console.error('[InteractionDataSource] toggleLike check error:', error);
+            throw error;
+        }
 
         if (existing) {
             // Varsa sil (unlike)
-            await supabase.from('likes').delete().eq('id', existing.id);
+            await supabase
+                .from('likes')
+                .delete()
+                .eq('user_id', userId)
+                .eq(column, targetId);
             return false;
         } else {
             // Yoksa ekle (like)
-            await supabase.from('likes').insert({
-                user_id: userId,
-                [column]: targetId
-            });
+            const { error: insertError } = await supabase
+                .from('likes')
+                .insert({
+                    user_id: userId,
+                    [column]: targetId
+                });
+
+            if (insertError) {
+                if (insertError.code === '23505') return true;
+                throw insertError;
+            }
             return true;
         }
     }
 
     async toggleSave(userId: string, videoId: string): Promise<boolean> {
-        const { data: existing } = await supabase
+        // Kontrol et
+        const { data: existing, error } = await supabase
             .from('saves')
             .select('id')
             .eq('user_id', userId)
             .eq('video_id', videoId)
-            .single();
+            .maybeSingle();
+
+        if (error) {
+            console.error('[InteractionDataSource] toggleSave check error:', error);
+            throw error;
+        }
 
         if (existing) {
-            await supabase.from('saves').delete().eq('id', existing.id);
+            // Varsa sil
+            const { error: deleteError } = await supabase
+                .from('saves')
+                .delete()
+                .eq('user_id', userId)
+                .eq('video_id', videoId);
+
+            if (deleteError) {
+                console.error('[InteractionDataSource] toggleSave delete error:', deleteError);
+                throw deleteError;
+            }
             return false;
         } else {
-            await supabase.from('saves').insert({
-                user_id: userId,
-                video_id: videoId
-            });
+            // Yoksa ekle
+            const { error: insertError } = await supabase
+                .from('saves')
+                .insert({
+                    user_id: userId,
+                    video_id: videoId
+                });
+
+            if (insertError) {
+                // If it already exists (race condition), just return false (as if it was already there)
+                if (insertError.code === '23505') return true;
+
+                console.error('[InteractionDataSource] toggleSave insert error:', insertError);
+                throw insertError;
+            }
             return true;
         }
     }

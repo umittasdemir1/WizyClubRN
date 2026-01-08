@@ -17,4 +17,10 @@ export interface Story {
     likesCount?: number;
     isLiked?: boolean;
     isSaved?: boolean;
+    mediaUrls?: {
+        url: string;
+        type: 'video' | 'image';
+        thumbnail?: string;
+    }[];
+    postType?: 'video' | 'carousel';
 }

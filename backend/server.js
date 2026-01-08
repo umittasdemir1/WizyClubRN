@@ -81,206 +81,151 @@ function setUploadProgress(id, stage, percent) {
     console.log(`📊 [PROGRESS] ${id}: ${stage} - ${percent}%`);
 }
 
-// Endpoint: HLS Video Upload
-app.post('/upload-hls', upload.single('video'), async (req, res) => {
-    const file = req.file;
+// Endpoint: HLS Video Upload (Supports Carousels)
+app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
+    const files = req.files;
     const { userId, description, brandName, brandUrl, commercialType } = req.body;
 
-    if (!file) {
-        return res.status(400).json({ error: 'No video file provided' });
+    if (!files || files.length === 0) {
+        return res.status(400).json({ error: 'No files provided' });
     }
 
     // Determine is_commercial flag
     // 'İş Birliği İçermiyor' means is_commercial = false
     const isCommercial = commercialType && commercialType !== 'İş Birliği İçermiyor';
 
-    const inputPath = file.path;
-    const uniqueId = uuidv4(); // Professional UUID instead of timestamp
+    const uniqueId = uuidv4();
     const tempOutputDir = path.join(__dirname, 'temp_uploads');
+    const isCarousel = files.length > 1 || files[0].mimetype.startsWith('image/');
 
-    // Professional Content Routing (media/{userId}/videos/{videoId}/...)
-    const baseKey = `media/${userId || 'test-user'}/videos/${uniqueId}`;
-    const thumbFileName = `${baseKey}/thumb.jpg`;
-    const processedThumbPath = path.join(tempOutputDir, `thumb_${uniqueId}.jpg`);
-
-    console.log(`\n🎬 [HLS] --- NEW UPLOAD START ---`);
-    console.log(`🎬 [HLS] File: ${file.originalname}`);
-    console.log(`🎬 [HLS] ID: ${uniqueId}`);
-    console.log(`🎬 [HLS] UserID: ${userId}`);
-    console.log(`🎬 [HLS] Description: ${description}`);
-
-    // Early response to client (Optimistic UI)? 
-    // No, let's keep it sync for the MVP to ensure success, 
-    // but in prod this should be a background job.
+    console.log(`\n🎬 [UPLOAD] --- NEW UPLOAD START ---`);
+    console.log(`🎬 [UPLOAD] Count: ${files.length}, Type: ${isCarousel ? 'carousel' : 'video'}`);
+    console.log(`🎬 [UPLOAD] ID: ${uniqueId}`);
+    console.log(`🎬 [UPLOAD] UserID: ${userId}`);
 
     try {
-        setUploadProgress(uniqueId, 'analyzing', 5);
-        // Step 0: Extract Metadata (Width/Height)
-        const metadata = await new Promise((resolve, reject) => {
-            ffmpeg(inputPath).ffprobe((err, data) => {
-                if (err) reject(err);
-                else resolve(data);
-            });
-        });
+        const mediaUrls = [];
+        let firstThumbUrl = '';
+        let firstSpriteUrl = '';
+        let finalWidth = 0;
+        let finalHeight = 0;
 
-        const videoStream = metadata.streams.find(s => s.codec_type === 'video');
-        let width = videoStream ? videoStream.width : 0;
-        let height = videoStream ? videoStream.height : 0;
-        const duration = parseFloat(metadata.format.duration || 0);
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const isVideo = file.mimetype.startsWith('video/');
+            const indexLabel = files.length > 1 ? `_${i}` : '';
+            const baseKey = `media/${userId || 'test-user'}/posts/${uniqueId}${indexLabel}`;
+            const inputPath = file.path;
 
-        // Check for rotation (Portrait video filmed as landscape)
-        const rotation = videoStream.tags && videoStream.tags.rotate ? parseInt(videoStream.tags.rotate, 10) : 0;
-        if (Math.abs(rotation) === 90 || Math.abs(rotation) === 270) {
-            console.log(`🔄 [METADATA] Rotation detected (${rotation}°). Swapping dimensions.`);
-            [width, height] = [height, width];
-        }
+            setUploadProgress(uniqueId, `item_${i}`, 10 + Math.floor((i / files.length) * 80));
 
-        console.log(`📏 [METADATA] Dimensions: ${width}x${height}`);
-        setUploadProgress(uniqueId, 'thumbnail', 15);
+            if (isVideo) {
+                const metadata = await new Promise((resolve, reject) => {
+                    ffmpeg(inputPath).ffprobe((err, data) => {
+                        if (err) reject(err);
+                        else resolve(data);
+                    });
+                });
 
-        const hasAudio = metadata.streams.some(s => s.codec_type === 'audio'); // Check if audio stream exists
-
-        // Step 1: Generate Thumbnail (Still needed for cover)
-        await new Promise((resolve, reject) => {
-            ffmpeg(inputPath)
-                .outputOptions(['-q:v 2']) // Highest JPEG quality
-                .screenshots({
-                    count: 1,
-                    filename: `thumb_${uniqueId}.jpg`,
-                    folder: 'temp_uploads',
-                    size: '1080x?' // Increased resolution
-                })
-                .on('end', resolve)
-                .on('error', reject);
-        });
-
-        // Upload Thumbnail
-        const thumbUrl = await uploadToR2(processedThumbPath, thumbFileName, 'image/jpeg');
-        setUploadProgress(uniqueId, 'video', 25);
-
-        // FEATURE FLAG: Hybrid Engine Switch
-        // true = HLS (Adaptive, Multi-bitrate) | false = MP4 (Direct, High Quality, Fast)
-        const ENABLE_HLS = false;
-
-        console.log(`🚀 [UPLOAD] Mode: ${ENABLE_HLS ? 'HLS (Adaptive)' : 'MP4 (Direct)'}`);
-
-        let videoUrl;
-
-        if (ENABLE_HLS) {
-            // Option A: HLS Transcoding
-            videoUrl = await hlsService.transcodeToHls(inputPath, tempOutputDir, uniqueId, baseKey, hasAudio, width, height);
-            console.log(`🔗 [VIDEO URL] Generated HLS URL: ${videoUrl}`);
-        } else {
-            // Option B: Smart Optimized MP4 (CRF 26, TikTok-style compression)
-            console.log('⚡ [MP4] Smart Optimization Starting...');
-            console.log(`   📂 Input: ${inputPath}`);
-            console.log(`   📐 Original Dimensions: ${width}x${height}`);
-            const optimizedPath = path.join(tempOutputDir, `optimized_${uniqueId}.mp4`);
-            console.log(`   📂 Output: ${optimizedPath}`);
-
-            // Smart Scaling: Only downscale if video is larger than 1080p width
-            const shouldScale = width > 1080;
-            console.log(`   🎯 Scaling: ${shouldScale ? 'YES (downscale to 1080p)' : 'NO (keep original size)'}`);
-
-            await new Promise((resolve, reject) => {
-                let cmd = ffmpeg(inputPath)
-                    .videoCodec('libx264');
-
-                // Only apply scaling if needed (prevents upscaling small videos)
-                if (shouldScale) {
-                    cmd = cmd.size('1080x?');
+                const videoStream = metadata.streams.find(s => s.codec_type === 'video');
+                let width = videoStream ? videoStream.width : 0;
+                let height = videoStream ? videoStream.height : 0;
+                const duration = parseFloat(metadata.format.duration || 0);
+                const rotation = videoStream.tags && videoStream.tags.rotate ? parseInt(videoStream.tags.rotate, 10) : 0;
+                if (Math.abs(rotation) === 90 || Math.abs(rotation) === 270) {
+                    [width, height] = [height, width];
                 }
 
-                cmd.outputOptions([
-                    '-crf 26',           // TikTok-style compression (smaller files, good quality)
-                    '-preset veryfast',  // Fast encoding
-                    '-movflags +faststart', // Move atom to front for instant playback
-                    '-pix_fmt yuv420p',  // Ensure compatibility
-                    '-maxrate 3M',       // Lower max bitrate for mobile-optimized delivery
-                    '-bufsize 6M'
-                ])
-                    .on('start', (cmdLine) => console.log('   👉 FFmpeg Command:', cmdLine))
-                    .on('end', () => {
-                        console.log('   ✅ Optimization Complete.');
-                        resolve();
-                    })
-                    .on('error', (err) => {
-                        console.error('   ❌ Optimization Failed:', err);
-                        reject(err);
-                    })
-                    .save(optimizedPath);
-            });
+                if (i === 0) {
+                    finalWidth = width;
+                    finalHeight = height;
+                }
 
-            // Compare Sizes
-            const originalStats = fs.statSync(inputPath);
-            const optimizedStats = fs.statSync(optimizedPath);
-            console.log(`   📉 Size: ${(originalStats.size / 1024 / 1024).toFixed(2)}MB -> ${(optimizedStats.size / 1024 / 1024).toFixed(2)}MB`);
+                const processedThumbPath = path.join(tempOutputDir, `thumb_${uniqueId}_${i}.jpg`);
+                await new Promise((resolve, reject) => {
+                    ffmpeg(inputPath)
+                        .outputOptions(['-q:v 2'])
+                        .screenshots({
+                            count: 1,
+                            filename: `thumb_${uniqueId}_${i}.jpg`,
+                            folder: tempOutputDir,
+                            size: '1080x?'
+                        })
+                        .on('end', resolve)
+                        .on('error', reject);
+                });
 
-            const mp4Key = `${baseKey}/master.mp4`;
-            console.log(`🚀 [R2] Uploading MP4 to: ${mp4Key}...`);
-            await uploadToR2(optimizedPath, mp4Key, 'video/mp4');
-            videoUrl = `${process.env.R2_PUBLIC_URL}/${mp4Key}`;
-            console.log(`🔗 [VIDEO URL] Optimized MP4 URL: ${videoUrl}`);
+                const thumbUrl = await uploadToR2(processedThumbPath, `${baseKey}/thumb.jpg`, 'image/jpeg');
+                if (i === 0) firstThumbUrl = thumbUrl;
 
-            // Cleanup optimized file
-            if (fs.existsSync(optimizedPath)) fs.unlinkSync(optimizedPath);
+                const optimizedPath = path.join(tempOutputDir, `optimized_${uniqueId}_${i}.mp4`);
+                await new Promise((resolve, reject) => {
+                    ffmpeg(inputPath)
+                        .videoCodec('libx264')
+                        .size(width > 1080 ? '1080x?' : `${width}x${height}`)
+                        .outputOptions(['-crf 26', '-preset veryfast', '-movflags +faststart', '-pix_fmt yuv420p'])
+                        .on('end', resolve)
+                        .on('error', reject)
+                        .save(optimizedPath);
+                });
+
+                const videoUrl = await uploadToR2(optimizedPath, `${baseKey}/master.mp4`, 'video/mp4');
+
+                let spriteUrl = '';
+                if (i === 0) {
+                    spriteUrl = await hlsService.generateSpriteSheet(inputPath, tempOutputDir, uniqueId, baseKey, duration);
+                    firstSpriteUrl = spriteUrl;
+                }
+
+                mediaUrls.push({ url: videoUrl, type: 'video', thumbnail: thumbUrl, sprite: spriteUrl });
+
+                if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+                if (fs.existsSync(processedThumbPath)) fs.unlinkSync(processedThumbPath);
+                if (fs.existsSync(optimizedPath)) fs.unlinkSync(optimizedPath);
+            } else {
+                const imageKey = `${baseKey}/image.jpg`;
+                const imageUrl = await uploadToR2(inputPath, imageKey, file.mimetype);
+
+                if (i === 0) {
+                    firstThumbUrl = imageUrl;
+                    finalWidth = 1080;
+                    finalHeight = 1920;
+                }
+
+                mediaUrls.push({ url: imageUrl, type: 'image' });
+                if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+            }
         }
-        setUploadProgress(uniqueId, 'sprite', 70);
 
-        // Step 2.5: Generate Sprite Sheet (2s intervals)
-        console.log(`🖼️ [SPRITE] Generating sprite sheet for ${duration}s video...`);
-        const spriteUrl = await hlsService.generateSpriteSheet(inputPath, tempOutputDir, uniqueId, baseKey, duration);
-        console.log(`🖼️ [SPRITE] Generated sprite URL: ${spriteUrl}`);
-        setUploadProgress(uniqueId, 'saving', 85);
-
-        // Step 3: Save metadata to Supabase
         const { data, error } = await supabase
             .from('videos')
             .insert({
                 user_id: userId || 'test-user',
-                video_url: videoUrl,
-                thumbnail_url: thumbUrl,
-                sprite_url: spriteUrl,
+                video_url: mediaUrls[0].url,
+                thumbnail_url: firstThumbUrl,
+                sprite_url: firstSpriteUrl,
+                media_urls: mediaUrls,
+                post_type: isCarousel ? 'carousel' : 'video',
                 description: description || '',
                 brand_name: brandName || null,
                 brand_url: brandUrl || null,
                 commercial_type: commercialType || null,
                 is_commercial: isCommercial,
-                width: width,
-                height: height,
-                likes_count: 0,
-                views_count: 0,
+                width: finalWidth,
+                height: finalHeight,
                 processing_status: 'completed'
             })
             .select();
 
         if (error) throw error;
 
-        console.log('🎉 [HLS] Upload & Processing successful!');
         setUploadProgress(uniqueId, 'done', 100);
-
-        res.json({
-            success: true,
-            message: 'Video uploaded and transcoded to HLS',
-            data: data[0]
-        });
-
-        // Cleanup
-        if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
-        if (fs.existsSync(processedThumbPath)) fs.unlinkSync(processedThumbPath);
-
-        // Cleanup HLS folder
-        const hlsFolder = path.join(tempOutputDir, uniqueId);
-        if (fs.existsSync(hlsFolder)) {
-            fs.rmSync(hlsFolder, { recursive: true, force: true });
-        }
+        res.json({ success: true, data: data[0] });
 
     } catch (error) {
-        console.error('❌ [HLS] Error:', error);
+        console.error('❌ [UPLOAD] Error:', error);
         res.status(500).json({ error: error.message });
-
-        // Basic cleanup
-        if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+        if (files) files.forEach(f => { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); });
     }
 });
 
@@ -288,89 +233,101 @@ app.post('/upload-hls', upload.single('video'), async (req, res) => {
 // ============================================
 // Endpoint: STORY Upload (Simple, no HLS)
 // ============================================
-app.post('/upload-story', upload.single('video'), async (req, res) => {
-    const file = req.file;
+// Endpoint: STORY Upload (Supports Carousels)
+app.post('/upload-story', upload.array('video', 10), async (req, res) => {
+    const files = req.files;
     const { userId, description, brandName, brandUrl, commercialType } = req.body;
 
-    if (!file) {
-        return res.status(400).json({ error: 'No file uploaded' });
+    if (!files || files.length === 0) {
+        return res.status(400).json({ error: 'No files provided' });
     }
 
     if (!userId) {
         return res.status(400).json({ error: 'User ID is required' });
     }
 
-    const uniqueId = Date.now().toString() + '_' + Math.random().toString(36).substr(2, 9);
-    const inputPath = file.path;
-    const isVideo = file.mimetype.startsWith('video/');
-    const fileExtension = isVideo ? 'mp4' : 'jpg';
-    const baseKey = `stories/${userId}/${uniqueId}`;
+    const uniqueId = uuidv4();
+    const tempOutputDir = path.join(__dirname, 'temp_uploads');
+    const isCarousel = files.length > 1 || files[0].mimetype.startsWith('image/');
 
-    console.log(`📖 [STORY] Upload started: ${uniqueId}`);
-    console.log(`📖 [STORY] User: ${userId}, Type: ${isVideo ? 'video' : 'image'}`);
+    console.log(`📖 [STORY] Upload started: ${uniqueId}, Count: ${files.length}`);
 
     try {
-        let storyUrl = '';
-        let thumbnailUrl = '';
-        let width = 0;
-        let height = 0;
+        const mediaUrls = [];
+        let firstThumbUrl = '';
+        let finalWidth = 1080;
+        let finalHeight = 1920;
 
-        if (isVideo) {
-            // Get video metadata
-            const metadata = await new Promise((resolve, reject) => {
-                ffmpeg(inputPath).ffprobe((err, data) => {
-                    if (err) reject(err);
-                    else resolve(data);
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const isVideo = file.mimetype.startsWith('video/');
+            const indexLabel = files.length > 1 ? `_${i}` : '';
+            const baseKey = `media/${userId}/stories/${uniqueId}${indexLabel}`;
+            const inputPath = file.path;
+
+            if (isVideo) {
+                const metadata = await new Promise((resolve, reject) => {
+                    ffmpeg(inputPath).ffprobe((err, data) => {
+                        if (err) reject(err);
+                        else resolve(data);
+                    });
                 });
-            });
 
-            const videoStream = metadata.streams.find(s => s.codec_type === 'video');
-            width = videoStream?.width || 1080;
-            height = videoStream?.height || 1920;
+                const videoStream = metadata.streams.find(s => s.codec_type === 'video');
+                let width = videoStream?.width || 1080;
+                let height = videoStream?.height || 1920;
 
-            // Upload original video to R2 (no transcoding for stories)
-            const videoKey = `${baseKey}/story.${fileExtension}`;
-            await uploadToR2(inputPath, videoKey, file.mimetype);
-            storyUrl = `${process.env.R2_PUBLIC_URL}/${videoKey}`;
+                const videoKey = `${baseKey}/story.mp4`;
+                await uploadToR2(inputPath, videoKey, file.mimetype);
+                const storyUrl = `${process.env.R2_PUBLIC_URL}/${videoKey}`;
 
-            // Generate thumbnail
-            const thumbPath = path.join(os.tmpdir(), `${uniqueId}_thumb.jpg`);
-            await new Promise((resolve, reject) => {
-                ffmpeg(inputPath)
-                    .screenshots({
-                        count: 1,
-                        folder: os.tmpdir(),
-                        filename: `${uniqueId}_thumb.jpg`,
-                        size: '?x480'
-                    })
-                    .on('end', resolve)
-                    .on('error', reject);
-            });
+                // Process Thumb
+                const thumbPath = path.join(os.tmpdir(), `${uniqueId}_${i}_thumb.jpg`);
+                await new Promise((resolve, reject) => {
+                    ffmpeg(inputPath)
+                        .screenshots({
+                            count: 1,
+                            folder: os.tmpdir(),
+                            filename: `${uniqueId}_${i}_thumb.jpg`,
+                            size: '?x480'
+                        })
+                        .on('end', resolve)
+                        .on('error', reject);
+                });
 
-            const thumbKey = `${baseKey}/thumb.jpg`;
-            await uploadToR2(thumbPath, thumbKey, 'image/jpeg');
-            thumbnailUrl = `${process.env.R2_PUBLIC_URL}/${thumbKey}`;
+                const thumbKey = `${baseKey}/thumb.jpg`;
+                const thumbnailUrl = await uploadToR2(thumbPath, thumbKey, 'image/jpeg');
 
-            // Cleanup temp thumb
-            if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
-        } else {
-            // Image story - upload directly
-            const imageKey = `${baseKey}/story.jpg`;
-            await uploadToR2(inputPath, imageKey, file.mimetype);
-            storyUrl = `${process.env.R2_PUBLIC_URL}/${imageKey}`;
-            thumbnailUrl = storyUrl; // Same as image for photos
+                if (i === 0) {
+                    firstThumbUrl = thumbnailUrl;
+                    finalWidth = width;
+                    finalHeight = height;
+                }
+
+                mediaUrls.push({ url: storyUrl, type: 'video', thumbnail: thumbnailUrl });
+                if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
+                if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+            } else {
+                const imageKey = `${baseKey}/story.jpg`;
+                const imageUrl = await uploadToR2(inputPath, imageKey, file.mimetype);
+
+                if (i === 0) firstThumbUrl = imageUrl;
+                mediaUrls.push({ url: imageUrl, type: 'image' });
+                if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+            }
         }
 
-        // Insert into stories table
         const isCommercial = commercialType && commercialType !== 'İş Birliği İçermiyor';
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
         const { data, error } = await supabase.from('stories').insert({
             user_id: userId,
-            video_url: storyUrl,
-            thumbnail_url: thumbnailUrl,
-            width,
-            height,
+            video_url: mediaUrls[0].url,
+            thumbnail_url: firstThumbUrl,
+            media_urls: mediaUrls,
+            post_type: isCarousel ? 'carousel' : 'video',
+            width: finalWidth,
+            height: finalHeight,
             is_commercial: isCommercial,
             brand_name: brandName || null,
             brand_url: brandUrl || null,
@@ -378,28 +335,14 @@ app.post('/upload-story', upload.single('video'), async (req, res) => {
             expires_at: expiresAt.toISOString()
         }).select();
 
-        if (error) {
-            console.error('❌ [STORY] Supabase error:', error);
-            return res.status(500).json({ error: error.message });
-        }
+        if (error) throw error;
 
-        console.log('🎉 [STORY] Upload successful!', data[0]?.id);
-
-        res.json({
-            success: true,
-            message: 'Story uploaded successfully',
-            data: data[0]
-        });
-
-        // Cleanup input file
-        if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+        res.json({ success: true, data: data[0] });
 
     } catch (error) {
         console.error('❌ [STORY] Error:', error);
         res.status(500).json({ error: error.message });
-
-        // Cleanup
-        if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+        if (files) files.forEach(f => { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); });
     }
 });
 

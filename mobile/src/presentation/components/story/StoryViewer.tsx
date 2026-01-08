@@ -1,5 +1,6 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { View, StyleSheet, Dimensions, Pressable, ImageBackground } from 'react-native';
+import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
 import Video from 'react-native-video';
 import { useSharedValue, withTiming, Easing, cancelAnimation, runOnJS, useAnimatedReaction } from 'react-native-reanimated';
@@ -41,6 +42,28 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
     const [isLiked, setIsLiked] = useState(stories[initialIndex]?.isLiked || false);
     const [flyingEmojis, setFlyingEmojis] = useState<FlyingEmojiData[]>([]);
     const holdTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const storyIdRef = useRef<string | null>(null); // For tracking distinct expanded story IDs
+
+    // 🔥 Expand carousels into individual story pages
+    const expandedStories = React.useMemo(() => {
+        return stories.flatMap((story) => {
+            if (story.postType === 'carousel' && story.mediaUrls) {
+                return story.mediaUrls.map((media, subIndex) => ({
+                    ...story,
+                    id: `${story.id}-${subIndex}`,
+                    originalId: story.id, // Keep reference to original ID
+                    videoUrl: media.url,
+                    thumbnailUrl: media.thumbnail || story.thumbnailUrl,
+                    mediaType: media.type,
+                }));
+            }
+            return {
+                ...story,
+                originalId: story.id,
+                mediaType: 'video' as const // Assume video for existing stories
+            };
+        });
+    }, [stories]);
 
     const markUserAsViewed = useStoryStore((state) => state.markUserAsViewed);
 
@@ -57,20 +80,22 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
 
     // 🔥 Initialize duration for initial story if already cached
     useEffect(() => {
-        const initialStory = stories[currentIndex];
+        const initialStory = expandedStories[currentIndex];
 
         // Mark user as viewed immediately when story opens
         if (initialStory?.user?.id) {
             markUserAsViewed(initialStory.user.id);
             // Also mark as viewed in backend
-            new StoryRepositoryImpl().markAsViewed(initialStory.id).catch(err => console.error('Failed to mark view', err));
+            new StoryRepositoryImpl().markAsViewed(initialStory.originalId).catch(err => console.error('Failed to mark view', err));
         }
 
         const cachedDuration = videoDurationsRef.current[initialStory?.id];
         if (cachedDuration && videoDuration === 0) {
             setVideoDuration(cachedDuration);
+        } else if (initialStory?.mediaType === 'image') {
+            setVideoDuration(DEFAULT_STORY_DURATION);
         }
-    }, [currentIndex, stories, videoDuration, markUserAsViewed]);
+    }, [currentIndex, expandedStories, videoDuration, markUserAsViewed]);
 
     // 🔥 Smooth progress animation (prevents stuttering)
     useAnimatedReaction(
@@ -109,7 +134,7 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
     );
 
     const handleNext = useCallback(() => {
-        if (currentIndex < stories.length - 1) {
+        if (currentIndex < expandedStories.length - 1) {
             pagerRef.current?.setPage(currentIndex + 1);
         } else {
             // End of stories for this user -> Go to next user
@@ -119,7 +144,7 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
                 router.back();
             }
         }
-    }, [currentIndex, stories.length, router, onNext]);
+    }, [currentIndex, expandedStories.length, router, onNext]);
 
     const handlePrev = useCallback(() => {
         if (currentIndex > 0) {
@@ -164,13 +189,13 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
 
     const handlePageSelected = useCallback((e: any) => {
         const newIndex = e.nativeEvent.position;
-        const newStory = stories[newIndex];
-        const prevStory = stories[currentIndex];
+        const newStory = expandedStories[newIndex];
+        const prevStory = expandedStories[currentIndex];
 
         // Mark user as viewed when sliding to next story
         if (newStory?.user?.id) {
             markUserAsViewed(newStory.user.id);
-            new StoryRepositoryImpl().markAsViewed(newStory.id).catch(console.error);
+            new StoryRepositoryImpl().markAsViewed(newStory.originalId).catch(console.error);
         }
 
         // 🔥 Reset previous video to start (prevents memory buildup)
@@ -192,12 +217,12 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
 
         // Check if we already have cached duration for this story
         const cachedDuration = videoDurationsRef.current[newStory.id];
-        if (cachedDuration) {
-            setVideoDuration(cachedDuration);
+        if (cachedDuration || newStory.mediaType === 'image') {
+            setVideoDuration(cachedDuration || DEFAULT_STORY_DURATION);
         } else {
             setVideoDuration(0);
         }
-    }, [stories, currentIndex, rawProgress, progress, markUserAsViewed]);
+    }, [expandedStories, currentIndex, rawProgress, progress, markUserAsViewed]);
 
     // Tap handlers
     const handleHoldStart = useCallback(() => {
@@ -241,7 +266,26 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
         }, 2000);
     }, []);
 
-    const activeStory = stories[currentIndex];
+    const activeStory = expandedStories[currentIndex];
+
+    // 🔥 Image progress simulation (Only for images)
+    useEffect(() => {
+        if (activeStory?.mediaType === 'image' && !isPaused) {
+            rawProgress.value = 0;
+            rawProgress.value = withTiming(1, {
+                duration: DEFAULT_STORY_DURATION,
+                easing: Easing.linear
+            }, (finished) => {
+                if (finished) {
+                    runOnJS(handleNext)();
+                }
+            });
+        } else if (isPaused) {
+            cancelAnimation(rawProgress);
+        }
+
+        return () => cancelAnimation(rawProgress);
+    }, [currentIndex, activeStory?.id, isPaused, activeStory?.mediaType, rawProgress, handleNext]);
 
     return (
         <View style={styles.container}>
@@ -268,22 +312,32 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
                     overdrag={false}
                     scrollEnabled={true}
                 >
-                    {stories.map((story, index) => (
+                    {expandedStories.map((story, index) => (
                         <View key={story.id} style={styles.page}>
-                            <Video
-                                ref={(ref) => { videoRefs.current[story.id] = ref; }}
-                                key={`video-${story.id}`}
-                                source={{ uri: story.videoUrl }}
-                                style={styles.video}
-                                resizeMode="contain"
-                                repeat={false}
-                                paused={isPaused || index !== currentIndex}
-                                muted={false}
-                                progressUpdateInterval={50}
-                                onLoad={handleVideoLoad(story.id, index)}
-                                onProgress={index === currentIndex ? handleVideoProgress : undefined}
-                                onEnd={index === currentIndex ? handleVideoEnd : undefined}
-                            />
+                            {story.mediaType === 'video' ? (
+                                <Video
+                                    ref={(ref) => { videoRefs.current[story.id] = ref; }}
+                                    key={`video-${story.id}`}
+                                    source={{ uri: story.videoUrl }}
+                                    style={styles.video}
+                                    resizeMode="contain"
+                                    repeat={false}
+                                    paused={isPaused || index !== currentIndex}
+                                    muted={false}
+                                    progressUpdateInterval={50}
+                                    onLoad={handleVideoLoad(story.id, index)}
+                                    onProgress={index === currentIndex ? handleVideoProgress : undefined}
+                                    onEnd={index === currentIndex ? handleVideoEnd : undefined}
+                                />
+                            ) : (
+                                <Image
+                                    source={{ uri: story.videoUrl }}
+                                    style={styles.video}
+                                    contentFit="contain"
+                                    priority="high"
+                                    cachePolicy="memory-disk"
+                                />
+                            )}
                         </View>
                     ))}
                 </PagerView>
@@ -307,9 +361,9 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
 
             {/* STATIC UI - Header (absolute, stays on swipe) */}
             <StoryHeader
-                story={activeStory}
+                story={activeStory as any}
                 progress={progress}
-                totalStories={stories.length}
+                totalStories={expandedStories.length}
                 currentStoryIndex={currentIndex}
                 onClose={handleClose}
             />

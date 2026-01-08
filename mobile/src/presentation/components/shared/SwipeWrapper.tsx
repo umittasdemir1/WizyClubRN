@@ -15,6 +15,7 @@ interface SwipeWrapperProps {
     enableLeft?: boolean;
     enableRight?: boolean;
     edgeOnly?: boolean;
+    disabled?: boolean;
 }
 
 export const SwipeWrapper: React.FC<SwipeWrapperProps> = ({
@@ -24,10 +25,12 @@ export const SwipeWrapper: React.FC<SwipeWrapperProps> = ({
     enableLeft = true,
     enableRight = true,
     edgeOnly = false,
+    disabled = false,
 }) => {
     const router = useRouter();
 
     const panGesture = Gesture.Pan()
+        .enabled(!disabled)
         .activeOffsetX([-15, 15])
         .failOffsetY([-20, 20])
         .manualActivation(edgeOnly)
@@ -35,12 +38,19 @@ export const SwipeWrapper: React.FC<SwipeWrapperProps> = ({
             if (!edgeOnly) return;
 
             const touchX = e.changedTouches[0].x;
-            const isLeftEdge = touchX < 50;
-            const isRightEdge = touchX > SCREEN_WIDTH - 50;
+            const isLeftEdge = touchX < 30;
+            const isRightEdge = touchX > SCREEN_WIDTH - 30;
 
             if (isLeftEdge || isRightEdge) {
                 state.activate();
             } else {
+                state.fail();
+            }
+        })
+        .onTouchesMove((e, state) => {
+            // If movement is mostly vertical, let the parent ScrollView handle it
+            const touch = e.allTouches[0];
+            if (Math.abs(touch.absoluteY - touch.y) > 10) {
                 state.fail();
             }
         })

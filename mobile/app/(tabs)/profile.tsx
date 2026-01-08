@@ -39,6 +39,8 @@ import Animated, {
 import MoreIcon from '../../assets/icons/more.svg';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import { useProfile } from '../../src/presentation/hooks/useProfile';
+import { useSavedVideos } from '../../src/presentation/hooks/useSavedVideos';
+import { useActiveVideoStore } from '../../src/presentation/store/useActiveVideoStore';
 import { DeletedContentSheet } from '../../src/presentation/components/profile/DeletedContentSheet';
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
 import { LIGHT_COLORS, DARK_COLORS } from '../../src/core/constants';
@@ -124,16 +126,18 @@ export default function ProfileScreen() {
   }, [currentUserId]);
 
   const { videos, refreshFeed } = useVideoFeed(currentUserId);
-
+  const { videos: savedVideosData, refresh: refreshSavedVideos } = useSavedVideos(currentUserId);
 
   const { user: profileUser, isLoading, reload, updateProfile, uploadAvatar } = useProfile(currentUserId);
+  const setCustomFeed = useActiveVideoStore((state) => state.setCustomFeed);
+  const setActiveVideo = useActiveVideoStore((state) => state.setActiveVideo);
 
   useFocusEffect(
     useCallback(() => {
       RNStatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
-      // Don't reload on every focus - Instagram/TikTok behavior
-      // Data loads on mount and via pull-to-refresh only
-    }, [isDark])
+      // Reload data when profile is focused
+      refreshSavedVideos();
+    }, [isDark, refreshSavedVideos])
   );
 
   // Collapsible Header Logic
@@ -174,7 +178,7 @@ export default function ProfileScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     // Silent refresh - don't show skeleton, just update data
-    await Promise.all([refreshFeed(), reload(true)]);
+    await Promise.all([refreshFeed(), reload(true), refreshSavedVideos()]);
     setRefreshing(false);
   }, [refreshFeed, reload]);
 
@@ -242,9 +246,9 @@ export default function ProfileScreen() {
   ];
 
   const safeVideos = videos || [];
-  const postsData = safeVideos.map(v => ({ id: v.id, thumbnail: v.thumbnailUrl, views: v.likesCount?.toString() || '0', type: 'video' as const, videoUrl: v.videoUrl }));
-  const videosData = safeVideos.map(v => ({ id: v.id, thumbnail: v.thumbnailUrl, views: v.likesCount?.toString() || '0', videoUrl: v.videoUrl }));
-  const savedData = [...postsData]; // Mock saved data
+  const postsData = safeVideos.map((v: any) => ({ id: v.id, thumbnail: v.thumbnailUrl, views: v.likesCount?.toString() || '0', type: 'video' as const, videoUrl: v.videoUrl }));
+  const videosData = safeVideos.map((v: any) => ({ id: v.id, thumbnail: v.thumbnailUrl, views: v.likesCount?.toString() || '0', videoUrl: v.videoUrl }));
+  const savedData = (savedVideosData || []).map((v: any) => ({ id: v.id, thumbnail: v.thumbnailUrl, views: v.likesCount?.toString() || '0', type: 'video' as const, videoUrl: v.videoUrl }));
   const tagsData: any[] = [];
 
   // Calculate grid height including the Drafts folder (always shown)
@@ -252,20 +256,32 @@ export default function ProfileScreen() {
   const gridItemSize = Math.floor((SCREEN_WIDTH - 8) / 3); // 8 = PADDING(2)*2 + GAP(2)*2
   const gridItemHeight = gridItemSize * 1.25; // Aspect Ratio 0.8 (4:5) -> Height = Width * 1.25
   const gridHeight = Math.ceil(totalGridItems / 3) * (gridItemHeight + 2) + 20; // +2 for gap
-  
+
   const videosHeight = Math.ceil(videosData.length / 3) * (gridItemSize * (16 / 9) + 1) + 20;
   const savedHeight = Math.ceil(savedData.length / 3) * (gridItemHeight + 2) + 20;
   const tagsHeight = 300;
 
   const handleTabPress = (index: number) => {
     setActiveTab(index);
-    pagerRef.current?.setPage(index);
+    pagerRef.current?.setPageWithoutAnimation(index);
   };
 
   const showPreview = (item: any) => setPreviewItem(item);
   const hidePreview = () => setPreviewItem(null);
   const handleDraftsFolderPress = () => {
-    router.push('/drafts');
+    router.push('/drafts' as any);
+  };
+
+  const handleVideoPress = (video: any, index: number) => {
+    setCustomFeed(safeVideos);
+    setActiveVideo(video.id, index);
+    router.push('/custom-feed');
+  };
+
+  const handleSavedPress = (video: any, index: number) => {
+    setCustomFeed(savedVideosData);
+    setActiveVideo(video.id, index);
+    router.push('/custom-feed');
   };
   const bioLimit = 110;
   const truncatedBio = user.bio.length > bioLimit ? user.bio.substring(0, bioLimit) + '...' : user.bio;
@@ -339,19 +355,19 @@ export default function ProfileScreen() {
               </TouchableOpacity>
 
               <View style={styles.actionsContainer}>
-                <TouchableOpacity
+                <Pressable
                   style={[styles.btnAction, { backgroundColor: btnEditBg }]}
                   onPress={() => editProfileSheetRef.current?.expand()}
                 >
                   <Text style={[styles.btnActionText, { color: btnEditText }]}>Profili Düzenle</Text>
-                </TouchableOpacity>
+                </Pressable>
 
-                <TouchableOpacity
+                <Pressable
                   style={[styles.btnAction, { backgroundColor: btnEditBg }]}
                   onPress={() => console.log('Share Profile')}
                 >
                   <Text style={[styles.btnActionText, { color: btnEditText }]}>Profili Paylaş</Text>
-                </TouchableOpacity>
+                </Pressable>
               </View>
 
               <View style={styles.socialClubsRow}>
@@ -369,10 +385,34 @@ export default function ProfileScreen() {
           )}
 
           <View style={[styles.navTabs, { borderBottomColor: cardBg }]}>
-            <TouchableOpacity style={[styles.tab, activeTab === 0 && [styles.activeTab, { borderBottomColor: textPrimary }]]} onPress={() => handleTabPress(0)}><GridIcon color={activeTab === 0 ? textPrimary : textSecondary} /></TouchableOpacity>
-            <TouchableOpacity style={[styles.tab, activeTab === 1 && [styles.activeTab, { borderBottomColor: textPrimary }]]} onPress={() => handleTabPress(1)}><VideoIcon color={activeTab === 1 ? textPrimary : textSecondary} /></TouchableOpacity>
-            <TouchableOpacity style={[styles.tab, activeTab === 2 && [styles.activeTab, { borderBottomColor: textPrimary }]]} onPress={() => handleTabPress(2)}><TagsIcon color={activeTab === 2 ? textPrimary : textSecondary} /></TouchableOpacity>
-            <TouchableOpacity style={[styles.tab, activeTab === 3 && [styles.activeTab, { borderBottomColor: textPrimary }]]} onPress={() => handleTabPress(3)}><SaveTabIcon color={activeTab === 3 ? textPrimary : textSecondary} /></TouchableOpacity>
+            <Pressable
+              style={[styles.tab, activeTab === 0 && [styles.activeTab, { borderBottomColor: textPrimary }]]}
+              onPress={() => handleTabPress(0)}
+              hitSlop={{ top: 15, bottom: 15, left: 10, right: 10 }}
+            >
+              <GridIcon color={activeTab === 0 ? textPrimary : textSecondary} />
+            </Pressable>
+            <Pressable
+              style={[styles.tab, activeTab === 1 && [styles.activeTab, { borderBottomColor: textPrimary }]]}
+              onPress={() => handleTabPress(1)}
+              hitSlop={{ top: 15, bottom: 15, left: 10, right: 10 }}
+            >
+              <VideoIcon color={activeTab === 1 ? textPrimary : textSecondary} />
+            </Pressable>
+            <Pressable
+              style={[styles.tab, activeTab === 2 && [styles.activeTab, { borderBottomColor: textPrimary }]]}
+              onPress={() => handleTabPress(2)}
+              hitSlop={{ top: 15, bottom: 15, left: 10, right: 10 }}
+            >
+              <TagsIcon color={activeTab === 2 ? textPrimary : textSecondary} />
+            </Pressable>
+            <Pressable
+              style={[styles.tab, activeTab === 3 && [styles.activeTab, { borderBottomColor: textPrimary }]]}
+              onPress={() => handleTabPress(3)}
+              hitSlop={{ top: 15, bottom: 15, left: 10, right: 10 }}
+            >
+              <SaveTabIcon color={activeTab === 3 ? textPrimary : textSecondary} />
+            </Pressable>
           </View>
 
           <HighlightPills highlights={highlights} isDark={isDark} />
@@ -388,19 +428,35 @@ export default function ProfileScreen() {
                 posts={postsData}
                 isDark={isDark}
                 onPreview={showPreview}
+                onPress={handleVideoPress}
                 onPreviewEnd={hidePreview}
                 showDraftsFolder={true}
                 drafts={drafts}
                 onDraftsFolderPress={handleDraftsFolderPress}
               />
             </View>
-            <View key="1"><VideoGrid videos={videosData} isDark={isDark} onPreview={showPreview} onPreviewEnd={hidePreview} /></View>
+            <View key="1">
+              <VideoGrid
+                videos={videosData}
+                isDark={isDark}
+                onPress={handleVideoPress}
+                onPreview={showPreview}
+                onPreviewEnd={hidePreview}
+              />
+            </View>
             <View key="2">
               <PostsGrid posts={tagsData} isDark={isDark} onPreview={showPreview} onPreviewEnd={hidePreview} />
               {tagsData.length === 0 && <View style={{ padding: 40, alignItems: 'center' }}><Text style={{ color: textSecondary }}>Etiketlenmiş gönderi yok</Text></View>}
             </View>
             <View key="3">
-              <PostsGrid posts={savedData} isDark={isDark} onPreview={showPreview} onPreviewEnd={hidePreview} showDraftsFolder={false} />
+              <PostsGrid
+                posts={savedData}
+                isDark={isDark}
+                onPress={handleSavedPress}
+                onPreview={showPreview}
+                onPreviewEnd={hidePreview}
+                showDraftsFolder={false}
+              />
               {savedData.length === 0 && <View style={{ padding: 40, alignItems: 'center' }}><Text style={{ color: textSecondary }}>Henüz kaydedilen gönderi yok</Text></View>}
             </View>
           </PagerView>

@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { VideoCacheService } from '../../../data/services/VideoCacheService';
 import { Image } from 'expo-image';
 import { PerformanceLogger } from '../../../core/services/PerformanceLogger';
+import { CarouselLayer } from './CarouselLayer';
 
 // Optional: Screen orientation (requires native build)
 let ScreenOrientation: any = null;
@@ -374,36 +375,45 @@ export const VideoLayer = memo(function VideoLayer({
 
     return (
         <View style={styles.container}>
-            {/* Only render Video component when source is ready */}
-            {isSourceReady && videoSource && (
-                <Video
-                    key={`${video.id}-${key}`}
-                    ref={videoRef}
-                    source={videoSource}
-                    style={[styles.video, { backgroundColor: '#000' }]} // Black bg to prevent white flash
-                    resizeMode={resizeMode}
-                    repeat={false}
-                    controls={false}
-                    paused={!shouldPlay || !isReadyForDisplay}
-                    muted={isMuted}
-                    bufferConfig={bufferConfig}
-                    onLoad={handleLoad}
-                    onReadyForDisplay={() => {
-                        // 🔥 CRITICAL: Hide poster ONLY when first frame is ready
-                        console.log(`[TIMING] 🎬 READY FOR DISPLAY: ${video.id}`);
-                        setShowPoster(false);
-                        setIsReadyForDisplay(true);
-                    }}
-                    onError={handleVideoError}
-                    onProgress={handleProgress}
-                    onEnd={handleEnd}
-                    playInBackground={false}
-                    playWhenInactive={false}
-                    ignoreSilentSwitch="ignore"
-                    progressUpdateInterval={33}
-                    automaticallyWaitsToMinimizeStalling={true}
-                    preventsDisplaySleepDuringVideoPlayback={true}
+            {/* Carousel Content */}
+            {video.postType === 'carousel' && video.mediaUrls ? (
+                <CarouselLayer
+                    mediaUrls={video.mediaUrls}
+                    isActive={isActive && isAppActive && isScreenFocused && !isPausedGlobal}
+                    isMuted={isMuted}
                 />
+            ) : (
+                /* Only render Video component when source is ready */
+                isSourceReady && videoSource && (
+                    <Video
+                        key={`${video.id}-${key}`}
+                        ref={videoRef}
+                        source={videoSource}
+                        style={[styles.video, { backgroundColor: '#000' }]} // Black bg to prevent white flash
+                        resizeMode={resizeMode}
+                        repeat={false}
+                        controls={false}
+                        paused={!shouldPlay || !isReadyForDisplay}
+                        muted={isMuted}
+                        bufferConfig={bufferConfig}
+                        onLoad={handleLoad}
+                        onReadyForDisplay={() => {
+                            // 🔥 CRITICAL: Hide poster ONLY when first frame is ready
+                            console.log(`[TIMING] 🎬 READY FOR DISPLAY: ${video.id}`);
+                            setShowPoster(false);
+                            setIsReadyForDisplay(true);
+                        }}
+                        onError={handleVideoError}
+                        onProgress={handleProgress}
+                        onEnd={handleEnd}
+                        playInBackground={false}
+                        playWhenInactive={false}
+                        ignoreSilentSwitch="ignore"
+                        progressUpdateInterval={33}
+                        automaticallyWaitsToMinimizeStalling={true}
+                        preventsDisplaySleepDuringVideoPlayback={true}
+                    />
+                )
             )}
 
             {/* Manual Poster Overlay (Only show before video starts loading) */}
@@ -444,33 +454,18 @@ export const VideoLayer = memo(function VideoLayer({
                 </View>
             )}
 
-            {/* Icons overlay - tap handled by DoubleTapLike */}
-            <View style={styles.touchArea} pointerEvents="none">
-                {showPlayIcon && (
-                    <View style={styles.iconContainer}>
-                        <View style={styles.iconBackground}>
-                            <PlayIcon width={32} height={32} color="#FFFFFF" />
-                        </View>
-                    </View>
-                )}
-                {showReplayIcon && (
-                    <View style={styles.iconContainer}>
-                        <View style={styles.iconBackground}>
-                            <ReplayIcon width={32} height={32} color="#FFFFFF" />
-                        </View>
-                    </View>
-                )}
-            </View>
 
-            {/* Per-Video Seekbar */}
-            <VideoSeekBar
-                currentTime={currentTimeSV}
-                duration={durationSV}
-                isScrolling={isScrolling}
-                onSeek={seekTo}
-                isActive={isActive}
-                spriteUrl={video.spriteUrl}
-            />
+            {/* Per-Video Seekbar (Only for standard videos) */}
+            {video.postType !== 'carousel' && (
+                <VideoSeekBar
+                    currentTime={currentTimeSV}
+                    duration={durationSV}
+                    isScrolling={isScrolling}
+                    onSeek={seekTo}
+                    isActive={isActive}
+                    spriteUrl={video.spriteUrl}
+                />
+            )}
         </View>
     );
 }, (prev, next) => {
