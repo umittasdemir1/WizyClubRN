@@ -317,7 +317,7 @@ export default function FeedScreen() {
     }, [isLoading]);
 
 
-    const hasUnseenStories = true;
+    const hasUnseenStories = storyUsers.some((u: any) => u.hasUnseenStory);
 
     // UI Opacity Animation for "Seek to Hide"
     const uiOpacityStyle = useAnimatedStyle(() => {

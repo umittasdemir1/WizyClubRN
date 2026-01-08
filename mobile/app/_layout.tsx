@@ -5,11 +5,15 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { ThemeProvider } from '../src/presentation/contexts/ThemeContext';
 import '../global.css';
+import * as SplashScreen from 'expo-splash-screen';
 
 import { useThemeStore } from '../src/presentation/store/useThemeStore';
 import { useAuthStore } from '../src/presentation/store/useAuthStore';
 import { SessionLogService } from '../src/core/services/SessionLogService';
 import { useEffect } from 'react';
+
+// Keep the splash screen visible while we fetch resources
+SplashScreen.preventAutoHideAsync();
 
 function RootNavigator() {
     const isDark = useThemeStore((state) => state.isDark);
@@ -19,6 +23,12 @@ function RootNavigator() {
         // Initialize auth state on app start
         initialize();
     }, []);
+
+    useEffect(() => {
+        if (isInitialized) {
+            SplashScreen.hideAsync();
+        }
+    }, [isInitialized]);
 
     useEffect(() => {
         // Log session when user is authenticated
@@ -35,6 +45,10 @@ function RootNavigator() {
             logSession();
         }
     }, [user]);
+
+    if (!isInitialized) {
+        return null; // Or a custom loading view, but Splash Screen covers this
+    }
 
     return (
         <Stack screenOptions={{ headerShown: false, lazy: false }}>

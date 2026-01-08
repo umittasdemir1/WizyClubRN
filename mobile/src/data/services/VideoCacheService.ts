@@ -25,7 +25,12 @@ export class VideoCacheService {
             if (!folderInfo.exists) {
                 await FileSystem.makeDirectoryAsync(CACHE_FOLDER, { intermediates: true });
             }
-            await VideoCacheService.pruneCache();
+            // Defer cache pruning to avoid blocking app startup
+            // await VideoCacheService.pruneCache();
+            // Instead, run it in background after a delay without awaiting
+            setTimeout(() => {
+                VideoCacheService.pruneCache().catch(err => console.error('[VideoCache] Background prune failed:', err));
+            }, 10000); // 10 seconds delay
         } catch (error) {
             console.error('[VideoCache] Failed to initialize cache folder:', error);
         }

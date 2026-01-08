@@ -1,5 +1,6 @@
 import { View, StyleSheet, ScrollView, StatusBar as RNStatusBar, RefreshControl, Text, Pressable, Dimensions, Modal } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import { useCallback, useState, useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
@@ -195,6 +196,7 @@ const PreviewModal = ({ item, onClose, onAction }: PreviewModalProps) => {
 export default function ExploreScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
+    const isFocused = useIsFocused();
     const { videos, refreshFeed, toggleLike, toggleSave, toggleShare, toggleShop } = useVideoFeed();
     const isDark = useThemeStore((state) => state.isDark);
     const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
@@ -344,6 +346,8 @@ export default function ExploreScreen() {
                             onPreviewEnd={hidePreview}
                             isDark={isDark}
                             scrollEnabled={!previewItem}
+                            isPreviewActive={!!previewItem}
+                            isScreenFocused={isFocused}
                         />
 
                         {/* 3. Masonry Grid */}

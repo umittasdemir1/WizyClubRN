@@ -12,6 +12,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Video from 'react-native-video';
 import MoreIcon from '../../../../assets/icons/more.svg';
+import { VideoCacheService } from '../../../../src/data/services/VideoCacheService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ITEM_WIDTH = SCREEN_WIDTH * 0.38;
@@ -36,6 +37,8 @@ interface TrendingCarouselProps {
     onPreviewEnd?: () => void;
     isDark?: boolean;
     scrollEnabled?: boolean;
+    isPreviewActive?: boolean;
+    isScreenFocused?: boolean;
 }
 
 interface TrendingCardProps {
@@ -48,34 +51,73 @@ interface TrendingCardProps {
     activeIndex: number;
     onVideoEnd?: () => void;
     isMuted: boolean;
+    isPreviewActive?: boolean;
+    isScreenFocused?: boolean;
+    dataLength: number;
 }
 
-const TrendingCard = memo(({ item, index, scrollX, onPress, onPreview, onPreviewEnd, activeIndex, onVideoEnd, isMuted }: TrendingCardProps) => {
+const TrendingCard = memo(({ item, index, scrollX, onPress, onPreview, onPreviewEnd, activeIndex, onVideoEnd, isMuted, isPreviewActive, isScreenFocused = true, dataLength }: TrendingCardProps) => {
     const [isPaused, setIsPaused] = useState(false);
     const [lastTap, setLastTap] = useState(0);
+    const [videoSource, setVideoSource] = useState({ uri: item.videoUrl });
     const isActive = activeIndex === index;
-    const shouldLoad = index >= activeIndex - 1 && index <= activeIndex + 2;
+
+    // Circular preloading logic
+    // Load normal window AND wrap-around items
+    const shouldLoad =
+        (index >= activeIndex - 1 && index <= activeIndex + 2) ||
+        (activeIndex >= dataLength - 2 && index <= 1) || // End of list -> load start
+        (activeIndex <= 1 && index >= dataLength - 1);   // Start of list -> load end
 
     const thumbnailOpacity = useSharedValue(1);
     const hasTriggeredEnd = useRef(false);
     const activeStartTime = useRef(Date.now());
+    const videoRef = useRef<any>(null);
+
+    useEffect(() => {
+        let isMounted = true;
+        const loadVideo = async () => {
+            if (shouldLoad) {
+                const cachedPath = await VideoCacheService.getCachedVideoPath(item.videoUrl);
+                if (isMounted) {
+                    if (cachedPath) {
+                        setVideoSource({ uri: cachedPath });
+                    } else {
+                        // If not cached, start caching but keep playing from URL
+                        VideoCacheService.cacheVideo(item.videoUrl).then(path => {
+                            if (isMounted && path) {
+                                setVideoSource({ uri: path });
+                            }
+                        });
+                    }
+                }
+            }
+        };
+        loadVideo();
+        return () => { isMounted = false; };
+    }, [item.videoUrl, shouldLoad]);
 
     useEffect(() => {
         if (isActive) {
             hasTriggeredEnd.current = false;
             activeStartTime.current = Date.now();
+            // Reset video to start when it becomes active
+            videoRef.current?.seek(0);
         } else {
             thumbnailOpacity.value = 1;
         }
     }, [isActive]);
 
     const triggerEnd = useCallback(() => {
+        // If screen is not focused, do not trigger end
+        if (!isScreenFocused) return;
+
         const timeSinceActive = Date.now() - activeStartTime.current;
         if (isActive && !hasTriggeredEnd.current && timeSinceActive > 1000) {
             hasTriggeredEnd.current = true;
             onVideoEnd?.();
         }
-    }, [isActive, onVideoEnd]);
+    }, [isActive, onVideoEnd, isScreenFocused]);
 
     const animatedCardStyle = useAnimatedStyle(() => {
         // Uniform size: scale 1 for all items
@@ -103,11 +145,12 @@ const TrendingCard = memo(({ item, index, scrollX, onPress, onPreview, onPreview
                 {shouldLoad && (
                     <View style={StyleSheet.absoluteFill}>
                         <Video
-                            source={{ uri: item.videoUrl }}
+                            ref={videoRef}
+                            source={videoSource}
                             style={StyleSheet.absoluteFill}
                             resizeMode="cover"
                             repeat={true}
-                            paused={!isActive || isPaused}
+                            paused={!isActive || isPaused || isPreviewActive || !isScreenFocused}
                             muted={isMuted}
                             onEnd={triggerEnd}
                             onReadyForDisplay={() => {
@@ -116,13 +159,13 @@ const TrendingCard = memo(({ item, index, scrollX, onPress, onPreview, onPreview
                                 }
                             }}
                             onProgress={({ currentTime }) => {
-                                if (isActive && currentTime >= 5) triggerEnd();
+                                if (isActive && isScreenFocused && currentTime >= 5) triggerEnd();
                             }}
                             bufferConfig={{
-                                minBufferMs: 1000,
-                                maxBufferMs: 3000,
-                                bufferForPlaybackMs: 100,
-                                bufferForPlaybackAfterRebufferMs: 500
+                                minBufferMs: 500,
+                                maxBufferMs: 1500,
+                                bufferForPlaybackMs: 10,
+                                bufferForPlaybackAfterRebufferMs: 100
                             }}
                             shutterColor="transparent"
                             automaticallyWaitsToMinimizeStalling={false}
@@ -155,7 +198,7 @@ const TrendingCard = memo(({ item, index, scrollX, onPress, onPreview, onPreview
     );
 });
 
-export function TrendingCarousel({ data, onItemPress, onPreview, onPreviewEnd, isDark = true, scrollEnabled = true }: TrendingCarouselProps) {
+export function TrendingCarousel({ data, onItemPress, onPreview, onPreviewEnd, isDark = true, scrollEnabled = true, isPreviewActive = false, isScreenFocused = true }: TrendingCarouselProps) {
     const scrollX = useSharedValue(0);
     const [activeIndex, setActiveIndex] = useState(0);
     const scrollViewRef = useRef<ScrollView>(null);
@@ -213,6 +256,9 @@ export function TrendingCarousel({ data, onItemPress, onPreview, onPreviewEnd, i
                         activeIndex={activeIndex}
                         onVideoEnd={scrollToNext}
                         isMuted={true}
+                        isPreviewActive={isPreviewActive}
+                        isScreenFocused={isScreenFocused}
+                        dataLength={data.length}
                     />
                 ))}
                 <View style={{ width: SCREEN_WIDTH - ITEM_WIDTH - 24 }} />

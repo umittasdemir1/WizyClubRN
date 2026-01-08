@@ -93,6 +93,7 @@ export const VideoLayer = memo(function VideoLayer({
 
     // Poster State (Manual Overlay)
     const [showPoster, setShowPoster] = useState(true);
+    const [isReadyForDisplay, setIsReadyForDisplay] = useState(false); // Track if first frame is rendered
 
     // Cache-First Strategy: Don't set source until we check cache
     const [videoSource, setVideoSource] = useState<any>(null);
@@ -127,6 +128,7 @@ export const VideoLayer = memo(function VideoLayer({
     const videoRef = useRef<VideoRef>(null);
     const loopCount = useRef(0);
     const memoryCachedRef = useRef(false); // Track if loaded from memory cache
+    const hasInitialSeekPerformed = useRef(false); // Prevent seek loop
 
     // Cache-First Strategy: Check cache BEFORE setting source
     useEffect(() => {
@@ -186,7 +188,9 @@ export const VideoLayer = memo(function VideoLayer({
         console.log(`[TIMING] ⏱️ START source init: ${video.id}`);
         setIsSourceReady(false);
         setShowPoster(true);
+        setIsReadyForDisplay(false); // Reset ready state
         memoryCachedRef.current = false;
+        hasInitialSeekPerformed.current = false;
 
         // Initialize source with cache-first strategy
         initVideoSource();
@@ -265,7 +269,7 @@ export const VideoLayer = memo(function VideoLayer({
         setDuration(data.duration);
         durationSV.value = data.duration;
         setHasError(false);
-        setShowPoster(false);
+        // setShowPoster(false); // REMOVED: Wait for ReadyForDisplay
 
         // Performance logging
         const source = videoSource?.uri?.startsWith('file://')
@@ -380,7 +384,7 @@ export const VideoLayer = memo(function VideoLayer({
                     resizeMode={resizeMode}
                     repeat={false}
                     controls={false}
-                    paused={!shouldPlay}
+                    paused={!shouldPlay || !isReadyForDisplay}
                     muted={isMuted}
                     bufferConfig={bufferConfig}
                     onLoad={handleLoad}
@@ -388,6 +392,7 @@ export const VideoLayer = memo(function VideoLayer({
                         // 🔥 CRITICAL: Hide poster ONLY when first frame is ready
                         console.log(`[TIMING] 🎬 READY FOR DISPLAY: ${video.id}`);
                         setShowPoster(false);
+                        setIsReadyForDisplay(true);
                     }}
                     onError={handleVideoError}
                     onProgress={handleProgress}
