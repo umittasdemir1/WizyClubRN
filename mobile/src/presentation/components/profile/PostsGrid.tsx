@@ -2,6 +2,8 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable, Dimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { Eye, Play } from 'lucide-react-native';
+import { DraftsFolderCard } from './DraftsFolderCard';
+import { Draft } from '../../../domain/entities/Draft';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const GAP = 2;
@@ -22,6 +24,9 @@ interface PostsGridProps {
   isDark: boolean;
   onPreview?: (post: PostItem) => void;
   onPreviewEnd?: () => void;
+  showDraftsFolder?: boolean;
+  drafts?: Draft[];
+  onDraftsFolderPress?: () => void;
 }
 
 export const PostsGrid: React.FC<PostsGridProps> = ({
@@ -29,8 +34,12 @@ export const PostsGrid: React.FC<PostsGridProps> = ({
   isDark,
   onPreview,
   onPreviewEnd,
+  showDraftsFolder = false,
+  drafts = [],
+  onDraftsFolderPress,
 }) => {
   const bgColor = isDark ? '#1c1c1e' : '#f0f0f0';
+  const offset = showDraftsFolder && onDraftsFolderPress ? 1 : 0;
 
   const formatViews = (views: string | number): string => {
     if (typeof views === 'string') return views;
@@ -45,37 +54,52 @@ export const PostsGrid: React.FC<PostsGridProps> = ({
 
   return (
     <View style={styles.container}>
-      {posts.map((post, index) => (
-        <Pressable
-          key={post.id}
-          style={[
-            styles.postItem,
-            { backgroundColor: bgColor },
-            // Add margin to create gaps between items
-            index % 3 !== 2 && { marginRight: GAP }, // Not the last column
-            { marginBottom: GAP }, // Gap between rows
-          ]}
-          onLongPress={() => onPreview?.(post)}
-          onPressOut={onPreviewEnd}
-        >
-          <Image
-            source={{ uri: post.thumbnail }}
-            style={styles.thumbnail}
-            contentFit="cover"
+      {/* Drafts Folder Card (pinned at top) */}
+      {showDraftsFolder && onDraftsFolderPress && (
+        <View style={{ marginRight: GAP, marginBottom: GAP }}>
+          <DraftsFolderCard
+            drafts={drafts}
+            isDark={isDark}
+            itemWidth={ITEM_WIDTH}
+            onPress={onDraftsFolderPress}
           />
-          {/* Gradient Shadow for Readability */}
-          <View style={styles.gradientOverlay} />
-          {/* Stats */}
-          <View style={styles.stats}>
-            {post.type === 'video' ? (
-              <Play size={12} color="#fff" strokeWidth={2.5} />
-            ) : (
-              <Eye size={12} color="#fff" />
-            )}
-            <Text style={styles.viewsText}>{formatViews(post.views)}</Text>
-          </View>
-        </Pressable>
-      ))}
+        </View>
+      )}
+
+      {posts.map((post, index) => {
+        const gridIndex = index + offset;
+        return (
+          <Pressable
+            key={post.id}
+            style={[
+              styles.postItem,
+              { backgroundColor: bgColor },
+              // Add margin to create gaps between items
+              gridIndex % 3 !== 2 && { marginRight: GAP }, // Not the last column
+              { marginBottom: GAP }, // Gap between rows
+            ]}
+            onLongPress={() => onPreview?.(post)}
+            onPressOut={onPreviewEnd}
+          >
+            <Image
+              source={{ uri: post.thumbnail }}
+              style={styles.thumbnail}
+              contentFit="cover"
+            />
+            {/* Gradient Shadow for Readability */}
+            <View style={styles.gradientOverlay} />
+            {/* Stats */}
+            <View style={styles.stats}>
+              {post.type === 'video' ? (
+                <Play size={12} color="#fff" strokeWidth={2.5} />
+              ) : (
+                <Eye size={12} color="#fff" />
+              )}
+              <Text style={styles.viewsText}>{formatViews(post.views)}</Text>
+            </View>
+          </Pressable>
+        );
+      })}
     </View>
   );
 };
@@ -89,7 +113,7 @@ const styles = StyleSheet.create({
   },
   postItem: {
     width: ITEM_WIDTH,
-    aspectRatio: 1, // Square format (1:1)
+    aspectRatio: 0.8, // Portrait format (4:5)
     position: 'relative',
     borderRadius: 0,
     overflow: 'hidden',

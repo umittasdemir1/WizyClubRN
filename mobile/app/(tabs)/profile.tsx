@@ -16,6 +16,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import { useAuthStore } from '../../src/presentation/store/useAuthStore';
+import { useDraftStore } from '../../src/presentation/store/useDraftStore';
 import { ProfileStats } from '../../src/presentation/components/profile/ProfileStats';
 import { SocialTags } from '../../src/presentation/components/profile/SocialTags';
 import { ClubsCollaboration } from '../../src/presentation/components/profile/ClubsCollaboration';
@@ -73,6 +74,12 @@ const TagsIcon = ({ color }: { color: string }) => (
   </Svg>
 );
 
+const SaveTabIcon = ({ color }: { color: string }) => (
+  <Svg width="22" height="22" viewBox="0 -960 960 960" fill={color}>
+    <Path d="M200-120v-640q0-33 23.5-56.5T280-840h400q33 0 56.5 23.5T760-760v640L480-240 200-120Zm80-122 200-86 200 86v-518H280v518Zm0-518h400-400Z" />
+  </Svg>
+);
+
 // Preview Modal Component
 const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnail: string; videoUrl: string }; onClose: () => void }) => {
   return (
@@ -96,6 +103,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { isDark, toggleTheme } = useThemeStore();
   const { user: authUser, initialize, isInitialized } = useAuthStore();
+  const { drafts, fetchDrafts } = useDraftStore();
   const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
 
   // Use authenticated user's ID, fallback to hardcoded for development
@@ -107,6 +115,13 @@ export default function ProfileScreen() {
       initialize();
     }
   }, [isInitialized, initialize]);
+
+  // Fetch drafts on mount
+  useEffect(() => {
+    if (currentUserId) {
+      fetchDrafts(currentUserId);
+    }
+  }, [currentUserId]);
 
   const { videos, refreshFeed } = useVideoFeed(currentUserId);
 
@@ -229,10 +244,17 @@ export default function ProfileScreen() {
   const safeVideos = videos || [];
   const postsData = safeVideos.map(v => ({ id: v.id, thumbnail: v.thumbnailUrl, views: v.likesCount?.toString() || '0', type: 'video' as const, videoUrl: v.videoUrl }));
   const videosData = safeVideos.map(v => ({ id: v.id, thumbnail: v.thumbnailUrl, views: v.likesCount?.toString() || '0', videoUrl: v.videoUrl }));
+  const savedData = [...postsData]; // Mock saved data
   const tagsData: any[] = [];
 
-  const gridHeight = Math.ceil(postsData.length / 3) * (Math.floor((SCREEN_WIDTH - 3) / 3) + 1) + 20;
-  const videosHeight = Math.ceil(videosData.length / 3) * (Math.floor((SCREEN_WIDTH - 3) / 3) * (16 / 9) + 1) + 20;
+  // Calculate grid height including the Drafts folder (always shown)
+  const totalGridItems = postsData.length + 1;
+  const gridItemSize = Math.floor((SCREEN_WIDTH - 8) / 3); // 8 = PADDING(2)*2 + GAP(2)*2
+  const gridItemHeight = gridItemSize * 1.25; // Aspect Ratio 0.8 (4:5) -> Height = Width * 1.25
+  const gridHeight = Math.ceil(totalGridItems / 3) * (gridItemHeight + 2) + 20; // +2 for gap
+  
+  const videosHeight = Math.ceil(videosData.length / 3) * (gridItemSize * (16 / 9) + 1) + 20;
+  const savedHeight = Math.ceil(savedData.length / 3) * (gridItemHeight + 2) + 20;
   const tagsHeight = 300;
 
   const handleTabPress = (index: number) => {
@@ -242,6 +264,9 @@ export default function ProfileScreen() {
 
   const showPreview = (item: any) => setPreviewItem(item);
   const hidePreview = () => setPreviewItem(null);
+  const handleDraftsFolderPress = () => {
+    router.push('/drafts');
+  };
   const bioLimit = 110;
   const truncatedBio = user.bio.length > bioLimit ? user.bio.substring(0, bioLimit) + '...' : user.bio;
 
@@ -347,21 +372,36 @@ export default function ProfileScreen() {
             <TouchableOpacity style={[styles.tab, activeTab === 0 && [styles.activeTab, { borderBottomColor: textPrimary }]]} onPress={() => handleTabPress(0)}><GridIcon color={activeTab === 0 ? textPrimary : textSecondary} /></TouchableOpacity>
             <TouchableOpacity style={[styles.tab, activeTab === 1 && [styles.activeTab, { borderBottomColor: textPrimary }]]} onPress={() => handleTabPress(1)}><VideoIcon color={activeTab === 1 ? textPrimary : textSecondary} /></TouchableOpacity>
             <TouchableOpacity style={[styles.tab, activeTab === 2 && [styles.activeTab, { borderBottomColor: textPrimary }]]} onPress={() => handleTabPress(2)}><TagsIcon color={activeTab === 2 ? textPrimary : textSecondary} /></TouchableOpacity>
+            <TouchableOpacity style={[styles.tab, activeTab === 3 && [styles.activeTab, { borderBottomColor: textPrimary }]]} onPress={() => handleTabPress(3)}><SaveTabIcon color={activeTab === 3 ? textPrimary : textSecondary} /></TouchableOpacity>
           </View>
 
           <HighlightPills highlights={highlights} isDark={isDark} />
 
           <PagerView
             ref={pagerRef}
-            style={{ width: '100%', height: activeTab === 0 ? gridHeight : activeTab === 1 ? videosHeight : tagsHeight }}
+            style={{ width: '100%', height: activeTab === 0 ? gridHeight : activeTab === 1 ? videosHeight : activeTab === 2 ? tagsHeight : savedHeight }}
             initialPage={0}
             onPageSelected={(e) => setActiveTab(e.nativeEvent.position)}
           >
-            <View key="0"><PostsGrid posts={postsData} isDark={isDark} onPreview={showPreview} onPreviewEnd={hidePreview} /></View>
+            <View key="0">
+              <PostsGrid
+                posts={postsData}
+                isDark={isDark}
+                onPreview={showPreview}
+                onPreviewEnd={hidePreview}
+                showDraftsFolder={true}
+                drafts={drafts}
+                onDraftsFolderPress={handleDraftsFolderPress}
+              />
+            </View>
             <View key="1"><VideoGrid videos={videosData} isDark={isDark} onPreview={showPreview} onPreviewEnd={hidePreview} /></View>
             <View key="2">
               <PostsGrid posts={tagsData} isDark={isDark} onPreview={showPreview} onPreviewEnd={hidePreview} />
               {tagsData.length === 0 && <View style={{ padding: 40, alignItems: 'center' }}><Text style={{ color: textSecondary }}>Etiketlenmiş gönderi yok</Text></View>}
+            </View>
+            <View key="3">
+              <PostsGrid posts={savedData} isDark={isDark} onPreview={showPreview} onPreviewEnd={hidePreview} showDraftsFolder={false} />
+              {savedData.length === 0 && <View style={{ padding: 40, alignItems: 'center' }}><Text style={{ color: textSecondary }}>Henüz kaydedilen gönderi yok</Text></View>}
             </View>
           </PagerView>
           <View style={{ height: 100 }} />

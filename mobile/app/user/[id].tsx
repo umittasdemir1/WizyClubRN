@@ -267,8 +267,11 @@ export default function UserProfileScreen() {
 
   const pagerRef = useRef<PagerView>(null);
   const [activeTab, setActiveTab] = useState(0);
-  const gridHeight = Math.ceil(postsData.length / 3) * (Math.floor((SCREEN_WIDTH - 3) / 3) + 1) + 20;
-  const videosHeight = Math.ceil(videosData.length / 3) * (Math.floor((SCREEN_WIDTH - 3) / 3) * (16 / 9) + 1) + 20;
+  const gridItemSize = Math.floor((SCREEN_WIDTH - 8) / 3);
+  const gridItemHeight = gridItemSize * 1.25; // 4:5 ratio
+  const gridHeight = Math.ceil(postsData.length / 3) * (gridItemHeight + 2) + 20;
+
+  const videosHeight = Math.ceil(videosData.length / 3) * (gridItemSize * (16 / 9) + 1) + 20;
   const tagsHeight = 300;
 
   const handleTabPress = (index: number) => { setActiveTab(index); pagerRef.current?.setPage(index); };

@@ -9,6 +9,7 @@ import * as SplashScreen from 'expo-splash-screen';
 
 import { useThemeStore } from '../src/presentation/store/useThemeStore';
 import { useAuthStore } from '../src/presentation/store/useAuthStore';
+import { useDraftCleanup } from '../src/presentation/hooks/useDraftCleanup';
 import { SessionLogService } from '../src/core/services/SessionLogService';
 import { useEffect } from 'react';
 
@@ -18,6 +19,9 @@ SplashScreen.preventAutoHideAsync();
 function RootNavigator() {
     const isDark = useThemeStore((state) => state.isDark);
     const { user, isInitialized, initialize } = useAuthStore();
+
+    // Cleanup expired drafts periodically
+    useDraftCleanup();
 
     useEffect(() => {
         // Initialize auth state on app start

@@ -18,6 +18,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { Video, ResizeMode } from 'expo-av';
 import { useUploadStore } from '../../store/useUploadStore';
+import { useDraftStore } from '../../store/useDraftStore';
 import { ChevronLeft, ChevronRight, Users, Tag, PlusCircle, X } from 'lucide-react-native';
 import { useThemeStore } from '../../store/useThemeStore';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -84,6 +85,7 @@ export function UploadModal({ isVisible, onClose, initialVideo, uploadMode = 'vi
     }, [initialVideo]);
 
     const { startUpload, setProgress, setStatus, setSuccess, setError, setThumbnailUri } = useUploadStore();
+    const { createDraft } = useDraftStore();
 
     const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
     const bgColor = isDark ? '#000000' : '#FFFFFF';
@@ -92,10 +94,48 @@ export function UploadModal({ isVisible, onClose, initialVideo, uploadMode = 'vi
     const borderColor = isDark ? '#2C2C2E' : '#E5E5E5';
     const inputBg = isDark ? '#1C1C1E' : '#F5F5F5';
 
-    const handleSaveDraft = () => {
-        // TODO: Backend'e taslak kaydet
-        Alert.alert('Taslak Kaydedildi', 'Videonuz taslak olarak kaydedildi.');
-        onClose();
+    const handleSaveDraft = async () => {
+        if (!selectedMedia) {
+            Alert.alert('Medya Seçilmedi', 'Taslak kaydetmek için bir fotoğraf veya video seçin.');
+            return;
+        }
+
+        if (!user?.id) {
+            Alert.alert('Giriş Gerekli', 'Taslak kaydetmek için lütfen giriş yapın.');
+            return;
+        }
+
+        try {
+            await createDraft({
+                userId: user.id,
+                mediaUri: selectedMedia.uri,
+                mediaType: selectedMedia.type === 'video' ? 'video' : 'image',
+                thumbnailUri: selectedMedia.uri,
+                description,
+                commercialType,
+                brandName,
+                brandUrl,
+                tags,
+                useAILabel,
+                uploadMode,
+            });
+
+            Alert.alert('Taslak Kaydedildi', 'Videonuz taslak olarak kaydedildi. Profil sayfanızdan erişebilirsiniz.');
+
+            // Reset form
+            setSelectedMedia(null);
+            setDescription('');
+            setCommercialType(null);
+            setBrandName('');
+            setBrandUrl('');
+            setTags([]);
+            setUseAILabel(false);
+
+            onClose();
+        } catch (error) {
+            console.error('[UploadModal] Error saving draft:', error);
+            Alert.alert('Hata', 'Taslak kaydedilirken bir hata oluştu.');
+        }
     };
 
     const handleCoverEdit = () => {

@@ -709,6 +709,175 @@ app.get('/migrate-assets', async (req, res) => {
     }
 });
 
+// ========================================
+// DRAFTS ENDPOINTS
+// ========================================
+
+// Get all drafts for current user
+app.get('/drafts', async (req, res) => {
+    const { userId } = req.query;
+
+    if (!userId) {
+        return res.status(400).json({ error: 'userId is required' });
+    }
+
+    try {
+        const { data, error } = await supabase
+            .from('drafts')
+            .select('*')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error('[DRAFTS] Error fetching drafts:', error);
+        res.status(500).json({ error: 'Failed to fetch drafts' });
+    }
+});
+
+// Get single draft by ID
+app.get('/drafts/:id', async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const { data, error } = await supabase
+            .from('drafts')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (error) throw error;
+
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error('[DRAFTS] Error fetching draft:', error);
+        res.status(500).json({ error: 'Failed to fetch draft' });
+    }
+});
+
+// Create new draft
+app.post('/drafts', async (req, res) => {
+    const {
+        userId,
+        mediaUri,
+        mediaType,
+        thumbnailUri,
+        description,
+        commercialType,
+        brandName,
+        brandUrl,
+        tags,
+        useAILabel,
+        uploadMode
+    } = req.body;
+
+    if (!userId || !mediaUri || !mediaType) {
+        return res.status(400).json({ error: 'userId, mediaUri, and mediaType are required' });
+    }
+
+    try {
+        const { data, error } = await supabase
+            .from('drafts')
+            .insert({
+                user_id: userId,
+                media_uri: mediaUri,
+                media_type: mediaType,
+                thumbnail_uri: thumbnailUri,
+                description: description || null,
+                commercial_type: commercialType || null,
+                brand_name: brandName || null,
+                brand_url: brandUrl || null,
+                tags: tags || [],
+                use_ai_label: useAILabel || false,
+                upload_mode: uploadMode || 'video',
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        console.log(`✅ [DRAFTS] Created draft ${data.id} for user ${userId}`);
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error('[DRAFTS] Error creating draft:', error);
+        res.status(500).json({ error: 'Failed to create draft' });
+    }
+});
+
+// Update draft
+app.patch('/drafts/:id', async (req, res) => {
+    const { id } = req.params;
+    const updates = req.body;
+
+    // Map frontend fields to database fields
+    const dbUpdates = {};
+    if (updates.description !== undefined) dbUpdates.description = updates.description;
+    if (updates.commercialType !== undefined) dbUpdates.commercial_type = updates.commercialType;
+    if (updates.brandName !== undefined) dbUpdates.brand_name = updates.brandName;
+    if (updates.brandUrl !== undefined) dbUpdates.brand_url = updates.brandUrl;
+    if (updates.tags !== undefined) dbUpdates.tags = updates.tags;
+    if (updates.useAILabel !== undefined) dbUpdates.use_ai_label = updates.useAILabel;
+
+    try {
+        const { data, error } = await supabase
+            .from('drafts')
+            .update(dbUpdates)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        console.log(`✅ [DRAFTS] Updated draft ${id}`);
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error('[DRAFTS] Error updating draft:', error);
+        res.status(500).json({ error: 'Failed to update draft' });
+    }
+});
+
+// Delete draft
+app.delete('/drafts/:id', async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const { error } = await supabase
+            .from('drafts')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+
+        console.log(`✅ [DRAFTS] Deleted draft ${id}`);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[DRAFTS] Error deleting draft:', error);
+        res.status(500).json({ error: 'Failed to delete draft' });
+    }
+});
+
+// Cleanup expired drafts (cron job endpoint)
+app.post('/drafts/cleanup', async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('drafts')
+            .delete()
+            .lt('expires_at', new Date().toISOString())
+            .select('id');
+
+        if (error) throw error;
+
+        const count = data?.length || 0;
+        console.log(`🧹 [DRAFTS] Cleaned up ${count} expired drafts`);
+        res.json({ success: true, deletedCount: count });
+    } catch (error) {
+        console.error('[DRAFTS] Error cleaning up drafts:', error);
+        res.status(500).json({ error: 'Failed to cleanup drafts' });
+    }
+});
+
 app.get('/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
