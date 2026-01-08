@@ -14,7 +14,7 @@ import Video from 'react-native-video';
 import MoreIcon from '../../../../assets/icons/more.svg';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const ITEM_WIDTH = SCREEN_WIDTH * 0.44;
+const ITEM_WIDTH = SCREEN_WIDTH * 0.38;
 const ITEM_HEIGHT = ITEM_WIDTH * (16 / 9);
 const ITEM_SPACING = 16;
 
@@ -58,17 +58,20 @@ const TrendingCard = memo(({ item, index, scrollX, onPress, onPreview, onPreview
 
     const thumbnailOpacity = useSharedValue(1);
     const hasTriggeredEnd = useRef(false);
+    const activeStartTime = useRef(Date.now());
 
     useEffect(() => {
         if (isActive) {
             hasTriggeredEnd.current = false;
+            activeStartTime.current = Date.now();
         } else {
             thumbnailOpacity.value = 1;
         }
     }, [isActive]);
 
     const triggerEnd = useCallback(() => {
-        if (isActive && !hasTriggeredEnd.current) {
+        const timeSinceActive = Date.now() - activeStartTime.current;
+        if (isActive && !hasTriggeredEnd.current && timeSinceActive > 1000) {
             hasTriggeredEnd.current = true;
             onVideoEnd?.();
         }
@@ -220,7 +223,7 @@ export function TrendingCarousel({ data, onItemPress, onPreview, onPreviewEnd, i
 
 const styles = StyleSheet.create({
     container: {
-        height: 380,
+        height: 320,
         marginTop: -10,
     },
     scrollContent: {

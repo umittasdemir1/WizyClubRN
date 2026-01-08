@@ -29,3 +29,7 @@ ios/
 debug-output.log
 dump-output.log
 audit_log.txt
+
+# Tools
+ngrok
+ngrok-v3-stable-linux-amd64.tgz
