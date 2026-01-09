@@ -2,17 +2,17 @@ import React, { forwardRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Flag, EyeOff, AlertTriangle } from 'lucide-react-native';
+import { Flag, EyeOff, AlertTriangle, Minimize2 } from 'lucide-react-native';
 import { useThemeStore } from '../../store/useThemeStore';
 import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface MoreOptionsSheetProps {
-    // callbacks
+    onCleanScreenPress?: () => void;
 }
 
-export const MoreOptionsSheet = forwardRef<BottomSheet, MoreOptionsSheetProps>((props, ref) => {
+export const MoreOptionsSheet = forwardRef<BottomSheet, MoreOptionsSheetProps>(({ onCleanScreenPress }, ref) => {
     const { isDark } = useThemeStore();
     const insets = useSafeAreaInsets();
 
@@ -25,6 +25,13 @@ export const MoreOptionsSheet = forwardRef<BottomSheet, MoreOptionsSheetProps>((
     const textColor = isDark ? '#fff' : '#000';
     const borderColor = isDark ? '#333' : '#e5e5e5';
 
+    const handleCleanScreenPress = () => {
+        onCleanScreenPress?.();
+        if (ref && typeof ref !== 'function' && ref.current) {
+            ref.current.close();
+        }
+    };
+
     return (
         <BottomSheet
             ref={ref}
@@ -35,6 +42,13 @@ export const MoreOptionsSheet = forwardRef<BottomSheet, MoreOptionsSheetProps>((
             handleIndicatorStyle={{ backgroundColor: handleColor }}
         >
             <BottomSheetView style={styles.contentContainer}>
+                <OptionItem
+                    icon={<Minimize2 color={textColor} size={24} />}
+                    label="Temiz Ekran"
+                    textColor={textColor}
+                    borderColor={borderColor}
+                    onPress={handleCleanScreenPress}
+                />
                 <OptionItem icon={<Flag color={textColor} size={24} />} label="Raporla" textColor={textColor} borderColor={borderColor} />
                 <OptionItem icon={<EyeOff color={textColor} size={24} />} label="İlgilenmiyorum" textColor={textColor} borderColor={borderColor} />
                 <OptionItem icon={<AlertTriangle color={textColor} size={24} />} label="Başka bir şey" textColor={textColor} borderColor={borderColor} />
@@ -43,9 +57,24 @@ export const MoreOptionsSheet = forwardRef<BottomSheet, MoreOptionsSheetProps>((
     );
 });
 
-function OptionItem({ icon, label, textColor, borderColor }: { icon: React.ReactNode; label: string; textColor: string; borderColor: string }) {
+function OptionItem({
+    icon,
+    label,
+    textColor,
+    borderColor,
+    onPress,
+}: {
+    icon: React.ReactNode;
+    label: string;
+    textColor: string;
+    borderColor: string;
+    onPress?: () => void;
+}) {
     return (
-        <TouchableOpacity style={[styles.optionItem, { borderBottomColor: borderColor }]}>
+        <TouchableOpacity
+            style={[styles.optionItem, { borderBottomColor: borderColor }]}
+            onPress={onPress}
+        >
             {icon}
             <Text style={[styles.optionLabel, { color: textColor }]}>{label}</Text>
         </TouchableOpacity>

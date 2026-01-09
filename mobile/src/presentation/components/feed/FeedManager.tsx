@@ -24,6 +24,7 @@ import {
     useAppStateSync,
     useMuteControls,
 } from '../../store/useActiveVideoStore';
+import { useBrightnessStore } from '../../store/useBrightnessStore';
 import { Video } from '../../../domain/entities/Video';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
@@ -93,6 +94,8 @@ export const FeedManager = ({
     const togglePause = activeVideoStore.togglePause;
     const setScreenFocused = activeVideoStore.setScreenFocused;
     const activeIndex = activeVideoStore.activeIndex;
+    const isCleanScreen = activeVideoStore.isCleanScreen;
+    const setCleanScreen = activeVideoStore.setCleanScreen;
 
     const { stories: storyListData } = useStoryViewer();
 
@@ -117,6 +120,7 @@ export const FeedManager = ({
     const uploadStatus = useUploadStore(state => state.status);
     const uploadedVideoId = useUploadStore(state => state.uploadedVideoId);
     const resetUpload = useUploadStore(state => state.reset);
+    const hideBrightnessController = useBrightnessStore(state => state.hideController);
 
     // Watch for upload success -> Fetch new video and prepend to feed
     useEffect(() => {
@@ -298,6 +302,15 @@ export const FeedManager = ({
         moreOptionsSheetRef.current?.snapToIndex(0);
     }, []);
 
+    const handleCleanScreen = useCallback(() => {
+        setCleanScreen(true);
+        hideBrightnessController();
+        moreOptionsSheetRef.current?.close();
+        sideOptionsSheetRef.current?.close();
+        descriptionSheetRef.current?.close();
+        shoppingSheetRef.current?.close();
+    }, [setCleanScreen, hideBrightnessController]);
+
     const handleStoryPress = useCallback(() => {
         setActiveTab('stories');
     }, []);
@@ -363,6 +376,10 @@ export const FeedManager = ({
         [videos, toggleLike]
     );
 
+    const handleVideoEnd = useCallback(() => {
+        setCleanScreen(false);
+    }, [setCleanScreen]);
+
     const handleSeekReady = useCallback((seekFn: (time: number) => void) => {
         videoSeekRef.current = seekFn;
     }, []);
@@ -394,6 +411,7 @@ export const FeedManager = ({
                     isScrolling={isScrollingSV}
                     isSeeking={isSeeking}
                     uiOpacityStyle={uiOpacityStyle}
+                    isCleanScreen={isCleanScreen}
                     currentUserId={currentUserId}
                     onDoubleTapLike={handleDoubleTapLike}
                     onFeedTap={handleFeedTap}
@@ -406,10 +424,11 @@ export const FeedManager = ({
                     onOpenShopping={handleOpenShopping}
                     onOpenDescription={handleOpenDescription}
                     onLongPress={handleLongPress}
+                    onVideoEnd={handleVideoEnd}
                 />
             );
         },
-        [activeVideoId, isAppActive, isMuted, isSeeking, currentUserId]
+        [activeVideoId, isAppActive, isMuted, isSeeking, currentUserId, isCleanScreen, handleVideoEnd]
     );
 
     const keyExtractor = useCallback((item: Video) => item.id, []);
@@ -451,24 +470,26 @@ export const FeedManager = ({
                     </View>
                 </ScrollView>
 
-                <Animated.View
-                    style={[StyleSheet.absoluteFill, { zIndex: 50 }]}
-                    pointerEvents="box-none"
-                >
-                    <HeaderOverlay
-                        isMuted={isMuted}
-                        onToggleMute={handleToggleMute}
-                        onStoryPress={handleStoryPress}
-                        onMorePress={handleMorePress}
-                        onUploadPress={() => router.push('/upload')}
-                        activeTab={activeTab}
-                        onTabChange={handleTabChange}
-                        showBrightnessButton={false}
-                        hasUnseenStories={hasUnseenStories}
-                        showBack={isCustomFeed}
-                        onBack={() => router.back()}
-                    />
-                </Animated.View>
+                {!isCleanScreen && (
+                    <Animated.View
+                        style={[StyleSheet.absoluteFill, { zIndex: 50 }]}
+                        pointerEvents="box-none"
+                    >
+                        <HeaderOverlay
+                            isMuted={isMuted}
+                            onToggleMute={handleToggleMute}
+                            onStoryPress={handleStoryPress}
+                            onMorePress={handleMorePress}
+                            onUploadPress={() => router.push('/upload')}
+                            activeTab={activeTab}
+                            onTabChange={handleTabChange}
+                            showBrightnessButton={false}
+                            hasUnseenStories={hasUnseenStories}
+                            showBack={isCustomFeed}
+                            onBack={() => router.back()}
+                        />
+                    </Animated.View>
+                )}
 
                 <SideOptionsSheet
                     ref={sideOptionsSheetRef}
@@ -502,7 +523,7 @@ export const FeedManager = ({
                     estimatedItemSize={ITEM_HEIGHT}
                     keyExtractor={keyExtractor}
                     pagingEnabled
-                    decelerationRate={0.985}  // Slightly faster than "fast" (0.99) - more responsive snap
+                    decelerationRate="fast"
                     snapToInterval={ITEM_HEIGHT}
                     snapToAlignment="start"
                     showsVerticalScrollIndicator={false}
@@ -535,26 +556,28 @@ export const FeedManager = ({
                     }}
                 />
 
-                <Animated.View
-                    style={[StyleSheet.absoluteFill, { zIndex: 50 }, uiOpacityStyle]}
-                    pointerEvents={isSeeking ? 'none' : 'box-none'}
-                >
-                    <HeaderOverlay
-                        isMuted={isMuted}
-                        onToggleMute={handleToggleMute}
-                        onStoryPress={handleStoryPress}
-                        onMorePress={handleMorePress}
-                        onUploadPress={() => router.push('/upload')}
-                        activeTab={activeTab}
-                        onTabChange={handleTabChange}
-                        showBrightnessButton={false}
-                        hasUnseenStories={hasUnseenStories}
-                        showBack={isCustomFeed}
-                        onBack={() => router.back()}
-                    />
-                </Animated.View>
+                {!isCleanScreen && (
+                    <Animated.View
+                        style={[StyleSheet.absoluteFill, { zIndex: 50 }, uiOpacityStyle]}
+                        pointerEvents={isSeeking ? 'none' : 'box-none'}
+                    >
+                        <HeaderOverlay
+                            isMuted={isMuted}
+                            onToggleMute={handleToggleMute}
+                            onStoryPress={handleStoryPress}
+                            onMorePress={handleMorePress}
+                            onUploadPress={() => router.push('/upload')}
+                            activeTab={activeTab}
+                            onTabChange={handleTabChange}
+                            showBrightnessButton={false}
+                            hasUnseenStories={hasUnseenStories}
+                            showBack={isCustomFeed}
+                            onBack={() => router.back()}
+                        />
+                    </Animated.View>
+                )}
 
-                {showStories && (
+                {!isCleanScreen && showStories && (
                     <StoryBar
                         isVisible={activeTab === 'stories'}
                         storyUsers={storyUsers}
@@ -563,7 +586,7 @@ export const FeedManager = ({
                     />
                 )}
 
-                {activeTab === 'stories' && (
+                {!isCleanScreen && activeTab === 'stories' && (
                     <Pressable
                         style={styles.touchInterceptor}
                         onPress={handleCloseStoryBar}
@@ -575,7 +598,10 @@ export const FeedManager = ({
                     onDeletePress={handleSheetDelete}
                 />
 
-                <MoreOptionsSheet ref={moreOptionsSheetRef} />
+                <MoreOptionsSheet
+                    ref={moreOptionsSheetRef}
+                    onCleanScreenPress={handleCleanScreen}
+                />
 
                 <DescriptionSheet
                     ref={descriptionSheetRef}
@@ -592,7 +618,7 @@ export const FeedManager = ({
                     ref={shoppingSheetRef}
                 />
 
-                <BrightnessController />
+                {!isCleanScreen && <BrightnessController />}
 
                 <DeleteConfirmationModal
                     visible={isDeleteModalVisible}

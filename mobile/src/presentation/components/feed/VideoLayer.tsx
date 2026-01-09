@@ -29,6 +29,7 @@ interface VideoLayerProps {
     video: VideoEntity;
     isActive: boolean;
     isMuted: boolean;
+    isCleanScreen?: boolean;
     onVideoEnd?: () => void;
     onProgressUpdate?: (progress: number, duration: number) => void;
     onSeekReady?: (seekFn: (time: number) => void) => void;
@@ -44,6 +45,7 @@ export const VideoLayer = memo(function VideoLayer({
     video,
     isActive,
     isMuted,
+    isCleanScreen = false,
     onVideoEnd,
     onProgressUpdate,
     onSeekReady,
@@ -360,6 +362,7 @@ export const VideoLayer = memo(function VideoLayer({
     // Icons
     const showPlayIcon = isPausedGlobal && !isSeeking && isActive && !isFinished && !hasError;
     const showReplayIcon = isFinished && isActive && !hasError;
+    const showUiOverlays = !isCleanScreen;
 
     return (
         <View style={styles.container}>
@@ -417,15 +420,17 @@ export const VideoLayer = memo(function VideoLayer({
             {/* Brightness Overlay */}
             <BrightnessOverlay />
 
-            <LinearGradient
-                colors={['rgba(0,0,0,0.15)', 'transparent', 'transparent', 'rgba(0,0,0,0.5)']}
-                locations={[0, 0.2, 0.6, 1]}
-                style={StyleSheet.absoluteFill}
-                pointerEvents="none"
-            />
+            {showUiOverlays && (
+                <LinearGradient
+                    colors={['rgba(0,0,0,0.15)', 'transparent', 'transparent', 'rgba(0,0,0,0.5)']}
+                    locations={[0, 0.2, 0.6, 1]}
+                    style={StyleSheet.absoluteFill}
+                    pointerEvents="none"
+                />
+            )}
 
             {/* Play/Pause Icon Overlay */}
-            {showPlayIcon && (
+            {showUiOverlays && showPlayIcon && (
                 <View style={styles.touchArea} pointerEvents="none">
                     <View style={styles.iconContainer}>
                         <View style={styles.iconBackground}>
@@ -436,7 +441,7 @@ export const VideoLayer = memo(function VideoLayer({
             )}
 
             {/* Replay Icon Overlay */}
-            {showReplayIcon && (
+            {showUiOverlays && showReplayIcon && (
                 <View style={styles.touchArea} pointerEvents="none">
                     <View style={styles.iconContainer}>
                         <View style={styles.iconBackground}>
@@ -465,7 +470,7 @@ export const VideoLayer = memo(function VideoLayer({
 
 
             {/* Per-Video Seekbar (Only for standard videos) */}
-            {video.postType !== 'carousel' && (
+            {showUiOverlays && video.postType !== 'carousel' && (
                 <VideoSeekBar
                     currentTime={currentTimeSV}
                     duration={durationSV}
@@ -483,7 +488,8 @@ export const VideoLayer = memo(function VideoLayer({
     return (
         prev.video.id === next.video.id &&
         prev.isActive === next.isActive &&
-        prev.isMuted === next.isMuted
+        prev.isMuted === next.isMuted &&
+        prev.isCleanScreen === next.isCleanScreen
     );
 });
 

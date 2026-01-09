@@ -21,6 +21,7 @@ interface FeedItemProps {
     isScrolling: SharedValue<boolean>;
     isSeeking: boolean;
     uiOpacityStyle: any;
+    isCleanScreen: boolean;
     onDoubleTapLike: (videoId: string) => void;
     onFeedTap: () => void;
     onSeekReady?: (seekFn: (time: number) => void) => void;
@@ -33,6 +34,7 @@ interface FeedItemProps {
     onOpenDescription: () => void;
     currentUserId?: string;
     onLongPress?: () => void;
+    onVideoEnd?: () => void;
 }
 
 export const FeedItem = memo(function FeedItem({
@@ -42,6 +44,7 @@ export const FeedItem = memo(function FeedItem({
     isScrolling,
     isSeeking,
     uiOpacityStyle,
+    isCleanScreen,
     currentUserId,
     onDoubleTapLike,
     onFeedTap,
@@ -54,6 +57,7 @@ export const FeedItem = memo(function FeedItem({
     onOpenShopping,
     onOpenDescription,
     onLongPress,
+    onVideoEnd,
 }: FeedItemProps) {
     const router = useRouter();
     const insets = useSafeAreaInsets();
@@ -95,39 +99,43 @@ export const FeedItem = memo(function FeedItem({
                         isScrolling={isScrolling}
                         onSeekReady={isActive ? onSeekReady : undefined}
                         onRemoveVideo={() => onRemoveVideo(video.id)}
+                        onVideoEnd={onVideoEnd}
+                        isCleanScreen={isCleanScreen}
                     />
                 </View>
             </DoubleTapLike>
 
-            <Animated.View
-                style={[StyleSheet.absoluteFill, { zIndex: 50, paddingTop: insets.top }, uiOpacityStyle]}
-                pointerEvents={isSeeking ? 'none' : 'box-none'}
-            >
-                <ActionButtons
-                    ref={actionButtonsRef}
-                    isLiked={video.isLiked}
-                    likesCount={video.likesCount}
-                    isSaved={video.isSaved}
-                    savesCount={video.savesCount || 0}
-                    sharesCount={video.sharesCount}
-                    shopsCount={video.shopsCount || 0}
-                    videoId={video.id}
-                    onLike={handleLikePress}
-                    onSave={() => onToggleSave(video.id)}
-                    onShare={() => onToggleShare(video.id)}
-                    onShop={onOpenShopping}
-                    onProfilePress={() => router.push(`/user/${video.user.id}`)}
-                />
+            {!isCleanScreen && (
+                <Animated.View
+                    style={[StyleSheet.absoluteFill, { zIndex: 50, paddingTop: insets.top }, uiOpacityStyle]}
+                    pointerEvents={isSeeking ? 'none' : 'box-none'}
+                >
+                    <ActionButtons
+                        ref={actionButtonsRef}
+                        isLiked={video.isLiked}
+                        likesCount={video.likesCount}
+                        isSaved={video.isSaved}
+                        savesCount={video.savesCount || 0}
+                        sharesCount={video.sharesCount}
+                        shopsCount={video.shopsCount || 0}
+                        videoId={video.id}
+                        onLike={handleLikePress}
+                        onSave={() => onToggleSave(video.id)}
+                        onShare={() => onToggleShare(video.id)}
+                        onShop={onOpenShopping}
+                        onProfilePress={() => router.push(`/user/${video.user.id}`)}
+                    />
 
-                <MetadataLayer
-                    video={video}
-                    currentUserId={currentUserId}
-                    onAvatarPress={() => router.push(`/user/${video.user.id}`)}
-                    onFollowPress={() => onToggleFollow(video.id)}
-                    onReadMorePress={onOpenDescription}
-                    onCommercialTagPress={() => console.log('Open Commercial Info')}
-                />
-            </Animated.View>
+                    <MetadataLayer
+                        video={video}
+                        currentUserId={currentUserId}
+                        onAvatarPress={() => router.push(`/user/${video.user.id}`)}
+                        onFollowPress={() => onToggleFollow(video.id)}
+                        onReadMorePress={onOpenDescription}
+                        onCommercialTagPress={() => console.log('Open Commercial Info')}
+                    />
+                </Animated.View>
+            )}
         </View>
     );
 }, (prevProps, nextProps) => {
@@ -137,7 +145,8 @@ export const FeedItem = memo(function FeedItem({
         prevProps.isMuted === nextProps.isMuted &&
         prevProps.video.isLiked === nextProps.video.isLiked &&
         prevProps.video.isSaved === nextProps.video.isSaved &&
-        prevProps.video.user.isFollowing === nextProps.video.user.isFollowing
+        prevProps.video.user.isFollowing === nextProps.video.user.isFollowing &&
+        prevProps.isCleanScreen === nextProps.isCleanScreen
     );
 });
 
