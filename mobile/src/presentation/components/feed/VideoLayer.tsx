@@ -83,7 +83,7 @@ export const VideoLayer = memo(function VideoLayer({
 
     // Poster State (Manual Overlay)
     const [showPoster, setShowPoster] = useState(true);
-    const [isReadyForDisplay, setIsReadyForDisplay] = useState(false); // Track if first frame is rendered
+    // Removed isReadyForDisplay - causes 1.4s delay on scroll because paused videos don't trigger onReadyForDisplay
 
     // Cache-First Strategy: Don't set source until we check cache
     const [videoSource, setVideoSource] = useState<any>(null);
@@ -172,7 +172,6 @@ export const VideoLayer = memo(function VideoLayer({
         // Reset states
         setIsSourceReady(false);
         setShowPoster(true);
-        setIsReadyForDisplay(false); // Reset ready state
         memoryCachedRef.current = false;
         hasInitialSeekPerformed.current = false;
 
@@ -247,12 +246,16 @@ export const VideoLayer = memo(function VideoLayer({
         setDuration(data.duration);
         durationSV.value = data.duration;
         setHasError(false);
-        // setShowPoster(false); // REMOVED: Wait for ReadyForDisplay
 
-        // Track performance silently
+        // 🔥 FIX: Hide poster immediately for cached videos (they load fast)
+        // For network videos, wait for onReadyForDisplay to avoid flickering
         const source = videoSource?.uri?.startsWith('file://')
             ? 'disk-cache'
             : isHLS ? 'network' : memoryCachedRef.current ? 'memory-cache' : 'network';
+
+        if (source === 'disk-cache' || source === 'memory-cache') {
+            setShowPoster(false);
+        }
 
         PerformanceLogger.endTransition(video.id, source);
 
@@ -369,14 +372,13 @@ export const VideoLayer = memo(function VideoLayer({
                         resizeMode={resizeMode}
                         repeat={false}
                         controls={false}
-                        paused={!shouldPlay || !isReadyForDisplay}
+                        paused={!shouldPlay}
                         muted={isMuted}
                         bufferConfig={bufferConfig}
                         onLoad={handleLoad}
                         onReadyForDisplay={() => {
-                            // 🔥 CRITICAL: Hide poster ONLY when first frame is ready
+                            // 🔥 CRITICAL: Hide poster when first frame is ready
                             setShowPoster(false);
-                            setIsReadyForDisplay(true);
                         }}
                         onError={handleVideoError}
                         onProgress={handleProgress}
