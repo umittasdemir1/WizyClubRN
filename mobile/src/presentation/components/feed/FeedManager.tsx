@@ -9,13 +9,18 @@ import {
     RefreshControl,
     ScrollView,
     Pressable,
+    Share,
+    Alert,
+    TouchableOpacity,
+    Modal,
+    PanResponder,
+    Animated as RNAnimated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HeaderOverlay } from './HeaderOverlay';
 import { FeedItem } from './FeedItem';
 import { DeleteConfirmationModal } from './DeleteConfirmationModal';
 import { DescriptionSheet } from '../sheets/DescriptionSheet';
-import { ShoppingSheet } from '../sheets/ShoppingSheet';
 import { MoreOptionsSheet } from '../sheets/MoreOptionsSheet';
 import {
     useActiveVideoStore,
@@ -33,11 +38,14 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { SwipeWrapper } from '../shared/SwipeWrapper';
 import { StoryBar } from './StoryBar';
 import { useStoryViewer } from '../../hooks/useStoryViewer';
-import { COLORS } from '../../../core/constants';
+import { COLORS, LIGHT_COLORS } from '../../../core/constants';
 import React from 'react';
 import { StatusBar as RNStatusBar } from 'react-native';
+import { WebView } from 'react-native-webview';
+import { ChevronLeft } from 'lucide-react-native';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
+const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 const VIEWABILITY_CONFIG = {
     itemVisiblePercentThreshold: 60,
@@ -179,10 +187,11 @@ export const FeedManager = ({
 
     // Delete modal state
     const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
+    const [webViewUrl, setWebViewUrl] = useState<string | null>(null);
+    const [isWebViewVisible, setWebViewVisible] = useState(false);
 
     // Sheet refs
     const descriptionSheetRef = useRef<BottomSheet>(null);
-    const shoppingSheetRef = useRef<BottomSheet>(null);
     const moreOptionsSheetRef = useRef<BottomSheet>(null);
 
     // App State Sync
@@ -195,6 +204,28 @@ export const FeedManager = ({
     const insets = useSafeAreaInsets();
     const router = useRouter();
     const listRef = useRef<any>(null);
+    const webSheetTranslateY = useRef(new RNAnimated.Value(0)).current;
+    const webSheetPanResponder = useRef(
+        PanResponder.create({
+            onMoveShouldSetPanResponder: (_, gesture) => gesture.dy > 4,
+            onPanResponderMove: (_, gesture) => {
+                if (gesture.dy > 0) {
+                    webSheetTranslateY.setValue(gesture.dy);
+                }
+            },
+            onPanResponderRelease: (_, gesture) => {
+                if (gesture.dy > 120) {
+                    setWebViewVisible(false);
+                    webSheetTranslateY.setValue(0);
+                    return;
+                }
+                RNAnimated.spring(webSheetTranslateY, {
+                    toValue: 0,
+                    useNativeDriver: true,
+                }).start();
+            },
+        })
+    ).current;
 
     const ITEM_HEIGHT = Dimensions.get('window').height;
 
@@ -202,6 +233,12 @@ export const FeedManager = ({
     useEffect(() => {
         videosRef.current = videos;
     }, [videos]);
+
+    useEffect(() => {
+        if (isWebViewVisible) {
+            webSheetTranslateY.setValue(0);
+        }
+    }, [isWebViewVisible, webSheetTranslateY]);
 
     // Imperative StatusBar Control
     useFocusEffect(
@@ -338,7 +375,6 @@ export const FeedManager = ({
         setCleanScreen(nextCleanScreen);
         moreOptionsSheetRef.current?.close();
         descriptionSheetRef.current?.close();
-        shoppingSheetRef.current?.close();
     }, [isCleanScreen, setCleanScreen]);
 
     const handleStoryPress = useCallback(() => {
@@ -382,8 +418,18 @@ export const FeedManager = ({
         }
     }, [togglePause]);
 
-    const handleOpenShopping = useCallback(() => {
-        shoppingSheetRef.current?.snapToIndex(0);
+    const handleOpenShopping = useCallback(async (videoId: string) => {
+        const video = videosRef.current.find((v) => v.id === videoId);
+        const rawUrl = video?.brandUrl;
+
+        if (!rawUrl) {
+            Alert.alert('Link bulunamadı', 'Bu video için bir alışveriş linki yok.');
+            return;
+        }
+
+        const url = rawUrl.match(/^https?:\/\//) ? rawUrl : `https://${rawUrl}`;
+        setWebViewUrl(url);
+        setWebViewVisible(true);
     }, []);
 
     const handleDeletePress = useCallback(() => {
@@ -427,6 +473,21 @@ export const FeedManager = ({
         deleteVideo(videoId);
     }, [deleteVideo]);
 
+    const handleSharePress = useCallback(async (videoId: string) => {
+        const video = videosRef.current.find((v) => v.id === videoId);
+        if (!video) return;
+
+        const shareUrl = `wizyclub://video/${videoId}`;
+        const message = video.description ? `${video.description}\n${shareUrl}` : shareUrl;
+
+        try {
+            await Share.share({ message, url: shareUrl });
+            toggleShare(videoId);
+        } catch (error) {
+            console.error('[Share] Failed to open share sheet:', error);
+        }
+    }, [toggleShare]);
+
     const { user } = useAuthStore();
     const currentUserId = user?.id;
 
@@ -449,7 +510,7 @@ export const FeedManager = ({
                     onRemoveVideo={handleRemoveVideo}
                     onToggleLike={toggleLike}
                     onToggleSave={toggleSave}
-                    onToggleShare={toggleShare}
+                    onToggleShare={handleSharePress}
                     onToggleFollow={toggleFollow}
                     onOpenShopping={handleOpenShopping}
                     onOpenDescription={handleOpenDescription}
@@ -638,10 +699,6 @@ export const FeedManager = ({
                     }}
                 />
 
-                <ShoppingSheet
-                    ref={shoppingSheetRef}
-                />
-
                 <DeleteConfirmationModal
                     visible={isDeleteModalVisible}
                     onCancel={() => setDeleteModalVisible(false)}
@@ -652,6 +709,43 @@ export const FeedManager = ({
                         setDeleteModalVisible(false);
                     }}
                 />
+
+                <Modal
+                    visible={isWebViewVisible}
+                    transparent={true}
+                    animationType="slide"
+                    onRequestClose={() => setWebViewVisible(false)}
+                >
+                    <View style={styles.webSheetBackdrop}>
+                        <RNAnimated.View
+                            style={[
+                                styles.webSheetContainer,
+                                { transform: [{ translateY: webSheetTranslateY }] },
+                            ]}
+                        >
+                            <View style={styles.webSheetDragArea} {...webSheetPanResponder.panHandlers}>
+                                <View style={styles.webSheetHandle} />
+                                <View style={styles.webSheetHeader}>
+                                    <TouchableOpacity
+                                        onPress={() => setWebViewVisible(false)}
+                                        style={[styles.webSheetClose, styles.webSheetCloseButton]}
+                                    >
+                                        <ChevronLeft size={22} color={LIGHT_COLORS.textPrimary} strokeWidth={1.2} />
+                                    </TouchableOpacity>
+                                    <View style={styles.webSheetClose} />
+                                </View>
+                            </View>
+                            {webViewUrl && (
+                                <WebView
+                                    source={{ uri: webViewUrl }}
+                                    startInLoadingState={true}
+                                    originWhitelist={['*']}
+                                    style={styles.webSheetWebView}
+                                />
+                            )}
+                        </RNAnimated.View>
+                    </View>
+                </Modal>
             </View>
         </SwipeWrapper>
     );
@@ -678,6 +772,53 @@ const styles = StyleSheet.create({
     touchInterceptor: {
         ...StyleSheet.absoluteFillObject,
         zIndex: 999,
+        backgroundColor: 'transparent',
+    },
+    webSheetBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        justifyContent: 'flex-end',
+    },
+    webSheetContainer: {
+        height: '92%',
+        backgroundColor: LIGHT_COLORS.background,
+        borderTopLeftRadius: 28,
+        borderTopRightRadius: 28,
+        overflow: 'hidden',
+    },
+    webSheetDragArea: {
+        backgroundColor: LIGHT_COLORS.background,
+    },
+    webSheetHandle: {
+        alignSelf: 'center',
+        width: 32,
+        height: 3,
+        borderRadius: 2,
+        backgroundColor: LIGHT_COLORS.black,
+        marginTop: 10,
+        marginBottom: 8,
+    },
+    webSheetHeader: {
+        height: 24,
+        paddingHorizontal: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderBottomWidth: 1,
+        borderBottomColor: LIGHT_COLORS.border,
+        backgroundColor: LIGHT_COLORS.background,
+    },
+    webSheetClose: {
+        width: 44,
+        justifyContent: 'center',
+        alignItems: 'flex-start',
+    },
+    webSheetCloseButton: {
+        marginTop: -16,
+        marginLeft: 10,
+    },
+    webSheetWebView: {
+        flex: 1,
         backgroundColor: 'transparent',
     },
 });

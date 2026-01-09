@@ -1,4 +1,4 @@
-import React, { memo, useState, useEffect, forwardRef, useImperativeHandle, useRef } from 'react';
+import React, { memo, useState, useEffect, forwardRef, useImperativeHandle, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -8,6 +8,9 @@ import Animated, {
     withTiming,
     withRepeat,
     Easing,
+    interpolate,
+    Extrapolate,
+    SharedValue,
 } from 'react-native-reanimated';
 import { Heart, Bookmark, Send, ShoppingBag } from 'lucide-react-native';
 
@@ -39,6 +42,13 @@ const SAVE_COLOR = '#FFD700';
 const WHITE = '#FFFFFF';
 
 const HEARTBEAT_DURATION = 80;
+const BURST_DURATION = 600;
+const BURST_SIZE = 64;
+const PARTICLE_COUNT = 12;
+const PARTICLE_DISTANCE = 32;
+const PARTICLE_SIZE = 4;
+const LIKE_PARTICLE_COLORS = ['#FF2146', '#FF3B30', '#FF6B6B', '#FF8A80'];
+const SAVE_PARTICLE_COLORS = ['#FFD700', '#FFC107', '#FFB300', '#FFE082'];
 
 
 interface ActionButtonProps {
@@ -50,25 +60,54 @@ interface ActionButtonProps {
     isActive: boolean;
     activeColor: string;
     canToggle?: boolean; // If false, no color change on press
+    enableBurst?: boolean;
+    burstColors?: string[];
 }
 
 interface ActionButtonRef {
     animate: () => void;
 }
 
+function BurstParticle({ angle, color, burst }: { angle: number; color: string; burst: SharedValue<number> }) {
+    const animatedStyle = useAnimatedStyle(() => {
+        const progress = burst.value;
+        const distance = interpolate(progress, [0, 1], [0, PARTICLE_DISTANCE], Extrapolate.CLAMP);
+        const opacity = interpolate(progress, [0, 0.2, 1], [0, 1, 0], Extrapolate.CLAMP);
+        const scale = interpolate(progress, [0, 0.2, 1], [0.5, 1, 0.8], Extrapolate.CLAMP);
+        return {
+            opacity,
+            transform: [
+                { translateX: Math.cos(angle) * distance },
+                { translateY: Math.sin(angle) * distance },
+                { scale },
+            ],
+        };
+    });
+
+    return <Animated.View style={[styles.particle, { backgroundColor: color }, animatedStyle]} />;
+}
+
 const ActionButton = forwardRef<ActionButtonRef, ActionButtonProps>(
-    ({ onPress, IconComponent, count, zeroText, videoId, isActive, activeColor, canToggle = true }, ref) => {
+    ({ onPress, IconComponent, count, zeroText, videoId, isActive, activeColor, canToggle = true, enableBurst = false, burstColors = LIKE_PARTICLE_COLORS }, ref) => {
         const [localActive, setLocalActive] = useState(isActive);
         const scale = useSharedValue(1);
         const isZero = count === '0';
+        const burst = useSharedValue(0);
 
         useEffect(() => {
             setLocalActive(isActive);
         }, [isActive]);
 
+        const triggerBurst = useCallback(() => {
+            if (!enableBurst) return;
+            burst.value = 0;
+            burst.value = withTiming(1, { duration: BURST_DURATION, easing: Easing.out(Easing.ease) });
+        }, [enableBurst, burst]);
+
         useImperativeHandle(ref, () => ({
             animate: () => {
                 setLocalActive(true);
+                triggerBurst();
                 scale.value = withSequence(
                     withTiming(1.3, { duration: HEARTBEAT_DURATION, easing: Easing.out(Easing.ease) }),
                     withTiming(0.9, { duration: HEARTBEAT_DURATION, easing: Easing.inOut(Easing.ease) }),
@@ -83,8 +122,9 @@ const ActionButton = forwardRef<ActionButtonRef, ActionButtonProps>(
         }));
 
         const handlePress = () => {
+            const nextActive = canToggle ? !localActive : localActive;
             if (canToggle) {
-                setLocalActive(prev => !prev);
+                setLocalActive(nextActive);
             }
 
             scale.value = withSequence(
@@ -94,12 +134,14 @@ const ActionButton = forwardRef<ActionButtonRef, ActionButtonProps>(
                 withTiming(1, { duration: HEARTBEAT_DURATION, easing: Easing.out(Easing.ease) })
             );
 
+            if (nextActive) {
+                triggerBurst();
+            }
             onPress();
         };
 
         const iconColor = localActive ? activeColor : WHITE;
         const iconFill = localActive ? activeColor : 'none';
-
         return (
             <Pressable
                 onPress={handlePress}
@@ -107,6 +149,22 @@ const ActionButton = forwardRef<ActionButtonRef, ActionButtonProps>(
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
                 <Animated.View style={[styles.iconWrapper, animatedStyle]}>
+                    {enableBurst && (
+                        <View style={styles.particles}>
+                            {Array.from({ length: PARTICLE_COUNT }).map((_, index) => {
+                                const angle = (Math.PI * 2 * Math.random());
+                                const color = burstColors[index % burstColors.length];
+                                return (
+                                    <BurstParticle
+                                        key={index}
+                                        angle={angle}
+                                        color={color}
+                                        burst={burst}
+                                    />
+                                );
+                            })}
+                        </View>
+                    )}
                     <IconComponent
                         size={ICON_SIZE}
                         color={iconColor}
@@ -162,6 +220,8 @@ export const ActionButtons = memo(forwardRef<ActionButtonsRef, ActionButtonsProp
                 onPress={onLike}
                 isActive={isLiked}
                 activeColor={LIKE_COLOR}
+                enableBurst={true}
+                burstColors={LIKE_PARTICLE_COLORS}
             />
 
             <ActionButton
@@ -172,6 +232,8 @@ export const ActionButtons = memo(forwardRef<ActionButtonsRef, ActionButtonsProp
                 onPress={onSave}
                 isActive={isSaved}
                 activeColor={SAVE_COLOR}
+                enableBurst={true}
+                burstColors={SAVE_PARTICLE_COLORS}
             />
 
             <ActionButton
@@ -224,6 +286,20 @@ const styles = StyleSheet.create({
     iconWrapper: {
         justifyContent: 'center',
         alignItems: 'center',
+        position: 'relative',
+    },
+    particles: {
+        position: 'absolute',
+        width: BURST_SIZE,
+        height: BURST_SIZE,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    particle: {
+        position: 'absolute',
+        width: PARTICLE_SIZE,
+        height: PARTICLE_SIZE,
+        borderRadius: PARTICLE_SIZE / 2,
     },
     countContainer: {
         height: 18,

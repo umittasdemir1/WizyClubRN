@@ -30,7 +30,7 @@ interface FeedItemProps {
     onToggleSave: (videoId: string) => void;
     onToggleShare: (videoId: string) => void;
     onToggleFollow: (videoId: string) => void;
-    onOpenShopping: () => void;
+    onOpenShopping: (videoId: string) => void;
     onOpenDescription: () => void;
     currentUserId?: string;
     onLongPress?: (event: GestureResponderEvent) => void;
@@ -128,7 +128,7 @@ export const FeedItem = memo(function FeedItem({
                         onLike={handleLikePress}
                         onSave={() => onToggleSave(video.id)}
                         onShare={() => onToggleShare(video.id)}
-                        onShop={onOpenShopping}
+                        onShop={() => onOpenShopping(video.id)}
                         onProfilePress={() => router.push(`/user/${video.user.id}`)}
                     />
 
