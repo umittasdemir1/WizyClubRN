@@ -70,6 +70,13 @@ export const VideoLayer = memo(function VideoLayer({
 
     const shouldPlay = isActive && isAppActive && isScreenFocused && !isSeeking && !isPausedGlobal && !isFinished && !hasError;
 
+    // Debug: Log when shouldPlay changes
+    useEffect(() => {
+        if (isActive) {
+            console.log(`[VideoTransition] 🎮 shouldPlay=${shouldPlay} for ${video.id} at ${Date.now()}`);
+        }
+    }, [shouldPlay, isActive, video.id]);
+
     // 🔥 CRITICAL: Calculate resizeMode UPFRONT using pre-stored dimensions
     // This prevents re-render during video load which causes 2-3 second delay!
     const [resizeMode, setResizeMode] = useState<'cover' | 'contain' | 'stretch'>(() => {
@@ -133,12 +140,14 @@ export const VideoLayer = memo(function VideoLayer({
                 return;
             }
 
+            console.log(`[VideoTransition] 🔍 Source init START for ${video.id} at ${Date.now()}`);
+
             // STEP 1: Memory cache (synchronous, instant)
             const memoryCached = VideoCacheService.getMemoryCachedPath(video.videoUrl);
 
             if (memoryCached && !isCancelled) {
                 const isHLS = video.videoUrl.endsWith('.m3u8');
-                // Reduced log spam - only log if not from memory cache
+                console.log(`[VideoTransition] 🚀 Memory cache HIT: ${video.id} in ${Date.now() - startTime}ms`);
                 memoryCachedRef.current = !isHLS;
                 setVideoSource({ uri: memoryCached });
                 setIsSourceReady(true);
@@ -150,10 +159,7 @@ export const VideoLayer = memo(function VideoLayer({
             const checkTime = Date.now() - startTime;
 
             if (diskCached && !isCancelled) {
-                // Only log if check took >200ms (slow disk)
-                if (checkTime > 200) {
-                    console.log(`[TIMING] ⚡ Disk cache HIT: ${video.id} | ${checkTime}ms`);
-                }
+                console.log(`[VideoTransition] ⚡ Disk cache HIT: ${video.id} in ${checkTime}ms`);
                 memoryCachedRef.current = false;
                 setVideoSource({ uri: diskCached });
                 setIsSourceReady(true);
@@ -162,7 +168,7 @@ export const VideoLayer = memo(function VideoLayer({
 
             // STEP 3: Network fallback (slow)
             if (!isCancelled) {
-                console.log(`[TIMING] 🌐 Network MISS: ${video.id} | ${Date.now() - startTime}ms`);
+                console.log(`[VideoTransition] 🌐 Network MISS: ${video.id} in ${Date.now() - startTime}ms`);
                 memoryCachedRef.current = false;
                 setVideoSource({ uri: video.videoUrl });
                 setIsSourceReady(true);
@@ -197,7 +203,7 @@ export const VideoLayer = memo(function VideoLayer({
     // 🔥 ALWAYS start from beginning when becoming active
     useEffect(() => {
         if (isActive) {
-            // Silently restart video (user doesn't need to see this)
+            console.log(`[VideoTransition] ⏱️ Video ${video.id} became ACTIVE at ${Date.now()}`);
             videoRef.current?.seek(0);
             currentTimeSV.value = 0;
             setIsFinished(false);
@@ -243,6 +249,8 @@ export const VideoLayer = memo(function VideoLayer({
     // const shouldPlay = isActive && isAppActive && !isSeeking && !isPausedGlobal && !isFinished && !hasError;
 
     const handleLoad = useCallback((data: OnLoadData) => {
+        console.log(`[VideoTransition] 📦 onLoad triggered for ${video.id} at ${Date.now()}`);
+
         setDuration(data.duration);
         durationSV.value = data.duration;
         setHasError(false);
@@ -254,6 +262,7 @@ export const VideoLayer = memo(function VideoLayer({
             : isHLS ? 'network' : memoryCachedRef.current ? 'memory-cache' : 'network';
 
         if (source === 'disk-cache' || source === 'memory-cache') {
+            console.log(`[VideoTransition] 🖼️ Poster HIDDEN (cached) for ${video.id} at ${Date.now()}`);
             setShowPoster(false);
         }
 
@@ -378,6 +387,7 @@ export const VideoLayer = memo(function VideoLayer({
                         onLoad={handleLoad}
                         onReadyForDisplay={() => {
                             // 🔥 CRITICAL: Hide poster when first frame is ready
+                            console.log(`[VideoTransition] 🎬 onReadyForDisplay for ${video.id} at ${Date.now()}`);
                             setShowPoster(false);
                         }}
                         onError={handleVideoError}
