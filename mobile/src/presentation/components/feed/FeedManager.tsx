@@ -18,6 +18,7 @@ import { SideOptionsSheet } from './SideOptionsSheet';
 import { DeleteConfirmationModal } from './DeleteConfirmationModal';
 import { DescriptionSheet } from '../sheets/DescriptionSheet';
 import { ShoppingSheet } from '../sheets/ShoppingSheet';
+import { MoreOptionsSheet } from '../sheets/MoreOptionsSheet';
 import {
     useActiveVideoStore,
     useAppStateSync,
@@ -182,6 +183,7 @@ export const FeedManager = ({
     const sideOptionsSheetRef = useRef<BottomSheet>(null);
     const descriptionSheetRef = useRef<BottomSheet>(null);
     const shoppingSheetRef = useRef<BottomSheet>(null);
+    const moreOptionsSheetRef = useRef<BottomSheet>(null);
 
     // App State Sync
     useAppStateSync();
@@ -292,6 +294,10 @@ export const FeedManager = ({
         sideOptionsSheetRef.current?.snapToIndex(0);
     }, []);
 
+    const handleLongPress = useCallback(() => {
+        moreOptionsSheetRef.current?.snapToIndex(0);
+    }, []);
+
     const handleStoryPress = useCallback(() => {
         setActiveTab('stories');
     }, []);
@@ -399,6 +405,7 @@ export const FeedManager = ({
                     onToggleFollow={toggleFollow}
                     onOpenShopping={handleOpenShopping}
                     onOpenDescription={handleOpenDescription}
+                    onLongPress={handleLongPress}
                 />
             );
         },
@@ -567,6 +574,8 @@ export const FeedManager = ({
                     ref={sideOptionsSheetRef}
                     onDeletePress={handleSheetDelete}
                 />
+
+                <MoreOptionsSheet ref={moreOptionsSheetRef} />
 
                 <DescriptionSheet
                     ref={descriptionSheetRef}

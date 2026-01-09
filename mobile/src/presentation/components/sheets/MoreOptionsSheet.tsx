@@ -35,9 +35,9 @@ export const MoreOptionsSheet = forwardRef<BottomSheet, MoreOptionsSheetProps>((
             handleIndicatorStyle={{ backgroundColor: handleColor }}
         >
             <BottomSheetView style={styles.contentContainer}>
-                <OptionItem icon={<Flag color={textColor} size={24} />} label="Report" textColor={textColor} borderColor={borderColor} />
-                <OptionItem icon={<EyeOff color={textColor} size={24} />} label="Not Interested" textColor={textColor} borderColor={borderColor} />
-                <OptionItem icon={<AlertTriangle color={textColor} size={24} />} label="Something else" textColor={textColor} borderColor={borderColor} />
+                <OptionItem icon={<Flag color={textColor} size={24} />} label="Raporla" textColor={textColor} borderColor={borderColor} />
+                <OptionItem icon={<EyeOff color={textColor} size={24} />} label="İlgilenmiyorum" textColor={textColor} borderColor={borderColor} />
+                <OptionItem icon={<AlertTriangle color={textColor} size={24} />} label="Başka bir şey" textColor={textColor} borderColor={borderColor} />
             </BottomSheetView>
         </BottomSheet>
     );

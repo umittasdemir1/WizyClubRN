@@ -32,6 +32,7 @@ interface FeedItemProps {
     onOpenShopping: () => void;
     onOpenDescription: () => void;
     currentUserId?: string;
+    onLongPress?: () => void;
 }
 
 export const FeedItem = memo(function FeedItem({
@@ -52,6 +53,7 @@ export const FeedItem = memo(function FeedItem({
     onToggleFollow,
     onOpenShopping,
     onOpenDescription,
+    onLongPress,
 }: FeedItemProps) {
     const router = useRouter();
     const insets = useSafeAreaInsets();
@@ -83,6 +85,7 @@ export const FeedItem = memo(function FeedItem({
                 ref={doubleTapRef}
                 onDoubleTap={handleDoubleTap}
                 onSingleTap={onFeedTap}
+                onLongPress={onLongPress}
             >
                 <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', paddingTop: insets.top }]}>
                     <VideoLayer

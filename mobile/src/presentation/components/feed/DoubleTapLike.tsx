@@ -14,6 +14,7 @@ interface DoubleTapLikeProps {
     children: React.ReactNode;
     onDoubleTap: () => void;
     onSingleTap?: () => void;
+    onLongPress?: () => void;
 }
 
 export interface DoubleTapLikeRef {
@@ -24,12 +25,13 @@ const HEART_COLOR = '#FF2146';
 const DOUBLE_TAP_DELAY = 250;
 
 const DoubleTapLikeComponent = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
-    ({ children, onDoubleTap, onSingleTap }, ref) => {
+    ({ children, onDoubleTap, onSingleTap, onLongPress }, ref) => {
         const scale = useSharedValue(0);
         const opacity = useSharedValue(0);
         const rotation = useSharedValue(0);
         const tapCount = useRef(0);
         const tapTimer = useRef<NodeJS.Timeout | null>(null);
+        const longPressTriggered = useRef(false);
 
         const performAnimation = useCallback(() => {
             const randomAngle = Math.random() * 30 - 15;
@@ -50,6 +52,10 @@ const DoubleTapLikeComponent = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
         }));
 
         const handlePress = useCallback(() => {
+            if (longPressTriggered.current) {
+                longPressTriggered.current = false;
+                return;
+            }
             tapCount.current += 1;
 
             if (tapCount.current === 1) {
@@ -72,6 +78,17 @@ const DoubleTapLikeComponent = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
             }
         }, [onDoubleTap, onSingleTap, performAnimation]);
 
+        const handleLongPress = useCallback(() => {
+            if (!onLongPress) return;
+            longPressTriggered.current = true;
+            if (tapTimer.current) {
+                clearTimeout(tapTimer.current);
+                tapTimer.current = null;
+            }
+            tapCount.current = 0;
+            onLongPress();
+        }, [onLongPress]);
+
         const animatedStyle = useAnimatedStyle(() => ({
             transform: [
                 { scale: Math.max(scale.value, 0) },
@@ -84,7 +101,10 @@ const DoubleTapLikeComponent = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
             <View style={styles.container}>
                 {children}
 
-                <TouchableWithoutFeedback onPress={handlePress}>
+                <TouchableWithoutFeedback
+                    onPress={handlePress}
+                    onLongPress={onLongPress ? handleLongPress : undefined}
+                >
                     <View style={styles.tapLayer} />
                 </TouchableWithoutFeedback>
 
