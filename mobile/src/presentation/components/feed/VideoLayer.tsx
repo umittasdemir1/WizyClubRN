@@ -57,18 +57,7 @@ export const VideoLayer = memo(function VideoLayer({
     const isPausedGlobal = useActiveVideoStore((state) => state.isPaused);
     const setPaused = useActiveVideoStore((state) => state.setPaused);
 
-    // Debug Pause Logic
-    useEffect(() => {
-        if (isActive) {
-            console.log(`[VideoLayer] ${video.id} State Update:`, {
-                isActive,
-                isAppActive,
-                isScreenFocused,
-                isPausedGlobal,
-                shouldPlay: isActive && isAppActive && isScreenFocused && !isSeeking && !isPausedGlobal && !isFinished && !hasError
-            });
-        }
-    }, [isActive, isAppActive, isScreenFocused, isPausedGlobal]);
+    // Debug state changes only when there's an issue (removed constant spam)
 
     const { type: networkType } = useNetInfo();
     const defaultBufferConfig = getBufferConfig(networkType);
@@ -132,6 +121,7 @@ export const VideoLayer = memo(function VideoLayer({
     const hasInitialSeekPerformed = useRef(false); // Prevent seek loop
 
     // Cache-First Strategy: Check cache BEFORE setting source
+    // Always init source for mounted videos (FlashList handles recycling correctly with proper keys)
     useEffect(() => {
         let isCancelled = false;
         const startTime = Date.now(); // ⏱️ TIMING START
@@ -144,15 +134,11 @@ export const VideoLayer = memo(function VideoLayer({
             }
 
             // STEP 1: Memory cache (synchronous, instant)
-            const step1Start = Date.now();
             const memoryCached = VideoCacheService.getMemoryCachedPath(video.videoUrl);
-            const step1Time = Date.now() - step1Start;
 
             if (memoryCached && !isCancelled) {
                 const isHLS = video.videoUrl.endsWith('.m3u8');
-                console.log(
-                    `[TIMING] 🚀 Memory cache HIT: ${video.id} | Check: ${step1Time}ms | Total: ${Date.now() - startTime}ms`
-                );
+                // Reduced log spam - only log if not from memory cache
                 memoryCachedRef.current = !isHLS;
                 setVideoSource({ uri: memoryCached });
                 setIsSourceReady(true);
@@ -160,14 +146,14 @@ export const VideoLayer = memo(function VideoLayer({
             }
 
             // STEP 2: Disk cache (async, fast)
-            const step2Start = Date.now();
             const diskCached = await VideoCacheService.getCachedVideoPath(video.videoUrl);
-            const step2Time = Date.now() - step2Start;
+            const checkTime = Date.now() - startTime;
 
             if (diskCached && !isCancelled) {
-                console.log(
-                    `[TIMING] ⚡ Disk cache HIT: ${video.id} | Check: ${step2Time}ms | Total: ${Date.now() - startTime}ms`
-                );
+                // Only log if check took >200ms (slow disk)
+                if (checkTime > 200) {
+                    console.log(`[TIMING] ⚡ Disk cache HIT: ${video.id} | ${checkTime}ms`);
+                }
                 memoryCachedRef.current = false;
                 setVideoSource({ uri: diskCached });
                 setIsSourceReady(true);
@@ -176,9 +162,7 @@ export const VideoLayer = memo(function VideoLayer({
 
             // STEP 3: Network fallback (slow)
             if (!isCancelled) {
-                console.log(
-                    `[TIMING] 🌐 Network MISS: ${video.id} | Cache checks: ${Date.now() - startTime}ms`
-                );
+                console.log(`[TIMING] 🌐 Network MISS: ${video.id} | ${Date.now() - startTime}ms`);
                 memoryCachedRef.current = false;
                 setVideoSource({ uri: video.videoUrl });
                 setIsSourceReady(true);
@@ -186,7 +170,6 @@ export const VideoLayer = memo(function VideoLayer({
         };
 
         // Reset states
-        console.log(`[TIMING] ⏱️ START source init: ${video.id}`);
         setIsSourceReady(false);
         setShowPoster(true);
         setIsReadyForDisplay(false); // Reset ready state
@@ -197,7 +180,7 @@ export const VideoLayer = memo(function VideoLayer({
         initVideoSource();
 
         return () => { isCancelled = true; };
-    }, [video.id]); // Use video.id instead of video.videoUrl for stability
+    }, [video.id]); // Reinit when video changes (FlashList cell recycling)
 
 
     // Reset finished state if video changes (NO KEY INCREMENT - Faz 4 optimization)
@@ -215,7 +198,7 @@ export const VideoLayer = memo(function VideoLayer({
     // 🔥 ALWAYS start from beginning when becoming active
     useEffect(() => {
         if (isActive) {
-            console.log(`[VideoLayer] ▶️ Video ${video.id} became active, seeking to 0`);
+            // Silently restart video (user doesn't need to see this)
             videoRef.current?.seek(0);
             currentTimeSV.value = 0;
             setIsFinished(false);
@@ -249,19 +232,13 @@ export const VideoLayer = memo(function VideoLayer({
 
         // Only restart if: user tapped to unpause + video was finished + video is active
         if (userToggledToUnpause && isFinished && isActive) {
-            console.log(`[Replay] 🔄 User tapped replay on ${video.id}`);
+            // Silently restart
             setIsFinished(false);
             loopCount.current = 0;
             clearVideoPosition(video.id);
             videoRef.current?.seek(0);
         }
-
-        // Fallback: If not playing but should be, and active - force mount
-        if (isActive && isScreenFocused && isAppActive && !isPausedGlobal && !shouldPlay) {
-            console.log(`[VideoLayer] ⚠️ Stalled state detected for ${video.id}, forcing refresh`);
-            setKey(prev => prev + 1);
-        }
-    }, [isPausedGlobal, isFinished, isActive, video.id, isScreenFocused, isAppActive, shouldPlay]);
+    }, [isPausedGlobal, isFinished, isActive, video.id]);
 
     // shouldPlay logic moved to top of component to include isScreenFocused
     // const shouldPlay = isActive && isAppActive && !isSeeking && !isPausedGlobal && !isFinished && !hasError;
@@ -272,13 +249,12 @@ export const VideoLayer = memo(function VideoLayer({
         setHasError(false);
         // setShowPoster(false); // REMOVED: Wait for ReadyForDisplay
 
-        // Performance logging
+        // Track performance silently
         const source = videoSource?.uri?.startsWith('file://')
             ? 'disk-cache'
             : isHLS ? 'network' : memoryCachedRef.current ? 'memory-cache' : 'network';
 
         PerformanceLogger.endTransition(video.id, source);
-        console.log(`[TIMING] ✅ VIDEO LOADED: ${video.id} | Source: ${source.toUpperCase()}`);
 
         // Note: resizeMode is pre-calculated from video.width/height in useState
         // onResizeModeChange is called if parent needs to know
@@ -399,7 +375,6 @@ export const VideoLayer = memo(function VideoLayer({
                         onLoad={handleLoad}
                         onReadyForDisplay={() => {
                             // 🔥 CRITICAL: Hide poster ONLY when first frame is ready
-                            console.log(`[TIMING] 🎬 READY FOR DISPLAY: ${video.id}`);
                             setShowPoster(false);
                             setIsReadyForDisplay(true);
                         }}
@@ -437,6 +412,28 @@ export const VideoLayer = memo(function VideoLayer({
                 pointerEvents="none"
             />
 
+            {/* Play/Pause Icon Overlay */}
+            {showPlayIcon && (
+                <View style={styles.touchArea} pointerEvents="none">
+                    <View style={styles.iconContainer}>
+                        <View style={styles.iconBackground}>
+                            <PlayIcon width={32} height={32} color="#FFFFFF" />
+                        </View>
+                    </View>
+                </View>
+            )}
+
+            {/* Replay Icon Overlay */}
+            {showReplayIcon && (
+                <View style={styles.touchArea} pointerEvents="none">
+                    <View style={styles.iconContainer}>
+                        <View style={styles.iconBackground}>
+                            <ReplayIcon width={32} height={32} color="#FFFFFF" />
+                        </View>
+                    </View>
+                </View>
+            )}
+
             {/* Error Overlay */}
             {hasError && (
                 <View style={[styles.touchArea, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
@@ -469,11 +466,12 @@ export const VideoLayer = memo(function VideoLayer({
         </View>
     );
 }, (prev, next) => {
+    // Return TRUE to SKIP re-render (props haven't changed)
+    // Return FALSE to re-render (props changed)
     return (
         prev.video.id === next.video.id &&
         prev.isActive === next.isActive &&
-        prev.isMuted === next.isMuted &&
-        true
+        prev.isMuted === next.isMuted
     );
 });
 

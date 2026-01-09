@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
     },
     mediaContainer: {
         width: SCREEN_WIDTH,
-        aspectRatio: 4 / 5,
+        flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
         overflow: 'hidden',

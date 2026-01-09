@@ -22,21 +22,17 @@ export default function FeedScreen() {
         prependVideo,
     } = useVideoFeed();
 
-    const customFeed = useActiveVideoStore((state) => state.customFeed);
-
-    // In the main tab, we don't want the customFeed to override unless it was intended.
-    // BUT the current implementation of customFeed is global.
-    // If we want to "Separate them", then index.tsx should ALWAYS show discovery feed.
-    // AND custom-feed.tsx should always show custom feed.
-
-    // For now, let's make index.tsx ONLY show regularVideos.
+    // Discovery feed always shows regularVideos (not customFeed)
     const videos = regularVideos;
     const isLoading = isLoadingRegular;
     const error = errorRegular;
 
+    // Debug logging - only log when feed is initially loaded or significantly changes
     useEffect(() => {
-        console.log(`[FeedScreen] Discovery feed ready with ${videos.length} videos`);
-    }, [videos]);
+        if (videos.length > 0) {
+            console.log(`[FeedScreen] Discovery feed ready with ${videos.length} videos`);
+        }
+    }, [videos.length]); // Changed from [videos] to [videos.length] to reduce re-renders
 
     return (
         <FeedManager

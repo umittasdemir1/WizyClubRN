@@ -25,7 +25,7 @@ class PerformanceLoggerService {
             startTime: Date.now(),
         };
         this.metrics.set(videoId, metric);
-        console.log(`[Perf] ⏱️  START transition: ${videoId}`);
+        // Removed console.log to reduce terminal spam
     }
 
     /**
@@ -37,7 +37,7 @@ class PerformanceLoggerService {
 
         // Auto-create start metric if not found (for pre-rendered videos)
         if (!metric) {
-            console.log(`[Perf] 🔄 Auto-creating start metric for pre-rendered video: ${videoId}`);
+            // Silently create metric for pre-rendered videos
             this.startTransition(videoId);
             metric = this.metrics.get(videoId);
             if (!metric) return; // Safety check
@@ -49,7 +49,7 @@ class PerformanceLoggerService {
 
         // Ignore pre-rendered videos with unrealistic timing (<100ms)
         if (isPreRendered && duration < 100) {
-            console.log(`[Perf] ⏭️  Ignoring pre-rendered video (${duration}ms): ${videoId}`);
+            // Silently ignore pre-rendered videos
             this.metrics.delete(videoId);
             return;
         }
@@ -61,11 +61,13 @@ class PerformanceLoggerService {
         this.completedMetrics.push(metric);
         this.metrics.delete(videoId);
 
-        // Log with emoji indicators
-        const emoji = this.getPerformanceEmoji(duration, source);
-        console.log(
-            `[Perf] ${emoji} END transition: ${videoId} | ${duration}ms | ${source.toUpperCase()}`
-        );
+        // Only log slow transitions (>1000ms) to reduce spam
+        if (duration > 1000) {
+            const emoji = this.getPerformanceEmoji(duration, source);
+            console.log(
+                `[Perf] ${emoji} SLOW transition: ${videoId} | ${duration}ms | ${source.toUpperCase()}`
+            );
+        }
 
         // Save to AsyncStorage periodically
         if (this.completedMetrics.length % 10 === 0) {

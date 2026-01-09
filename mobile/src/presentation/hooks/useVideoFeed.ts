@@ -53,10 +53,11 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
     const [hasMore, setHasMore] = useState(true);
 
     const isMounted = useRef(true);
+    const hasInitialFetch = useRef(false); // Prevent multiple initial fetches
     const activeVideoId = useActiveVideoStore((state) => state.activeVideoId);
 
     // Auth User
-    const { user } = useAuthStore();
+    const { user, isInitialized } = useAuthStore();
     const currentUserId = user?.id || 'anon';
 
     // Social sync: Get following status from global store
@@ -91,9 +92,9 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
                 }
             });
         }
-    }, [videos.length > 0]);
+    }, [videos.length]); // Fixed: Use videos.length instead of boolean expression
 
-    // 2. Scroll Prefetch: When active video changes, prefetch next 3 videos
+    // 2. Scroll Prefetch: When user scrolls to new video, prefetch next 3 videos
     const lastPrefetchedIndex = useRef(-1);
     useEffect(() => {
         if (!activeVideoId || videos.length === 0) return;
@@ -101,17 +102,21 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
         const currentIndex = videos.findIndex(v => v.id === activeVideoId);
         if (currentIndex === -1 || currentIndex === lastPrefetchedIndex.current) return;
 
+        // Skip prefetch if we're still on initial videos (index 0-2) to avoid overlap
+        // Initial prefetch already handled first 3 videos
+        if (currentIndex < 2) {
+            lastPrefetchedIndex.current = currentIndex;
+            return;
+        }
+
         lastPrefetchedIndex.current = currentIndex;
 
         // Prefetch next 3 videos (if they exist)
         const nextVideos = videos.slice(currentIndex + 1, currentIndex + 4);
         if (nextVideos.length > 0) {
-            console.log(`[Prefetch] 📥 Prefetching ${nextVideos.length} upcoming videos...`);
-
-            nextVideos.forEach((v, i) => {
-                VideoCacheService.cacheVideo(v.videoUrl).then(path => {
-                    if (path) console.log(`[Prefetch] ✅ Next video ${i + 1} cached`);
-                });
+            // Silently prefetch without spam (user doesn't need to see this)
+            nextVideos.forEach((v) => {
+                VideoCacheService.cacheVideo(v.videoUrl);
                 if (v.thumbnailUrl) {
                     Image.prefetch(v.thumbnailUrl);
                 }
@@ -132,7 +137,10 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
         try {
             setIsLoading(true);
             setError(null);
-            const fetchedVideos = await getVideoFeedUseCase.execute(1, 10, currentUserId, filterUserId);
+
+            // Get fresh userId from store to avoid stale closure
+            const freshUserId = useAuthStore.getState().user?.id || 'anon';
+            const fetchedVideos = await getVideoFeedUseCase.execute(1, 10, freshUserId, filterUserId);
 
             if (isMounted.current) {
                 setVideos(fetchedVideos);
@@ -159,7 +167,7 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
                 setIsLoading(false);
             }
         }
-    }, [getVideoFeedUseCase, currentUserId, filterUserId, syncSocialData]);
+    }, [getVideoFeedUseCase, filterUserId, syncSocialData]); // Removed currentUserId from dependencies
 
     const refreshFeed = useCallback(async () => {
         if (isRefreshing) return;
@@ -169,8 +177,11 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
             setError(null);
             // Clear cache on refresh to resolve any persistence issues with same-named files
             await VideoCacheService.clearCache();
+
+            // Get fresh userId from store
+            const freshUserId = useAuthStore.getState().user?.id || 'anon';
             // Reset to page 1
-            const fetchedVideos = await getVideoFeedUseCase.execute(1, 10, currentUserId, filterUserId);
+            const fetchedVideos = await getVideoFeedUseCase.execute(1, 10, freshUserId, filterUserId);
 
             if (isMounted.current) {
                 setVideos(fetchedVideos);
@@ -197,14 +208,17 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
                 setIsRefreshing(false);
             }
         }
-    }, [isRefreshing, getVideoFeedUseCase, currentUserId, filterUserId, syncSocialData]);
+    }, [isRefreshing, getVideoFeedUseCase, filterUserId, syncSocialData]); // Removed currentUserId
 
     const loadMore = useCallback(async () => {
         if (isLoadingMore || !hasMore || isLoading) return;
 
         try {
             setIsLoadingMore(true);
-            const fetchedVideos = await getVideoFeedUseCase.execute(page, 10, currentUserId, filterUserId);
+
+            // Get fresh userId from store
+            const freshUserId = useAuthStore.getState().user?.id || 'anon';
+            const fetchedVideos = await getVideoFeedUseCase.execute(page, 10, freshUserId, filterUserId);
 
             if (isMounted.current) {
                 if (fetchedVideos.length > 0) {
@@ -232,7 +246,7 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
                 setIsLoadingMore(false);
             }
         }
-    }, [isLoadingMore, hasMore, isLoading, page, getVideoFeedUseCase, currentUserId, filterUserId]);
+    }, [isLoadingMore, hasMore, isLoading, page, getVideoFeedUseCase, filterUserId, syncSocialData]); // Removed currentUserId
 
     // Optimistic Update with Rollback
     const toggleLike = useCallback(async (videoId: string) => {
@@ -258,7 +272,8 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
         );
 
         try {
-            await toggleLikeUseCase.execute(videoId, currentUserId);
+            const freshUserId = useAuthStore.getState().user?.id || 'anon';
+            await toggleLikeUseCase.execute(videoId, freshUserId);
         } catch (err) {
             // Rollback on error
             console.error('Toggle like failed, reverting:', err);
@@ -277,7 +292,7 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
                 })
             );
         }
-    }, [toggleLikeUseCase, user, currentUserId]);
+    }, [toggleLikeUseCase, user]);
 
     const toggleSave = useCallback(async (videoId: string) => {
         if (!user) {
@@ -302,7 +317,8 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
         );
 
         try {
-            await toggleSaveUseCase.execute(videoId, currentUserId);
+            const freshUserId = useAuthStore.getState().user?.id || 'anon';
+            await toggleSaveUseCase.execute(videoId, freshUserId);
         } catch (err) {
             console.error('Toggle save failed, reverting:', err);
             // Rollback
@@ -321,7 +337,7 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
                 })
             );
         }
-    }, [toggleSaveUseCase, user, currentUserId]);
+    }, [toggleSaveUseCase, user]);
 
     // Sync local videos with global following state
     const syncedVideos = videos.map(v => ({
@@ -344,12 +360,13 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
         const userIdToFollow = video.user.id;
 
         try {
+            const freshUserId = useAuthStore.getState().user?.id || 'anon';
             // Use global store for the action - it handles optimistic updates and counts
-            await globalToggleFollow(userIdToFollow, currentUserId);
+            await globalToggleFollow(userIdToFollow, freshUserId);
         } catch (err) {
             // Error is handled in store
         }
-    }, [videos, globalToggleFollow, user, currentUserId]);
+    }, [videos, globalToggleFollow, user]);
 
     const toggleShare = useCallback((videoId: string) => {
         setVideos((prevVideos) =>
@@ -457,9 +474,26 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
         });
     }, []);
 
+    // 🔥 CRITICAL FIX: Only fetch once when auth is initialized
+    // This prevents triple-fetch on mount (when userId changes from undefined -> anon -> real ID)
     useEffect(() => {
+        // Guard: Wait for auth to be initialized
+        if (!isInitialized) {
+            console.log('[useVideoFeed] ⏸️  Waiting for auth initialization...');
+            return;
+        }
+
+        // Guard: Prevent duplicate initial fetch
+        if (hasInitialFetch.current) {
+            console.log('[useVideoFeed] ✋ Initial fetch already done, skipping');
+            return;
+        }
+
+        // Mark as fetched BEFORE making the call (prevents race condition)
+        hasInitialFetch.current = true;
+        console.log('[useVideoFeed] 🚀 Starting initial fetch with userId:', currentUserId);
         fetchFeed();
-    }, [fetchFeed]);
+    }, [isInitialized]); // Only depend on isInitialized, NOT on fetchFeed or currentUserId
 
     return {
         videos: syncedVideos,

@@ -51,7 +51,7 @@ export default function TabLayout() {
             backBehavior="history"
             screenOptions={{
                 headerShown: false,
-                lazy: false,
+                lazy: true, // 🔥 FIX: Only render active tab to prevent multiple useVideoFeed instances
                 tabBarStyle: {
                     backgroundColor: isDark ? COLORS.background : '#fefefe',
                     borderTopWidth: 0.5,

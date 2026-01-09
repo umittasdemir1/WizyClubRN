@@ -512,9 +512,9 @@ export const FeedManager = ({
                     onEndReachedThreshold={0.5}
                     ListFooterComponent={renderFooter}
                     removeClippedSubviews={false}
-                    maxToRenderPerBatch={5}
-                    windowSize={21}
-                    initialNumToRender={5}
+                    maxToRenderPerBatch={2}
+                    windowSize={7}
+                    initialNumToRender={2}  // Render first 2 videos (active + next) for smooth scroll
                     bounces={false}
                     overScrollMode="never"
                     onScrollBeginDrag={() => {
