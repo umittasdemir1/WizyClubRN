@@ -14,7 +14,6 @@ interface MetadataLayerProps {
 
 const BASE_BOTTOM_POSITION = 80; // Aligned exactly with seekbar center (80px touch area / 2)
 const SAFE_AREA_OFFSET = 0; // No extra offset needed as seekbar is also at 0
-const COMMERCIAL_GAP_MATCH = 54; // Match seekbar-to-tag gap when no description
 
 export function MetadataLayer({
     video,
@@ -90,10 +89,7 @@ export function MetadataLayer({
             {/* Commercial Tag - Always at bottom: -40 */}
             {video.isCommercial && (
                 <Pressable
-                    style={[
-                        styles.commercialTag,
-                        !hasDescription && styles.commercialTagInline,
-                    ]}
+                    style={styles.commercialTag}
                     onPress={onCommercialTagPress}
                     hitSlop={8}
                 >
@@ -183,11 +179,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
         paddingVertical: 2,
         borderRadius: 2,
-    },
-    commercialTagInline: {
-        position: 'relative',
-        bottom: undefined,
-        marginTop: COMMERCIAL_GAP_MATCH,
     },
     commercialText: {
         color: 'black',
