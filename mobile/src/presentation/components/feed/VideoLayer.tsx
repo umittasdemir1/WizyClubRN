@@ -429,7 +429,7 @@ export const VideoLayer = memo(function VideoLayer({
                 <View style={styles.touchArea} pointerEvents="none">
                     <View style={styles.iconContainer}>
                         <View style={styles.iconBackground}>
-                            <PlayIcon width={32} height={32} color="#FFFFFF" />
+                            <PlayIcon width={56} height={56} color="#FFFFFF" />
                         </View>
                     </View>
                 </View>
@@ -440,7 +440,7 @@ export const VideoLayer = memo(function VideoLayer({
                 <View style={styles.touchArea} pointerEvents="none">
                     <View style={styles.iconContainer}>
                         <View style={styles.iconBackground}>
-                            <ReplayIcon width={32} height={32} color="#FFFFFF" />
+                            <ReplayIcon width={56} height={56} color="#FFFFFF" />
                         </View>
                     </View>
                 </View>
@@ -508,9 +508,9 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     iconBackground: {
-        width: 72,
-        height: 72,
-        borderRadius: 36,
+        width: 100,
+        height: 100,
+        borderRadius: 50,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
         justifyContent: 'center',
         alignItems: 'center',
