@@ -27,6 +27,7 @@ const HEART_COLOR = '#FF2146';
 const HEART_SIZE = 100;
 const DOUBLE_TAP_DELAY = 250;
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const TAP_Y_OFFSET = HEART_SIZE * 0.6;
 
 const DoubleTapLikeComponent = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
     ({ children, onDoubleTap, onSingleTap, onLongPress, onPressOut, onPressIn }, ref) => {
@@ -38,6 +39,7 @@ const DoubleTapLikeComponent = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
         const tapCount = useRef(0);
         const tapTimer = useRef<NodeJS.Timeout | null>(null);
         const longPressTriggered = useRef(false);
+        const containerSizeRef = useRef({ width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
 
         const performAnimation = useCallback((x?: number, y?: number) => {
             const randomAngle = Math.random() * 30 - 15;
@@ -68,9 +70,10 @@ const DoubleTapLikeComponent = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
             }
             tapCount.current += 1;
             const rawX = event.nativeEvent.locationX;
-            const rawY = event.nativeEvent.locationY;
-            const tapX = Math.max(HEART_SIZE / 2, Math.min(SCREEN_WIDTH - HEART_SIZE / 2, rawX));
-            const tapY = Math.max(HEART_SIZE / 2, Math.min(SCREEN_HEIGHT - HEART_SIZE / 2, rawY - 40));
+            const rawY = event.nativeEvent.locationY - TAP_Y_OFFSET;
+            const { width, height } = containerSizeRef.current;
+            const tapX = Math.max(HEART_SIZE / 2, Math.min(width - HEART_SIZE / 2, rawX));
+            const tapY = Math.max(HEART_SIZE / 2, Math.min(height - HEART_SIZE / 2, rawY));
 
             if (tapCount.current === 1) {
                 tapTimer.current = setTimeout(() => {
@@ -115,7 +118,15 @@ const DoubleTapLikeComponent = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
         }));
 
         return (
-            <View style={styles.container}>
+            <View
+                style={styles.container}
+                onLayout={(event) => {
+                    containerSizeRef.current = {
+                        width: event.nativeEvent.layout.width,
+                        height: event.nativeEvent.layout.height,
+                    };
+                }}
+            >
                 {children}
 
                 <TouchableWithoutFeedback
@@ -152,8 +163,8 @@ const styles = StyleSheet.create({
     },
     iconContainer: {
         ...StyleSheet.absoluteFillObject,
-        justifyContent: 'center',
-        alignItems: 'center',
+        justifyContent: 'flex-start',
+        alignItems: 'flex-start',
         zIndex: 999,
     },
     heartWrapper: {
