@@ -10,13 +10,12 @@ import Animated, {
     Easing,
     cancelAnimation,
 } from 'react-native-reanimated';
-import { Plus, Loader, Trash2, Volume2, VolumeX, ChevronLeft } from 'lucide-react-native';
+import { Plus, Volume2, VolumeX, ChevronLeft } from 'lucide-react-native';
 import { useBrightnessStore } from '../../store/useBrightnessStore';
 import { useUploadStore } from '../../store/useUploadStore';
 
 // Import SVGs
 import SunIcon from '../../../../assets/icons/sun.svg';
-import MoreIcon from '../../../../assets/icons/more.svg';
 
 // Brightness Button sub-component
 function BrightnessButton() {
@@ -116,7 +115,6 @@ interface HeaderOverlayProps {
     isMuted: boolean;
     onToggleMute: () => void;
     onStoryPress: () => void;
-    onMorePress: () => void;
     onUploadPress?: () => void;
     hasUnseenStories?: boolean;
     showBrightnessButton?: boolean;
@@ -132,7 +130,6 @@ export function HeaderOverlay({
     isMuted,
     onToggleMute,
     onStoryPress,
-    onMorePress,
     onUploadPress,
     hasUnseenStories = false,
     showBrightnessButton = true,
@@ -229,7 +226,7 @@ export function HeaderOverlay({
                 </View>
             </View>
 
-            {/* Right: Voice + More + Brightness */}
+            {/* Right: Voice + Brightness */}
             <View style={styles.rightButtons}>
                 {showBrightnessButton && <BrightnessButton />}
 
@@ -239,19 +236,12 @@ export function HeaderOverlay({
                     activeOpacity={0.7}
                 >
                     {isMuted ? (
-                        <VolumeX size={24} color="#FFFFFF" />
+                        <VolumeX size={24} color="#D6D6D6" strokeWidth={1.2} />
                     ) : (
-                        <Volume2 size={24} color="#FFFFFF" />
+                        <Volume2 size={24} color="#D6D6D6" strokeWidth={1.2} />
                     )}
                 </TouchableOpacity>
 
-                <Pressable
-                    style={styles.iconButton}
-                    onPress={onMorePress}
-                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                >
-                    <MoreIcon width={24} height={24} color="#FFFFFF" />
-                </Pressable>
             </View>
         </View>
     );

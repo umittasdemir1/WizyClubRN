@@ -25,6 +25,8 @@ export interface ActiveVideoState {
     isPaused: boolean;
     // Temiz ekran modu
     isCleanScreen: boolean;
+    // Video oynatma hızı
+    playbackRate: number;
     // Özel feed (Grid'den gelince)
     customFeed: any[] | null;
     // Önceden yüklenecek video index'leri
@@ -40,6 +42,7 @@ export interface ActiveVideoState {
     togglePause: () => void;
     setPaused: (paused: boolean) => void;
     setCleanScreen: (clean: boolean) => void;
+    setPlaybackRate: (rate: number) => void;
     setCustomFeed: (videos: any[] | null) => void;
     setPreloadIndices: (indices: number[]) => void;
 }
@@ -53,6 +56,7 @@ export const useActiveVideoStore = create<ActiveVideoState>((set, get) => ({
     isSeeking: false,
     isPaused: false,
     isCleanScreen: false,
+    playbackRate: 1.0,
     customFeed: null,
     preloadIndices: [],
 
@@ -87,6 +91,11 @@ export const useActiveVideoStore = create<ActiveVideoState>((set, get) => ({
     setPaused: (paused) => set({ isPaused: paused }),
 
     setCleanScreen: (clean) => set({ isCleanScreen: clean }),
+
+    setPlaybackRate: (rate) => {
+        const clamped = Math.max(0.5, Math.min(2.0, rate));
+        set({ playbackRate: clamped });
+    },
 
     setCustomFeed: (videos) => set({ customFeed: videos }),
 

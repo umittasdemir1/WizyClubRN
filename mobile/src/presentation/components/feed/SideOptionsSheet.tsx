@@ -1,8 +1,7 @@
 import React, { forwardRef, useMemo, useCallback, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, LayoutChangeEvent } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, LayoutChangeEvent } from 'react-native';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Trash2 } from 'lucide-react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, {
     useSharedValue,
@@ -18,9 +17,7 @@ import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-interface SideOptionsSheetProps {
-    onDeletePress?: () => void;
-}
+interface SideOptionsSheetProps {}
 
 // Separate component for real-time slider
 const BrightnessSlider = ({
@@ -127,7 +124,7 @@ const BrightnessSlider = ({
 };
 
 export const SideOptionsSheet = forwardRef<BottomSheet, SideOptionsSheetProps>(
-    ({ onDeletePress }, ref) => {
+    (_props, ref) => {
         const insets = useSafeAreaInsets();
         const { isDark } = useThemeStore();
         const { brightness, setBrightness } = useBrightnessStore();
@@ -176,21 +173,6 @@ export const SideOptionsSheet = forwardRef<BottomSheet, SideOptionsSheetProps>(
                             />
                         </View>
 
-                        {/* Delete Button */}
-                        {onDeletePress && (
-                            <TouchableOpacity
-                                style={[styles.deleteButton, { borderTopColor: borderColor }]}
-                                onPress={() => {
-                                    onDeletePress();
-                                    if (ref && typeof ref !== 'function' && ref.current) {
-                                        ref.current.close();
-                                    }
-                                }}
-                            >
-                                <Trash2 size={24} color="#FF6B6B" />
-                                <Text style={styles.deleteText}>Sil</Text>
-                            </TouchableOpacity>
-                        )}
                     </View>
                 </BottomSheetView>
             </BottomSheet>
@@ -267,18 +249,5 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginTop: 8,
         fontWeight: '500',
-    },
-    deleteButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        paddingTop: 20,
-        paddingVertical: 16,
-        borderTopWidth: 1,
-    },
-    deleteText: {
-        color: '#FF6B6B',
-        fontSize: 16,
-        fontWeight: '600',
     },
 });

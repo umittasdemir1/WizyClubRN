@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, forwardRef, useImperativeHandle } from 'react';
-import { View, StyleSheet, TouchableWithoutFeedback } from 'react-native';
+import { View, StyleSheet, TouchableWithoutFeedback, GestureResponderEvent } from 'react-native';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -14,7 +14,8 @@ interface DoubleTapLikeProps {
     children: React.ReactNode;
     onDoubleTap: () => void;
     onSingleTap?: () => void;
-    onLongPress?: () => void;
+    onLongPress?: (event: GestureResponderEvent) => void;
+    onPressOut?: () => void;
 }
 
 export interface DoubleTapLikeRef {
@@ -25,7 +26,7 @@ const HEART_COLOR = '#FF2146';
 const DOUBLE_TAP_DELAY = 250;
 
 const DoubleTapLikeComponent = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
-    ({ children, onDoubleTap, onSingleTap, onLongPress }, ref) => {
+    ({ children, onDoubleTap, onSingleTap, onLongPress, onPressOut }, ref) => {
         const scale = useSharedValue(0);
         const opacity = useSharedValue(0);
         const rotation = useSharedValue(0);
@@ -78,7 +79,7 @@ const DoubleTapLikeComponent = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
             }
         }, [onDoubleTap, onSingleTap, performAnimation]);
 
-        const handleLongPress = useCallback(() => {
+        const handleLongPress = useCallback((event: GestureResponderEvent) => {
             if (!onLongPress) return;
             longPressTriggered.current = true;
             if (tapTimer.current) {
@@ -86,7 +87,7 @@ const DoubleTapLikeComponent = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
                 tapTimer.current = null;
             }
             tapCount.current = 0;
-            onLongPress();
+            onLongPress(event);
         }, [onLongPress]);
 
         const animatedStyle = useAnimatedStyle(() => ({
@@ -104,6 +105,7 @@ const DoubleTapLikeComponent = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
                 <TouchableWithoutFeedback
                     onPress={handlePress}
                     onLongPress={onLongPress ? handleLongPress : undefined}
+                    onPressOut={onPressOut}
                 >
                     <View style={styles.tapLayer} />
                 </TouchableWithoutFeedback>

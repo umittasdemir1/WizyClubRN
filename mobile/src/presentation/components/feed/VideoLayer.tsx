@@ -58,6 +58,7 @@ export const VideoLayer = memo(function VideoLayer({
     const isSeeking = useActiveVideoStore((state) => state.isSeeking);
     const isPausedGlobal = useActiveVideoStore((state) => state.isPaused);
     const setPaused = useActiveVideoStore((state) => state.setPaused);
+    const playbackRate = useActiveVideoStore((state) => state.playbackRate);
 
     // Debug state changes only when there's an issue (removed constant spam)
 
@@ -78,6 +79,11 @@ export const VideoLayer = memo(function VideoLayer({
             console.log(`[VideoTransition] 🎮 shouldPlay=${shouldPlay} for ${video.id} at ${Date.now()}`);
         }
     }, [shouldPlay, isActive, video.id]);
+
+    const rateLabel =
+        isActive && playbackRate > 1
+            ? (Number.isInteger(playbackRate) ? `${playbackRate}x` : `${playbackRate.toFixed(1)}x`)
+            : null;
 
     // 🔥 CRITICAL: Calculate resizeMode UPFRONT using pre-stored dimensions
     // This prevents re-render during video load which causes 2-3 second delay!
@@ -386,6 +392,7 @@ export const VideoLayer = memo(function VideoLayer({
                         controls={false}
                         paused={!shouldPlay}
                         muted={isMuted}
+                        rate={playbackRate}
                         bufferConfig={bufferConfig}
                         onLoad={handleLoad}
                         onReadyForDisplay={() => {
@@ -419,6 +426,12 @@ export const VideoLayer = memo(function VideoLayer({
 
             {/* Brightness Overlay */}
             <BrightnessOverlay />
+
+            {rateLabel && (
+                <View style={styles.rateBadge} pointerEvents="none">
+                    <Text style={styles.rateText}>{rateLabel}</Text>
+                </View>
+            )}
 
             {showUiOverlays && (
                 <LinearGradient
@@ -551,6 +564,22 @@ const styles = StyleSheet.create({
         color: '#9CA3AF',
         fontSize: 12,
         marginTop: 12,
+    },
+    rateBadge: {
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: [{ translateX: -24 }, { translateY: -16 }],
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 14,
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        zIndex: 12,
+    },
+    rateText: {
+        color: '#FFFFFF',
+        fontSize: 24,
+        fontWeight: '600',
     },
     fullScreenButton: {
         position: 'absolute',

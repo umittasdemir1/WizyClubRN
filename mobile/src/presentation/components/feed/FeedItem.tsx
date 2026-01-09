@@ -1,5 +1,5 @@
 import React, { memo, useRef, useCallback } from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
+import { View, StyleSheet, Dimensions, GestureResponderEvent } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { SharedValue } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
@@ -33,7 +33,8 @@ interface FeedItemProps {
     onOpenShopping: () => void;
     onOpenDescription: () => void;
     currentUserId?: string;
-    onLongPress?: () => void;
+    onLongPress?: (event: GestureResponderEvent) => void;
+    onPressOut?: () => void;
     onVideoEnd?: () => void;
 }
 
@@ -57,6 +58,7 @@ export const FeedItem = memo(function FeedItem({
     onOpenShopping,
     onOpenDescription,
     onLongPress,
+    onPressOut,
     onVideoEnd,
 }: FeedItemProps) {
     const router = useRouter();
@@ -90,6 +92,7 @@ export const FeedItem = memo(function FeedItem({
                 onDoubleTap={handleDoubleTap}
                 onSingleTap={onFeedTap}
                 onLongPress={onLongPress}
+                onPressOut={onPressOut}
             >
                 <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', paddingTop: insets.top }]}>
                     <VideoLayer

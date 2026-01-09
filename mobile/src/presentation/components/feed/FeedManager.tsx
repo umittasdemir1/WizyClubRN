@@ -13,8 +13,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HeaderOverlay } from './HeaderOverlay';
 import { FeedItem } from './FeedItem';
-import { BrightnessController } from './BrightnessController';
-import { SideOptionsSheet } from './SideOptionsSheet';
 import { DeleteConfirmationModal } from './DeleteConfirmationModal';
 import { DescriptionSheet } from '../sheets/DescriptionSheet';
 import { ShoppingSheet } from '../sheets/ShoppingSheet';
@@ -24,7 +22,6 @@ import {
     useAppStateSync,
     useMuteControls,
 } from '../../store/useActiveVideoStore';
-import { useBrightnessStore } from '../../store/useBrightnessStore';
 import { Video } from '../../../domain/entities/Video';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
@@ -96,6 +93,8 @@ export const FeedManager = ({
     const activeIndex = activeVideoStore.activeIndex;
     const isCleanScreen = activeVideoStore.isCleanScreen;
     const setCleanScreen = activeVideoStore.setCleanScreen;
+    const playbackRate = activeVideoStore.playbackRate;
+    const setPlaybackRate = activeVideoStore.setPlaybackRate;
 
     const { stories: storyListData } = useStoryViewer();
 
@@ -120,8 +119,6 @@ export const FeedManager = ({
     const uploadStatus = useUploadStore(state => state.status);
     const uploadedVideoId = useUploadStore(state => state.uploadedVideoId);
     const resetUpload = useUploadStore(state => state.reset);
-    const hideBrightnessController = useBrightnessStore(state => state.hideController);
-
     // Watch for upload success -> Fetch new video and prepend to feed
     useEffect(() => {
         if (uploadedVideoId && uploadStatus === 'success' && prependVideo && !isCustomFeed) {
@@ -184,7 +181,6 @@ export const FeedManager = ({
     const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
 
     // Sheet refs
-    const sideOptionsSheetRef = useRef<BottomSheet>(null);
     const descriptionSheetRef = useRef<BottomSheet>(null);
     const shoppingSheetRef = useRef<BottomSheet>(null);
     const moreOptionsSheetRef = useRef<BottomSheet>(null);
@@ -295,22 +291,43 @@ export const FeedManager = ({
         toggleMute();
     }, [toggleMute]);
 
-    const handleMorePress = useCallback(() => {
-        sideOptionsSheetRef.current?.snapToIndex(0);
-    }, []);
+    const wasSpeedBoostedRef = useRef(false);
+    const previousPlaybackRateRef = useRef(playbackRate);
 
-    const handleLongPress = useCallback(() => {
+    useEffect(() => {
+        if (!wasSpeedBoostedRef.current) {
+            previousPlaybackRateRef.current = playbackRate;
+        }
+    }, [playbackRate]);
+
+    const handleLongPress = useCallback((event: any) => {
+        const pressX = event?.nativeEvent?.locationX ?? 0;
+        const screenWidth = Dimensions.get('window').width;
+        const isRightSide = pressX >= screenWidth / 2;
+
+        if (isRightSide) {
+            wasSpeedBoostedRef.current = true;
+            previousPlaybackRateRef.current = playbackRate;
+            setPlaybackRate(2.0);
+            return;
+        }
+
         moreOptionsSheetRef.current?.snapToIndex(0);
-    }, []);
+    }, [playbackRate, setPlaybackRate]);
+
+    const handlePressOut = useCallback(() => {
+        if (!wasSpeedBoostedRef.current) return;
+        wasSpeedBoostedRef.current = false;
+        setPlaybackRate(previousPlaybackRateRef.current);
+    }, [setPlaybackRate]);
 
     const handleCleanScreen = useCallback(() => {
-        setCleanScreen(true);
-        hideBrightnessController();
+        const nextCleanScreen = !isCleanScreen;
+        setCleanScreen(nextCleanScreen);
         moreOptionsSheetRef.current?.close();
-        sideOptionsSheetRef.current?.close();
         descriptionSheetRef.current?.close();
         shoppingSheetRef.current?.close();
-    }, [setCleanScreen, hideBrightnessController]);
+    }, [isCleanScreen, setCleanScreen]);
 
     const handleStoryPress = useCallback(() => {
         setActiveTab('stories');
@@ -363,7 +380,7 @@ export const FeedManager = ({
     }, [activeVideoId]);
 
     const handleSheetDelete = useCallback(() => {
-        sideOptionsSheetRef.current?.close();
+        moreOptionsSheetRef.current?.close();
         handleDeletePress();
     }, [handleDeletePress]);
 
@@ -425,11 +442,12 @@ export const FeedManager = ({
                     onOpenShopping={handleOpenShopping}
                     onOpenDescription={handleOpenDescription}
                     onLongPress={handleLongPress}
+                    onPressOut={handlePressOut}
                     onVideoEnd={handleVideoEnd}
                 />
             );
         },
-        [activeVideoId, isAppActive, isMuted, isSeeking, currentUserId, isCleanScreen, handleVideoEnd]
+        [activeVideoId, isAppActive, isMuted, isSeeking, currentUserId, isCleanScreen, handlePressOut, handleVideoEnd, handleLongPress]
     );
 
     const keyExtractor = useCallback((item: Video) => item.id, []);
@@ -480,7 +498,6 @@ export const FeedManager = ({
                             isMuted={isMuted}
                             onToggleMute={handleToggleMute}
                             onStoryPress={handleStoryPress}
-                            onMorePress={handleMorePress}
                             onUploadPress={() => router.push('/upload')}
                             activeTab={activeTab}
                             onTabChange={handleTabChange}
@@ -492,10 +509,6 @@ export const FeedManager = ({
                     </Animated.View>
                 )}
 
-                <SideOptionsSheet
-                    ref={sideOptionsSheetRef}
-                    onDeletePress={handleSheetDelete}
-                />
             </View>
         );
     }
@@ -567,7 +580,6 @@ export const FeedManager = ({
                             isMuted={isMuted}
                             onToggleMute={handleToggleMute}
                             onStoryPress={handleStoryPress}
-                            onMorePress={handleMorePress}
                             onUploadPress={() => router.push('/upload')}
                             activeTab={activeTab}
                             onTabChange={handleTabChange}
@@ -595,14 +607,11 @@ export const FeedManager = ({
                     />
                 )}
 
-                <SideOptionsSheet
-                    ref={sideOptionsSheetRef}
-                    onDeletePress={handleSheetDelete}
-                />
-
                 <MoreOptionsSheet
                     ref={moreOptionsSheetRef}
                     onCleanScreenPress={handleCleanScreen}
+                    onDeletePress={handleSheetDelete}
+                    isCleanScreen={isCleanScreen}
                 />
 
                 <DescriptionSheet
@@ -619,8 +628,6 @@ export const FeedManager = ({
                 <ShoppingSheet
                     ref={shoppingSheetRef}
                 />
-
-                {!isCleanScreen && <BrightnessController />}
 
                 <DeleteConfirmationModal
                     visible={isDeleteModalVisible}

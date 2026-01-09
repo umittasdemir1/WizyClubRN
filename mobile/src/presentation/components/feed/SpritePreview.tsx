@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TextInput } from 'react-native';
+import { View, StyleSheet, TextInput, Text } from 'react-native';
 import { Image } from 'expo-image';
 import Animated, {
     useAnimatedStyle,
@@ -19,6 +19,7 @@ const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 interface SpritePreviewProps {
     spriteUrl: string;
     sharedTime: SharedValue<number>; // REQUIRED for performance
+    sharedDuration?: SharedValue<number>;
     frameWidth?: number;
     frameHeight?: number;
     columns?: number;
@@ -28,6 +29,7 @@ interface SpritePreviewProps {
 export const SpritePreview = ({
     spriteUrl,
     sharedTime,
+    sharedDuration,
     frameWidth = 200, // HD (Matched with Backend)
     frameHeight = 360,
     columns = 10,
@@ -36,6 +38,7 @@ export const SpritePreview = ({
     // Start with 0 size to allow correct loading logic
     const [imgSize, setImgSize] = useState({ width: 0, height: 0 });
     const [activeUrl, setActiveUrl] = useState(spriteUrl); // Start with provided URL (usually _0.jpg)
+    const [totalText, setTotalText] = useState('0:00');
 
     // Sync state with prop (Fix for FlashList recycling)
     React.useEffect(() => {
@@ -60,6 +63,19 @@ export const SpritePreview = ({
             }
         },
         [spriteUrl]
+    );
+
+    useAnimatedReaction(
+        () => sharedDuration?.value ?? 0,
+        (durationSeconds, prevDurationSeconds) => {
+            if (durationSeconds === prevDurationSeconds) return;
+            const totalSeconds = Math.max(0, Math.floor(durationSeconds));
+            const totalMins = Math.floor(totalSeconds / 60);
+            const totalSecs = totalSeconds % 60;
+            const text = `${totalMins}:${totalSecs < 10 ? '0' : ''}${totalSecs}`;
+            runOnJS(setTotalText)(text);
+        },
+        [sharedDuration]
     );
 
     // 1. CALCULATE TRANSFORM ON UI THREAD (60 FPS)
@@ -87,10 +103,12 @@ export const SpritePreview = ({
 
     // 2. CALCULATE TIME TEXT ON UI THREAD (Lag-free)
     const animatedTextProps = useAnimatedProps(() => {
-        const seconds = sharedTime.value;
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        const text = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+        const currentSeconds = Math.max(0, Math.floor(sharedTime.value));
+        const currentMins = Math.floor(currentSeconds / 60);
+        const currentSecs = currentSeconds % 60;
+
+        const currentText = `${currentMins}:${currentSecs < 10 ? '0' : ''}${currentSecs}`;
+        const text = `${currentText}`;
         return {
             text: text
         } as any;
@@ -130,6 +148,8 @@ export const SpritePreview = ({
                     style={styles.timeText}
                     animatedProps={animatedTextProps}
                 />
+                <Text style={styles.separatorText}> | </Text>
+                <Text style={styles.totalTimeText}>{totalText}</Text>
             </View>
         </View>
     );
@@ -164,12 +184,14 @@ const styles = StyleSheet.create({
         bottom: 8,
         left: 0,
         right: 0,
-        alignItems: 'center',        // Center text horizontally
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
         zIndex: 10,                  // Ensure text is above image
     },
     timeText: {
-        color: 'white',
-        fontSize: 14,
+        color: '#FFFFFF',
+        fontSize: 12,
         fontWeight: 'bold',
         fontVariant: ['tabular-nums'],
         textShadowColor: 'rgba(0, 0, 0, 0.75)', // Small text shadow for readability against video
@@ -179,5 +201,17 @@ const styles = StyleSheet.create({
         padding: 0,
         margin: 0,
         textAlign: 'center',
+    },
+    separatorText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: 'bold',
+        marginHorizontal: 2,
+    },
+    totalTimeText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: 'bold',
+        fontVariant: ['tabular-nums'],
     },
 });

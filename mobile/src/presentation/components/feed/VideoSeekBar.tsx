@@ -22,12 +22,12 @@ import { SpritePreview } from './SpritePreview';
 import { useWindowDimensions } from 'react-native';
 
 // Usage Configuration
-const HORIZONTAL_PADDING = 15;
+const HORIZONTAL_PADDING = 24;
 const TOUCH_AREA_HEIGHT = 80;
-const THUMB_SIZE = 12; // Height of the vertical bar
-const THUMB_WIDTH = 2; // Width of the vertical bar
-const TRACK_HEIGHT = 2;
-const TRACK_HEIGHT_EXPANDED = 4; // Slimmer track expansion
+const THUMB_SIZE = 10; // Diameter of the thumb
+const THUMB_WIDTH = THUMB_SIZE; // Match width for circular thumb
+const TRACK_HEIGHT = 1;
+const TRACK_HEIGHT_EXPANDED = 2; // Slimmer track expansion
 const TOOLTIP_WIDTH = 100;
 const TOOLTIP_HALF_WIDTH = TOOLTIP_WIDTH / 2;
 const TOOLTIP_SCREEN_MARGIN = 16;
@@ -63,7 +63,7 @@ export function VideoSeekBar({
     const tooltipOpacity = useSharedValue(0);
 
     const POSITION_MODE = 'custom' as 'safe' | 'hidden' | 'custom';
-    const CUSTOM_OFFSET = -14;
+    const CUSTOM_OFFSET = -4;
 
     const insets = useSafeAreaInsets();
     const TAB_BAR_HEIGHT = 0; // Resetting to 0 to find the true baseline
@@ -242,7 +242,7 @@ export function VideoSeekBar({
         opacity: thumbOpacity.value,
         transform: [
             { translateX: animatedProgress.value * BAR_WIDTH - THUMB_WIDTH / 2 },
-            { scaleY: thumbScale.value },
+            { scale: thumbScale.value },
         ],
     }));
 
@@ -285,6 +285,7 @@ export function VideoSeekBar({
                     <SpritePreview
                         spriteUrl={spriteUrl}
                         sharedTime={currentTime} // Pass SharedValue directly for 60fps
+                        sharedDuration={duration}
                         frameWidth={100}
                         frameHeight={180}
                     />
@@ -328,7 +329,7 @@ const styles = StyleSheet.create({
         left: 0,
         width: THUMB_WIDTH,
         height: THUMB_SIZE,
-        borderRadius: THUMB_WIDTH / 2,
+        borderRadius: THUMB_SIZE / 2,
         backgroundColor: '#FFFFFF',
         // No shadows for the line indicator for a cleaner look
     },
