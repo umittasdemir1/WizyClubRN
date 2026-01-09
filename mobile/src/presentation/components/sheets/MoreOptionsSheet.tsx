@@ -41,10 +41,9 @@ export const MoreOptionsSheet = forwardRef<BottomSheet, MoreOptionsSheetProps>(
     };
 
     const eyeComfortLevels = [
-        { label: '25%', value: 0.4 },
-        { label: '50%', value: 0.6 },
-        { label: '75%', value: 0.8 },
-        { label: '100%', value: 1.0 },
+        { label: 'Yumuşak', value: 0.33 },
+        { label: 'Dinlendirici', value: 0.66 },
+        { label: 'Doğal', value: 1.0 },
     ];
 
     const getClosestLevel = (value: number) => {
@@ -82,14 +81,14 @@ export const MoreOptionsSheet = forwardRef<BottomSheet, MoreOptionsSheetProps>(
         >
             <BottomSheetView style={styles.contentContainer}>
                 <OptionItem
-                    icon={isCleanScreen ? <Minimize2 color={textColor} size={24} /> : <Maximize2 color={textColor} size={24} />}
+                    icon={isCleanScreen ? <Minimize2 color={textColor} size={24} strokeWidth={1.2} /> : <Maximize2 color={textColor} size={24} strokeWidth={1.2} />}
                     label="Temiz Ekran"
                     textColor={textColor}
                     borderColor={borderColor}
                     onPress={handleCleanScreenPress}
                 />
                 <SegmentedItem
-                    icon={<LampDesk color={textColor} size={24} />}
+                    icon={<LampDesk color={textColor} size={24} strokeWidth={1.2} />}
                     label="Göz Rahatlığı"
                     textColor={textColor}
                     borderColor={borderColor}
@@ -120,16 +119,16 @@ export const MoreOptionsSheet = forwardRef<BottomSheet, MoreOptionsSheetProps>(
                 />
                 {onDeletePress && (
                     <OptionItem
-                        icon={<Trash2 color={textColor} size={24} />}
+                        icon={<Trash2 color={textColor} size={24} strokeWidth={1.2} />}
                         label="Sil"
                         textColor={textColor}
                         borderColor={borderColor}
                         onPress={handleDeletePress}
                     />
                 )}
-                <OptionItem icon={<Flag color={textColor} size={24} />} label="Raporla" textColor={textColor} borderColor={borderColor} />
-                <OptionItem icon={<EyeOff color={textColor} size={24} />} label="İlgilenmiyorum" textColor={textColor} borderColor={borderColor} />
-                <OptionItem icon={<AlertTriangle color={textColor} size={24} />} label="Başka bir şey" textColor={textColor} borderColor={borderColor} />
+                <OptionItem icon={<Flag color={textColor} size={24} strokeWidth={1.2} />} label="Raporla" textColor={textColor} borderColor={borderColor} />
+                <OptionItem icon={<EyeOff color={textColor} size={24} strokeWidth={1.2} />} label="İlgilenmiyorum" textColor={textColor} borderColor={borderColor} />
+                <OptionItem icon={<AlertTriangle color={textColor} size={24} strokeWidth={1.2} />} label="Başka bir şey" textColor={textColor} borderColor={borderColor} />
             </BottomSheetView>
         </BottomSheet>
     );
@@ -180,8 +179,9 @@ function SegmentedItem({
     options: string[];
     isDark: boolean;
 }) {
-    const activeFill = isDark ? '#f4f4f5' : '#111';
-    const activeText = isDark ? '#111' : '#fff';
+    const activeFill = '#FF3B30';
+    const activeText = '#FFFFFF';
+    const groupFill = isDark ? '#2c2c2e' : '#ededf0';
 
     return (
         <View style={[styles.optionItem, { borderBottomColor: borderColor }]}>
@@ -189,13 +189,16 @@ function SegmentedItem({
                 {icon}
                 <Text style={[styles.optionLabel, { color: textColor }]}>{label}</Text>
             </View>
-            <View style={styles.segmentedGroup}>
+            <View style={[styles.segmentedGroup, { backgroundColor: groupFill }]}>
                 {options.map((option) => {
                     const isActive = option === activeLabel;
                     return (
                         <TouchableOpacity
                             key={option}
-                            style={[styles.segmentedOption, isActive && { backgroundColor: activeFill }]}
+                            style={[
+                                styles.segmentedOption,
+                                isActive && { backgroundColor: activeFill },
+                            ]}
                             onPress={() => onSelect(option)}
                         >
                             <Text style={[styles.segmentedText, { color: isActive ? activeText : textColor }]}>
@@ -230,6 +233,8 @@ const styles = StyleSheet.create({
     },
     segmentedGroup: {
         flexDirection: 'row',
+        borderRadius: 12,
+        padding: 2,
         overflow: 'hidden',
         marginLeft: 'auto',
     },
@@ -238,9 +243,11 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         alignItems: 'center',
         justifyContent: 'center',
+        borderRadius: 12,
     },
     segmentedText: {
-        fontSize: 16,
+        fontSize: 11,
+        fontWeight: '400',
     },
     speedIcon: {
         width: 24,
