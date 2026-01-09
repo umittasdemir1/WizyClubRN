@@ -495,7 +495,7 @@ export const FeedManager = ({
                     estimatedItemSize={ITEM_HEIGHT}
                     keyExtractor={keyExtractor}
                     pagingEnabled
-                    decelerationRate="fast"
+                    decelerationRate={0.985}  // Slightly faster than "fast" (0.99) - more responsive snap
                     snapToInterval={ITEM_HEIGHT}
                     snapToAlignment="start"
                     showsVerticalScrollIndicator={false}
@@ -511,10 +511,10 @@ export const FeedManager = ({
                     onEndReached={hasMore ? loadMore : null}
                     onEndReachedThreshold={0.5}
                     ListFooterComponent={renderFooter}
-                    removeClippedSubviews={false}
-                    maxToRenderPerBatch={2}
-                    windowSize={7}
-                    initialNumToRender={2}  // Render first 2 videos (active + next) for smooth scroll
+                    removeClippedSubviews={true}  // Enable clipping for better performance
+                    maxToRenderPerBatch={1}
+                    windowSize={3}  // Only render 3 items: prev + current + next
+                    initialNumToRender={1}  // Only render first video on mount
                     bounces={false}
                     overScrollMode="never"
                     onScrollBeginDrag={() => {
