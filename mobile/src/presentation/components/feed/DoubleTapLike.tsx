@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, forwardRef, useImperativeHandle } from 'react';
-import { View, StyleSheet, TouchableWithoutFeedback, GestureResponderEvent } from 'react-native';
+import { View, StyleSheet, TouchableWithoutFeedback, GestureResponderEvent, Dimensions } from 'react-native';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -16,6 +16,7 @@ interface DoubleTapLikeProps {
     onSingleTap?: () => void;
     onLongPress?: (event: GestureResponderEvent) => void;
     onPressOut?: () => void;
+    onPressIn?: (event: GestureResponderEvent) => void;
 }
 
 export interface DoubleTapLikeRef {
@@ -23,20 +24,28 @@ export interface DoubleTapLikeRef {
 }
 
 const HEART_COLOR = '#FF2146';
+const HEART_SIZE = 100;
 const DOUBLE_TAP_DELAY = 250;
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const DoubleTapLikeComponent = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
-    ({ children, onDoubleTap, onSingleTap, onLongPress, onPressOut }, ref) => {
+    ({ children, onDoubleTap, onSingleTap, onLongPress, onPressOut, onPressIn }, ref) => {
         const scale = useSharedValue(0);
         const opacity = useSharedValue(0);
         const rotation = useSharedValue(0);
+        const heartX = useSharedValue(SCREEN_WIDTH / 2);
+        const heartY = useSharedValue(SCREEN_HEIGHT / 2);
         const tapCount = useRef(0);
         const tapTimer = useRef<NodeJS.Timeout | null>(null);
         const longPressTriggered = useRef(false);
 
-        const performAnimation = useCallback(() => {
+        const performAnimation = useCallback((x?: number, y?: number) => {
             const randomAngle = Math.random() * 30 - 15;
             rotation.value = randomAngle;
+            if (typeof x === 'number' && typeof y === 'number') {
+                heartX.value = x;
+                heartY.value = y;
+            }
             opacity.value = 1;
             scale.value = 0;
 
@@ -52,12 +61,16 @@ const DoubleTapLikeComponent = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
             animateLike: performAnimation,
         }));
 
-        const handlePress = useCallback(() => {
+        const handlePress = useCallback((event: GestureResponderEvent) => {
             if (longPressTriggered.current) {
                 longPressTriggered.current = false;
                 return;
             }
             tapCount.current += 1;
+            const rawX = event.nativeEvent.locationX;
+            const rawY = event.nativeEvent.locationY;
+            const tapX = Math.max(HEART_SIZE / 2, Math.min(SCREEN_WIDTH - HEART_SIZE / 2, rawX));
+            const tapY = Math.max(HEART_SIZE / 2, Math.min(SCREEN_HEIGHT - HEART_SIZE / 2, rawY - 40));
 
             if (tapCount.current === 1) {
                 tapTimer.current = setTimeout(() => {
@@ -74,7 +87,7 @@ const DoubleTapLikeComponent = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
                 tapCount.current = 0;
 
                 // 🔥 Animation FIRST, then callback
-                performAnimation();
+                performAnimation(tapX, tapY);
                 onDoubleTap();
             }
         }, [onDoubleTap, onSingleTap, performAnimation]);
@@ -91,7 +104,10 @@ const DoubleTapLikeComponent = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
         }, [onLongPress]);
 
         const animatedStyle = useAnimatedStyle(() => ({
+            position: 'absolute',
             transform: [
+                { translateX: heartX.value - HEART_SIZE / 2 },
+                { translateY: heartY.value - HEART_SIZE / 2 },
                 { scale: Math.max(scale.value, 0) },
                 { rotate: `${rotation.value}deg` },
             ],
@@ -106,13 +122,14 @@ const DoubleTapLikeComponent = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
                     onPress={handlePress}
                     onLongPress={onLongPress ? handleLongPress : undefined}
                     onPressOut={onPressOut}
+                    onPressIn={onPressIn}
                 >
                     <View style={styles.tapLayer} />
                 </TouchableWithoutFeedback>
 
                 <View style={styles.iconContainer} pointerEvents="none">
                     <Animated.View style={[styles.heartWrapper, animatedStyle]}>
-                        <AnimatedLikeIcon width={100} height={100} color={HEART_COLOR} />
+                        <AnimatedLikeIcon width={HEART_SIZE} height={HEART_SIZE} color={HEART_COLOR} />
                     </Animated.View>
                 </View>
             </View>

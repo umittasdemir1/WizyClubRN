@@ -293,6 +293,7 @@ export const FeedManager = ({
 
     const wasSpeedBoostedRef = useRef(false);
     const previousPlaybackRateRef = useRef(playbackRate);
+    const lastPressXRef = useRef<number | null>(null);
 
     useEffect(() => {
         if (!wasSpeedBoostedRef.current) {
@@ -300,10 +301,14 @@ export const FeedManager = ({
         }
     }, [playbackRate]);
 
+    const handlePressIn = useCallback((event: any) => {
+        lastPressXRef.current = event?.nativeEvent?.pageX ?? event?.nativeEvent?.locationX ?? null;
+    }, []);
+
     const handleLongPress = useCallback((event: any) => {
-        const pressX = event?.nativeEvent?.locationX ?? 0;
+        const pressX = lastPressXRef.current ?? event?.nativeEvent?.pageX ?? event?.nativeEvent?.locationX ?? 0;
         const screenWidth = Dimensions.get('window').width;
-        const isRightSide = pressX >= screenWidth / 2;
+        const isRightSide = pressX > screenWidth * 0.8;
 
         if (isRightSide) {
             wasSpeedBoostedRef.current = true;
@@ -312,13 +317,20 @@ export const FeedManager = ({
             return;
         }
 
+        if (wasSpeedBoostedRef.current) {
+            wasSpeedBoostedRef.current = false;
+            setPlaybackRate(previousPlaybackRateRef.current);
+        }
+
         moreOptionsSheetRef.current?.snapToIndex(0);
+        lastPressXRef.current = null;
     }, [playbackRate, setPlaybackRate]);
 
     const handlePressOut = useCallback(() => {
         if (!wasSpeedBoostedRef.current) return;
         wasSpeedBoostedRef.current = false;
         setPlaybackRate(previousPlaybackRateRef.current);
+        lastPressXRef.current = null;
     }, [setPlaybackRate]);
 
     const handleCleanScreen = useCallback(() => {
@@ -443,11 +455,12 @@ export const FeedManager = ({
                     onOpenDescription={handleOpenDescription}
                     onLongPress={handleLongPress}
                     onPressOut={handlePressOut}
+                    onPressIn={handlePressIn}
                     onVideoEnd={handleVideoEnd}
                 />
             );
         },
-        [activeVideoId, isAppActive, isMuted, isSeeking, currentUserId, isCleanScreen, handlePressOut, handleVideoEnd, handleLongPress]
+        [activeVideoId, isAppActive, isMuted, isSeeking, currentUserId, isCleanScreen, handlePressIn, handlePressOut, handleVideoEnd, handleLongPress]
     );
 
     const keyExtractor = useCallback((item: Video) => item.id, []);

@@ -35,6 +35,7 @@ interface FeedItemProps {
     currentUserId?: string;
     onLongPress?: (event: GestureResponderEvent) => void;
     onPressOut?: () => void;
+    onPressIn?: (event: GestureResponderEvent) => void;
     onVideoEnd?: () => void;
 }
 
@@ -59,6 +60,7 @@ export const FeedItem = memo(function FeedItem({
     onOpenDescription,
     onLongPress,
     onPressOut,
+    onPressIn,
     onVideoEnd,
 }: FeedItemProps) {
     const router = useRouter();
@@ -93,6 +95,7 @@ export const FeedItem = memo(function FeedItem({
                 onSingleTap={onFeedTap}
                 onLongPress={onLongPress}
                 onPressOut={onPressOut}
+                onPressIn={onPressIn}
             >
                 <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', paddingTop: insets.top }]}>
                     <VideoLayer
