@@ -277,10 +277,11 @@ export const FeedManager = ({
                     lastActiveIdRef.current = newId;
                     setActiveVideo(newId, newIndex);
                     setActiveTab('foryou');
+                    setCleanScreen(false);
                 }
             }
         },
-        [setActiveVideo]
+        [setActiveVideo, setCleanScreen]
     );
 
     const viewabilityConfigCallbackPairs = useRef([
