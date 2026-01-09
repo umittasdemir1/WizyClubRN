@@ -549,6 +549,7 @@ export const FeedManager = ({
                     onScrollBeginDrag={() => {
                         isScrollingSV.value = true;
                         setActiveTab('foryou');
+                        setCleanScreen(false);
                     }}
                     onScrollEndDrag={() => { isScrollingSV.value = false; }}
                     onMomentumScrollEnd={(e) => {
