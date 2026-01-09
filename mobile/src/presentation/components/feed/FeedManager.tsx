@@ -207,7 +207,8 @@ export const FeedManager = ({
     const webSheetTranslateY = useRef(new RNAnimated.Value(0)).current;
     const webSheetPanResponder = useRef(
         PanResponder.create({
-            onMoveShouldSetPanResponder: (_, gesture) => gesture.dy > 4,
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 2,
             onPanResponderMove: (_, gesture) => {
                 if (gesture.dy > 0) {
                     webSheetTranslateY.setValue(gesture.dy);

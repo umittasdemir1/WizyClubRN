@@ -55,7 +55,7 @@ function RootNavigator() {
     }
 
     return (
-        <Stack screenOptions={{ headerShown: false, lazy: false }}>
+        <Stack screenOptions={{ headerShown: false }}>
             {/* Auth screens */}
             <Stack.Screen name="login" options={{ headerShown: false }} />
             <Stack.Screen name="signup" options={{ headerShown: false }} />
