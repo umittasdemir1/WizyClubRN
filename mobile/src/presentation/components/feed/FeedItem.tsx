@@ -37,6 +37,7 @@ interface FeedItemProps {
     onPressOut?: () => void;
     onPressIn?: (event: GestureResponderEvent) => void;
     onVideoEnd?: () => void;
+    onProgressUpdate?: (progress: number, duration: number) => void;
 }
 
 export const FeedItem = memo(function FeedItem({
@@ -62,6 +63,7 @@ export const FeedItem = memo(function FeedItem({
     onPressOut,
     onPressIn,
     onVideoEnd,
+    onProgressUpdate,
 }: FeedItemProps) {
     const router = useRouter();
     const insets = useSafeAreaInsets();
@@ -108,6 +110,7 @@ export const FeedItem = memo(function FeedItem({
                         onSeekReady={isActive ? onSeekReady : undefined}
                         onRemoveVideo={() => onRemoveVideo(video.id)}
                         onVideoEnd={onVideoEnd}
+                        onProgressUpdate={isActive ? onProgressUpdate : undefined}
                         isCleanScreen={isCleanScreen}
                     />
                 </View>

@@ -27,6 +27,8 @@ export interface ActiveVideoState {
     isCleanScreen: boolean;
     // Video oynatma hızı
     playbackRate: number;
+    // İzleme modu
+    viewingMode: 'off' | 'fast' | 'full';
     // Özel feed (Grid'den gelince)
     customFeed: any[] | null;
     // Önceden yüklenecek video index'leri
@@ -43,6 +45,7 @@ export interface ActiveVideoState {
     setPaused: (paused: boolean) => void;
     setCleanScreen: (clean: boolean) => void;
     setPlaybackRate: (rate: number) => void;
+    setViewingMode: (mode: 'off' | 'fast' | 'full') => void;
     setCustomFeed: (videos: any[] | null) => void;
     setPreloadIndices: (indices: number[]) => void;
 }
@@ -57,6 +60,7 @@ export const useActiveVideoStore = create<ActiveVideoState>((set, get) => ({
     isPaused: false,
     isCleanScreen: false,
     playbackRate: 1.0,
+    viewingMode: 'off',
     customFeed: null,
     preloadIndices: [],
 
@@ -96,6 +100,8 @@ export const useActiveVideoStore = create<ActiveVideoState>((set, get) => ({
         const clamped = Math.max(0.5, Math.min(2.0, rate));
         set({ playbackRate: clamped });
     },
+
+    setViewingMode: (mode) => set({ viewingMode: mode }),
 
     setCustomFeed: (videos) => set({ customFeed: videos }),
 

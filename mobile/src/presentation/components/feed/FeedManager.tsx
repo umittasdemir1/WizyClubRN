@@ -104,6 +104,7 @@ export const FeedManager = ({
     const isCleanScreen = activeVideoStore.isCleanScreen;
     const setCleanScreen = activeVideoStore.setCleanScreen;
     const playbackRate = activeVideoStore.playbackRate;
+    const viewingMode = activeVideoStore.viewingMode;
     const setPlaybackRate = activeVideoStore.setPlaybackRate;
 
     const { stories: storyListData } = useStoryViewer();
@@ -217,6 +218,7 @@ export const FeedManager = ({
         })
     ).current;
     const isWebViewClosingRef = useRef(false);
+    const activeDurationRef = useRef(0);
     const saveToastTranslateY = useRef(new RNAnimated.Value(-70)).current;
     const saveToastOpacity = useRef(new RNAnimated.Value(0)).current;
     const saveToastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -552,7 +554,50 @@ export const FeedManager = ({
 
     const handleVideoEnd = useCallback(() => {
         setCleanScreen(false);
-    }, [setCleanScreen]);
+        const shouldAdvance =
+            viewingMode === 'full' || (viewingMode === 'fast' && activeDurationRef.current > 0 && activeDurationRef.current <= 10);
+        if (shouldAdvance) {
+            const currentIndex = activeVideoId
+                ? videosRef.current.findIndex((v) => v.id === activeVideoId)
+                : activeIndex;
+            const safeIndex = currentIndex >= 0 ? currentIndex : activeIndex;
+            const nextIndex = Math.min(safeIndex + 1, videosRef.current.length - 1);
+            if (nextIndex !== safeIndex) {
+                listRef.current?.scrollToOffset({
+                    offset: nextIndex * ITEM_HEIGHT,
+                    animated: true,
+                });
+            }
+        }
+    }, [setCleanScreen, viewingMode, activeIndex, activeVideoId]);
+
+    const autoAdvanceGuardRef = useRef<string | null>(null);
+    const handleProgressUpdate = useCallback((currentTime: number, duration: number) => {
+        if (viewingMode !== 'fast') return;
+        if (!activeVideoId) return;
+        if (duration > 0) {
+            activeDurationRef.current = duration;
+        }
+        if (duration > 0 && duration <= 10) return;
+        if (currentTime < 10) return;
+        if (autoAdvanceGuardRef.current === activeVideoId) return;
+        autoAdvanceGuardRef.current = activeVideoId;
+        const currentIndex = activeVideoId
+            ? videosRef.current.findIndex((v) => v.id === activeVideoId)
+            : activeIndex;
+        const safeIndex = currentIndex >= 0 ? currentIndex : activeIndex;
+        const nextIndex = Math.min(safeIndex + 1, videosRef.current.length - 1);
+        if (nextIndex !== safeIndex) {
+            listRef.current?.scrollToOffset({
+                offset: nextIndex * ITEM_HEIGHT,
+                animated: true,
+            });
+        }
+    }, [viewingMode, activeVideoId, activeIndex]);
+
+    useEffect(() => {
+        autoAdvanceGuardRef.current = null;
+    }, [activeVideoId, viewingMode]);
 
     const handleSeekReady = useCallback((seekFn: (time: number) => void) => {
         videoSeekRef.current = seekFn;
@@ -626,10 +671,11 @@ export const FeedManager = ({
                     onPressOut={handlePressOut}
                     onPressIn={handlePressIn}
                     onVideoEnd={handleVideoEnd}
+                    onProgressUpdate={handleProgressUpdate}
                 />
             );
         },
-        [activeVideoId, isAppActive, isMuted, isSeeking, currentUserId, isCleanScreen, handlePressIn, handlePressOut, handleVideoEnd, handleLongPress]
+        [activeVideoId, isAppActive, isMuted, isSeeking, currentUserId, isCleanScreen, handlePressIn, handlePressOut, handleVideoEnd, handleLongPress, handleProgressUpdate]
     );
 
     const keyExtractor = useCallback((item: Video) => item.id, []);

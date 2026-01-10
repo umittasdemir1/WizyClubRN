@@ -2,7 +2,7 @@ import React, { forwardRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Flag, EyeOff, AlertTriangle, Minimize2, Maximize2, Trash2, LampDesk } from 'lucide-react-native';
+import { Flag, EyeOff, AlertTriangle, Minimize2, Maximize2, Trash2, LampDesk, GalleryVerticalEnd, Gauge } from 'lucide-react-native';
 import { useThemeStore } from '../../store/useThemeStore';
 import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
 import { useBrightnessStore } from '../../store/useBrightnessStore';
@@ -23,6 +23,8 @@ export const MoreOptionsSheet = forwardRef<BottomSheet, MoreOptionsSheetProps>(
     const { brightness, setBrightness } = useBrightnessStore();
     const playbackRate = useActiveVideoStore((state) => state.playbackRate);
     const setPlaybackRate = useActiveVideoStore((state) => state.setPlaybackRate);
+    const viewingMode = useActiveVideoStore((state) => state.viewingMode);
+    const setViewingMode = useActiveVideoStore((state) => state.setViewingMode);
 
     const topOffset = insets.top + 60 + 25;
     const snapPoints = useMemo(() => [SCREEN_HEIGHT - topOffset], [insets.top]);
@@ -58,6 +60,11 @@ export const MoreOptionsSheet = forwardRef<BottomSheet, MoreOptionsSheetProps>(
         { label: '1x', value: 1.0 },
         { label: '1.5x', value: 1.5 },
         { label: '2x', value: 2.0 },
+    ];
+    const viewingModes = [
+        { label: 'Kapalı', value: 'off' as const },
+        { label: 'Hızlı', value: 'fast' as const },
+        { label: 'Tam İzleme', value: 'full' as const },
     ];
     const activeSpeed = speedLevels.reduce((closest, level) => {
         return Math.abs(level.value - playbackRate) < Math.abs(closest.value - playbackRate) ? level : closest;
@@ -103,7 +110,7 @@ export const MoreOptionsSheet = forwardRef<BottomSheet, MoreOptionsSheetProps>(
                     isDark={isDark}
                 />
                 <SegmentedItem
-                    icon={<Text style={[styles.speedIcon, { color: textColor }]}>1x</Text>}
+                    icon={<Gauge color={textColor} size={24} strokeWidth={1.2} />}
                     label="Hız"
                     textColor={textColor}
                     borderColor={borderColor}
@@ -115,6 +122,21 @@ export const MoreOptionsSheet = forwardRef<BottomSheet, MoreOptionsSheetProps>(
                         }
                     }}
                     options={speedLevels.map((level) => level.label)}
+                    isDark={isDark}
+                />
+                <SegmentedItem
+                    icon={<GalleryVerticalEnd color={textColor} size={24} strokeWidth={1.2} />}
+                    label="İzleme Modu"
+                    textColor={textColor}
+                    borderColor={borderColor}
+                    activeLabel={viewingModes.find((mode) => mode.value === viewingMode)?.label || 'Hızlı'}
+                    onSelect={(label) => {
+                        const selected = viewingModes.find((mode) => mode.label === label);
+                        if (selected) {
+                            setViewingMode(selected.value);
+                        }
+                    }}
+                    options={viewingModes.map((mode) => mode.label)}
                     isDark={isDark}
                 />
                 {onDeletePress && (

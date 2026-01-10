@@ -59,6 +59,8 @@ export const VideoLayer = memo(function VideoLayer({
     const isPausedGlobal = useActiveVideoStore((state) => state.isPaused);
     const setPaused = useActiveVideoStore((state) => state.setPaused);
     const playbackRate = useActiveVideoStore((state) => state.playbackRate);
+    const viewingMode = useActiveVideoStore((state) => state.viewingMode);
+    const maxLoops = viewingMode === 'off' ? MAX_LOOPS : 1;
 
     // Debug state changes only when there's an issue (removed constant spam)
 
@@ -339,7 +341,7 @@ export const VideoLayer = memo(function VideoLayer({
         loopCount.current += 1;
         console.log(`[Loop] 🔄 Video ${video.id} ended, loop ${loopCount.current}/${MAX_LOOPS}`);
 
-        if (loopCount.current >= MAX_LOOPS) {
+        if (loopCount.current >= maxLoops) {
             console.log(`[Loop] ✅ Max loops reached, showing replay icon`);
             setIsFinished(true);
             clearVideoPosition(video.id); // Clear position on finish
