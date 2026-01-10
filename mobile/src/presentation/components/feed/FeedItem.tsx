@@ -67,6 +67,8 @@ export const FeedItem = memo(function FeedItem({
     const insets = useSafeAreaInsets();
     const doubleTapRef = useRef<DoubleTapLikeRef>(null);
     const actionButtonsRef = useRef<ActionButtonsRef>(null);
+    const isSelfProfile = !!currentUserId && video.user.id === currentUserId;
+    const profileRoute = isSelfProfile ? '/profile' : `/user/${video.user.id}`;
 
     const handleDoubleTap = useCallback(() => {
         // DoubleTapLike already handles the center heart animation
@@ -129,13 +131,13 @@ export const FeedItem = memo(function FeedItem({
                         onSave={() => onToggleSave(video.id)}
                         onShare={() => onToggleShare(video.id)}
                         onShop={() => onOpenShopping(video.id)}
-                        onProfilePress={() => router.push(`/user/${video.user.id}`)}
+                        onProfilePress={() => router.push(profileRoute)}
                     />
 
                     <MetadataLayer
                         video={video}
                         currentUserId={currentUserId}
-                        onAvatarPress={() => router.push(`/user/${video.user.id}`)}
+                        onAvatarPress={() => router.push(profileRoute)}
                         onFollowPress={() => onToggleFollow(video.id)}
                         onReadMorePress={onOpenDescription}
                         onCommercialTagPress={() => console.log('Open Commercial Info')}

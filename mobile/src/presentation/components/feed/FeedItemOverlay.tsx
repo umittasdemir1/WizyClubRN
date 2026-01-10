@@ -93,6 +93,9 @@ export const FeedItemOverlay = memo(function FeedItemOverlay({
         }
     }, [video.isLiked, video.id, onToggleLike]);
 
+    const isSelfProfile = !!currentUserId && video.user.id === currentUserId;
+    const profileRoute = isSelfProfile ? '/profile' : `/user/${video.user.id}`;
+
     const showPlayIcon = isActive && isPaused && !isFinished && !isLoading && !hasError;
     const showReplayIcon = isActive && isFinished && !isLoading && !hasError;
 
@@ -168,13 +171,13 @@ export const FeedItemOverlay = memo(function FeedItemOverlay({
                     onSave={() => onToggleSave(video.id)}
                     onShare={() => onToggleShare(video.id)}
                     onShop={onOpenShopping}
-                    onProfilePress={() => router.push(`/user/${video.user.id}`)}
+                    onProfilePress={() => router.push(profileRoute)}
                 />
 
                 <MetadataLayer
                     video={video}
                     currentUserId={currentUserId}
-                    onAvatarPress={() => router.push(`/user/${video.user.id}`)}
+                    onAvatarPress={() => router.push(profileRoute)}
                     onFollowPress={() => onToggleFollow(video.id)}
                     onReadMorePress={onOpenDescription}
                     onCommercialTagPress={() => console.log('Open Commercial Info')}

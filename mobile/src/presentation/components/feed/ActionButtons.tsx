@@ -250,7 +250,7 @@ export const ActionButtons = memo(forwardRef<ActionButtonsRef, ActionButtonsProp
             <ActionButton
                 IconComponent={ShoppingBag}
                 count={formatCount(shopsCount || 0)}
-                zeroText="Alışveriş"
+                zeroText="Göz At"
                 videoId={videoId}
                 onPress={onShop}
                 isActive={false}

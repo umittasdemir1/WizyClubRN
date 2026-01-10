@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Video } from '../../../domain/entities/Video';
 import { Avatar } from '../shared/Avatar';
+import { VerifiedBadge } from '../shared/VerifiedBadge';
 
 interface MetadataLayerProps {
     video: Video;
@@ -47,9 +48,16 @@ export function MetadataLayer({
                     style={styles.nameContainer}
                     hitSlop={8}
                 >
-                    <Text style={styles.nameText}>
-                        {video.user.fullName || video.user.username}
-                    </Text>
+                    <View style={styles.nameRow}>
+                        <Text style={styles.nameText}>
+                            {video.user.fullName || video.user.username}
+                        </Text>
+                        {video.user.isVerified === true && (
+                            <View style={styles.verifiedBadge}>
+                                <VerifiedBadge size={16} />
+                            </View>
+                        )}
+                    </View>
                     <Text style={styles.handleText}>
                         @{video.user.username.replace(/\s+/g, '_').toLowerCase()}
                     </Text>
@@ -116,6 +124,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 12,
     },
+    nameRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
     nameContainer: {
         marginLeft: 12,
         marginRight: 12,
@@ -136,6 +148,10 @@ const styles = StyleSheet.create({
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 2,
         marginTop: -2,
+    },
+    verifiedBadge: {
+        marginLeft: 6,
+        alignSelf: 'center',
     },
     followPill: {
         backgroundColor: 'rgba(255, 255, 255, 0.15)', // Glass effect

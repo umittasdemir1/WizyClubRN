@@ -45,16 +45,11 @@ import { DeletedContentSheet } from '../../src/presentation/components/profile/D
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
 import { LIGHT_COLORS, DARK_COLORS } from '../../src/core/constants';
 import { ProfileSkeleton } from '../../src/presentation/components/profile/ProfileSkeleton';
+import { VerifiedBadge } from '../../src/presentation/components/shared/VerifiedBadge';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // SVG Icons
-const VerifiedBadge = () => (
-  <Svg width="20" height="20" viewBox="0 -960 960 960" fill="#3D91FF">
-    <Path d="m344-60-76-128-144-32+14-148-98-112+98-112-14-148+144-32+76-128+136+58+136-58+76+128+144+32-14+148+98+112-98+112+14+148-144+32-76+128-136-58-136+58Zm34-102+102-44+104+44+56-96+110-26-10-112+74-84-74-86+10-112-110-24-58-96-102+44-104-44-56+96-110+24+10+112-74+86+74+84-10+114+110+24+58+96Zm102-318Zm-42+142+226-226-56-58-170+170-86-84-56+56+142+142Z" />
-  </Svg>
-);
-
 const GridIcon = ({ color }: { color: string }) => (
   <Svg width="22" height="22" viewBox="0 -960 960 960" fill={color}>
     <Path d="M240-160q-33 0-56.5-23.5T160-240q0-33 23.5-56.5T240-320q33 0 56.5 23.5T320-240q0 33-23.5 56.5T240-160Zm240 0q-33 0-56.5-23.5T400-240q0-33 23.5-56.5T480-320q33 0 56.5 23.5T560-240q0 33-23.5 56.5T480-160Zm240 0q-33 0-56.5-23.5T640-240q0-33 23.5-56.5T720-320q33 0 56.5 23.5T800-240q0 33-23.5 56.5T720-160ZM240-400q-33 0-56.5-23.5T160-480q0-33 23.5-56.5T240-560q33 0 56.5 23.5T320-480q0 33-23.5 56.5T240-400Zm240 0q-33 0-56.5-23.5T400-480q0-33 23.5-56.5T480-560q33 0 56.5 23.5T560-480q0 33-23.5 56.5T480-400Zm240 0q-33 0-56.5-23.5T640-480q0-33 23.5-56.5T720-560q33 0 56.5 23.5T800-480q0 33-23.5 56.5T720-400ZM240-640q-33 0-56.5-23.5T160-720q0-33 23.5-56.5T240-800q33 0 56.5 23.5T320-720q0 33-23.5 56.5T240-640Zm240 0q-33 0-56.5-23.5T400-720q0-33 23.5-56.5T480-800q33 0 56.5 23.5T560-720q0 33-23.5 56.5T480-640Zm240 0q-33 0-56.5-23.5T640-720q0-33 23.5-56.5T720-800q33 0 56.5 23.5T800-720q0 33-23.5 56.5T720-640Z" />
@@ -344,7 +339,7 @@ export default function ProfileScreen() {
 
               <View style={styles.userNameRow}>
                 <Text style={[styles.userNameText, { color: textPrimary }]}>{user.name}</Text>
-                <VerifiedBadge />
+                {user.entity?.isVerified === true && <VerifiedBadge />}
               </View>
 
               <TouchableOpacity onPress={() => bioSheetRef.current?.expand()} disabled={user.bio.length <= bioLimit}>
