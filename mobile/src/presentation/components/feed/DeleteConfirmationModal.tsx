@@ -1,8 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, Dimensions } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { useThemeStore } from '../../store/useThemeStore';
-import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
 
 interface DeleteConfirmationModalProps {
     visible: boolean;
@@ -13,10 +11,6 @@ interface DeleteConfirmationModalProps {
 const { width } = Dimensions.get('window');
 
 export const DeleteConfirmationModal = ({ visible, onCancel, onConfirm }: DeleteConfirmationModalProps) => {
-    const { isDark } = useThemeStore();
-    const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
-    const bgColor = isDark ? '#1c1c1e' : themeColors.background;
-
     if (!visible) return null;
 
     return (
@@ -27,7 +21,7 @@ export const DeleteConfirmationModal = ({ visible, onCancel, onConfirm }: Delete
             onRequestClose={onCancel}
         >
             <View style={styles.overlay}>
-                <View style={[styles.container, { backgroundColor: bgColor }]}>
+                <View style={styles.container}>
                     <View style={styles.content}>
                         <Text style={styles.title}>Bu içeriği silmek istiyor musunuz?</Text>
                         <Text style={styles.message}>
@@ -64,6 +58,7 @@ const styles = StyleSheet.create({
         borderRadius: 32,
         overflow: 'hidden',
         alignItems: 'center',
+        backgroundColor: '#1c1c1e',
     },
     content: {
         padding: 16,

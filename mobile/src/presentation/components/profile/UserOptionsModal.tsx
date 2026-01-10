@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, Dimensions } from 'react-native';
-import { useThemeStore } from '../../store/useThemeStore';
-import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
 
 interface UserOptionsModalProps {
     visible: boolean;
@@ -11,11 +9,7 @@ interface UserOptionsModalProps {
 }
 
 export const UserOptionsModal = ({ visible, username, onClose, onAction }: UserOptionsModalProps) => {
-    const { isDark } = useThemeStore();
     const [confirmType, setConfirmType] = useState<'none' | 'block' | 'mute' | 'report'>('none');
-
-    const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
-    const bgColor = isDark ? '#1c1c1e' : themeColors.background;
 
     const handleActionPress = (type: 'block' | 'mute' | 'report') => {
         setConfirmType(type);
@@ -27,7 +21,7 @@ export const UserOptionsModal = ({ visible, username, onClose, onAction }: UserO
     };
 
     const renderMainOptions = () => (
-        <View style={[styles.container, { backgroundColor: bgColor }]}>
+        <View style={styles.container}>
             <View style={styles.content}>
                 <Text style={styles.title}>@{username}</Text>
             </View>
@@ -62,7 +56,7 @@ export const UserOptionsModal = ({ visible, username, onClose, onAction }: UserO
         }[type];
 
         return (
-            <View style={[styles.container, { backgroundColor: bgColor }]}>
+            <View style={styles.container}>
                 <View style={styles.content}>
                     <Text style={styles.title}>{config.title}</Text>
                     <Text style={styles.message}>{config.msg}</Text>
@@ -93,7 +87,7 @@ export const UserOptionsModal = ({ visible, username, onClose, onAction }: UserO
 const styles = StyleSheet.create({
     overlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.6)',
+        backgroundColor: 'rgba(0,0,0,0.5)',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -101,6 +95,7 @@ const styles = StyleSheet.create({
         width: 270,
         borderRadius: 32,
         overflow: 'hidden',
+        backgroundColor: '#1c1c1e',
     },
     content: {
         padding: 16,

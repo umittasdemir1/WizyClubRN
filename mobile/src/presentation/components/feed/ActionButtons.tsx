@@ -12,7 +12,7 @@ import Animated, {
     Extrapolate,
     SharedValue,
 } from 'react-native-reanimated';
-import { Heart, Bookmark, Send, ShoppingBag } from 'lucide-react-native';
+import { Heart, Bookmark, Send, PictureInPicture } from 'lucide-react-native';
 
 interface ActionButtonsProps {
     isLiked: boolean;
@@ -248,7 +248,7 @@ export const ActionButtons = memo(forwardRef<ActionButtonsRef, ActionButtonsProp
             />
 
             <ActionButton
-                IconComponent={ShoppingBag}
+                IconComponent={PictureInPicture}
                 count={formatCount(shopsCount || 0)}
                 zeroText="Göz At"
                 videoId={videoId}

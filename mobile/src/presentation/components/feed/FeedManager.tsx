@@ -12,9 +12,10 @@ import {
     Share,
     Alert,
     TouchableOpacity,
-    Modal,
+    BackHandler,
     PanResponder,
     Animated as RNAnimated,
+    Easing,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HeaderOverlay } from './HeaderOverlay';
@@ -42,10 +43,11 @@ import { COLORS, LIGHT_COLORS } from '../../../core/constants';
 import React from 'react';
 import { StatusBar as RNStatusBar } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { ChevronLeft } from 'lucide-react-native';
+import { Bookmark } from 'lucide-react-native';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const SCREEN_HEIGHT = Dimensions.get('window').height;
+const SAVE_ICON_ACTIVE = '#FFFFFF';
 
 const VIEWABILITY_CONFIG = {
     itemVisiblePercentThreshold: 60,
@@ -189,6 +191,8 @@ export const FeedManager = ({
     const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
     const [webViewUrl, setWebViewUrl] = useState<string | null>(null);
     const [isWebViewVisible, setWebViewVisible] = useState(false);
+    const [saveToastMessage, setSaveToastMessage] = useState<string | null>(null);
+    const [saveToastActive, setSaveToastActive] = useState(false);
 
     // Sheet refs
     const descriptionSheetRef = useRef<BottomSheet>(null);
@@ -205,19 +209,91 @@ export const FeedManager = ({
     const router = useRouter();
     const listRef = useRef<any>(null);
     const webSheetTranslateY = useRef(new RNAnimated.Value(0)).current;
+    const webSheetBackdropOpacity = useRef(
+        webSheetTranslateY.interpolate({
+            inputRange: [0, SCREEN_HEIGHT],
+            outputRange: [0.4, 0],
+            extrapolate: 'clamp',
+        })
+    ).current;
+    const isWebViewClosingRef = useRef(false);
+    const saveToastTranslateY = useRef(new RNAnimated.Value(-70)).current;
+    const saveToastOpacity = useRef(new RNAnimated.Value(0)).current;
+    const saveToastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const showSaveToast = useCallback((message: string) => {
+        setSaveToastMessage(message);
+        if (saveToastTimeoutRef.current) {
+            clearTimeout(saveToastTimeoutRef.current);
+            saveToastTimeoutRef.current = null;
+        }
+        saveToastTranslateY.setValue(-70);
+        saveToastOpacity.setValue(0);
+        RNAnimated.parallel([
+            RNAnimated.timing(saveToastTranslateY, {
+                toValue: 0,
+                duration: 180,
+                easing: Easing.out(Easing.quad),
+                useNativeDriver: true,
+            }),
+            RNAnimated.timing(saveToastOpacity, {
+                toValue: 1,
+                duration: 180,
+                useNativeDriver: true,
+            }),
+        ]).start();
+        saveToastTimeoutRef.current = setTimeout(() => {
+            RNAnimated.parallel([
+                RNAnimated.timing(saveToastTranslateY, {
+                    toValue: -70,
+                    duration: 180,
+                    easing: Easing.in(Easing.quad),
+                    useNativeDriver: true,
+                }),
+                RNAnimated.timing(saveToastOpacity, {
+                    toValue: 0,
+                    duration: 180,
+                    useNativeDriver: true,
+                }),
+            ]).start(() => {
+                setSaveToastMessage(null);
+            });
+        }, 2000);
+    }, [saveToastOpacity, saveToastTranslateY]);
+    const closeWebView = useCallback(() => {
+        if (isWebViewClosingRef.current) {
+            return;
+        }
+        isWebViewClosingRef.current = true;
+        RNAnimated.timing(webSheetTranslateY, {
+            toValue: SCREEN_HEIGHT,
+            duration: 180,
+            easing: Easing.out(Easing.quad),
+            useNativeDriver: true,
+        }).start(() => {
+            setWebViewVisible(false);
+            webSheetTranslateY.setValue(SCREEN_HEIGHT);
+            isWebViewClosingRef.current = false;
+        });
+    }, [webSheetTranslateY]);
     const webSheetPanResponder = useRef(
         PanResponder.create({
             onStartShouldSetPanResponder: () => true,
             onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 2,
             onPanResponderMove: (_, gesture) => {
+                if (isWebViewClosingRef.current) {
+                    return;
+                }
                 if (gesture.dy > 0) {
                     webSheetTranslateY.setValue(gesture.dy);
                 }
             },
             onPanResponderRelease: (_, gesture) => {
+                if (isWebViewClosingRef.current) {
+                    return;
+                }
                 if (gesture.dy > 120) {
-                    setWebViewVisible(false);
-                    webSheetTranslateY.setValue(0);
+                    closeWebView();
                     return;
                 }
                 RNAnimated.spring(webSheetTranslateY, {
@@ -238,8 +314,29 @@ export const FeedManager = ({
     useEffect(() => {
         if (isWebViewVisible) {
             webSheetTranslateY.setValue(0);
+            isWebViewClosingRef.current = false;
         }
     }, [isWebViewVisible, webSheetTranslateY]);
+
+    useEffect(() => {
+        return () => {
+            if (saveToastTimeoutRef.current) {
+                clearTimeout(saveToastTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        const handleBackPress = () => {
+            if (isWebViewVisible) {
+                closeWebView();
+                return true;
+            }
+            return false;
+        };
+        const subscription = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
+        return () => subscription.remove();
+    }, [isWebViewVisible, closeWebView]);
 
     // Imperative StatusBar Control
     useFocusEffect(
@@ -489,8 +586,18 @@ export const FeedManager = ({
         }
     }, [toggleShare]);
 
+    const handleToggleSave = useCallback((videoId: string) => {
+        const video = videosRef.current.find((v) => v.id === videoId);
+        const nextSaved = !video?.isSaved;
+        toggleSave(videoId);
+        setSaveToastActive(nextSaved);
+        showSaveToast(nextSaved ? 'Kaydedilenlere eklendi' : 'Kaydedilenlerden kaldırıldı');
+    }, [showSaveToast, toggleSave]);
+
     const { user } = useAuthStore();
     const currentUserId = user?.id;
+    const activeVideo = videos.find((v) => v.id === activeVideoId) || null;
+    const isOwnActiveVideo = !!activeVideo && activeVideo.user?.id === currentUserId;
 
     const renderItem = useCallback(
         ({ item }: { item: Video }) => {
@@ -510,7 +617,7 @@ export const FeedManager = ({
                     onSeekReady={isActive ? handleSeekReady : undefined}
                     onRemoveVideo={handleRemoveVideo}
                     onToggleLike={toggleLike}
-                    onToggleSave={toggleSave}
+                    onToggleSave={handleToggleSave}
                     onToggleShare={handleSharePress}
                     onToggleFollow={toggleFollow}
                     onOpenShopping={handleOpenShopping}
@@ -604,6 +711,35 @@ export const FeedManager = ({
             disabled={isCustomFeed}
         >
             <View style={styles.container}>
+                {saveToastMessage && (
+                    <RNAnimated.View
+                        pointerEvents="none"
+                        style={[
+                            styles.saveToast,
+                            saveToastActive ? styles.saveToastActive : styles.saveToastInactive,
+                            {
+                                top: insets.top + 60,
+                                opacity: saveToastOpacity,
+                                transform: [{ translateY: saveToastTranslateY }],
+                            },
+                        ]}
+                    >
+                        <View style={styles.saveToastContent}>
+                            <Bookmark
+                                size={18}
+                                color={SAVE_ICON_ACTIVE}
+                                fill={saveToastActive ? SAVE_ICON_ACTIVE : 'none'}
+                                strokeWidth={1.6}
+                            />
+                            <Text style={[
+                                styles.saveToastText,
+                                styles.saveToastTextActive,
+                            ]}>
+                                {saveToastMessage}
+                            </Text>
+                        </View>
+                    </RNAnimated.View>
+                )}
                 <FlashList
                     // @ts-ignore
                     ref={listRef}
@@ -685,13 +821,13 @@ export const FeedManager = ({
                 <MoreOptionsSheet
                     ref={moreOptionsSheetRef}
                     onCleanScreenPress={handleCleanScreen}
-                    onDeletePress={handleSheetDelete}
+                    onDeletePress={isOwnActiveVideo ? handleSheetDelete : undefined}
                     isCleanScreen={isCleanScreen}
                 />
 
                 <DescriptionSheet
                     ref={descriptionSheetRef}
-                    video={videos.find(v => v.id === activeVideoId) || null}
+                    video={activeVideo}
                     onFollowPress={() => activeVideoId && toggleFollow(activeVideoId)}
                     onChange={(index) => {
                         if (index === -1 && useActiveVideoStore.getState().isPaused) {
@@ -711,42 +847,41 @@ export const FeedManager = ({
                     }}
                 />
 
-                <Modal
-                    visible={isWebViewVisible}
-                    transparent={true}
-                    animationType="slide"
-                    onRequestClose={() => setWebViewVisible(false)}
-                >
-                    <View style={styles.webSheetBackdrop}>
-                        <RNAnimated.View
+                {isWebViewVisible && (
+                    <View style={styles.webSheetOverlay}>
+                        <View style={styles.webSheetBackdrop}>
+                            <RNAnimated.View
+                                pointerEvents="none"
+                                style={[styles.webSheetBackdropOverlay, { opacity: webSheetBackdropOpacity }]}
+                            />
+                            <Pressable
+                                style={styles.webSheetBackdropPressable}
+                                onPress={closeWebView}
+                            />
+                            <RNAnimated.View
                             style={[
                                 styles.webSheetContainer,
                                 { transform: [{ translateY: webSheetTranslateY }] },
                             ]}
-                        >
-                            <View style={styles.webSheetDragArea} {...webSheetPanResponder.panHandlers}>
-                                <View style={styles.webSheetHandle} />
-                                <View style={styles.webSheetHeader}>
-                                    <TouchableOpacity
-                                        onPress={() => setWebViewVisible(false)}
-                                        style={[styles.webSheetClose, styles.webSheetCloseButton]}
-                                    >
-                                        <ChevronLeft size={22} color={LIGHT_COLORS.textPrimary} strokeWidth={1.2} />
-                                    </TouchableOpacity>
-                                    <View style={styles.webSheetClose} />
+                            >
+                                <View style={styles.webSheetDragArea} {...webSheetPanResponder.panHandlers}>
+                                    <View style={styles.webSheetHandle} />
+                                    <View style={styles.webSheetHeader}>
+                                        <View style={styles.webSheetClose} />
+                                    </View>
                                 </View>
-                            </View>
-                            {webViewUrl && (
-                                <WebView
-                                    source={{ uri: webViewUrl }}
-                                    startInLoadingState={true}
-                                    originWhitelist={['*']}
-                                    style={styles.webSheetWebView}
-                                />
-                            )}
-                        </RNAnimated.View>
+                                {webViewUrl && (
+                                    <WebView
+                                        source={{ uri: webViewUrl }}
+                                        startInLoadingState={true}
+                                        originWhitelist={['*']}
+                                        style={styles.webSheetWebView}
+                                    />
+                                )}
+                            </RNAnimated.View>
+                        </View>
                     </View>
-                </Modal>
+                )}
             </View>
         </SwipeWrapper>
     );
@@ -777,11 +912,25 @@ const styles = StyleSheet.create({
     },
     webSheetBackdrop: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.4)',
         justifyContent: 'flex-end',
     },
+    webSheetOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        zIndex: 200,
+    },
+    webSheetBackdropOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+    },
+    webSheetBackdropPressable: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: '85%',
+    },
     webSheetContainer: {
-        height: '92%',
+        height: '85%',
         backgroundColor: LIGHT_COLORS.background,
         borderTopLeftRadius: 28,
         borderTopRightRadius: 28,
@@ -796,11 +945,11 @@ const styles = StyleSheet.create({
         height: 3,
         borderRadius: 2,
         backgroundColor: LIGHT_COLORS.black,
-        marginTop: 10,
-        marginBottom: 8,
+        marginTop: 6,
+        marginBottom: 4,
     },
     webSheetHeader: {
-        height: 24,
+        height: 14,
         paddingHorizontal: 12,
         flexDirection: 'row',
         alignItems: 'center',
@@ -814,12 +963,43 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'flex-start',
     },
-    webSheetCloseButton: {
-        marginTop: -16,
-        marginLeft: 10,
-    },
     webSheetWebView: {
         flex: 1,
         backgroundColor: 'transparent',
+    },
+    saveToast: {
+        position: 'absolute',
+        alignSelf: 'center',
+        zIndex: 300,
+        minWidth: 280,
+        paddingVertical: 14,
+        paddingHorizontal: 12,
+        borderRadius: 14,
+        alignItems: 'center',
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOpacity: 0,
+        shadowRadius: 0,
+        shadowOffset: { width: 0, height: 0 },
+        elevation: 0,
+    },
+    saveToastActive: {
+        backgroundColor: '#2c2c2e',
+    },
+    saveToastInactive: {
+        backgroundColor: '#2c2c2e',
+    },
+    saveToastText: {
+        fontSize: 17,
+        fontWeight: '400',
+        zIndex: 1,
+    },
+    saveToastTextActive: {
+        color: '#FFFFFF',
+    },
+    saveToastContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
     },
 });
