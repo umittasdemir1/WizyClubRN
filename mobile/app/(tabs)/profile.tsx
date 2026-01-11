@@ -530,14 +530,14 @@ export default function ProfileScreen() {
                   <Text style={[styles.settingsTitle, { color: textPrimary }]}>kişisel araçlar</Text>
                 </View>
                 <TouchableOpacity onPress={closeSettings} style={styles.settingsCloseButton}>
-                  <X size={22} color={textPrimary} />
+                  <X size={22} color={textPrimary} strokeWidth={1.2} />
                 </TouchableOpacity>
               </>
             ) : (
               <>
                 <View style={styles.settingsHeaderLeft}>
                   <TouchableOpacity onPress={closeSettings} style={styles.settingsBackButton}>
-                    <ArrowLeft size={22} color={textPrimary} />
+                    <ArrowLeft size={22} color={textPrimary} strokeWidth={1.2} />
                   </TouchableOpacity>
                   <Text style={[styles.settingsTitle, { color: textPrimary }]}>
                     {settingsSection === 'actions' ? 'Hareketler' : 'Yakınlarda Silinenler'}
@@ -554,7 +554,7 @@ export default function ProfileScreen() {
                 <View style={[styles.settingsItem, { borderBottomColor: isDark ? '#2c2c2e' : '#e5e5e5' }]}>
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
-                      <SunMoon size={20} color={textPrimary} />
+                      <SunMoon size={24} color={textPrimary} strokeWidth={1.2} />
                       <Text style={[styles.settingsLabel, { color: textPrimary, marginBottom: 0 }]}>Tema</Text>
                     </View>
                   </View>
@@ -585,7 +585,7 @@ export default function ProfileScreen() {
                 >
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
-                      <SquareActivity size={20} color={textPrimary} />
+                      <SquareActivity size={24} color={textPrimary} strokeWidth={1.2} />
                       <Text style={[styles.settingsLabel, { color: textPrimary, marginBottom: 0 }]}>Hareketler</Text>
                     </View>
                   </View>
@@ -619,7 +619,7 @@ export default function ProfileScreen() {
                 >
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
-                      <Heart size={20} color={textPrimary} />
+                      <Heart size={24} color={textPrimary} strokeWidth={1.2} />
                       <Text style={[styles.settingsLabel, { color: textPrimary, marginBottom: 0 }]}>Beğenilerin</Text>
                     </View>
                   </View>
@@ -632,7 +632,7 @@ export default function ProfileScreen() {
                 >
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
-                      <Bookmark size={20} color={textPrimary} />
+                      <Bookmark size={24} color={textPrimary} strokeWidth={1.2} />
                       <Text style={[styles.settingsLabel, { color: textPrimary, marginBottom: 0 }]}>Kaydedilenlerin</Text>
                     </View>
                   </View>
@@ -645,7 +645,7 @@ export default function ProfileScreen() {
                 >
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
-                      <SquareActivity size={20} color={textPrimary} />
+                      <SquareActivity size={24} color={textPrimary} strokeWidth={1.2} />
                       <Text style={[styles.settingsLabel, { color: textPrimary, marginBottom: 0 }]}>Arşivlenenler</Text>
                     </View>
                   </View>
@@ -658,7 +658,7 @@ export default function ProfileScreen() {
                 >
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
-                      <EyeOff size={20} color={textPrimary} />
+                      <EyeOff size={24} color={textPrimary} strokeWidth={1.2} />
                       <Text style={[styles.settingsLabel, { color: textPrimary, marginBottom: 0 }]}>İlgilenmediklerin</Text>
                     </View>
                   </View>
@@ -671,7 +671,7 @@ export default function ProfileScreen() {
                 >
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
-                      <Eye size={20} color={textPrimary} />
+                      <Eye size={24} color={textPrimary} strokeWidth={1.2} />
                       <Text style={[styles.settingsLabel, { color: textPrimary, marginBottom: 0 }]}>İlgilendiklerin</Text>
                     </View>
                   </View>
@@ -684,7 +684,7 @@ export default function ProfileScreen() {
                 >
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
-                      <CalendarDays size={20} color={textPrimary} />
+                      <CalendarDays size={24} color={textPrimary} strokeWidth={1.2} />
                       <Text style={[styles.settingsLabel, { color: textPrimary, marginBottom: 0 }]}>Hesap geçmişi</Text>
                     </View>
                   </View>
@@ -697,7 +697,7 @@ export default function ProfileScreen() {
                 >
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
-                      <ImagePlay size={20} color={textPrimary} />
+                      <ImagePlay size={24} color={textPrimary} strokeWidth={1.2} />
                       <Text style={[styles.settingsLabel, { color: textPrimary, marginBottom: 0 }]}>İzleme geçmişi</Text>
                     </View>
                   </View>
@@ -709,7 +709,7 @@ export default function ProfileScreen() {
                 >
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
-                      <Trash2 size={20} color={textPrimary} />
+                      <Trash2 size={24} color={textPrimary} strokeWidth={1.2} />
                       <Text style={[styles.settingsLabel, { color: textPrimary, marginBottom: 0 }]}>Yakınlarda Silinenler</Text>
                     </View>
                     <Text style={[styles.settingsValue, { color: textSecondary }]}>
@@ -795,7 +795,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   settingsTitle: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '600',
     letterSpacing: 0.3,
   },

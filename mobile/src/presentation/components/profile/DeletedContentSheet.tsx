@@ -126,14 +126,14 @@ export const DeletedContentMenu = ({ isDark, isActive }: DeletedContentMenuProps
                         style={[styles.actionButton, { backgroundColor: actionBg }]}
                         onPress={() => handleRestore(item.id)}
                     >
-                        <RotateCcw size={18} color={textColor} />
+                        <RotateCcw size={18} color={textColor} strokeWidth={1.2} />
                         <Text style={[styles.actionText, { color: textColor }]}>Geri yükle</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={[styles.actionButton, { backgroundColor: dangerBg }]}
                         onPress={() => handlePermanentDelete(item.id)}
                     >
-                        <Trash2 size={18} color={dangerText} />
+                        <Trash2 size={18} color={dangerText} strokeWidth={1.2} />
                         <Text style={[styles.actionText, { color: dangerText }]}>Kalıcı sil</Text>
                     </TouchableOpacity>
                 </View>
