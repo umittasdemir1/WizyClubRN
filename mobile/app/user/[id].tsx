@@ -291,7 +291,7 @@ export default function UserProfileScreen() {
           </TouchableOpacity>
           <Text style={[styles.headerUsername, { color: textPrimary }]}>{!isLoading ? `@${user.username}` : ''}</Text>
           <TouchableOpacity
-            style={styles.navIcon}
+            style={[styles.navIcon, { alignItems: 'flex-end' }]}
             onPress={() => setIsUserOptionsVisible(true)}
             hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
           >
@@ -433,9 +433,9 @@ export default function UserProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   topNavContainer: { width: '100%', zIndex: 1000, position: 'absolute', top: 0, left: 0, right: 0 },
-  topNav: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, height: 60 },
+  topNav: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 10, height: 60 },
   navIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  headerUsername: { fontSize: 16, fontWeight: '600', flex: 1, textAlign: 'center' },
+  headerUsername: { fontSize: 20, fontWeight: '600', flex: 1, textAlign: 'center' },
   profileContainer: { alignItems: 'center', paddingHorizontal: 10, marginTop: 5 },
   userNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
   userNameText: { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },

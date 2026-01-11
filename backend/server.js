@@ -369,9 +369,9 @@ const DEFAULT_ADMIN_CONFIG = {
         {
             key: 'profile.settings.icon.archived.name',
             label: 'İkon - Arşivlenenler',
-            description: 'Lucide: SquareActivity',
+            description: 'Lucide: ClockFading',
             type: 'text',
-            value: 'SquareActivity',
+            value: 'ClockFading',
             group: 'Profil > İkonlar',
         },
         {

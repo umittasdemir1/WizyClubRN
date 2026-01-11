@@ -28,7 +28,7 @@ import { PostsGrid } from '../../src/presentation/components/profile/PostsGrid';
 import { BioBottomSheet } from '../../src/presentation/components/profile/BioBottomSheet';
 import { ClubsBottomSheet } from '../../src/presentation/components/profile/ClubsBottomSheet';
 import { EditProfileSheet } from '../../src/presentation/components/profile/EditProfileSheet';
-import { Eye, X, Menu, SunMoon, SquareActivity, ArrowLeft, EyeOff, CalendarDays, ImagePlay, Bookmark, Trash2, Heart } from 'lucide-react-native';
+import { Eye, X, Menu, SunMoon, ClockFading, SquareActivity, ArrowLeft, EyeOff, CalendarDays, ImagePlay, Bookmark, Trash2, Heart } from 'lucide-react-native';
 import BottomSheet from '@gorhom/bottom-sheet';
 import Svg, { Path, Circle } from 'react-native-svg';
 import Animated, {
@@ -627,14 +627,7 @@ export default function ProfileScreen() {
           <Text style={[styles.headerUsername, { color: textPrimary }]}>{!isLoading ? `@${user.username}` : ''}</Text>
           <View style={styles.navActions}>
             <TouchableOpacity
-              style={styles.navIconButton}
-              onPress={() => router.push(`/user/${currentUserId}`)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Eye size={24} color={iconColor} strokeWidth={2} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.navIconButton}
+              style={[styles.navIconButton, { alignItems: 'flex-end' }]}
               onPress={openSettings}
             >
               <Menu size={24} color={iconColor} />
@@ -881,6 +874,20 @@ export default function ProfileScreen() {
                     })}
                   </View>
                 </View>
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
+                  onPress={() => {
+                    closeSettings();
+                    router.push(`/user/${currentUserId}`);
+                  }}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <Eye size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>Kendini gör</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
 
                 <TouchableOpacity
                   style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
@@ -948,7 +955,7 @@ export default function ProfileScreen() {
                 >
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
-                      <SquareActivity size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <ClockFading size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
                       <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.actionsItemArchived}</Text>
                     </View>
                   </View>
@@ -1088,11 +1095,11 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   topNavContainer: { width: '100%', zIndex: 1000, position: 'absolute', top: 0, left: 0, right: 0 },
-  topNav: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, height: 60, position: 'relative' },
+  topNav: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 10, height: 60, position: 'relative' },
   navIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   navActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   navIconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  headerUsername: { fontSize: 16, fontWeight: '600', position: 'absolute', left: 0, right: 0, textAlign: 'center', zIndex: -1 },
+  headerUsername: { fontSize: 20, fontWeight: '600', position: 'absolute', left: 0, right: 0, textAlign: 'center', zIndex: -1 },
   profileContainer: { alignItems: 'center', paddingHorizontal: 10, marginTop: 5 },
   userNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
   userNameText: { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
