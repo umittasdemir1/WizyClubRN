@@ -1,598 +1,107 @@
 {
   "version": 1,
-  "updatedAt": "2026-01-11T15:10:40.466Z",
+  "updatedAt": "2026-01-11T20:45:00.000Z",
   "items": [
     {
-      "key": "profile.settings.title.text",
-      "label": "Başlık metni",
-      "description": "Profil ayarlar menüsü başlığı metni",
-      "type": "text",
-      "value": "Ayarlar ve kişisel araçlar",
-      "group": "Profil Ayarlar Başlığı"
-    },
-    {
-      "key": "profile.settings.title.color",
-      "label": "Renk",
-      "description": "Başlık metin rengi",
-      "type": "color",
-      "value": "auto",
-      "group": "Profil Ayarlar Başlığı"
-    },
-    {
-      "key": "profile.settings.title.fontSize",
-      "label": "Font boyutu",
-      "description": "Başlık font boyutu",
+      "key": "feed.video.overlayOpacity",
+      "label": "Gölge Yoğunluğu",
+      "description": "Video üzerindeki alt karartma gradyanı",
       "type": "number",
-      "value": 24,
-      "group": "Profil Ayarlar Başlığı",
-      "min": 12,
-      "max": 48,
-      "step": 1
-    },
-    {
-      "key": "profile.settings.title.fontWeight",
-      "label": "Font ağırlığı",
-      "description": "Başlık font ağırlığı",
-      "type": "select",
-      "value": "600",
-      "group": "Profil Ayarlar Başlığı",
-      "options": [
-        "300",
-        "400",
-        "500",
-        "600",
-        "700",
-        "800"
-      ]
-    },
-    {
-      "key": "profile.settings.title.fontStyle",
-      "label": "Font stili",
-      "description": "Başlık font stili",
-      "type": "select",
-      "value": "normal",
-      "group": "Profil Ayarlar Başlığı",
-      "options": [
-        "normal",
-        "italic"
-      ]
-    },
-    {
-      "key": "profile.settings.title.fontFamily",
-      "label": "Font ailesi",
-      "description": "Başlık font ailesi (cihaza göre değişebilir)",
-      "type": "select",
-      "value": "system",
-      "group": "Profil Ayarlar Başlığı",
-      "options": [
-        "system",
-        "sans-serif",
-        "serif",
-        "monospace"
-      ]
-    },
-    {
-      "key": "profile.settings.title.letterSpacing",
-      "label": "Harf aralığı",
-      "description": "Başlık harf aralığı",
-      "type": "number",
-      "value": 0.3,
-      "group": "Profil Ayarlar Başlığı",
-      "min": -1,
-      "max": 6,
+      "value": 0.4,
+      "group": "Feed > Görünüm",
+      "min": 0,
+      "max": 1,
       "step": 0.1
     },
     {
-      "key": "profile.settings.title.lineHeight",
-      "label": "Satır yüksekliği",
-      "description": "Başlık satır yüksekliği",
-      "type": "number",
-      "value": 28,
-      "group": "Profil Ayarlar Başlığı",
-      "min": 10,
-      "max": 64,
-      "step": 1
-    },
-    {
-      "key": "profile.settings.title.textAlign",
-      "label": "Hizalama",
-      "description": "Başlık metin hizası",
+      "key": "feed.video.mutedDefault",
+      "label": "Varsayılan Sessiz",
+      "description": "Videoları başlangıçta sessiz oynat",
       "type": "select",
-      "value": "left",
-      "group": "Profil Ayarlar Başlığı",
+      "value": "Hayır",
+      "group": "Feed > Ayarlar",
       "options": [
-        "left",
-        "center",
-        "right"
+        "Evet",
+        "Hayır"
       ]
     },
     {
-      "key": "profile.settings.title.textTransform",
-      "label": "Metin dönüşümü",
-      "description": "Başlık metin dönüşümü",
-      "type": "select",
-      "value": "none",
-      "group": "Profil Ayarlar Başlığı",
-      "options": [
-        "none",
-        "uppercase",
-        "lowercase",
-        "capitalize"
-      ]
-    },
-    {
-      "key": "profile.settings.sectionTitle.color",
-      "label": "Alt başlık renk",
-      "description": "Alt başlık metin rengi",
-      "type": "color",
-      "value": "auto",
-      "group": "Profil Ayar Stilleri"
-    },
-    {
-      "key": "profile.settings.sectionTitle.fontSize",
-      "label": "Alt başlık boyutu",
-      "description": "Alt başlık font boyutu",
+      "key": "explore.grid.columns",
+      "label": "Izgara Sütun Sayısı",
+      "description": "Keşfet sayfasındaki video sütunları",
       "type": "number",
-      "value": 24,
-      "group": "Profil Ayar Stilleri",
-      "min": 12,
-      "max": 48,
-      "step": 1
+      "value": 3,
+      "group": "Keşfet > Izgara",
+      "min": 1,
+      "max": 4
     },
     {
-      "key": "profile.settings.sectionTitle.fontWeight",
-      "label": "Alt başlık ağırlığı",
-      "description": "Alt başlık font ağırlığı",
-      "type": "select",
-      "value": "600",
-      "group": "Profil Ayar Stilleri",
-      "options": [
-        "300",
-        "400",
-        "500",
-        "600",
-        "700",
-        "800"
-      ]
-    },
-    {
-      "key": "profile.settings.itemLabel.color",
-      "label": "Menü metni renk",
-      "description": "Ayar item metin rengi",
-      "type": "color",
-      "value": "auto",
-      "group": "Profil Ayar Stilleri"
-    },
-    {
-      "key": "profile.settings.itemLabel.fontSize",
-      "label": "Menü metni boyutu",
-      "description": "Ayar item metin boyutu",
+      "key": "deals.card.borderRadius",
+      "label": "Kart Köşe Yuvarlaklığı",
+      "description": "Fırsatlar sayfasındaki kartların yuvarlığı",
       "type": "number",
-      "value": 18,
-      "group": "Profil Ayar Stilleri",
-      "min": 10,
-      "max": 30,
-      "step": 1
+      "value": 16,
+      "group": "Fırsatlar > Kartlar"
     },
     {
-      "key": "profile.settings.itemLabel.fontWeight",
-      "label": "Menü metni ağırlığı",
-      "description": "Ayar item metin ağırlığı",
-      "type": "select",
-      "value": "400",
-      "group": "Profil Ayar Stilleri",
-      "options": [
-        "300",
-        "400",
-        "500",
-        "600",
-        "700"
-      ]
-    },
-    {
-      "key": "profile.settings.helperText.color",
-      "label": "Açıklama metni renk",
-      "description": "Yardımcı metin rengi",
+      "key": "notifications.item.unreadColor",
+      "label": "Okunmamış Rengi",
+      "description": "Okunmamış bildirim vurgu rengi",
       "type": "color",
-      "value": "auto",
-      "group": "Profil Ayar Stilleri"
+      "value": "#FF3B30",
+      "group": "Bildirimler > Liste"
     },
     {
-      "key": "profile.settings.helperText.fontSize",
-      "label": "Açıklama metni boyutu",
-      "description": "Yardımcı metin boyutu",
+      "key": "profile.header.avatarSize",
+      "label": "Avatar Boyutu",
+      "description": "Profil başlığındaki avatar genişliği",
       "type": "number",
-      "value": 14,
-      "group": "Profil Ayar Stilleri",
-      "min": 10,
-      "max": 24,
-      "step": 1
+      "value": 100,
+      "group": "Profil > Başlık",
+      "min": 40,
+      "max": 150
     },
     {
-      "key": "profile.settings.icon.color",
-      "label": "İkon rengi",
-      "description": "Ayar ikon rengi",
+      "key": "upload.camera.shutterColor",
+      "label": "Deklanşör Rengi",
+      "description": "Kamera kayıt butonu rengi",
       "type": "color",
-      "value": "auto",
-      "group": "Profil Ayar Stilleri"
+      "value": "#FF3B30",
+      "group": "Upload > Kamera"
     },
     {
-      "key": "profile.settings.icon.strokeWidth",
-      "label": "İkon kalınlığı",
-      "description": "Ayar ikon stroke kalınlığı",
+      "key": "story.viewer.autoAdvanceDelay",
+      "label": "Oto-Geçiş Süresi (sn)",
+      "description": "Hikayelerin otomatik geçme süresi",
       "type": "number",
-      "value": 1.2,
-      "group": "Profil Ayar Stilleri",
-      "min": 0.8,
-      "max": 2.5,
-      "step": 0.1
+      "value": 10,
+      "group": "Hikaye > İzleyici",
+      "min": 3,
+      "max": 30
     },
     {
-      "key": "profile.settings.icon.size",
-      "label": "İkon boyutu",
-      "description": "Ayar ikon boyutu",
+      "key": "auth.login.title",
+      "label": "Giriş Başlığı",
+      "description": "Giriş sayfasındaki ana başlık",
+      "type": "text",
+      "value": "WizyClub'a Hoş Geldin",
+      "group": "Giriş/Kayıt > Metinler"
+    },
+    {
+      "key": "activities.grid.spacing",
+      "label": "Izgara Boşluğu",
+      "description": "Beğenilenler listesindeki boşluklar",
       "type": "number",
-      "value": 24,
-      "group": "Profil Ayar Stilleri",
-      "min": 16,
-      "max": 32,
-      "step": 1
+      "value": 1,
+      "group": "Aktiviteler > Izgara"
     },
     {
-      "key": "profile.settings.icon.close.name",
-      "label": "İkon - Kapat (X)",
-      "description": "Lucide: X",
-      "type": "text",
-      "value": "X",
-      "group": "Profil Ayar İkonları"
-    },
-    {
-      "key": "profile.settings.icon.close.color",
-      "label": "Kapat renk",
-      "description": "Kapat ikon rengi",
+      "key": "drafts.folder.color",
+      "label": "Klasör Rengi",
+      "description": "Taslaklar sayfası klasör ikonu rengi",
       "type": "color",
-      "value": "auto",
-      "group": "Profil Ayar İkonları"
-    },
-    {
-      "key": "profile.settings.icon.close.size",
-      "label": "Kapat boyut",
-      "description": "Kapat ikon boyutu",
-      "type": "number",
-      "value": 22,
-      "group": "Profil Ayar İkonları",
-      "min": 16,
-      "max": 32,
-      "step": 1
-    },
-    {
-      "key": "profile.settings.icon.close.strokeWidth",
-      "label": "Kapat kalınlık",
-      "description": "Kapat ikon stroke kalınlığı",
-      "type": "number",
-      "value": 1.6,
-      "group": "Profil Ayar İkonları",
-      "min": 0.8,
-      "max": 2.5,
-      "step": 0.1
-    },
-    {
-      "key": "profile.settings.icon.back.name",
-      "label": "İkon - Geri",
-      "description": "Lucide: ArrowLeft",
-      "type": "text",
-      "value": "ArrowLeft",
-      "group": "Profil Ayar İkonları"
-    },
-    {
-      "key": "profile.settings.icon.back.color",
-      "label": "Geri renk",
-      "description": "Geri ikon rengi",
-      "type": "color",
-      "value": "auto",
-      "group": "Profil Ayar İkonları"
-    },
-    {
-      "key": "profile.settings.icon.back.size",
-      "label": "Geri boyut",
-      "description": "Geri ikon boyutu",
-      "type": "number",
-      "value": 22,
-      "group": "Profil Ayar İkonları",
-      "min": 16,
-      "max": 32,
-      "step": 1
-    },
-    {
-      "key": "profile.settings.icon.back.strokeWidth",
-      "label": "Geri kalınlık",
-      "description": "Geri ikon stroke kalınlığı",
-      "type": "number",
-      "value": 1.6,
-      "group": "Profil Ayar İkonları",
-      "min": 0.8,
-      "max": 2.5,
-      "step": 0.1
-    },
-    {
-      "key": "profile.settings.icon.theme.name",
-      "label": "İkon - Tema",
-      "description": "Lucide: SunMoon",
-      "type": "text",
-      "value": "SunMoon",
-      "group": "Profil Ayar İkonları"
-    },
-    {
-      "key": "profile.settings.icon.actions.name",
-      "label": "İkon - Hareketler",
-      "description": "Lucide: SquareActivity",
-      "type": "text",
-      "value": "SquareActivity",
-      "group": "Profil Ayar İkonları"
-    },
-    {
-      "key": "profile.settings.icon.likes.name",
-      "label": "İkon - Beğenilerin",
-      "description": "Lucide: Heart",
-      "type": "text",
-      "value": "Heart",
-      "group": "Profil Ayar İkonları"
-    },
-    {
-      "key": "profile.settings.icon.saved.name",
-      "label": "İkon - Kaydedilenlerin",
-      "description": "Lucide: Bookmark",
-      "type": "text",
-      "value": "Bookmark",
-      "group": "Profil Ayar İkonları"
-    },
-    {
-      "key": "profile.settings.icon.archived.name",
-      "label": "İkon - Arşivlenenler",
-      "description": "Lucide: SquareActivity",
-      "type": "text",
-      "value": "SquareActivity",
-      "group": "Profil Ayar İkonları"
-    },
-    {
-      "key": "profile.settings.icon.notInterested.name",
-      "label": "İkon - İlgilenmediklerin",
-      "description": "Lucide: EyeOff",
-      "type": "text",
-      "value": "EyeOff",
-      "group": "Profil Ayar İkonları"
-    },
-    {
-      "key": "profile.settings.icon.interested.name",
-      "label": "İkon - İlgilendiklerin",
-      "description": "Lucide: Eye",
-      "type": "text",
-      "value": "Eye",
-      "group": "Profil Ayar İkonları"
-    },
-    {
-      "key": "profile.settings.icon.accountHistory.name",
-      "label": "İkon - Hesap geçmişi",
-      "description": "Lucide: CalendarDays",
-      "type": "text",
-      "value": "CalendarDays",
-      "group": "Profil Ayar İkonları"
-    },
-    {
-      "key": "profile.settings.icon.watchHistory.name",
-      "label": "İkon - İzleme geçmişi",
-      "description": "Lucide: ImagePlay",
-      "type": "text",
-      "value": "ImagePlay",
-      "group": "Profil Ayar İkonları"
-    },
-    {
-      "key": "profile.settings.icon.deleted.name",
-      "label": "İkon - Yakınlarda Silinenler",
-      "description": "Lucide: Trash2",
-      "type": "text",
-      "value": "Trash2",
-      "group": "Profil Ayar İkonları"
-    },
-    {
-      "key": "profile.settings.chevron.color",
-      "label": "Chevron rengi",
-      "description": "Sağ ok rengi",
-      "type": "color",
-      "value": "auto",
-      "group": "Profil Ayar Stilleri"
-    },
-    {
-      "key": "profile.settings.item.borderColor",
-      "label": "Item ayırıcı rengi",
-      "description": "Ayar item alt çizgi rengi",
-      "type": "color",
-      "value": "auto",
-      "group": "Profil Ayar Stilleri"
-    },
-    {
-      "key": "profile.settings.segment.backgroundColor",
-      "label": "Tema seçici arka plan",
-      "description": "Segment arka plan rengi",
-      "type": "color",
-      "value": "auto",
-      "group": "Profil Ayar Stilleri"
-    },
-    {
-      "key": "profile.settings.segment.activeColor",
-      "label": "Tema seçici aktif renk",
-      "description": "Segment aktif arka plan rengi",
-      "type": "color",
-      "value": "auto",
-      "group": "Profil Ayar Stilleri"
-    },
-    {
-      "key": "profile.settings.segment.activeTextColor",
-      "label": "Tema seçici aktif yazı rengi",
-      "description": "Segment aktif yazı rengi",
-      "type": "color",
-      "value": "auto",
-      "group": "Profil Ayar Stilleri"
-    },
-    {
-      "key": "profile.settings.segment.textColor",
-      "label": "Tema seçici yazı rengi",
-      "description": "Segment pasif yazı rengi",
-      "type": "color",
-      "value": "auto",
-      "group": "Profil Ayar Stilleri"
-    },
-    {
-      "key": "profile.settings.actionsHeader",
-      "label": "Profil alt başlık - Hareketler",
-      "description": "Profil ayarlar alt menüsü başlığı",
-      "type": "text",
-      "value": "Hareketler",
-      "group": "Profil Ayar Metinleri"
-    },
-    {
-      "key": "profile.settings.deletedHeader",
-      "label": "Profil alt başlık - Yakınlarda Silinenler",
-      "description": "Profil ayarlar alt menüsü başlığı (silinenler)",
-      "type": "text",
-      "value": "Yakınlarda Silinenler",
-      "group": "Profil Ayar Metinleri"
-    },
-    {
-      "key": "profile.settings.themeLabel",
-      "label": "Profil ayar etiketi - Tema",
-      "description": "Tema seçeneği etiketi",
-      "type": "text",
-      "value": "Tema",
-      "group": "Profil Ayar Metinleri"
-    },
-    {
-      "key": "profile.settings.themeOptionLight",
-      "label": "Tema seçeneği - Açık",
-      "description": "Tema seçeneği Açık metni",
-      "type": "text",
-      "value": "Açık",
-      "group": "Profil Ayar Metinleri"
-    },
-    {
-      "key": "profile.settings.themeOptionDark",
-      "label": "Tema seçeneği - Koyu",
-      "description": "Tema seçeneği Koyu metni",
-      "type": "text",
-      "value": "Koyu",
-      "group": "Profil Ayar Metinleri"
-    },
-    {
-      "key": "profile.settings.themeOptionSystem",
-      "label": "Tema seçeneği - Cihaz",
-      "description": "Tema seçeneği Cihaz metni",
-      "type": "text",
-      "value": "Cihaz",
-      "group": "Profil Ayar Metinleri"
-    },
-    {
-      "key": "profile.settings.actionsLabel",
-      "label": "Profil ayar etiketi - Hareketler",
-      "description": "Hareketler seçeneği etiketi",
-      "type": "text",
-      "value": "Hareketler",
-      "group": "Profil Ayar Metinleri"
-    },
-    {
-      "key": "profile.settings.actionsHeroTitle",
-      "label": "Hareketler - Üst başlık",
-      "description": "Hareketler sayfası üst başlığı",
-      "type": "text",
-      "value": "Hesap yönetimini tek bir yerde yapabilirsin",
-      "group": "Profil Ayar Metinleri"
-    },
-    {
-      "key": "profile.settings.actionsHeroText",
-      "label": "Hareketler - Alt metin",
-      "description": "Hareketler sayfası açıklama metni",
-      "type": "text",
-      "value": "Tüm hesap hareketlerini incele ve yönet",
-      "group": "Profil Ayar Metinleri"
-    },
-    {
-      "key": "profile.settings.logoutLabel",
-      "label": "Profil ayar etiketi - Çıkış Yap",
-      "description": "Çıkış yap seçeneği etiketi",
-      "type": "text",
-      "value": "Çıkış Yap",
-      "group": "Profil Ayar Metinleri"
-    },
-    {
-      "key": "profile.settings.deletedLabel",
-      "label": "Profil ayar etiketi - Yakınlarda Silinenler",
-      "description": "Silinenler seçeneği etiketi",
-      "type": "text",
-      "value": "Yakınlarda Silinenler",
-      "group": "Profil Ayar Metinleri"
-    },
-    {
-      "key": "profile.settings.deletedHelper",
-      "label": "Profil ayar açıklaması - Yakınlarda Silinenler",
-      "description": "Silinenler açıklama metni",
-      "type": "text",
-      "value": "Son 15 gün içinde silinenleri geri yükle",
-      "group": "Profil Ayar Metinleri"
-    },
-    {
-      "key": "profile.settings.actionsItem.likes",
-      "label": "Hareketler - Beğenilerin",
-      "description": "Hareketler menüsü item metni",
-      "type": "text",
-      "value": "Beğenilerin",
-      "group": "Profil Ayar - Hareketler Menüsü"
-    },
-    {
-      "key": "profile.settings.actionsItem.saved",
-      "label": "Hareketler - Kaydedilenlerin",
-      "description": "Hareketler menüsü item metni",
-      "type": "text",
-      "value": "Kaydedilenlerin",
-      "group": "Profil Ayar - Hareketler Menüsü"
-    },
-    {
-      "key": "profile.settings.actionsItem.archived",
-      "label": "Hareketler - Arşivlenenler",
-      "description": "Hareketler menüsü item metni",
-      "type": "text",
-      "value": "Arşivlenenler",
-      "group": "Profil Ayar - Hareketler Menüsü"
-    },
-    {
-      "key": "profile.settings.actionsItem.notInterested",
-      "label": "Hareketler - İlgilenmediklerin",
-      "description": "Hareketler menüsü item metni",
-      "type": "text",
-      "value": "İlgilenmediklerin",
-      "group": "Profil Ayar - Hareketler Menüsü"
-    },
-    {
-      "key": "profile.settings.actionsItem.interested",
-      "label": "Hareketler - İlgilendiklerin",
-      "description": "Hareketler menüsü item metni",
-      "type": "text",
-      "value": "İlgilendiklerin",
-      "group": "Profil Ayar - Hareketler Menüsü"
-    },
-    {
-      "key": "profile.settings.actionsItem.accountHistory",
-      "label": "Hareketler - Hesap geçmişi",
-      "description": "Hareketler menüsü item metni",
-      "type": "text",
-      "value": "Hesap geçmişi",
-      "group": "Profil Ayar - Hareketler Menüsü"
-    },
-    {
-      "key": "profile.settings.actionsItem.watchHistory",
-      "label": "Hareketler - İzleme geçmişi",
-      "description": "Hareketler menüsü item metni",
-      "type": "text",
-      "value": "İzleme geçmişi",
-      "group": "Profil Ayar - Hareketler Menüsü"
+      "value": "#FFD60A",
+      "group": "Taslaklar > Görünüm"
     }
   ]
 }

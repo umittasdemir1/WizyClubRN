@@ -16,6 +16,10 @@ import { VideoCacheService } from '../../../data/services/VideoCacheService';
 import { Image } from 'expo-image';
 import { PerformanceLogger } from '../../../core/services/PerformanceLogger';
 import { CarouselLayer } from './CarouselLayer';
+import { SupabaseVideoDataSource } from '../../../data/datasources/SupabaseVideoDataSource';
+import { useAuthStore } from '../../store/useAuthStore';
+
+const videoDataSource = new SupabaseVideoDataSource();
 
 // Optional: Screen orientation (requires native build)
 let ScreenOrientation: any = null;
@@ -217,6 +221,14 @@ export const VideoLayer = memo(function VideoLayer({
             videoRef.current?.seek(0);
             currentTimeSV.value = 0;
             setIsFinished(false);
+
+            // Record view
+            const userId = useAuthStore.getState().user?.id;
+            if (userId && video.id) {
+                videoDataSource.recordVideoView(video.id, userId).catch(err => {
+                    console.error('[VideoLayer] recordVideoView error:', err);
+                });
+            }
         }
     }, [isActive, video.id]);
 

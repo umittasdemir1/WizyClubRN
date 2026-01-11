@@ -65,7 +65,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Profil ayarlar menüsü başlığı metni',
             type: 'text',
             value: 'Ayarlar ve kişisel araçlar',
-            group: 'Profil Ayarlar Başlığı',
+            group: 'Profil > Ayarlar',
         },
         {
             key: 'profile.settings.title.color',
@@ -73,7 +73,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Başlık metin rengi',
             type: 'color',
             value: 'auto',
-            group: 'Profil Ayarlar Başlığı',
+            group: 'Profil > Ayarlar',
         },
         {
             key: 'profile.settings.title.fontSize',
@@ -84,7 +84,7 @@ const DEFAULT_ADMIN_CONFIG = {
             min: 12,
             max: 48,
             step: 1,
-            group: 'Profil Ayarlar Başlığı',
+            group: 'Profil > Ayarlar',
         },
         {
             key: 'profile.settings.title.fontWeight',
@@ -93,7 +93,7 @@ const DEFAULT_ADMIN_CONFIG = {
             type: 'select',
             value: '600',
             options: ['300', '400', '500', '600', '700', '800'],
-            group: 'Profil Ayarlar Başlığı',
+            group: 'Profil > Ayarlar',
         },
         {
             key: 'profile.settings.title.fontStyle',
@@ -102,7 +102,7 @@ const DEFAULT_ADMIN_CONFIG = {
             type: 'select',
             value: 'normal',
             options: ['normal', 'italic'],
-            group: 'Profil Ayarlar Başlığı',
+            group: 'Profil > Ayarlar',
         },
         {
             key: 'profile.settings.title.fontFamily',
@@ -111,7 +111,7 @@ const DEFAULT_ADMIN_CONFIG = {
             type: 'select',
             value: 'system',
             options: ['system', 'sans-serif', 'serif', 'monospace'],
-            group: 'Profil Ayarlar Başlığı',
+            group: 'Profil > Ayarlar',
         },
         {
             key: 'profile.settings.title.letterSpacing',
@@ -122,7 +122,7 @@ const DEFAULT_ADMIN_CONFIG = {
             min: -1,
             max: 6,
             step: 0.1,
-            group: 'Profil Ayarlar Başlığı',
+            group: 'Profil > Ayarlar',
         },
         {
             key: 'profile.settings.title.lineHeight',
@@ -133,7 +133,7 @@ const DEFAULT_ADMIN_CONFIG = {
             min: 10,
             max: 64,
             step: 1,
-            group: 'Profil Ayarlar Başlığı',
+            group: 'Profil > Ayarlar',
         },
         {
             key: 'profile.settings.title.textAlign',
@@ -142,7 +142,7 @@ const DEFAULT_ADMIN_CONFIG = {
             type: 'select',
             value: 'left',
             options: ['left', 'center', 'right'],
-            group: 'Profil Ayarlar Başlığı',
+            group: 'Profil > Ayarlar',
         },
         {
             key: 'profile.settings.title.textTransform',
@@ -151,7 +151,7 @@ const DEFAULT_ADMIN_CONFIG = {
             type: 'select',
             value: 'none',
             options: ['none', 'uppercase', 'lowercase', 'capitalize'],
-            group: 'Profil Ayarlar Başlığı',
+            group: 'Profil > Ayarlar',
         },
         {
             key: 'profile.settings.sectionTitle.color',
@@ -159,7 +159,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Alt başlık metin rengi',
             type: 'color',
             value: 'auto',
-            group: 'Profil Ayar Stilleri',
+            group: 'Profil > Stiller',
         },
         {
             key: 'profile.settings.sectionTitle.fontSize',
@@ -170,7 +170,7 @@ const DEFAULT_ADMIN_CONFIG = {
             min: 12,
             max: 48,
             step: 1,
-            group: 'Profil Ayar Stilleri',
+            group: 'Profil > Stiller',
         },
         {
             key: 'profile.settings.sectionTitle.fontWeight',
@@ -179,7 +179,7 @@ const DEFAULT_ADMIN_CONFIG = {
             type: 'select',
             value: '600',
             options: ['300', '400', '500', '600', '700', '800'],
-            group: 'Profil Ayar Stilleri',
+            group: 'Profil > Stiller',
         },
         {
             key: 'profile.settings.itemLabel.color',
@@ -187,7 +187,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Ayar item metin rengi',
             type: 'color',
             value: 'auto',
-            group: 'Profil Ayar Stilleri',
+            group: 'Profil > Stiller',
         },
         {
             key: 'profile.settings.itemLabel.fontSize',
@@ -198,7 +198,7 @@ const DEFAULT_ADMIN_CONFIG = {
             min: 10,
             max: 30,
             step: 1,
-            group: 'Profil Ayar Stilleri',
+            group: 'Profil > Stiller',
         },
         {
             key: 'profile.settings.itemLabel.fontWeight',
@@ -207,7 +207,7 @@ const DEFAULT_ADMIN_CONFIG = {
             type: 'select',
             value: '400',
             options: ['300', '400', '500', '600', '700'],
-            group: 'Profil Ayar Stilleri',
+            group: 'Profil > Stiller',
         },
         {
             key: 'profile.settings.helperText.color',
@@ -215,7 +215,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Yardımcı metin rengi',
             type: 'color',
             value: 'auto',
-            group: 'Profil Ayar Stilleri',
+            group: 'Profil > Stiller',
         },
         {
             key: 'profile.settings.helperText.fontSize',
@@ -226,7 +226,7 @@ const DEFAULT_ADMIN_CONFIG = {
             min: 10,
             max: 24,
             step: 1,
-            group: 'Profil Ayar Stilleri',
+            group: 'Profil > Stiller',
         },
         {
             key: 'profile.settings.icon.color',
@@ -234,7 +234,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Ayar ikon rengi',
             type: 'color',
             value: 'auto',
-            group: 'Profil Ayar Stilleri',
+            group: 'Profil > Stiller',
         },
         {
             key: 'profile.settings.icon.strokeWidth',
@@ -245,7 +245,7 @@ const DEFAULT_ADMIN_CONFIG = {
             min: 0.8,
             max: 2.5,
             step: 0.1,
-            group: 'Profil Ayar Stilleri',
+            group: 'Profil > Stiller',
         },
         {
             key: 'profile.settings.icon.size',
@@ -256,7 +256,7 @@ const DEFAULT_ADMIN_CONFIG = {
             min: 16,
             max: 32,
             step: 1,
-            group: 'Profil Ayar Stilleri',
+            group: 'Profil > Stiller',
         },
         {
             key: 'profile.settings.icon.close.name',
@@ -264,7 +264,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Lucide: X',
             type: 'text',
             value: 'X',
-            group: 'Profil Ayar İkonları',
+            group: 'Profil > İkonlar',
         },
         {
             key: 'profile.settings.icon.close.color',
@@ -272,7 +272,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Kapat ikon rengi',
             type: 'color',
             value: 'auto',
-            group: 'Profil Ayar İkonları',
+            group: 'Profil > İkonlar',
         },
         {
             key: 'profile.settings.icon.close.size',
@@ -283,7 +283,7 @@ const DEFAULT_ADMIN_CONFIG = {
             min: 16,
             max: 32,
             step: 1,
-            group: 'Profil Ayar İkonları',
+            group: 'Profil > İkonlar',
         },
         {
             key: 'profile.settings.icon.close.strokeWidth',
@@ -294,7 +294,7 @@ const DEFAULT_ADMIN_CONFIG = {
             min: 0.8,
             max: 2.5,
             step: 0.1,
-            group: 'Profil Ayar İkonları',
+            group: 'Profil > İkonlar',
         },
         {
             key: 'profile.settings.icon.back.name',
@@ -302,7 +302,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Lucide: ArrowLeft',
             type: 'text',
             value: 'ArrowLeft',
-            group: 'Profil Ayar İkonları',
+            group: 'Profil > İkonlar',
         },
         {
             key: 'profile.settings.icon.back.color',
@@ -310,7 +310,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Geri ikon rengi',
             type: 'color',
             value: 'auto',
-            group: 'Profil Ayar İkonları',
+            group: 'Profil > İkonlar',
         },
         {
             key: 'profile.settings.icon.back.size',
@@ -321,7 +321,7 @@ const DEFAULT_ADMIN_CONFIG = {
             min: 16,
             max: 32,
             step: 1,
-            group: 'Profil Ayar İkonları',
+            group: 'Profil > İkonlar',
         },
         {
             key: 'profile.settings.icon.back.strokeWidth',
@@ -332,7 +332,7 @@ const DEFAULT_ADMIN_CONFIG = {
             min: 0.8,
             max: 2.5,
             step: 0.1,
-            group: 'Profil Ayar İkonları',
+            group: 'Profil > İkonlar',
         },
         {
             key: 'profile.settings.icon.theme.name',
@@ -340,7 +340,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Lucide: SunMoon',
             type: 'text',
             value: 'SunMoon',
-            group: 'Profil Ayar İkonları',
+            group: 'Profil > İkonlar',
         },
         {
             key: 'profile.settings.icon.actions.name',
@@ -348,7 +348,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Lucide: SquareActivity',
             type: 'text',
             value: 'SquareActivity',
-            group: 'Profil Ayar İkonları',
+            group: 'Profil > İkonlar',
         },
         {
             key: 'profile.settings.icon.likes.name',
@@ -356,7 +356,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Lucide: Heart',
             type: 'text',
             value: 'Heart',
-            group: 'Profil Ayar İkonları',
+            group: 'Profil > İkonlar',
         },
         {
             key: 'profile.settings.icon.saved.name',
@@ -364,7 +364,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Lucide: Bookmark',
             type: 'text',
             value: 'Bookmark',
-            group: 'Profil Ayar İkonları',
+            group: 'Profil > İkonlar',
         },
         {
             key: 'profile.settings.icon.archived.name',
@@ -372,7 +372,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Lucide: SquareActivity',
             type: 'text',
             value: 'SquareActivity',
-            group: 'Profil Ayar İkonları',
+            group: 'Profil > İkonlar',
         },
         {
             key: 'profile.settings.icon.notInterested.name',
@@ -380,7 +380,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Lucide: EyeOff',
             type: 'text',
             value: 'EyeOff',
-            group: 'Profil Ayar İkonları',
+            group: 'Profil > İkonlar',
         },
         {
             key: 'profile.settings.icon.interested.name',
@@ -388,7 +388,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Lucide: Eye',
             type: 'text',
             value: 'Eye',
-            group: 'Profil Ayar İkonları',
+            group: 'Profil > İkonlar',
         },
         {
             key: 'profile.settings.icon.accountHistory.name',
@@ -396,7 +396,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Lucide: CalendarDays',
             type: 'text',
             value: 'CalendarDays',
-            group: 'Profil Ayar İkonları',
+            group: 'Profil > İkonlar',
         },
         {
             key: 'profile.settings.icon.watchHistory.name',
@@ -404,7 +404,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Lucide: ImagePlay',
             type: 'text',
             value: 'ImagePlay',
-            group: 'Profil Ayar İkonları',
+            group: 'Profil > İkonlar',
         },
         {
             key: 'profile.settings.icon.deleted.name',
@@ -412,7 +412,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Lucide: Trash2',
             type: 'text',
             value: 'Trash2',
-            group: 'Profil Ayar İkonları',
+            group: 'Profil > İkonlar',
         },
         {
             key: 'profile.settings.chevron.color',
@@ -420,7 +420,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Sağ ok rengi',
             type: 'color',
             value: 'auto',
-            group: 'Profil Ayar Stilleri',
+            group: 'Profil > Stiller',
         },
         {
             key: 'profile.settings.item.borderColor',
@@ -428,7 +428,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Ayar item alt çizgi rengi',
             type: 'color',
             value: 'auto',
-            group: 'Profil Ayar Stilleri',
+            group: 'Profil > Stiller',
         },
         {
             key: 'profile.settings.segment.backgroundColor',
@@ -436,7 +436,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Segment arka plan rengi',
             type: 'color',
             value: 'auto',
-            group: 'Profil Ayar Stilleri',
+            group: 'Profil > Stiller',
         },
         {
             key: 'profile.settings.segment.activeColor',
@@ -444,7 +444,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Segment aktif arka plan rengi',
             type: 'color',
             value: 'auto',
-            group: 'Profil Ayar Stilleri',
+            group: 'Profil > Stiller',
         },
         {
             key: 'profile.settings.segment.activeTextColor',
@@ -452,7 +452,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Segment aktif yazı rengi',
             type: 'color',
             value: 'auto',
-            group: 'Profil Ayar Stilleri',
+            group: 'Profil > Stiller',
         },
         {
             key: 'profile.settings.segment.textColor',
@@ -460,7 +460,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Segment pasif yazı rengi',
             type: 'color',
             value: 'auto',
-            group: 'Profil Ayar Stilleri',
+            group: 'Profil > Stiller',
         },
         {
             key: 'profile.settings.actionsHeader',
@@ -468,7 +468,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Profil ayarlar alt menüsü başlığı',
             type: 'text',
             value: 'Hareketler',
-            group: 'Profil Ayar Metinleri',
+            group: 'Profil > Metinler',
         },
         {
             key: 'profile.settings.deletedHeader',
@@ -476,7 +476,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Profil ayarlar alt menüsü başlığı (silinenler)',
             type: 'text',
             value: 'Yakınlarda Silinenler',
-            group: 'Profil Ayar Metinleri',
+            group: 'Profil > Metinler',
         },
         {
             key: 'profile.settings.themeLabel',
@@ -484,7 +484,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Tema seçeneği etiketi',
             type: 'text',
             value: 'Tema',
-            group: 'Profil Ayar Metinleri',
+            group: 'Profil > Metinler',
         },
         {
             key: 'profile.settings.themeOptionLight',
@@ -492,7 +492,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Tema seçeneği Açık metni',
             type: 'text',
             value: 'Açık',
-            group: 'Profil Ayar Metinleri',
+            group: 'Profil > Metinler',
         },
         {
             key: 'profile.settings.themeOptionDark',
@@ -500,7 +500,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Tema seçeneği Koyu metni',
             type: 'text',
             value: 'Koyu',
-            group: 'Profil Ayar Metinleri',
+            group: 'Profil > Metinler',
         },
         {
             key: 'profile.settings.themeOptionSystem',
@@ -508,7 +508,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Tema seçeneği Cihaz metni',
             type: 'text',
             value: 'Cihaz',
-            group: 'Profil Ayar Metinleri',
+            group: 'Profil > Metinler',
         },
         {
             key: 'profile.settings.actionsLabel',
@@ -516,7 +516,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Hareketler seçeneği etiketi',
             type: 'text',
             value: 'Hareketler',
-            group: 'Profil Ayar Metinleri',
+            group: 'Profil > Metinler',
         },
         {
             key: 'profile.settings.actionsHeroTitle',
@@ -524,7 +524,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Hareketler sayfası üst başlığı',
             type: 'text',
             value: 'Hesap yönetimini tek bir yerde yapabilirsin',
-            group: 'Profil Ayar Metinleri',
+            group: 'Profil > Metinler',
         },
         {
             key: 'profile.settings.actionsHeroText',
@@ -532,7 +532,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Hareketler sayfası açıklama metni',
             type: 'text',
             value: 'Tüm hesap hareketlerini incele ve yönet',
-            group: 'Profil Ayar Metinleri',
+            group: 'Profil > Metinler',
         },
         {
             key: 'profile.settings.logoutLabel',
@@ -540,7 +540,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Çıkış yap seçeneği etiketi',
             type: 'text',
             value: 'Çıkış Yap',
-            group: 'Profil Ayar Metinleri',
+            group: 'Profil > Metinler',
         },
         {
             key: 'profile.settings.deletedLabel',
@@ -548,7 +548,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Silinenler seçeneği etiketi',
             type: 'text',
             value: 'Yakınlarda Silinenler',
-            group: 'Profil Ayar Metinleri',
+            group: 'Profil > Metinler',
         },
         {
             key: 'profile.settings.deletedHelper',
@@ -556,7 +556,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Silinenler açıklama metni',
             type: 'text',
             value: 'Son 15 gün içinde silinenleri geri yükle',
-            group: 'Profil Ayar Metinleri',
+            group: 'Profil > Metinler',
         },
         {
             key: 'profile.settings.actionsItem.likes',
@@ -564,7 +564,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Hareketler menüsü item metni',
             type: 'text',
             value: 'Beğenilerin',
-            group: 'Profil Ayar - Hareketler Menüsü',
+            group: 'Profil > Hareketler',
         },
         {
             key: 'profile.settings.actionsItem.saved',
@@ -572,7 +572,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Hareketler menüsü item metni',
             type: 'text',
             value: 'Kaydedilenlerin',
-            group: 'Profil Ayar - Hareketler Menüsü',
+            group: 'Profil > Hareketler',
         },
         {
             key: 'profile.settings.actionsItem.archived',
@@ -580,7 +580,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Hareketler menüsü item metni',
             type: 'text',
             value: 'Arşivlenenler',
-            group: 'Profil Ayar - Hareketler Menüsü',
+            group: 'Profil > Hareketler',
         },
         {
             key: 'profile.settings.actionsItem.notInterested',
@@ -588,7 +588,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Hareketler menüsü item metni',
             type: 'text',
             value: 'İlgilenmediklerin',
-            group: 'Profil Ayar - Hareketler Menüsü',
+            group: 'Profil > Hareketler',
         },
         {
             key: 'profile.settings.actionsItem.interested',
@@ -596,7 +596,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Hareketler menüsü item metni',
             type: 'text',
             value: 'İlgilendiklerin',
-            group: 'Profil Ayar - Hareketler Menüsü',
+            group: 'Profil > Hareketler',
         },
         {
             key: 'profile.settings.actionsItem.accountHistory',
@@ -604,7 +604,7 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Hareketler menüsü item metni',
             type: 'text',
             value: 'Hesap geçmişi',
-            group: 'Profil Ayar - Hareketler Menüsü',
+            group: 'Profil > Hareketler',
         },
         {
             key: 'profile.settings.actionsItem.watchHistory',
@@ -612,28 +612,34 @@ const DEFAULT_ADMIN_CONFIG = {
             description: 'Hareketler menüsü item metni',
             type: 'text',
             value: 'İzleme geçmişi',
-            group: 'Profil Ayar - Hareketler Menüsü',
+            group: 'Profil > Hareketler',
         },
     ],
 };
 
 function mergeAdminConfig(storedConfig) {
+    const defaultItems = DEFAULT_ADMIN_CONFIG.items;
+    const defaultMap = new Map(defaultItems.map((item) => [item.key, item]));
     const storedItems = Array.isArray(storedConfig?.items) ? storedConfig.items : [];
     const storedMap = new Map(storedItems.map((item) => [item.key, item]));
-    const mergedItems = DEFAULT_ADMIN_CONFIG.items.map((defaultItem) => {
+
+    // Start with all default items, merging values from stored config if they exist
+    const mergedItems = defaultItems.map((defaultItem) => {
         const storedItem = storedMap.get(defaultItem.key);
         if (!storedItem) return defaultItem;
         return {
             ...defaultItem,
-            key: defaultItem.key,
             value: storedItem.value ?? defaultItem.value,
         };
     });
+
+    // Add items from stored config that ARE NOT in default config
     storedItems.forEach((item) => {
-        if (!storedMap.has(item.key)) {
+        if (!defaultMap.has(item.key)) {
             mergedItems.push(item);
         }
     });
+
     return {
         version: typeof storedConfig?.version === 'number' ? storedConfig.version : DEFAULT_ADMIN_CONFIG.version,
         updatedAt: storedConfig?.updatedAt || DEFAULT_ADMIN_CONFIG.updatedAt,

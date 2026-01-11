@@ -174,14 +174,32 @@ export class SupabaseVideoDataSource {
             .insert({
                 user_id: userId,
                 story_id: storyId
-            }); // Conflicts (duplicates) are handled by ON CONFLICT DO NOTHING implicit or we should explicit it?
-        // The table has UNIQUE(user_id, story_id). Insert will fail if exists.
-        // We should use upsert or ignore error.
+            });
 
         if (error) {
             // Ignore unique violation (code 23505)
             if (error.code !== '23505') {
                 console.error('Error marking story as viewed:', error);
+            }
+        }
+    }
+
+    async recordVideoView(videoId: string, userId: string): Promise<void> {
+        if (!userId) return;
+
+        const { error } = await supabase
+            .from('video_views')
+            .insert({
+                user_id: userId,
+                video_id: videoId
+            });
+
+        if (error) {
+            // Ignore unique violation (code 23505) if we had a unique constraint
+            // But for video_views, we might want multiple entries or just one.
+            // Based on the migration, we didn't add a UNIQUE constraint, so multiple views will be recorded.
+            if (error.code !== '23505') {
+                console.error('Error recording video view:', error);
             }
         }
     }

@@ -9,6 +9,7 @@ import {
   StatusBar as RNStatusBar,
   RefreshControl,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import Video from 'react-native-video';
@@ -46,6 +47,11 @@ import { LIGHT_COLORS, DARK_COLORS } from '../../src/core/constants';
 import { CONFIG } from '../../src/core/config';
 import { ProfileSkeleton } from '../../src/presentation/components/profile/ProfileSkeleton';
 import { VerifiedBadge } from '../../src/presentation/components/shared/VerifiedBadge';
+import { ActivityGrid } from '../../src/presentation/components/profile/ActivityGrid';
+import { UserActivityRepositoryImpl } from '../../src/data/repositories/UserActivityRepositoryImpl';
+import { Video as VideoEntity } from '../../src/domain/entities/Video';
+
+const activityRepository = new UserActivityRepositoryImpl();
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -165,6 +171,11 @@ export default function ProfileScreen() {
         actionsItemInterested: getString('profile.settings.actionsItem.interested') || prev.actionsItemInterested,
         actionsItemAccountHistory: getString('profile.settings.actionsItem.accountHistory') || prev.actionsItemAccountHistory,
         actionsItemWatchHistory: getString('profile.settings.actionsItem.watchHistory') || prev.actionsItemWatchHistory,
+        interestedTopics: getString('profile.settings.interested.topics') || prev.interestedTopics,
+        accountHistoryTitle: getString('profile.settings.accountHistory.title') || prev.accountHistoryTitle,
+        accountHistoryDateLabel: getString('profile.settings.accountHistory.dateLabel') || prev.accountHistoryDateLabel,
+        accountHistoryEmailLabel: getString('profile.settings.accountHistory.emailLabel') || prev.accountHistoryEmailLabel,
+        accountHistoryIdLabel: getString('profile.settings.accountHistory.idLabel') || prev.accountHistoryIdLabel,
       }));
 
       const buildTextOverrides = (prefix: string) => {
@@ -359,7 +370,9 @@ export default function ProfileScreen() {
   const bioSheetRef = useRef<BottomSheet>(null);
   const clubsSheetRef = useRef<BottomSheet>(null);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
-  const [settingsSection, setSettingsSection] = useState<'main' | 'actions' | 'deleted'>('main');
+  const [settingsSection, setSettingsSection] = useState<'main' | 'actions' | 'deleted' | 'likes' | 'saved' | 'history' | 'archived' | 'notInterested' | 'interested' | 'accountHistory'>('main');
+  const [activityVideos, setActivityVideos] = useState<VideoEntity[]>([]);
+  const [isActivityLoading, setIsActivityLoading] = useState(false);
   const [settingsCopy, setSettingsCopy] = useState({
     title: 'Ayarlar ve kişisel araçlar',
     actionsHeader: 'Hareketler',
@@ -381,6 +394,11 @@ export default function ProfileScreen() {
     actionsItemInterested: 'İlgilendiklerin',
     actionsItemAccountHistory: 'Hesap geçmişi',
     actionsItemWatchHistory: 'İzleme geçmişi',
+    interestedTopics: 'Müzik, Teknoloji, Yaşam, Spor, Eğlence, Seyahat',
+    accountHistoryTitle: 'Hesap Bilgileri',
+    accountHistoryDateLabel: 'Hesabın oluşturulma tarihi',
+    accountHistoryEmailLabel: 'E-posta',
+    accountHistoryIdLabel: 'Kullanıcı Kimliği (ID)',
   });
   const [settingsTitleOverrides, setSettingsTitleOverrides] = useState<Record<string, any>>({});
   const [settingsSectionTitleOverrides, setSettingsSectionTitleOverrides] = useState<Record<string, any>>({});
@@ -542,6 +560,10 @@ export default function ProfileScreen() {
   }, [loadAdminConfig]);
 
   const closeSettings = useCallback(() => {
+    if (['likes', 'saved', 'history', 'archived', 'notInterested', 'interested', 'accountHistory'].includes(settingsSection)) {
+      setSettingsSection('actions');
+      return;
+    }
     if (settingsSection === 'deleted') {
       setSettingsSection('actions');
       return;
@@ -552,6 +574,24 @@ export default function ProfileScreen() {
     }
     setSettingsOpen(false);
   }, [settingsSection]);
+
+  const openActivityGrid = useCallback(async (type: 'likes' | 'saved' | 'history') => {
+    if (!currentUserId) return;
+    setSettingsSection(type);
+    setIsActivityLoading(true);
+    setActivityVideos([]);
+    try {
+      let data: VideoEntity[] = [];
+      if (type === 'likes') data = await activityRepository.getLikedVideos(currentUserId);
+      else if (type === 'saved') data = await activityRepository.getSavedVideos(currentUserId);
+      else if (type === 'history') data = await activityRepository.getWatchHistory(currentUserId);
+      setActivityVideos(data);
+    } catch (err) {
+      console.error('[Profile] Activity fetch error:', err);
+    } finally {
+      setIsActivityLoading(false);
+    }
+  }, [currentUserId]);
 
   const openActionsMenu = useCallback(() => {
     setSettingsSection('actions');
@@ -789,7 +829,15 @@ export default function ProfileScreen() {
                     <ArrowLeft size={backIconSize} color={backIconColor} strokeWidth={backIconStroke} />
                   </TouchableOpacity>
                   <Text style={[styles.settingsTitle, { color: textPrimary }, settingsSectionTitleOverrides]}>
-                    {settingsSection === 'actions' ? settingsCopy.actionsHeader : settingsCopy.deletedHeader}
+                    {settingsSection === 'actions' ? settingsCopy.actionsHeader :
+                      settingsSection === 'likes' ? settingsCopy.actionsItemLikes :
+                        settingsSection === 'saved' ? settingsCopy.actionsItemSaved :
+                          settingsSection === 'history' ? settingsCopy.actionsItemWatchHistory :
+                            settingsSection === 'archived' ? settingsCopy.actionsItemArchived :
+                              settingsSection === 'notInterested' ? settingsCopy.actionsItemNotInterested :
+                                settingsSection === 'interested' ? settingsCopy.actionsItemInterested :
+                                  settingsSection === 'accountHistory' ? settingsCopy.actionsItemAccountHistory :
+                                    settingsCopy.deletedHeader}
                   </Text>
                 </View>
                 <View style={styles.settingsHeaderRight} />
@@ -797,7 +845,13 @@ export default function ProfileScreen() {
             )}
           </View>
 
-          <ScrollView contentContainerStyle={styles.settingsContent} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            contentContainerStyle={[
+              styles.settingsContent,
+              ['likes', 'saved', 'history', 'archived', 'notInterested'].includes(settingsSection) && { paddingHorizontal: 0 }
+            ]}
+            showsVerticalScrollIndicator={false}
+          >
             {settingsSection === 'main' ? (
               <>
                 <View style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}>
@@ -864,7 +918,7 @@ export default function ProfileScreen() {
                 </View>
                 <TouchableOpacity
                   style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
-                  onPress={() => {}}
+                  onPress={() => openActivityGrid('likes')}
                 >
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
@@ -877,7 +931,7 @@ export default function ProfileScreen() {
 
                 <TouchableOpacity
                   style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
-                  onPress={() => {}}
+                  onPress={() => openActivityGrid('saved')}
                 >
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
@@ -890,7 +944,7 @@ export default function ProfileScreen() {
 
                 <TouchableOpacity
                   style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
-                  onPress={() => {}}
+                  onPress={() => setSettingsSection('archived')}
                 >
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
@@ -903,7 +957,7 @@ export default function ProfileScreen() {
 
                 <TouchableOpacity
                   style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
-                  onPress={() => {}}
+                  onPress={() => setSettingsSection('notInterested')}
                 >
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
@@ -916,7 +970,7 @@ export default function ProfileScreen() {
 
                 <TouchableOpacity
                   style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
-                  onPress={() => {}}
+                  onPress={() => setSettingsSection('interested')}
                 >
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
@@ -929,7 +983,7 @@ export default function ProfileScreen() {
 
                 <TouchableOpacity
                   style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
-                  onPress={() => {}}
+                  onPress={() => setSettingsSection('accountHistory')}
                 >
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
@@ -942,7 +996,7 @@ export default function ProfileScreen() {
 
                 <TouchableOpacity
                   style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
-                  onPress={() => {}}
+                  onPress={() => openActivityGrid('history')}
                 >
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
@@ -968,8 +1022,61 @@ export default function ProfileScreen() {
                   <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
               </>
-            ) : (
+            ) : settingsSection === 'deleted' ? (
               <DeletedContentMenu isDark={isDark} isActive={settingsSection === 'deleted'} />
+            ) : settingsSection === 'interested' ? (
+              <View style={{ paddingTop: 10 }}>
+                {settingsCopy.interestedTopics.split(',').map((topic, idx) => (
+                  <View key={idx} style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor, paddingHorizontal: 20 }]}>
+                    <Text style={[styles.settingsLabel, { color: textPrimary }]}>{topic.trim()}</Text>
+                    <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
+                  </View>
+                ))}
+              </View>
+            ) : settingsSection === 'accountHistory' ? (
+              <View style={{ padding: 20 }}>
+                <View style={{ marginBottom: 20 }}>
+                  <Text style={[styles.settingsLabel, { color: textPrimary, fontSize: 16 }]}>{settingsCopy.accountHistoryTitle}</Text>
+                  <Text style={{ color: textSecondary, marginTop: 4 }}>
+                    {settingsCopy.accountHistoryDateLabel}: {authUser?.created_at ? new Date(authUser.created_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Bilinmiyor'}
+                  </Text>
+                </View>
+                <View style={{ marginBottom: 20 }}>
+                  <Text style={[styles.settingsLabel, { color: textPrimary, fontSize: 16 }]}>{settingsCopy.accountHistoryEmailLabel}</Text>
+                  <Text style={{ color: textSecondary, marginTop: 4 }}>{authUser?.email || 'Bilinmiyor'}</Text>
+                </View>
+                <View style={{ marginBottom: 20 }}>
+                  <Text style={[styles.settingsLabel, { color: textPrimary, fontSize: 16 }]}>{settingsCopy.accountHistoryIdLabel}</Text>
+                  <Text style={{ color: textSecondary, marginTop: 4, fontSize: 12 }}>{authUser?.id || 'Bilinmiyor'}</Text>
+                </View>
+              </View>
+            ) : (
+              <View style={{ marginTop: 10 }}>
+                {isActivityLoading ? (
+                  <View style={{ padding: 40, alignItems: 'center' }}>
+                    <ActivityIndicator color={textPrimary} />
+                  </View>
+                ) : activityVideos.length === 0 && !['archived', 'notInterested'].includes(settingsSection) ? (
+                  <View style={{ padding: 40, alignItems: 'center' }}>
+                    <Text style={{ color: textSecondary }}>Gösterilecek içerik yok</Text>
+                  </View>
+                ) : (
+                  <ActivityGrid
+                    videos={['archived', 'notInterested'].includes(settingsSection) ? [] : activityVideos}
+                    isDark={isDark}
+                    onPress={(video, index) => {
+                      setCustomFeed(activityVideos);
+                      setActiveVideo(video.id, index);
+                      router.push('/custom-feed' as any);
+                    }}
+                  />
+                )}
+                {['archived', 'notInterested'].includes(settingsSection) && activityVideos.length === 0 && (
+                  <View style={{ padding: 40, alignItems: 'center' }}>
+                    <Text style={{ color: textSecondary }}>Henüz içerik eklenmemiş</Text>
+                  </View>
+                )}
+              </View>
             )}
           </ScrollView>
         </Animated.View>
@@ -1059,6 +1166,9 @@ const styles = StyleSheet.create({
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  settingsHeaderRight: {
+    width: 44,
   },
   settingsContent: {
     paddingHorizontal: 20,
