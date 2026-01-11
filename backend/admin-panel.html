@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="tr" class="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WizyClub Yönetim Paneli</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              primary: "#48cb90",
+              "background-light": "#f6f8f7",
+              "background-dark": "#131f1a",
+            },
+            borderRadius: {
+              DEFAULT: "0.25rem",
+              lg: "0.5rem",
+              xl: "0.75rem",
+              full: "9999px",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      body { font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif; font-size: 18px; font-weight: 400; }
+      .settings-title { font-size: 24px; font-weight: 600; letter-spacing: 0.3px; }
+      .text-body { font-size: 18px; font-weight: 400; }
+    </style>
+  </head>
+  <body class="bg-background-light text-[#101915]">
+    <main class="min-h-screen">
+      <header class="flex items-center justify-between px-8 py-5 border-b border-[#e9f1ee] bg-white">
+        <div class="flex items-center gap-4">
+          <div class="w-10 h-10 rounded-lg bg-primary/15 flex items-center justify-center text-primary font-bold">W</div>
+          <div>
+            <h1 class="settings-title leading-tight">Ayarlar ve kişisel araçlar</h1>
+            <p class="text-body text-[#5a8c75]">UI ayarları ve stil yönetimi</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-4">
+          <p class="text-body text-[#5a8c75]" id="updatedAt">Son güncelleme: -</p>
+          <div class="flex gap-2">
+            <button id="resetBtn" class="h-9 px-4 rounded-lg bg-[#e9f1ee] text-[#101915] text-body hover:bg-[#dde8e3] transition-colors">Varsayılan</button>
+            <button id="saveBtn" class="h-9 px-5 rounded-lg bg-primary text-white text-body shadow-lg shadow-primary/20 hover:opacity-90 transition-opacity">Kaydet</button>
+          </div>
+        </div>
+      </header>
+
+      <div class="px-8 py-6">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="settings-title">Profil Ayarları</h2>
+            <p class="text-body text-[#5a8c75]">Tema ve Hareketler gibi metinleri buradan yönet.</p>
+          </div>
+          <p class="text-body text-[#5a8c75]">Durum: <span class="text-primary font-bold" id="status">Yükleniyor...</span></p>
+        </div>
+
+        <div id="tables" class="flex flex-col gap-6"></div>
+
+        <div class="mt-8 p-4 rounded-xl bg-white border border-[#e9f1ee] text-body text-[#5a8c75]">
+          Not: Değişiklikler kaydedildikten sonra uygulamaya iletilir.
+        </div>
+      </div>
+    </main>
+
+    <script>
+      const tablesEl = document.getElementById('tables');
+      const statusEl = document.getElementById('status');
+      const updatedAtEl = document.getElementById('updatedAt');
+      let config = null;
+
+      function formatDate(iso) {
+        if (!iso) return 'Son güncelleme: -';
+        const d = new Date(iso);
+        return isNaN(d.getTime()) ? 'Son güncelleme: -' : `Son güncelleme: ${d.toLocaleString('tr-TR')}`;
+      }
+
+      function buildInput(item) {
+        let input;
+        if (item.type === 'select') {
+          input = document.createElement('select');
+          (item.options || []).forEach((opt) => {
+            const option = document.createElement('option');
+            option.value = opt;
+            option.textContent = opt;
+            input.appendChild(option);
+          });
+          input.value = item.value ?? '';
+          input.className = 'w-full bg-[#f9fbfa] border border-[#e9f1ee] rounded-lg text-body focus:ring-primary focus:border-primary';
+        } else {
+          if (item.type === 'color') {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'flex items-center gap-2';
+
+            const colorInput = document.createElement('input');
+            colorInput.type = 'color';
+            colorInput.value = item.value ?? '#000000';
+            colorInput.className = 'h-9 w-12 rounded-lg border border-[#e9f1ee] bg-[#f9fbfa]';
+
+            const hexInput = document.createElement('input');
+            hexInput.type = 'text';
+            hexInput.value = String(item.value ?? '#000000').toUpperCase();
+            hexInput.placeholder = '#RRGGBB';
+            hexInput.className = 'flex-1 bg-[#f9fbfa] border border-[#e9f1ee] rounded-lg text-body focus:ring-primary focus:border-primary px-3 py-2';
+
+            colorInput.addEventListener('input', () => {
+              hexInput.value = String(colorInput.value || '').toUpperCase();
+            });
+            hexInput.addEventListener('input', () => {
+              const value = hexInput.value.trim();
+              if (/^#?[0-9A-Fa-f]{6}$/.test(value)) {
+                const normalized = value.startsWith('#') ? value : `#${value}`;
+                colorInput.value = normalized;
+              }
+            });
+
+            wrapper.appendChild(colorInput);
+            wrapper.appendChild(hexInput);
+            hexInput.dataset.key = item.key;
+            return wrapper;
+          }
+
+          input = document.createElement('input');
+          input.type = item.type === 'number' ? 'number' : 'text';
+          if (item.type === 'number') {
+            if (typeof item.min === 'number') input.min = item.min;
+            if (typeof item.max === 'number') input.max = item.max;
+            if (typeof item.step === 'number') input.step = item.step;
+          }
+          input.value = item.value ?? '';
+          input.className = 'w-full bg-[#f9fbfa] border border-[#e9f1ee] rounded-lg text-body focus:ring-primary focus:border-primary px-3 py-2';
+        }
+        input.dataset.key = item.key;
+        return input;
+      }
+
+      function render(configData) {
+        tablesEl.innerHTML = '';
+        const groups = new Map();
+        configData.items.forEach((item) => {
+          const groupName = item.group || 'Genel';
+          if (!groups.has(groupName)) groups.set(groupName, []);
+          groups.get(groupName).push(item);
+        });
+
+        groups.forEach((items, groupName) => {
+          const card = document.createElement('div');
+          card.className = 'p-5 rounded-xl bg-white border border-[#e9f1ee] shadow-sm';
+
+          const header = document.createElement('div');
+          header.className = 'mb-4';
+          header.innerHTML = `<h4 class="settings-title">${groupName}</h4><p class="text-body text-[#5a8c75]">${items.length} alan</p>`;
+          card.appendChild(header);
+
+          const tableWrap = document.createElement('div');
+          tableWrap.className = 'overflow-x-auto';
+
+          const table = document.createElement('table');
+          table.className = 'w-full border-collapse';
+          const thead = document.createElement('thead');
+          const headRow = document.createElement('tr');
+          items.forEach((item) => {
+            const th = document.createElement('th');
+            th.textContent = item.label;
+            th.title = item.description || '';
+            th.className = 'text-left text-body text-[#5a8c75] pb-2';
+            headRow.appendChild(th);
+          });
+          thead.appendChild(headRow);
+          table.appendChild(thead);
+
+          const tbody = document.createElement('tbody');
+          const row = document.createElement('tr');
+          items.forEach((item) => {
+            const td = document.createElement('td');
+            td.className = 'pr-4 min-w-[160px]';
+            const input = buildInput(item);
+            if (item.description) input.title = item.description;
+            td.appendChild(input);
+            row.appendChild(td);
+          });
+          tbody.appendChild(row);
+          table.appendChild(tbody);
+
+          tableWrap.appendChild(table);
+          card.appendChild(tableWrap);
+          tablesEl.appendChild(card);
+        });
+        updatedAtEl.textContent = formatDate(configData.updatedAt);
+      }
+
+      async function loadConfig() {
+        statusEl.textContent = 'Yükleniyor...';
+        const res = await fetch('/admin/config');
+        config = await res.json();
+        render(config);
+        statusEl.textContent = 'Hazır';
+      }
+
+      async function saveConfig() {
+        const saveBtn = document.getElementById('saveBtn');
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Kaydediliyor...';
+        const inputs = tablesEl.querySelectorAll('input[data-key], select[data-key]');
+        inputs.forEach((input) => {
+          const item = config.items.find((i) => i.key === input.dataset.key);
+          if (!item) return;
+          let val = input.value;
+          if (item.type === 'number') val = Number(val);
+          if (item.type === 'color') {
+            const normalized = String(val || '').trim().toUpperCase();
+            val = normalized.startsWith('#') ? normalized : `#${normalized}`;
+          }
+          item.value = val;
+        });
+        statusEl.textContent = 'Kaydediliyor...';
+        const res = await fetch('/admin/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(config),
+        });
+        if (!res.ok) {
+          statusEl.textContent = 'Kaydetme hatası';
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Kaydet';
+          return;
+        }
+        const data = await res.json();
+        config = data.config;
+        render(config);
+        statusEl.textContent = 'Kaydedildi';
+        saveBtn.textContent = 'Kaydedildi';
+        setTimeout(() => {
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Kaydet';
+        }, 1200);
+      }
+
+      async function resetConfig() {
+        statusEl.textContent = 'Varsayılan yükleniyor...';
+        const res = await fetch('/admin/config/defaults');
+        config = await res.json();
+        render(config);
+        statusEl.textContent = 'Varsayılan hazır';
+      }
+
+      document.getElementById('saveBtn').addEventListener('click', saveConfig);
+      document.getElementById('resetBtn').addEventListener('click', resetConfig);
+
+      loadConfig().catch(() => {
+        statusEl.textContent = 'Yükleme hatası';
+      });
+    </script>
+  </body>
+</html>

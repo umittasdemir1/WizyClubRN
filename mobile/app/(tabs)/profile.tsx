@@ -13,6 +13,7 @@ import {
 import PagerView from 'react-native-pager-view';
 import Video from 'react-native-video';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import { useAuthStore } from '../../src/presentation/store/useAuthStore';
@@ -42,6 +43,7 @@ import { useActiveVideoStore } from '../../src/presentation/store/useActiveVideo
 import { DeletedContentMenu } from '../../src/presentation/components/profile/DeletedContentSheet';
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
 import { LIGHT_COLORS, DARK_COLORS } from '../../src/core/constants';
+import { CONFIG } from '../../src/core/config';
 import { ProfileSkeleton } from '../../src/presentation/components/profile/ProfileSkeleton';
 import { VerifiedBadge } from '../../src/presentation/components/shared/VerifiedBadge';
 
@@ -100,6 +102,7 @@ export default function ProfileScreen() {
   const { user: authUser, initialize, isInitialized } = useAuthStore();
   const { drafts, fetchDrafts } = useDraftStore();
   const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const isFocused = useIsFocused();
 
   // Use authenticated user's ID, fallback to hardcoded for development
   const currentUserId = authUser?.id || '687c8079-e94c-42c2-9442-8a4a6b63dec6';
@@ -117,6 +120,130 @@ export default function ProfileScreen() {
       fetchDrafts(currentUserId);
     }
   }, [currentUserId]);
+
+  const loadAdminConfig = useCallback(async () => {
+    try {
+      const response = await fetch(`${CONFIG.API_URL}/admin/config?ts=${Date.now()}`);
+      if (!response.ok) return;
+      const data = await response.json();
+      const items = Array.isArray(data?.items) ? data.items : [];
+      const getValue = (key: string) => items.find((item: any) => item.key === key)?.value;
+      const getNumber = (key: string) => {
+        const value = getValue(key);
+        if (typeof value === 'number') return value;
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : undefined;
+      };
+      const getString = (key: string) => {
+        const value = getValue(key);
+        return typeof value === 'string' ? value.trim() : undefined;
+      };
+
+      const titleText = getString('profile.settings.title.text') || getString('profile.settings.title');
+      if (typeof titleText === 'string' && titleText.trim().length > 0) {
+        setSettingsTitle(titleText.trim());
+      }
+
+      const overrides: Record<string, any> = {};
+      const color = getString('profile.settings.title.color');
+      if (color) overrides.color = color;
+      const fontSize = getNumber('profile.settings.title.fontSize');
+      if (typeof fontSize === 'number') overrides.fontSize = fontSize;
+      const fontWeight = getString('profile.settings.title.fontWeight');
+      if (fontWeight) overrides.fontWeight = fontWeight;
+      const fontStyle = getString('profile.settings.title.fontStyle');
+      if (fontStyle) overrides.fontStyle = fontStyle;
+      const fontFamily = getString('profile.settings.title.fontFamily');
+      if (fontFamily && fontFamily !== 'system') overrides.fontFamily = fontFamily;
+      const letterSpacing = getNumber('profile.settings.title.letterSpacing');
+      if (typeof letterSpacing === 'number') overrides.letterSpacing = letterSpacing;
+      const lineHeight = getNumber('profile.settings.title.lineHeight');
+      if (typeof lineHeight === 'number') overrides.lineHeight = lineHeight;
+      const textAlign = getString('profile.settings.title.textAlign');
+      if (textAlign) overrides.textAlign = textAlign;
+      const textTransform = getString('profile.settings.title.textTransform');
+      if (textTransform) overrides.textTransform = textTransform;
+      setSettingsTitleOverrides(overrides);
+    } catch (error) {
+      console.warn('[Profile] Admin config load failed:', error);
+    }
+  }, []);
+
+  const connectAdminSocket = useCallback(() => {
+    const existing = adminWsRef.current;
+    if (existing && (existing.readyState === WebSocket.OPEN || existing.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+    const scheduleReconnect = () => {
+      if (adminWsReconnectRef.current) return;
+      adminWsReconnectRef.current = setTimeout(() => {
+        adminWsReconnectRef.current = null;
+        connectAdminSocket();
+      }, 2000);
+    };
+    const wsUrl = CONFIG.API_URL.replace(/^http/, 'ws') + '/admin/ws';
+    const socket = new WebSocket(wsUrl);
+    adminWsRef.current = socket;
+
+    socket.onopen = () => {
+      loadAdminConfig();
+    };
+
+    socket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(String(event.data || '{}'));
+        if (data?.type === 'admin-config-updated') {
+          loadAdminConfig();
+        }
+      } catch {
+        // Ignore malformed messages
+      }
+    };
+
+    socket.onclose = () => {
+      adminWsRef.current = null;
+      if (isProfileFocusedRef.current) {
+        scheduleReconnect();
+      }
+    };
+  }, [loadAdminConfig]);
+
+  useEffect(() => {
+    let isActive = true;
+    if (isActive) {
+      loadAdminConfig();
+    }
+    return () => {
+      isActive = false;
+    };
+  }, [loadAdminConfig]);
+
+  useEffect(() => {
+    isProfileFocusedRef.current = isFocused;
+    if (isFocused) {
+      loadAdminConfig();
+      connectAdminSocket();
+      return () => {
+        isProfileFocusedRef.current = false;
+        if (adminWsReconnectRef.current) {
+          clearTimeout(adminWsReconnectRef.current);
+          adminWsReconnectRef.current = null;
+        }
+        if (adminWsRef.current) {
+          adminWsRef.current.close();
+          adminWsRef.current = null;
+        }
+      };
+    }
+    if (adminWsReconnectRef.current) {
+      clearTimeout(adminWsReconnectRef.current);
+      adminWsReconnectRef.current = null;
+    }
+    if (adminWsRef.current) {
+      adminWsRef.current.close();
+      adminWsRef.current = null;
+    }
+  }, [isFocused, loadAdminConfig, connectAdminSocket]);
 
   const { videos, refreshFeed } = useVideoFeed(currentUserId);
   const { videos: savedVideosData, refresh: refreshSavedVideos } = useSavedVideos(currentUserId);
@@ -166,6 +293,11 @@ export default function ProfileScreen() {
   const clubsSheetRef = useRef<BottomSheet>(null);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState<'main' | 'actions' | 'deleted'>('main');
+  const [settingsTitle, setSettingsTitle] = useState('Ayarlar ve kisisel araclar');
+  const [settingsTitleOverrides, setSettingsTitleOverrides] = useState<Record<string, any>>({});
+  const adminWsRef = useRef<WebSocket | null>(null);
+  const adminWsReconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isProfileFocusedRef = useRef(false);
   const settingsTranslateX = useSharedValue(SCREEN_WIDTH);
   const settingsBackdropOpacity = useSharedValue(0);
   const editProfileSheetRef = useRef<BottomSheet>(null);
@@ -287,9 +419,10 @@ export default function ProfileScreen() {
   ];
 
   const openSettings = useCallback(() => {
+    loadAdminConfig();
     setSettingsSection('main');
     setSettingsOpen(true);
-  }, []);
+  }, [loadAdminConfig]);
 
   const closeSettings = useCallback(() => {
     if (settingsSection === 'deleted') {
@@ -526,11 +659,10 @@ export default function ProfileScreen() {
             {settingsSection === 'main' ? (
               <>
                 <View style={styles.settingsHeaderLeft}>
-                  <Text style={[styles.settingsTitle, { color: textPrimary }]}>Ayarlar ve</Text>
-                  <Text style={[styles.settingsTitle, { color: textPrimary }]}>kişisel araçlar</Text>
+                  <Text style={[styles.settingsTitle, { color: textPrimary }, settingsTitleOverrides]}>{settingsTitle}</Text>
                 </View>
                 <TouchableOpacity onPress={closeSettings} style={styles.settingsCloseButton}>
-                  <X size={22} color={textPrimary} strokeWidth={1.2} />
+                  <X size={22} color={textPrimary} strokeWidth={1.6} />
                 </TouchableOpacity>
               </>
             ) : (
@@ -555,7 +687,7 @@ export default function ProfileScreen() {
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
                       <SunMoon size={24} color={textPrimary} strokeWidth={1.2} />
-                      <Text style={[styles.settingsLabel, { color: textPrimary, marginBottom: 0 }]}>Tema</Text>
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }]}>Tema</Text>
                     </View>
                   </View>
                   <View style={[styles.settingsSegmentGroup, { backgroundColor: isDark ? '#2c2c2e' : '#ededf0' }]}>
@@ -586,7 +718,7 @@ export default function ProfileScreen() {
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
                       <SquareActivity size={24} color={textPrimary} strokeWidth={1.2} />
-                      <Text style={[styles.settingsLabel, { color: textPrimary, marginBottom: 0 }]}>Hareketler</Text>
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }]}>Hareketler</Text>
                     </View>
                   </View>
                   <Text style={[styles.settingsChevron, { color: textSecondary }]}>›</Text>
@@ -620,7 +752,7 @@ export default function ProfileScreen() {
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
                       <Heart size={24} color={textPrimary} strokeWidth={1.2} />
-                      <Text style={[styles.settingsLabel, { color: textPrimary, marginBottom: 0 }]}>Beğenilerin</Text>
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }]}>Beğenilerin</Text>
                     </View>
                   </View>
                   <Text style={[styles.settingsChevron, { color: textSecondary }]}>›</Text>
@@ -633,7 +765,7 @@ export default function ProfileScreen() {
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
                       <Bookmark size={24} color={textPrimary} strokeWidth={1.2} />
-                      <Text style={[styles.settingsLabel, { color: textPrimary, marginBottom: 0 }]}>Kaydedilenlerin</Text>
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }]}>Kaydedilenlerin</Text>
                     </View>
                   </View>
                   <Text style={[styles.settingsChevron, { color: textSecondary }]}>›</Text>
@@ -646,7 +778,7 @@ export default function ProfileScreen() {
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
                       <SquareActivity size={24} color={textPrimary} strokeWidth={1.2} />
-                      <Text style={[styles.settingsLabel, { color: textPrimary, marginBottom: 0 }]}>Arşivlenenler</Text>
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }]}>Arşivlenenler</Text>
                     </View>
                   </View>
                   <Text style={[styles.settingsChevron, { color: textSecondary }]}>›</Text>
@@ -659,7 +791,7 @@ export default function ProfileScreen() {
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
                       <EyeOff size={24} color={textPrimary} strokeWidth={1.2} />
-                      <Text style={[styles.settingsLabel, { color: textPrimary, marginBottom: 0 }]}>İlgilenmediklerin</Text>
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }]}>İlgilenmediklerin</Text>
                     </View>
                   </View>
                   <Text style={[styles.settingsChevron, { color: textSecondary }]}>›</Text>
@@ -672,7 +804,7 @@ export default function ProfileScreen() {
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
                       <Eye size={24} color={textPrimary} strokeWidth={1.2} />
-                      <Text style={[styles.settingsLabel, { color: textPrimary, marginBottom: 0 }]}>İlgilendiklerin</Text>
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }]}>İlgilendiklerin</Text>
                     </View>
                   </View>
                   <Text style={[styles.settingsChevron, { color: textSecondary }]}>›</Text>
@@ -685,7 +817,7 @@ export default function ProfileScreen() {
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
                       <CalendarDays size={24} color={textPrimary} strokeWidth={1.2} />
-                      <Text style={[styles.settingsLabel, { color: textPrimary, marginBottom: 0 }]}>Hesap geçmişi</Text>
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }]}>Hesap geçmişi</Text>
                     </View>
                   </View>
                   <Text style={[styles.settingsChevron, { color: textSecondary }]}>›</Text>
@@ -698,7 +830,7 @@ export default function ProfileScreen() {
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
                       <ImagePlay size={24} color={textPrimary} strokeWidth={1.2} />
-                      <Text style={[styles.settingsLabel, { color: textPrimary, marginBottom: 0 }]}>İzleme geçmişi</Text>
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }]}>İzleme geçmişi</Text>
                     </View>
                   </View>
                   <Text style={[styles.settingsChevron, { color: textSecondary }]}>›</Text>
@@ -710,7 +842,7 @@ export default function ProfileScreen() {
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
                       <Trash2 size={24} color={textPrimary} strokeWidth={1.2} />
-                      <Text style={[styles.settingsLabel, { color: textPrimary, marginBottom: 0 }]}>Yakınlarda Silinenler</Text>
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }]}>Yakınlarda Silinenler</Text>
                     </View>
                     <Text style={[styles.settingsValue, { color: textSecondary }]}>
                       Son 15 gün içinde silinenleri geri yükle
@@ -802,7 +934,7 @@ const styles = StyleSheet.create({
   settingsCloseButton: {
     width: 44,
     height: 44,
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'center',
   },
   settingsBackButton: {
@@ -830,6 +962,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 4,
+  },
+  settingsLabelSub: {
+    fontWeight: '400',
   },
   settingsLabelRow: {
     flexDirection: 'row',

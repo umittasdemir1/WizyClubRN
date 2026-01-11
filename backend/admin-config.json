@@ -1,0 +1,180 @@
+{
+  "version": 1,
+  "updatedAt": "2026-01-11T14:38:00.716Z",
+  "items": [
+    {
+      "key": "profile.settings.title.text",
+      "label": "Başlık metni",
+      "description": "Profil ayarlar menüsü başlığı metni",
+      "type": "text",
+      "value": "Ayarlar ve kişisel araçlar",
+      "group": "Profil Ayarlar Başlığı"
+    },
+    {
+      "key": "profile.settings.title.color",
+      "label": "Renk",
+      "description": "Başlık metin rengi",
+      "type": "color",
+      "value": "#111827",
+      "group": "Profil Ayarlar Başlığı"
+    },
+    {
+      "key": "profile.settings.title.fontSize",
+      "label": "Font boyutu",
+      "description": "Başlık font boyutu",
+      "type": "number",
+      "value": 24,
+      "group": "Profil Ayarlar Başlığı",
+      "min": 12,
+      "max": 48,
+      "step": 1
+    },
+    {
+      "key": "profile.settings.title.fontWeight",
+      "label": "Font ağırlığı",
+      "description": "Başlık font ağırlığı",
+      "type": "select",
+      "value": "600",
+      "group": "Profil Ayarlar Başlığı",
+      "options": [
+        "300",
+        "400",
+        "500",
+        "600",
+        "700",
+        "800"
+      ]
+    },
+    {
+      "key": "profile.settings.title.fontStyle",
+      "label": "Font stili",
+      "description": "Başlık font stili",
+      "type": "select",
+      "value": "normal",
+      "group": "Profil Ayarlar Başlığı",
+      "options": [
+        "normal",
+        "italic"
+      ]
+    },
+    {
+      "key": "profile.settings.title.fontFamily",
+      "label": "Font ailesi",
+      "description": "Başlık font ailesi (cihaza göre değişebilir)",
+      "type": "select",
+      "value": "system",
+      "group": "Profil Ayarlar Başlığı",
+      "options": [
+        "system",
+        "sans-serif",
+        "serif",
+        "monospace"
+      ]
+    },
+    {
+      "key": "profile.settings.title.letterSpacing",
+      "label": "Harf aralığı",
+      "description": "Başlık harf aralığı",
+      "type": "number",
+      "value": 0.3,
+      "group": "Profil Ayarlar Başlığı",
+      "min": -1,
+      "max": 6,
+      "step": 0.1
+    },
+    {
+      "key": "profile.settings.title.lineHeight",
+      "label": "Satır yüksekliği",
+      "description": "Başlık satır yüksekliği",
+      "type": "number",
+      "value": 28,
+      "group": "Profil Ayarlar Başlığı",
+      "min": 10,
+      "max": 64,
+      "step": 1
+    },
+    {
+      "key": "profile.settings.title.textAlign",
+      "label": "Hizalama",
+      "description": "Başlık metin hizası",
+      "type": "select",
+      "value": "left",
+      "group": "Profil Ayarlar Başlığı",
+      "options": [
+        "left",
+        "center",
+        "right"
+      ]
+    },
+    {
+      "key": "profile.settings.title.textTransform",
+      "label": "Metin dönüşümü",
+      "description": "Başlık metin dönüşümü",
+      "type": "select",
+      "value": "none",
+      "group": "Profil Ayarlar Başlığı",
+      "options": [
+        "none",
+        "uppercase",
+        "lowercase",
+        "capitalize"
+      ]
+    },
+    {
+      "key": "profile.settings.actionsHeader",
+      "label": "Profil alt başlık - Hareketler",
+      "description": "Profil ayarlar alt menüsü başlığı",
+      "type": "text",
+      "value": "Hareketler",
+      "group": "Profil Ayar Metinleri"
+    },
+    {
+      "key": "profile.settings.deletedHeader",
+      "label": "Profil alt başlık - Yakınlarda Silinenler",
+      "description": "Profil ayarlar alt menüsü başlığı (silinenler)",
+      "type": "text",
+      "value": "Yakınlarda Silinenler",
+      "group": "Profil Ayar Metinleri"
+    },
+    {
+      "key": "profile.settings.themeLabel",
+      "label": "Profil ayar etiketi - Tema",
+      "description": "Tema seçeneği etiketi",
+      "type": "text",
+      "value": "Tema",
+      "group": "Profil Ayar Metinleri"
+    },
+    {
+      "key": "profile.settings.actionsLabel",
+      "label": "Profil ayar etiketi - Hareketler",
+      "description": "Hareketler seçeneği etiketi",
+      "type": "text",
+      "value": "Hareketler",
+      "group": "Profil Ayar Metinleri"
+    },
+    {
+      "key": "profile.settings.logoutLabel",
+      "label": "Profil ayar etiketi - Çıkış Yap",
+      "description": "Çıkış yap seçeneği etiketi",
+      "type": "text",
+      "value": "Çıkış Yap",
+      "group": "Profil Ayar Metinleri"
+    },
+    {
+      "key": "profile.settings.deletedLabel",
+      "label": "Profil ayar etiketi - Yakınlarda Silinenler",
+      "description": "Silinenler seçeneği etiketi",
+      "type": "text",
+      "value": "Yakınlarda Silinenler",
+      "group": "Profil Ayar Metinleri"
+    },
+    {
+      "key": "profile.settings.deletedHelper",
+      "label": "Profil ayar açıklaması - Yakınlarda Silinenler",
+      "description": "Silinenler açıklama metni",
+      "type": "text",
+      "value": "Son 15 gün içinde silinenleri geri yükle",
+      "group": "Profil Ayar Metinleri"
+    }
+  ]
+}

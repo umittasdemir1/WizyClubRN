@@ -11,6 +11,8 @@ const path = require('path');
 const os = require('os'); // For temp directory in story uploads
 const swaggerUi = require('swagger-ui-express');
 const yaml = require('js-yaml');
+const http = require('http');
+const { WebSocketServer } = require('ws');
 
 const app = express();
 app.use(cors());
@@ -50,6 +52,269 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 const openApiPath = path.join(__dirname, 'docs', 'openapi.yaml');
 const openApiSpec = yaml.load(fs.readFileSync(openApiPath, 'utf8'));
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
+
+const ADMIN_CONFIG_PATH = path.join(__dirname, 'admin-config.json');
+let adminWss = null;
+const DEFAULT_ADMIN_CONFIG = {
+    version: 1,
+    updatedAt: null,
+    items: [
+        {
+            key: 'profile.settings.title.text',
+            label: 'Başlık metni',
+            description: 'Profil ayarlar menüsü başlığı metni',
+            type: 'text',
+            value: 'Ayarlar ve kişisel araçlar',
+            group: 'Profil Ayarlar Başlığı',
+        },
+        {
+            key: 'profile.settings.title.color',
+            label: 'Renk',
+            description: 'Başlık metin rengi',
+            type: 'color',
+            value: '#111827',
+            group: 'Profil Ayarlar Başlığı',
+        },
+        {
+            key: 'profile.settings.title.fontSize',
+            label: 'Font boyutu',
+            description: 'Başlık font boyutu',
+            type: 'number',
+            value: 24,
+            min: 12,
+            max: 48,
+            step: 1,
+            group: 'Profil Ayarlar Başlığı',
+        },
+        {
+            key: 'profile.settings.title.fontWeight',
+            label: 'Font ağırlığı',
+            description: 'Başlık font ağırlığı',
+            type: 'select',
+            value: '600',
+            options: ['300', '400', '500', '600', '700', '800'],
+            group: 'Profil Ayarlar Başlığı',
+        },
+        {
+            key: 'profile.settings.title.fontStyle',
+            label: 'Font stili',
+            description: 'Başlık font stili',
+            type: 'select',
+            value: 'normal',
+            options: ['normal', 'italic'],
+            group: 'Profil Ayarlar Başlığı',
+        },
+        {
+            key: 'profile.settings.title.fontFamily',
+            label: 'Font ailesi',
+            description: 'Başlık font ailesi (cihaza göre değişebilir)',
+            type: 'select',
+            value: 'system',
+            options: ['system', 'sans-serif', 'serif', 'monospace'],
+            group: 'Profil Ayarlar Başlığı',
+        },
+        {
+            key: 'profile.settings.title.letterSpacing',
+            label: 'Harf aralığı',
+            description: 'Başlık harf aralığı',
+            type: 'number',
+            value: 0.3,
+            min: -1,
+            max: 6,
+            step: 0.1,
+            group: 'Profil Ayarlar Başlığı',
+        },
+        {
+            key: 'profile.settings.title.lineHeight',
+            label: 'Satır yüksekliği',
+            description: 'Başlık satır yüksekliği',
+            type: 'number',
+            value: 28,
+            min: 10,
+            max: 64,
+            step: 1,
+            group: 'Profil Ayarlar Başlığı',
+        },
+        {
+            key: 'profile.settings.title.textAlign',
+            label: 'Hizalama',
+            description: 'Başlık metin hizası',
+            type: 'select',
+            value: 'left',
+            options: ['left', 'center', 'right'],
+            group: 'Profil Ayarlar Başlığı',
+        },
+        {
+            key: 'profile.settings.title.textTransform',
+            label: 'Metin dönüşümü',
+            description: 'Başlık metin dönüşümü',
+            type: 'select',
+            value: 'none',
+            options: ['none', 'uppercase', 'lowercase', 'capitalize'],
+            group: 'Profil Ayarlar Başlığı',
+        },
+        {
+            key: 'profile.settings.actionsHeader',
+            label: 'Profil alt başlık - Hareketler',
+            description: 'Profil ayarlar alt menüsü başlığı',
+            type: 'text',
+            value: 'Hareketler',
+            group: 'Profil Ayar Metinleri',
+        },
+        {
+            key: 'profile.settings.deletedHeader',
+            label: 'Profil alt başlık - Yakınlarda Silinenler',
+            description: 'Profil ayarlar alt menüsü başlığı (silinenler)',
+            type: 'text',
+            value: 'Yakınlarda Silinenler',
+            group: 'Profil Ayar Metinleri',
+        },
+        {
+            key: 'profile.settings.themeLabel',
+            label: 'Profil ayar etiketi - Tema',
+            description: 'Tema seçeneği etiketi',
+            type: 'text',
+            value: 'Tema',
+            group: 'Profil Ayar Metinleri',
+        },
+        {
+            key: 'profile.settings.actionsLabel',
+            label: 'Profil ayar etiketi - Hareketler',
+            description: 'Hareketler seçeneği etiketi',
+            type: 'text',
+            value: 'Hareketler',
+            group: 'Profil Ayar Metinleri',
+        },
+        {
+            key: 'profile.settings.logoutLabel',
+            label: 'Profil ayar etiketi - Çıkış Yap',
+            description: 'Çıkış yap seçeneği etiketi',
+            type: 'text',
+            value: 'Çıkış Yap',
+            group: 'Profil Ayar Metinleri',
+        },
+        {
+            key: 'profile.settings.deletedLabel',
+            label: 'Profil ayar etiketi - Yakınlarda Silinenler',
+            description: 'Silinenler seçeneği etiketi',
+            type: 'text',
+            value: 'Yakınlarda Silinenler',
+            group: 'Profil Ayar Metinleri',
+        },
+        {
+            key: 'profile.settings.deletedHelper',
+            label: 'Profil ayar açıklaması - Yakınlarda Silinenler',
+            description: 'Silinenler açıklama metni',
+            type: 'text',
+            value: 'Son 15 gün içinde silinenleri geri yükle',
+            group: 'Profil Ayar Metinleri',
+        },
+    ],
+};
+
+function mergeAdminConfig(storedConfig) {
+    const storedItems = Array.isArray(storedConfig?.items) ? storedConfig.items : [];
+    const storedMap = new Map(storedItems.map((item) => [item.key, item]));
+    const mergedItems = DEFAULT_ADMIN_CONFIG.items.map((defaultItem) => {
+        const storedItem = storedMap.get(defaultItem.key);
+        if (!storedItem) return defaultItem;
+        return { ...defaultItem, ...storedItem, key: defaultItem.key };
+    });
+    storedItems.forEach((item) => {
+        if (!storedMap.has(item.key)) {
+            mergedItems.push(item);
+        }
+    });
+    return {
+        version: typeof storedConfig?.version === 'number' ? storedConfig.version : DEFAULT_ADMIN_CONFIG.version,
+        updatedAt: storedConfig?.updatedAt || DEFAULT_ADMIN_CONFIG.updatedAt,
+        items: mergedItems,
+    };
+}
+
+function loadAdminConfig() {
+    try {
+        if (!fs.existsSync(ADMIN_CONFIG_PATH)) {
+            return DEFAULT_ADMIN_CONFIG;
+        }
+        const raw = fs.readFileSync(ADMIN_CONFIG_PATH, 'utf8');
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.items)) {
+            return mergeAdminConfig(parsed);
+        }
+        return DEFAULT_ADMIN_CONFIG;
+    } catch (error) {
+        console.error('[ADMIN CONFIG] Load error:', error);
+        return DEFAULT_ADMIN_CONFIG;
+    }
+}
+
+function sanitizeAdminConfig(input) {
+    if (!input || !Array.isArray(input.items)) {
+        return null;
+    }
+    const items = input.items
+        .map((item) => ({
+            key: String(item.key || '').trim(),
+            label: String(item.label || '').trim(),
+            description: String(item.description || '').trim(),
+            type: String(item.type || 'text').trim(),
+            value: item.value,
+            group: item.group ? String(item.group) : undefined,
+            options: Array.isArray(item.options) ? item.options.map((opt) => String(opt)) : undefined,
+            min: typeof item.min === 'number' ? item.min : undefined,
+            max: typeof item.max === 'number' ? item.max : undefined,
+            step: typeof item.step === 'number' ? item.step : undefined,
+        }))
+        .filter((item) => item.key.length > 0);
+
+    return {
+        version: typeof input.version === 'number' ? input.version : DEFAULT_ADMIN_CONFIG.version,
+        updatedAt: new Date().toISOString(),
+        items,
+    };
+}
+
+function saveAdminConfig(config) {
+    fs.writeFileSync(ADMIN_CONFIG_PATH, JSON.stringify(config, null, 2));
+}
+
+function broadcastAdminConfigUpdate() {
+    if (!adminWss) return;
+    const message = JSON.stringify({ type: 'admin-config-updated', updatedAt: new Date().toISOString() });
+    adminWss.clients.forEach((client) => {
+        if (client.readyState === 1) {
+            client.send(message);
+        }
+    });
+}
+
+app.get('/admin', (req, res) => {
+    res.sendFile(path.join(__dirname, 'admin-panel.html'));
+});
+
+app.get('/admin/config', (req, res) => {
+    res.json(loadAdminConfig());
+});
+
+app.get('/admin/config/defaults', (req, res) => {
+    res.json(DEFAULT_ADMIN_CONFIG);
+});
+
+app.post('/admin/config', (req, res) => {
+    const sanitized = sanitizeAdminConfig(req.body);
+    if (!sanitized) {
+        return res.status(400).json({ error: 'Gecersiz config verisi.' });
+    }
+    try {
+        saveAdminConfig(sanitized);
+        broadcastAdminConfigUpdate();
+        return res.json({ ok: true, config: sanitized });
+    } catch (error) {
+        console.error('[ADMIN CONFIG] Save error:', error);
+        return res.status(500).json({ error: 'Config kaydedilemedi.' });
+    }
+});
 
 // Helper: Upload to R2 with CDN Cache Headers
 async function uploadToR2(filePath, fileName, contentType) {
@@ -833,7 +1098,13 @@ app.get('/health', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => {
+const server = http.createServer(app);
+adminWss = new WebSocketServer({ server, path: '/admin/ws' });
+adminWss.on('connection', (socket) => {
+    socket.send(JSON.stringify({ type: 'admin-config-connected' }));
+});
+
+server.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Video Backend running on http://0.0.0.0:${PORT}`);
     console.log(`🏠 Local Access: http://localhost:${PORT}`);
     console.log(`🌐 Network Access: http://192.168.0.138:${PORT}`);
