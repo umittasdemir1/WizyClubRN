@@ -537,7 +537,7 @@ export default function ProfileScreen() {
               <>
                 <View style={styles.settingsHeaderLeft}>
                   <TouchableOpacity onPress={closeSettings} style={styles.settingsBackButton}>
-                    <ArrowLeft size={22} color={textPrimary} strokeWidth={1.2} />
+                    <ArrowLeft size={22} color={textPrimary} strokeWidth={1.6} />
                   </TouchableOpacity>
                   <Text style={[styles.settingsTitle, { color: textPrimary }]}>
                     {settingsSection === 'actions' ? 'Hareketler' : 'Yakınlarda Silinenler'}
@@ -819,8 +819,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 18,
-    borderBottomWidth: 1,
+    paddingVertical: 14,
+    borderBottomWidth: 0,
   },
   settingsInfo: {
     flex: 1,
