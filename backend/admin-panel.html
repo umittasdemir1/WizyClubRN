@@ -1,259 +1,631 @@
 <!doctype html>
-<html lang="tr" class="light">
+<html lang="tr">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>WizyClub Yönetim Paneli</title>
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-    <script id="tailwind-config">
-      tailwind.config = {
-        darkMode: "class",
-        theme: {
-          extend: {
-            colors: {
-              primary: "#48cb90",
-              "background-light": "#f6f8f7",
-              "background-dark": "#131f1a",
-            },
-            borderRadius: {
-              DEFAULT: "0.25rem",
-              lg: "0.5rem",
-              xl: "0.75rem",
-              full: "9999px",
-            },
-          },
-        },
-      };
-    </script>
+    <title>WizyClub Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-      body { font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif; font-size: 18px; font-weight: 400; }
-      .settings-title { font-size: 24px; font-weight: 600; letter-spacing: 0.3px; }
-      .text-body { font-size: 18px; font-weight: 400; }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      
+      :root {
+        --bg: #ffffff;
+        --bg-subtle: #fafafa;
+        --border: #e5e5e5;
+        --border-dark: #d4d4d4;
+        --text: #171717;
+        --text-secondary: #737373;
+        --text-muted: #a3a3a3;
+        --accent: #171717;
+        --accent-hover: #404040;
+        --success: #22c55e;
+        --radius: 6px;
+      }
+      
+      body {
+        font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+        font-size: 14px;
+        color: var(--text);
+        background: var(--bg);
+        line-height: 1.5;
+      }
+      
+      /* Header */
+      .header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 24px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+      }
+      
+      .header-left {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+      
+      .logo {
+        width: 32px;
+        height: 32px;
+        background: var(--accent);
+        border-radius: var(--radius);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 14px;
+      }
+      
+      .header-title {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text);
+      }
+      
+      .header-subtitle {
+        font-size: 13px;
+        color: var(--text-secondary);
+      }
+      
+      .header-right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      
+      .status-badge {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        color: var(--text-secondary);
+      }
+      
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--success);
+      }
+      
+      .btn {
+        height: 32px;
+        padding: 0 12px;
+        border-radius: var(--radius);
+        font-size: 13px;
+        font-weight: 500;
+        font-family: inherit;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      
+      .btn-secondary {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        color: var(--text);
+      }
+      
+      .btn-secondary:hover {
+        background: var(--bg-subtle);
+        border-color: var(--border-dark);
+      }
+      
+      .btn-primary {
+        background: var(--accent);
+        border: 1px solid var(--accent);
+        color: white;
+      }
+      
+      .btn-primary:hover {
+        background: var(--accent-hover);
+      }
+      
+      .btn-primary:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      
+      /* Main Content */
+      .main {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+      
+      /* Section */
+      .section {
+        margin-bottom: 32px;
+      }
+      
+      .section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+      }
+      
+      .section-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      
+      .section-count {
+        font-size: 12px;
+        color: var(--text-muted);
+        font-weight: 400;
+        text-transform: none;
+        letter-spacing: 0;
+        margin-left: 8px;
+      }
+      
+      /* Table */
+      .table-container {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow-x: auto;
+        background: var(--bg);
+      }
+      
+      .table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      
+      .table th {
+        text-align: left;
+        padding: 10px 16px;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        background: var(--bg-subtle);
+        border-bottom: 1px solid var(--border);
+        white-space: nowrap;
+      }
+      
+      .table td {
+        padding: 10px 16px;
+        border-bottom: 1px solid var(--border);
+        vertical-align: middle;
+        font-size: 13px;
+      }
+      
+      .table tr:last-child td {
+        border-bottom: none;
+      }
+      
+      .table tr:hover td {
+        background: var(--bg-subtle);
+      }
+      
+      /* Input Styles */
+      .input {
+        width: 100%;
+        height: 32px;
+        padding: 0 10px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        font-size: 13px;
+        font-family: inherit;
+        color: var(--text);
+        background: var(--bg);
+        transition: border-color 0.15s ease;
+      }
+      
+      .input:focus {
+        outline: none;
+        border-color: var(--accent);
+      }
+      
+      select.input {
+        cursor: pointer;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23737373' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 10px center;
+        padding-right: 32px;
+      }
+      
+      /* Color Input */
+      .color-input-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      
+      .color-swatch {
+        width: 32px;
+        height: 32px;
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+        cursor: pointer;
+        padding: 0;
+        overflow: hidden;
+        flex-shrink: 0;
+      }
+      
+      .color-swatch::-webkit-color-swatch-wrapper {
+        padding: 0;
+      }
+      
+      .color-swatch::-webkit-color-swatch {
+        border: none;
+      }
+      
+      .color-hex {
+        width: 90px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12px;
+        text-transform: uppercase;
+      }
+      
+      /* Footer Note */
+      .footer-note {
+        padding: 16px;
+        background: var(--bg-subtle);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        font-size: 13px;
+        color: var(--text-secondary);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      
+      .footer-note svg {
+        flex-shrink: 0;
+      }
+      
+      /* Toast */
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        background: var(--accent);
+        color: white;
+        padding: 12px 16px;
+        border-radius: var(--radius);
+        font-size: 13px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transform: translateY(100px);
+        opacity: 0;
+        transition: all 0.3s ease;
+        z-index: 1000;
+      }
+      
+      .toast.show {
+        transform: translateY(0);
+        opacity: 1;
+      }
+      
+      /* Responsive */
+      @media (max-width: 768px) {
+        .header {
+          padding: 12px 16px;
+          flex-wrap: wrap;
+          gap: 12px;
+        }
+        
+        .main {
+          padding: 16px;
+        }
+      }
     </style>
   </head>
-  <body class="bg-background-light text-[#101915]">
-    <main class="min-h-screen">
-      <header class="flex items-center justify-between px-8 py-5 border-b border-[#e9f1ee] bg-white">
-        <div class="flex items-center gap-4">
-          <div class="w-10 h-10 rounded-lg bg-primary/15 flex items-center justify-center text-primary font-bold">W</div>
-          <div>
-            <h1 class="settings-title leading-tight">Ayarlar ve kişisel araçlar</h1>
-            <p class="text-body text-[#5a8c75]">UI ayarları ve stil yönetimi</p>
-          </div>
-        </div>
-        <div class="flex items-center gap-4">
-          <p class="text-body text-[#5a8c75]" id="updatedAt">Son güncelleme: -</p>
-          <div class="flex gap-2">
-            <button id="resetBtn" class="h-9 px-4 rounded-lg bg-[#e9f1ee] text-[#101915] text-body hover:bg-[#dde8e3] transition-colors">Varsayılan</button>
-            <button id="saveBtn" class="h-9 px-5 rounded-lg bg-primary text-white text-body shadow-lg shadow-primary/20 hover:opacity-90 transition-opacity">Kaydet</button>
-          </div>
-        </div>
-      </header>
-
-      <div class="px-8 py-6">
-        <div class="flex items-center justify-between mb-4">
-          <div>
-            <h2 class="settings-title">Profil Ayarları</h2>
-            <p class="text-body text-[#5a8c75]">Tema ve Hareketler gibi metinleri buradan yönet.</p>
-          </div>
-          <p class="text-body text-[#5a8c75]">Durum: <span class="text-primary font-bold" id="status">Yükleniyor...</span></p>
-        </div>
-
-        <div id="tables" class="flex flex-col gap-6"></div>
-
-        <div class="mt-8 p-4 rounded-xl bg-white border border-[#e9f1ee] text-body text-[#5a8c75]">
-          Not: Değişiklikler kaydedildikten sonra uygulamaya iletilir.
+  <body>
+    <header class="header">
+      <div class="header-left">
+        <div class="logo">W</div>
+        <div>
+          <div class="header-title">WizyClub Admin</div>
+          <div class="header-subtitle">UI Konfigürasyonu</div>
         </div>
       </div>
+      <div class="header-right">
+        <div class="status-badge">
+          <span class="status-dot"></span>
+          <span id="status">Hazır</span>
+        </div>
+        <span class="header-subtitle" id="updatedAt"></span>
+        <button class="btn btn-secondary" id="resetBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+            <path d="M3 3v5h5"/>
+          </svg>
+          Sıfırla
+        </button>
+        <button class="btn btn-primary" id="saveBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          Kaydet
+        </button>
+      </div>
+    </header>
+
+    <main class="main">
+      <div id="tables"></div>
+      
+      <div class="footer-note">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 16v-4"/>
+          <path d="M12 8h.01"/>
+        </svg>
+        Değişiklikler kaydedildikten sonra uygulamaya otomatik olarak yansır.
+      </div>
     </main>
+
+    <div class="toast" id="toast">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+      <span id="toastText">Kaydedildi</span>
+    </div>
 
     <script>
       const tablesEl = document.getElementById('tables');
       const statusEl = document.getElementById('status');
       const updatedAtEl = document.getElementById('updatedAt');
+      const toast = document.getElementById('toast');
+      const toastText = document.getElementById('toastText');
       let config = null;
 
+      function showToast(message) {
+        toastText.textContent = message;
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 3000);
+      }
+
       function formatDate(iso) {
-        if (!iso) return 'Son güncelleme: -';
+        if (!iso) return '';
         const d = new Date(iso);
-        return isNaN(d.getTime()) ? 'Son güncelleme: -' : `Son güncelleme: ${d.toLocaleString('tr-TR')}`;
+        return isNaN(d.getTime()) ? '' : d.toLocaleString('tr-TR', { 
+          day: '2-digit', 
+          month: '2-digit', 
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
       }
 
       function buildInput(item) {
-        let input;
+        if (item.type === 'color') {
+          const wrapper = document.createElement('div');
+          wrapper.className = 'color-input-wrapper';
+
+          const colorInput = document.createElement('input');
+          colorInput.type = 'color';
+          const rawValue = String(item.value ?? '').trim();
+          const isAuto = rawValue.toLowerCase() === 'auto' || rawValue.length === 0;
+          colorInput.value = isAuto ? '#000000' : rawValue;
+          colorInput.className = 'color-swatch';
+
+          const hexInput = document.createElement('input');
+          hexInput.type = 'text';
+          hexInput.value = isAuto ? 'AUTO' : String(item.value ?? '#000000').toUpperCase();
+          hexInput.className = 'input color-hex';
+          hexInput.dataset.key = item.key;
+
+          const autoLabel = document.createElement('label');
+          autoLabel.className = 'header-subtitle';
+          autoLabel.style.display = 'inline-flex';
+          autoLabel.style.alignItems = 'center';
+          autoLabel.style.gap = '6px';
+          const autoCheckbox = document.createElement('input');
+          autoCheckbox.type = 'checkbox';
+          autoCheckbox.checked = isAuto;
+          autoCheckbox.style.width = '14px';
+          autoCheckbox.style.height = '14px';
+          autoLabel.appendChild(autoCheckbox);
+          autoLabel.appendChild(document.createTextNode('Oto'));
+
+          colorInput.addEventListener('input', () => {
+            hexInput.value = colorInput.value.toUpperCase();
+          });
+          
+          hexInput.addEventListener('input', () => {
+            const val = hexInput.value.trim();
+            if (/^#?[0-9A-Fa-f]{6}$/.test(val)) {
+              colorInput.value = val.startsWith('#') ? val : '#' + val;
+            }
+          });
+
+          autoCheckbox.addEventListener('change', () => {
+            if (autoCheckbox.checked) {
+              hexInput.value = 'AUTO';
+              colorInput.disabled = true;
+            } else {
+              const val = colorInput.value.toUpperCase();
+              hexInput.value = val;
+              colorInput.disabled = false;
+            }
+          });
+          if (isAuto) colorInput.disabled = true;
+
+          wrapper.appendChild(colorInput);
+          wrapper.appendChild(hexInput);
+          wrapper.appendChild(autoLabel);
+          return wrapper;
+        }
+
         if (item.type === 'select') {
-          input = document.createElement('select');
-          (item.options || []).forEach((opt) => {
+          const select = document.createElement('select');
+          select.className = 'input';
+          select.dataset.key = item.key;
+          (item.options || []).forEach(opt => {
             const option = document.createElement('option');
             option.value = opt;
             option.textContent = opt;
-            input.appendChild(option);
+            select.appendChild(option);
           });
-          input.value = item.value ?? '';
-          input.className = 'w-full bg-[#f9fbfa] border border-[#e9f1ee] rounded-lg text-body focus:ring-primary focus:border-primary';
-        } else {
-          if (item.type === 'color') {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'flex items-center gap-2';
-
-            const colorInput = document.createElement('input');
-            colorInput.type = 'color';
-            colorInput.value = item.value ?? '#000000';
-            colorInput.className = 'h-9 w-12 rounded-lg border border-[#e9f1ee] bg-[#f9fbfa]';
-
-            const hexInput = document.createElement('input');
-            hexInput.type = 'text';
-            hexInput.value = String(item.value ?? '#000000').toUpperCase();
-            hexInput.placeholder = '#RRGGBB';
-            hexInput.className = 'flex-1 bg-[#f9fbfa] border border-[#e9f1ee] rounded-lg text-body focus:ring-primary focus:border-primary px-3 py-2';
-
-            colorInput.addEventListener('input', () => {
-              hexInput.value = String(colorInput.value || '').toUpperCase();
-            });
-            hexInput.addEventListener('input', () => {
-              const value = hexInput.value.trim();
-              if (/^#?[0-9A-Fa-f]{6}$/.test(value)) {
-                const normalized = value.startsWith('#') ? value : `#${value}`;
-                colorInput.value = normalized;
-              }
-            });
-
-            wrapper.appendChild(colorInput);
-            wrapper.appendChild(hexInput);
-            hexInput.dataset.key = item.key;
-            return wrapper;
-          }
-
-          input = document.createElement('input');
-          input.type = item.type === 'number' ? 'number' : 'text';
-          if (item.type === 'number') {
-            if (typeof item.min === 'number') input.min = item.min;
-            if (typeof item.max === 'number') input.max = item.max;
-            if (typeof item.step === 'number') input.step = item.step;
-          }
-          input.value = item.value ?? '';
-          input.className = 'w-full bg-[#f9fbfa] border border-[#e9f1ee] rounded-lg text-body focus:ring-primary focus:border-primary px-3 py-2';
+          select.value = item.value ?? '';
+          return select;
         }
+
+        const input = document.createElement('input');
+        input.type = item.type === 'number' ? 'number' : 'text';
+        input.className = 'input';
         input.dataset.key = item.key;
+        input.value = item.value ?? '';
+        
+        if (item.type === 'number') {
+          if (typeof item.min === 'number') input.min = item.min;
+          if (typeof item.max === 'number') input.max = item.max;
+          if (typeof item.step === 'number') input.step = item.step;
+          input.style.width = '100px';
+        }
+        
         return input;
       }
 
       function render(configData) {
         tablesEl.innerHTML = '';
         const groups = new Map();
-        configData.items.forEach((item) => {
+        
+        configData.items.forEach(item => {
           const groupName = item.group || 'Genel';
           if (!groups.has(groupName)) groups.set(groupName, []);
           groups.get(groupName).push(item);
         });
 
         groups.forEach((items, groupName) => {
-          const card = document.createElement('div');
-          card.className = 'p-5 rounded-xl bg-white border border-[#e9f1ee] shadow-sm';
+          const section = document.createElement('div');
+          section.className = 'section';
 
           const header = document.createElement('div');
-          header.className = 'mb-4';
-          header.innerHTML = `<h4 class="settings-title">${groupName}</h4><p class="text-body text-[#5a8c75]">${items.length} alan</p>`;
-          card.appendChild(header);
+          header.className = 'section-header';
+          header.innerHTML = `
+            <h3 class="section-title">${groupName}<span class="section-count">${items.length} alan</span></h3>
+          `;
+          section.appendChild(header);
 
-          const tableWrap = document.createElement('div');
-          tableWrap.className = 'overflow-x-auto';
+          const tableContainer = document.createElement('div');
+          tableContainer.className = 'table-container';
 
           const table = document.createElement('table');
-          table.className = 'w-full border-collapse';
+          table.className = 'table';
+
+          // Dinamik header - her item'ın label'ı bir kolon başlığı
           const thead = document.createElement('thead');
           const headRow = document.createElement('tr');
-          items.forEach((item) => {
+          items.forEach(item => {
             const th = document.createElement('th');
             th.textContent = item.label;
             th.title = item.description || '';
-            th.className = 'text-left text-body text-[#5a8c75] pb-2';
             headRow.appendChild(th);
           });
           thead.appendChild(headRow);
           table.appendChild(thead);
 
+          // Tek satırda tüm değerler
           const tbody = document.createElement('tbody');
           const row = document.createElement('tr');
-          items.forEach((item) => {
+          items.forEach(item => {
             const td = document.createElement('td');
-            td.className = 'pr-4 min-w-[160px]';
-            const input = buildInput(item);
-            if (item.description) input.title = item.description;
-            td.appendChild(input);
+            td.appendChild(buildInput(item));
             row.appendChild(td);
           });
           tbody.appendChild(row);
           table.appendChild(tbody);
 
-          tableWrap.appendChild(table);
-          card.appendChild(tableWrap);
-          tablesEl.appendChild(card);
+          tableContainer.appendChild(table);
+          section.appendChild(tableContainer);
+          tablesEl.appendChild(section);
         });
-        updatedAtEl.textContent = formatDate(configData.updatedAt);
+
+        const dateStr = formatDate(configData.updatedAt);
+        updatedAtEl.textContent = dateStr ? `Güncelleme: ${dateStr}` : '';
       }
 
       async function loadConfig() {
         statusEl.textContent = 'Yükleniyor...';
-        const res = await fetch('/admin/config');
-        config = await res.json();
-        render(config);
-        statusEl.textContent = 'Hazır';
+        try {
+          const res = await fetch('/admin/config');
+          config = await res.json();
+          render(config);
+          statusEl.textContent = 'Hazır';
+        } catch (e) {
+          statusEl.textContent = 'Hata';
+        }
       }
 
       async function saveConfig() {
         const saveBtn = document.getElementById('saveBtn');
         saveBtn.disabled = true;
-        saveBtn.textContent = 'Kaydediliyor...';
+        statusEl.textContent = 'Kaydediliyor...';
+
         const inputs = tablesEl.querySelectorAll('input[data-key], select[data-key]');
-        inputs.forEach((input) => {
-          const item = config.items.find((i) => i.key === input.dataset.key);
+        inputs.forEach(input => {
+          const item = config.items.find(i => i.key === input.dataset.key);
           if (!item) return;
           let val = input.value;
           if (item.type === 'number') val = Number(val);
           if (item.type === 'color') {
             const normalized = String(val || '').trim().toUpperCase();
-            val = normalized.startsWith('#') ? normalized : `#${normalized}`;
+            if (normalized === 'AUTO' || normalized.length === 0) {
+              val = 'auto';
+            } else {
+              val = normalized.startsWith('#') ? normalized : '#' + normalized;
+            }
           }
           item.value = val;
         });
-        statusEl.textContent = 'Kaydediliyor...';
-        const res = await fetch('/admin/config', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(config),
-        });
-        if (!res.ok) {
+
+        try {
+          const res = await fetch('/admin/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config),
+          });
+          
+          if (!res.ok) throw new Error();
+          
+          const data = await res.json();
+          config = data.config;
+          render(config);
+          statusEl.textContent = 'Hazır';
+          showToast('Değişiklikler kaydedildi');
+        } catch (e) {
           statusEl.textContent = 'Kaydetme hatası';
-          saveBtn.disabled = false;
-          saveBtn.textContent = 'Kaydet';
-          return;
         }
-        const data = await res.json();
-        config = data.config;
-        render(config);
-        statusEl.textContent = 'Kaydedildi';
-        saveBtn.textContent = 'Kaydedildi';
-        setTimeout(() => {
-          saveBtn.disabled = false;
-          saveBtn.textContent = 'Kaydet';
-        }, 1200);
+        
+        saveBtn.disabled = false;
       }
 
       async function resetConfig() {
-        statusEl.textContent = 'Varsayılan yükleniyor...';
-        const res = await fetch('/admin/config/defaults');
-        config = await res.json();
-        render(config);
-        statusEl.textContent = 'Varsayılan hazır';
+        statusEl.textContent = 'Sıfırlanıyor...';
+        try {
+          const res = await fetch('/admin/config/defaults');
+          config = await res.json();
+          render(config);
+          statusEl.textContent = 'Hazır';
+          showToast('Varsayılan değerler yüklendi');
+        } catch (e) {
+          statusEl.textContent = 'Hata';
+        }
       }
 
       document.getElementById('saveBtn').addEventListener('click', saveConfig);
       document.getElementById('resetBtn').addEventListener('click', resetConfig);
 
-      loadConfig().catch(() => {
-        statusEl.textContent = 'Yükleme hatası';
-      });
+      loadConfig();
     </script>
   </body>
 </html>

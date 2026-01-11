@@ -136,34 +136,101 @@ export default function ProfileScreen() {
       };
       const getString = (key: string) => {
         const value = getValue(key);
-        return typeof value === 'string' ? value.trim() : undefined;
+        if (typeof value !== 'string') return undefined;
+        const trimmed = value.trim();
+        if (trimmed.toLowerCase() === 'auto') return undefined;
+        return trimmed;
       };
 
       const titleText = getString('profile.settings.title.text') || getString('profile.settings.title');
-      if (typeof titleText === 'string' && titleText.trim().length > 0) {
-        setSettingsTitle(titleText.trim());
-      }
+      setSettingsCopy((prev) => ({
+        ...prev,
+        title: titleText || prev.title,
+        actionsHeader: getString('profile.settings.actionsHeader') || prev.actionsHeader,
+        deletedHeader: getString('profile.settings.deletedHeader') || prev.deletedHeader,
+        themeLabel: getString('profile.settings.themeLabel') || prev.themeLabel,
+        themeOptionLight: getString('profile.settings.themeOptionLight') || prev.themeOptionLight,
+        themeOptionDark: getString('profile.settings.themeOptionDark') || prev.themeOptionDark,
+        themeOptionSystem: getString('profile.settings.themeOptionSystem') || prev.themeOptionSystem,
+        actionsLabel: getString('profile.settings.actionsLabel') || prev.actionsLabel,
+        actionsHeroTitle: getString('profile.settings.actionsHeroTitle') || prev.actionsHeroTitle,
+        actionsHeroText: getString('profile.settings.actionsHeroText') || prev.actionsHeroText,
+        logoutLabel: getString('profile.settings.logoutLabel') || prev.logoutLabel,
+        deletedLabel: getString('profile.settings.deletedLabel') || prev.deletedLabel,
+        deletedHelper: getString('profile.settings.deletedHelper') || prev.deletedHelper,
+        actionsItemLikes: getString('profile.settings.actionsItem.likes') || prev.actionsItemLikes,
+        actionsItemSaved: getString('profile.settings.actionsItem.saved') || prev.actionsItemSaved,
+        actionsItemArchived: getString('profile.settings.actionsItem.archived') || prev.actionsItemArchived,
+        actionsItemNotInterested: getString('profile.settings.actionsItem.notInterested') || prev.actionsItemNotInterested,
+        actionsItemInterested: getString('profile.settings.actionsItem.interested') || prev.actionsItemInterested,
+        actionsItemAccountHistory: getString('profile.settings.actionsItem.accountHistory') || prev.actionsItemAccountHistory,
+        actionsItemWatchHistory: getString('profile.settings.actionsItem.watchHistory') || prev.actionsItemWatchHistory,
+      }));
 
-      const overrides: Record<string, any> = {};
-      const color = getString('profile.settings.title.color');
-      if (color) overrides.color = color;
-      const fontSize = getNumber('profile.settings.title.fontSize');
-      if (typeof fontSize === 'number') overrides.fontSize = fontSize;
-      const fontWeight = getString('profile.settings.title.fontWeight');
-      if (fontWeight) overrides.fontWeight = fontWeight;
-      const fontStyle = getString('profile.settings.title.fontStyle');
-      if (fontStyle) overrides.fontStyle = fontStyle;
-      const fontFamily = getString('profile.settings.title.fontFamily');
-      if (fontFamily && fontFamily !== 'system') overrides.fontFamily = fontFamily;
-      const letterSpacing = getNumber('profile.settings.title.letterSpacing');
-      if (typeof letterSpacing === 'number') overrides.letterSpacing = letterSpacing;
-      const lineHeight = getNumber('profile.settings.title.lineHeight');
-      if (typeof lineHeight === 'number') overrides.lineHeight = lineHeight;
-      const textAlign = getString('profile.settings.title.textAlign');
-      if (textAlign) overrides.textAlign = textAlign;
-      const textTransform = getString('profile.settings.title.textTransform');
-      if (textTransform) overrides.textTransform = textTransform;
-      setSettingsTitleOverrides(overrides);
+      const buildTextOverrides = (prefix: string) => {
+        const overrides: Record<string, any> = {};
+        const color = getString(`${prefix}.color`);
+        if (color) overrides.color = color;
+        const fontSize = getNumber(`${prefix}.fontSize`);
+        if (typeof fontSize === 'number') overrides.fontSize = fontSize;
+        const fontWeight = getString(`${prefix}.fontWeight`);
+        if (fontWeight) overrides.fontWeight = fontWeight;
+        const fontStyle = getString(`${prefix}.fontStyle`);
+        if (fontStyle) overrides.fontStyle = fontStyle;
+        const fontFamily = getString(`${prefix}.fontFamily`);
+        if (fontFamily && fontFamily !== 'system') overrides.fontFamily = fontFamily;
+        const letterSpacing = getNumber(`${prefix}.letterSpacing`);
+        if (typeof letterSpacing === 'number') overrides.letterSpacing = letterSpacing;
+        const lineHeight = getNumber(`${prefix}.lineHeight`);
+        if (typeof lineHeight === 'number') overrides.lineHeight = lineHeight;
+        const textAlign = getString(`${prefix}.textAlign`);
+        if (textAlign) overrides.textAlign = textAlign;
+        const textTransform = getString(`${prefix}.textTransform`);
+        if (textTransform) overrides.textTransform = textTransform;
+        return overrides;
+      };
+
+      setSettingsTitleOverrides(buildTextOverrides('profile.settings.title'));
+      setSettingsSectionTitleOverrides(buildTextOverrides('profile.settings.sectionTitle'));
+      setSettingsItemLabelOverrides(buildTextOverrides('profile.settings.itemLabel'));
+      setSettingsHelperOverrides(buildTextOverrides('profile.settings.helperText'));
+
+      const iconColor = getString('profile.settings.icon.color');
+      setSettingsIconColorOverride(iconColor || null);
+      const iconStrokeWidth = getNumber('profile.settings.icon.strokeWidth');
+      setSettingsIconStrokeWidthOverride(typeof iconStrokeWidth === 'number' ? iconStrokeWidth : null);
+      const iconSize = getNumber('profile.settings.icon.size');
+      setSettingsIconSizeOverride(typeof iconSize === 'number' ? iconSize : null);
+
+      const closeIconColor = getString('profile.settings.icon.close.color');
+      const closeIconSize = getNumber('profile.settings.icon.close.size');
+      const closeIconStroke = getNumber('profile.settings.icon.close.strokeWidth');
+      setSettingsIconCloseOverrides({
+        color: closeIconColor,
+        size: closeIconSize,
+        strokeWidth: closeIconStroke,
+      });
+
+      const backIconColor = getString('profile.settings.icon.back.color');
+      const backIconSize = getNumber('profile.settings.icon.back.size');
+      const backIconStroke = getNumber('profile.settings.icon.back.strokeWidth');
+      setSettingsIconBackOverrides({
+        color: backIconColor,
+        size: backIconSize,
+        strokeWidth: backIconStroke,
+      });
+      const chevronColor = getString('profile.settings.chevron.color');
+      setSettingsChevronColorOverride(chevronColor || null);
+      const borderColor = getString('profile.settings.item.borderColor');
+      setSettingsBorderColorOverride(borderColor || null);
+      const segmentBg = getString('profile.settings.segment.backgroundColor');
+      setSettingsSegmentBgColorOverride(segmentBg || null);
+      const segmentActive = getString('profile.settings.segment.activeColor');
+      setSettingsSegmentActiveColorOverride(segmentActive || null);
+      const segmentActiveText = getString('profile.settings.segment.activeTextColor');
+      setSettingsSegmentActiveTextColorOverride(segmentActiveText || null);
+      const segmentText = getString('profile.settings.segment.textColor');
+      setSettingsSegmentTextColorOverride(segmentText || null);
     } catch (error) {
       console.warn('[Profile] Admin config load failed:', error);
     }
@@ -293,8 +360,43 @@ export default function ProfileScreen() {
   const clubsSheetRef = useRef<BottomSheet>(null);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState<'main' | 'actions' | 'deleted'>('main');
-  const [settingsTitle, setSettingsTitle] = useState('Ayarlar ve kisisel araclar');
+  const [settingsCopy, setSettingsCopy] = useState({
+    title: 'Ayarlar ve kişisel araçlar',
+    actionsHeader: 'Hareketler',
+    deletedHeader: 'Yakınlarda Silinenler',
+    themeLabel: 'Tema',
+    themeOptionLight: 'Açık',
+    themeOptionDark: 'Koyu',
+    themeOptionSystem: 'Cihaz',
+    actionsLabel: 'Hareketler',
+    actionsHeroTitle: 'Hesap yönetimini tek bir yerde yapabilirsin',
+    actionsHeroText: 'Tüm hesap hareketlerini incele ve yönet',
+    logoutLabel: 'Çıkış Yap',
+    deletedLabel: 'Yakınlarda Silinenler',
+    deletedHelper: 'Son 15 gün içinde silinenleri geri yükle',
+    actionsItemLikes: 'Beğenilerin',
+    actionsItemSaved: 'Kaydedilenlerin',
+    actionsItemArchived: 'Arşivlenenler',
+    actionsItemNotInterested: 'İlgilenmediklerin',
+    actionsItemInterested: 'İlgilendiklerin',
+    actionsItemAccountHistory: 'Hesap geçmişi',
+    actionsItemWatchHistory: 'İzleme geçmişi',
+  });
   const [settingsTitleOverrides, setSettingsTitleOverrides] = useState<Record<string, any>>({});
+  const [settingsSectionTitleOverrides, setSettingsSectionTitleOverrides] = useState<Record<string, any>>({});
+  const [settingsItemLabelOverrides, setSettingsItemLabelOverrides] = useState<Record<string, any>>({});
+  const [settingsHelperOverrides, setSettingsHelperOverrides] = useState<Record<string, any>>({});
+  const [settingsIconColorOverride, setSettingsIconColorOverride] = useState<string | null>(null);
+  const [settingsIconStrokeWidthOverride, setSettingsIconStrokeWidthOverride] = useState<number | null>(null);
+  const [settingsIconSizeOverride, setSettingsIconSizeOverride] = useState<number | null>(null);
+  const [settingsIconCloseOverrides, setSettingsIconCloseOverrides] = useState<Record<string, any>>({});
+  const [settingsIconBackOverrides, setSettingsIconBackOverrides] = useState<Record<string, any>>({});
+  const [settingsChevronColorOverride, setSettingsChevronColorOverride] = useState<string | null>(null);
+  const [settingsBorderColorOverride, setSettingsBorderColorOverride] = useState<string | null>(null);
+  const [settingsSegmentBgColorOverride, setSettingsSegmentBgColorOverride] = useState<string | null>(null);
+  const [settingsSegmentActiveColorOverride, setSettingsSegmentActiveColorOverride] = useState<string | null>(null);
+  const [settingsSegmentActiveTextColorOverride, setSettingsSegmentActiveTextColorOverride] = useState<string | null>(null);
+  const [settingsSegmentTextColorOverride, setSettingsSegmentTextColorOverride] = useState<string | null>(null);
   const adminWsRef = useRef<WebSocket | null>(null);
   const adminWsReconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isProfileFocusedRef = useRef(false);
@@ -316,6 +418,21 @@ export default function ProfileScreen() {
   const textSecondary = themeColors.textSecondary;
   const cardBg = themeColors.card;
   const iconColor = themeColors.textPrimary;
+  const settingsItemBorderColor = settingsBorderColorOverride || (isDark ? '#2c2c2e' : '#e5e5e5');
+  const settingsIconColor = settingsIconColorOverride || textPrimary;
+  const settingsIconStroke = settingsIconStrokeWidthOverride ?? 1.2;
+  const settingsIconSize = settingsIconSizeOverride ?? 24;
+  const closeIconColor = settingsIconCloseOverrides.color || settingsIconColor;
+  const closeIconSize = settingsIconCloseOverrides.size ?? 22;
+  const closeIconStroke = settingsIconCloseOverrides.strokeWidth ?? 1.6;
+  const backIconColor = settingsIconBackOverrides.color || settingsIconColor;
+  const backIconSize = settingsIconBackOverrides.size ?? 22;
+  const backIconStroke = settingsIconBackOverrides.strokeWidth ?? 1.6;
+  const settingsChevronColor = settingsChevronColorOverride || textSecondary;
+  const settingsSegmentBg = settingsSegmentBgColorOverride || (isDark ? '#2c2c2e' : '#ededf0');
+  const settingsSegmentActive = settingsSegmentActiveColorOverride || '#FF3B30';
+  const settingsSegmentActiveText = settingsSegmentActiveTextColorOverride || '#FFFFFF';
+  const settingsSegmentText = settingsSegmentTextColorOverride || textPrimary;
 
   // Button Colors
   const btnEditBg = isDark ? '#333333' : '#E5E5E5';
@@ -413,9 +530,9 @@ export default function ProfileScreen() {
   const bioLimit = 110;
   const truncatedBio = user.bio.length > bioLimit ? user.bio.substring(0, bioLimit) + '...' : user.bio;
   const themeOptions = [
-    { label: 'Açık', value: 'light' as const },
-    { label: 'Koyu', value: 'dark' as const },
-    { label: 'Cihaz', value: 'system' as const },
+    { label: settingsCopy.themeOptionLight, value: 'light' as const },
+    { label: settingsCopy.themeOptionDark, value: 'dark' as const },
+    { label: settingsCopy.themeOptionSystem, value: 'system' as const },
   ];
 
   const openSettings = useCallback(() => {
@@ -659,20 +776,20 @@ export default function ProfileScreen() {
             {settingsSection === 'main' ? (
               <>
                 <View style={styles.settingsHeaderLeft}>
-                  <Text style={[styles.settingsTitle, { color: textPrimary }, settingsTitleOverrides]}>{settingsTitle}</Text>
+                  <Text style={[styles.settingsTitle, { color: textPrimary }, settingsTitleOverrides]}>{settingsCopy.title}</Text>
                 </View>
                 <TouchableOpacity onPress={closeSettings} style={styles.settingsCloseButton}>
-                  <X size={22} color={textPrimary} strokeWidth={1.6} />
+                  <X size={closeIconSize} color={closeIconColor} strokeWidth={closeIconStroke} />
                 </TouchableOpacity>
               </>
             ) : (
               <>
                 <View style={styles.settingsHeaderLeft}>
                   <TouchableOpacity onPress={closeSettings} style={styles.settingsBackButton}>
-                    <ArrowLeft size={22} color={textPrimary} strokeWidth={1.6} />
+                    <ArrowLeft size={backIconSize} color={backIconColor} strokeWidth={backIconStroke} />
                   </TouchableOpacity>
-                  <Text style={[styles.settingsTitle, { color: textPrimary }]}>
-                    {settingsSection === 'actions' ? 'Hareketler' : 'Yakınlarda Silinenler'}
+                  <Text style={[styles.settingsTitle, { color: textPrimary }, settingsSectionTitleOverrides]}>
+                    {settingsSection === 'actions' ? settingsCopy.actionsHeader : settingsCopy.deletedHeader}
                   </Text>
                 </View>
                 <View style={styles.settingsHeaderRight} />
@@ -683,14 +800,14 @@ export default function ProfileScreen() {
           <ScrollView contentContainerStyle={styles.settingsContent} showsVerticalScrollIndicator={false}>
             {settingsSection === 'main' ? (
               <>
-                <View style={[styles.settingsItem, { borderBottomColor: isDark ? '#2c2c2e' : '#e5e5e5' }]}>
+                <View style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}>
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
-                      <SunMoon size={24} color={textPrimary} strokeWidth={1.2} />
-                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }]}>Tema</Text>
+                      <SunMoon size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.themeLabel}</Text>
                     </View>
                   </View>
-                  <View style={[styles.settingsSegmentGroup, { backgroundColor: isDark ? '#2c2c2e' : '#ededf0' }]}>
+                  <View style={[styles.settingsSegmentGroup, { backgroundColor: settingsSegmentBg }]}>
                     {themeOptions.map((option) => {
                       const isActive = theme === option.value;
                       return (
@@ -698,11 +815,11 @@ export default function ProfileScreen() {
                           key={option.value}
                           style={[
                             styles.settingsSegmentOption,
-                            isActive && { backgroundColor: '#FF3B30' },
+                            isActive && { backgroundColor: settingsSegmentActive },
                           ]}
                           onPress={() => setTheme(option.value)}
                         >
-                          <Text style={[styles.settingsSegmentText, { color: isActive ? '#FFFFFF' : textPrimary }]}>
+                          <Text style={[styles.settingsSegmentText, { color: isActive ? settingsSegmentActiveText : settingsSegmentText }]}>
                             {option.label}
                           </Text>
                         </TouchableOpacity>
@@ -712,16 +829,16 @@ export default function ProfileScreen() {
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.settingsItem, { borderBottomColor: isDark ? '#2c2c2e' : '#e5e5e5' }]}
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
                   onPress={openActionsMenu}
                 >
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
-                      <SquareActivity size={24} color={textPrimary} strokeWidth={1.2} />
-                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }]}>Hareketler</Text>
+                      <SquareActivity size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.actionsLabel}</Text>
                     </View>
                   </View>
-                  <Text style={[styles.settingsChevron, { color: textSecondary }]}>›</Text>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -732,123 +849,123 @@ export default function ProfileScreen() {
                     router.replace('/login');
                   }}
                 >
-                  <Text style={[styles.settingsLabel, { color: '#FF3B30', marginTop: 10 }]}>Çıkış Yap</Text>
+                  <Text style={[styles.settingsLabel, settingsItemLabelOverrides, { color: '#FF3B30', marginTop: 10 }]}>{settingsCopy.logoutLabel}</Text>
                 </TouchableOpacity>
               </>
             ) : settingsSection === 'actions' ? (
               <>
                 <View style={styles.settingsActionsHero}>
-                  <Text style={[styles.settingsActionsHeroTitle, { color: textPrimary }]}>
-                    Hesap yönetimini tek bir yerde yapabilirsin
+                  <Text style={[styles.settingsActionsHeroTitle, { color: textPrimary }, settingsSectionTitleOverrides]}>
+                    {settingsCopy.actionsHeroTitle}
                   </Text>
-                  <Text style={[styles.settingsValue, styles.settingsActionsHeroText, { color: textSecondary }]}>
-                    Tüm hesap hareketlerini incele ve yönet
+                  <Text style={[styles.settingsValue, styles.settingsActionsHeroText, { color: textSecondary }, settingsHelperOverrides]}>
+                    {settingsCopy.actionsHeroText}
                   </Text>
                 </View>
                 <TouchableOpacity
-                  style={[styles.settingsItem, { borderBottomColor: isDark ? '#2c2c2e' : '#e5e5e5' }]}
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
                   onPress={() => {}}
                 >
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
-                      <Heart size={24} color={textPrimary} strokeWidth={1.2} />
-                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }]}>Beğenilerin</Text>
+                      <Heart size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.actionsItemLikes}</Text>
                     </View>
                   </View>
-                  <Text style={[styles.settingsChevron, { color: textSecondary }]}>›</Text>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.settingsItem, { borderBottomColor: isDark ? '#2c2c2e' : '#e5e5e5' }]}
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
                   onPress={() => {}}
                 >
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
-                      <Bookmark size={24} color={textPrimary} strokeWidth={1.2} />
-                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }]}>Kaydedilenlerin</Text>
+                      <Bookmark size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.actionsItemSaved}</Text>
                     </View>
                   </View>
-                  <Text style={[styles.settingsChevron, { color: textSecondary }]}>›</Text>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.settingsItem, { borderBottomColor: isDark ? '#2c2c2e' : '#e5e5e5' }]}
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
                   onPress={() => {}}
                 >
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
-                      <SquareActivity size={24} color={textPrimary} strokeWidth={1.2} />
-                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }]}>Arşivlenenler</Text>
+                      <SquareActivity size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.actionsItemArchived}</Text>
                     </View>
                   </View>
-                  <Text style={[styles.settingsChevron, { color: textSecondary }]}>›</Text>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.settingsItem, { borderBottomColor: isDark ? '#2c2c2e' : '#e5e5e5' }]}
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
                   onPress={() => {}}
                 >
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
-                      <EyeOff size={24} color={textPrimary} strokeWidth={1.2} />
-                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }]}>İlgilenmediklerin</Text>
+                      <EyeOff size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.actionsItemNotInterested}</Text>
                     </View>
                   </View>
-                  <Text style={[styles.settingsChevron, { color: textSecondary }]}>›</Text>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.settingsItem, { borderBottomColor: isDark ? '#2c2c2e' : '#e5e5e5' }]}
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
                   onPress={() => {}}
                 >
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
-                      <Eye size={24} color={textPrimary} strokeWidth={1.2} />
-                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }]}>İlgilendiklerin</Text>
+                      <Eye size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.actionsItemInterested}</Text>
                     </View>
                   </View>
-                  <Text style={[styles.settingsChevron, { color: textSecondary }]}>›</Text>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.settingsItem, { borderBottomColor: isDark ? '#2c2c2e' : '#e5e5e5' }]}
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
                   onPress={() => {}}
                 >
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
-                      <CalendarDays size={24} color={textPrimary} strokeWidth={1.2} />
-                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }]}>Hesap geçmişi</Text>
+                      <CalendarDays size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.actionsItemAccountHistory}</Text>
                     </View>
                   </View>
-                  <Text style={[styles.settingsChevron, { color: textSecondary }]}>›</Text>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.settingsItem, { borderBottomColor: isDark ? '#2c2c2e' : '#e5e5e5' }]}
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
                   onPress={() => {}}
                 >
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
-                      <ImagePlay size={24} color={textPrimary} strokeWidth={1.2} />
-                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }]}>İzleme geçmişi</Text>
+                      <ImagePlay size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.actionsItemWatchHistory}</Text>
                     </View>
                   </View>
-                  <Text style={[styles.settingsChevron, { color: textSecondary }]}>›</Text>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.settingsItem, { borderBottomColor: isDark ? '#2c2c2e' : '#e5e5e5' }]}
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
                   onPress={openDeletedMenu}
                 >
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
-                      <Trash2 size={24} color={textPrimary} strokeWidth={1.2} />
-                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }]}>Yakınlarda Silinenler</Text>
+                      <Trash2 size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.deletedLabel}</Text>
                     </View>
-                    <Text style={[styles.settingsValue, { color: textSecondary }]}>
-                      Son 15 gün içinde silinenleri geri yükle
+                    <Text style={[styles.settingsValue, { color: textSecondary }, settingsHelperOverrides]}>
+                      {settingsCopy.deletedHelper}
                     </Text>
                   </View>
-                  <Text style={[styles.settingsChevron, { color: textSecondary }]}>›</Text>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
               </>
             ) : (
