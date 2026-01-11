@@ -23,6 +23,7 @@ tar xvzf ngrok-v3-stable-linux-amd64.tgz
 ```
 
 **Terminal 3: Mobile**
+
 ```bash
 cd ~/WizyClubRN/mobile
 nano .env

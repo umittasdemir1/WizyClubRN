@@ -40,7 +40,7 @@ export const FeedSkeleton = () => {
                 <View style={styles.background} />
             </MotiView>
 
-            <View style={styles.contentOverlay}>
+            <View style={[styles.contentOverlay, { paddingTop: insets.top }]}>
                 {/* Right Side Actions - Exact position from ActionButtons.tsx */}
                 <View style={[styles.rightActions, { bottom: actionBottom, right: ACTION_RIGHT }]}>
                     {[1, 2, 3, 4].map((i) => (
@@ -53,26 +53,26 @@ export const FeedSkeleton = () => {
                 {/* Bottom Metadata - Exact position from MetadataLayer.tsx */}
                 <View style={[styles.bottomContent, { bottom: metadataBottom, left: METADATA_LEFT, right: METADATA_RIGHT }]}>
                     {/* User Row: Avatar + Name + Username */}
-                    <View style={styles.userRow}>
-                        {/* Avatar - 40px like in MetadataLayer */}
-                        <Skeleton colorMode="dark" radius="round" height={40} width={40} />
-                        <View style={{ width: 12 }} />
-                        <View style={styles.nameContainer}>
-                            {/* Full Name - 15px font, approx width */}
-                            <Skeleton colorMode="dark" width={90} height={15} radius={4} />
-                            <View style={{ height: 4 }} />
-                            {/* Username - 12px font */}
-                            <Skeleton colorMode="dark" width={65} height={12} radius={4} />
+                        <View style={styles.userRow}>
+                            {/* Avatar - 40px like in MetadataLayer */}
+                            <Skeleton colorMode="dark" radius="round" height={40} width={40} />
+                            <View style={{ width: 12 }} />
+                            <View style={styles.nameContainer}>
+                                {/* Full Name - 15px font, approx width */}
+                                <Skeleton colorMode="dark" width={90} height={15} radius={4} />
+                                <View style={{ height: 4 }} />
+                                {/* Username - 12px font */}
+                                <Skeleton colorMode="dark" width={65} height={12} radius={4} />
+                            </View>
+                        </View>
+
+                        {/* Description - 2 lines, 14px font, 20px line height */}
+                        <View style={styles.descriptionRow}>
+                            <Skeleton colorMode="dark" width={width * 0.55} height={14} radius={4} />
+                            <View style={{ height: 6 }} />
+                            <Skeleton colorMode="dark" width={width * 0.4} height={14} radius={4} />
                         </View>
                     </View>
-
-                    {/* Description - 2 lines, 14px font, 20px line height */}
-                    <View style={styles.descriptionRow}>
-                        <Skeleton colorMode="dark" width={width * 0.55} height={14} radius={4} />
-                        <View style={{ height: 6 }} />
-                        <Skeleton colorMode="dark" width={width * 0.4} height={14} radius={4} />
-                    </View>
-                </View>
             </View>
         </View>
     );

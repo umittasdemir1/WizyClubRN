@@ -31,6 +31,7 @@ interface MasonryFeedProps {
 }
 
 export function MasonryFeed({ data, onItemPress, onPreview, onPreviewEnd, isDark = true }: MasonryFeedProps) {
+    const itemBg = isDark ? '#222222' : '#F2F2F7';
 
     // Chunk data into groups of 5 (1 Large + 2 Small + 2 Small)
     const chunks = [];
@@ -41,7 +42,7 @@ export function MasonryFeed({ data, onItemPress, onPreview, onPreviewEnd, isDark
     const renderLargeItem = (item: DiscoveryItem) => (
         <Pressable
             key={item.id}
-            style={[styles.item, { width: COLUMN_WIDTH, height: LARGE_HEIGHT }]}
+            style={[styles.item, { width: COLUMN_WIDTH, height: LARGE_HEIGHT, backgroundColor: itemBg }]}
             onPress={() => onItemPress(item.id)}
             onLongPress={() => onPreview?.(item)}
             delayLongPress={300}
@@ -50,6 +51,9 @@ export function MasonryFeed({ data, onItemPress, onPreview, onPreviewEnd, isDark
                 source={{ uri: item.thumbnailUrl }}
                 style={styles.thumbnail}
                 contentFit="cover"
+                cachePolicy="memory-disk"
+                transition={0}
+                priority="high"
             />
             <View style={styles.statsBadge}>
                 <Play size={10} color="white" strokeWidth={2.5} />
@@ -61,7 +65,7 @@ export function MasonryFeed({ data, onItemPress, onPreview, onPreviewEnd, isDark
     const renderSmallItem = (item: DiscoveryItem) => (
         <Pressable
             key={item.id}
-            style={[styles.item, { width: COLUMN_WIDTH, height: SMALL_HEIGHT }]}
+            style={[styles.item, { width: COLUMN_WIDTH, height: SMALL_HEIGHT, backgroundColor: itemBg }]}
             onPress={() => onItemPress(item.id)}
             onLongPress={() => onPreview?.(item)}
             delayLongPress={300}
@@ -70,6 +74,9 @@ export function MasonryFeed({ data, onItemPress, onPreview, onPreviewEnd, isDark
                 source={{ uri: item.thumbnailUrl }}
                 style={styles.thumbnail}
                 contentFit="cover"
+                cachePolicy="memory-disk"
+                transition={0}
+                priority="high"
             />
             <View style={styles.statsBadge}>
                 <Play size={10} color="white" strokeWidth={2.5} />

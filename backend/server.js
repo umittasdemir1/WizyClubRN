@@ -9,6 +9,8 @@ const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 const path = require('path');
 const os = require('os'); // For temp directory in story uploads
+const swaggerUi = require('swagger-ui-express');
+const yaml = require('js-yaml');
 
 const app = express();
 app.use(cors());
@@ -43,6 +45,11 @@ const r2 = new S3Client({
 
 console.log('5. Initializing Supabase Client...');
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+// Swagger / OpenAPI docs (local)
+const openApiPath = path.join(__dirname, 'docs', 'openapi.yaml');
+const openApiSpec = yaml.load(fs.readFileSync(openApiPath, 'utf8'));
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
 
 // Helper: Upload to R2 with CDN Cache Headers
 async function uploadToR2(filePath, fileName, contentType) {

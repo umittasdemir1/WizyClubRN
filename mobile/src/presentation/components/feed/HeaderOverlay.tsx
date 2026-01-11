@@ -236,9 +236,9 @@ export function HeaderOverlay({
                     activeOpacity={0.7}
                 >
                     {isMuted ? (
-                        <VolumeX size={24} color="#D6D6D6" strokeWidth={1.2} />
+                        <VolumeX size={24} color="#FFFFFF" strokeWidth={1.2} />
                     ) : (
-                        <Volume2 size={24} color="#D6D6D6" strokeWidth={1.2} />
+                        <Volume2 size={24} color="#FFFFFF" strokeWidth={1.2} />
                     )}
                 </TouchableOpacity>
 

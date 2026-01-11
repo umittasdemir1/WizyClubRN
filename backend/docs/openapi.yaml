@@ -1,0 +1,370 @@
+openapi: 3.0.3
+info:
+  title: Wizy Backend API
+  version: 1.0.0
+  description: Minimal API docs for the local backend server.
+servers:
+  - url: http://localhost:3000
+tags:
+  - name: Uploads
+  - name: Videos
+  - name: Drafts
+  - name: Internal
+  - name: Health
+paths:
+  /upload-progress/{id}:
+    get:
+      tags: [Uploads]
+      summary: Get upload progress
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Progress state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stage: { type: string }
+                  percent: { type: integer }
+  /upload-hls:
+    post:
+      tags: [Uploads]
+      summary: Upload HLS video (supports carousel)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [video]
+              properties:
+                video:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                userId: { type: string }
+                description: { type: string }
+                commercialType: { type: string }
+                brandName: { type: string }
+                brandUrl: { type: string }
+      responses:
+        "200":
+          description: Upload success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessData"
+        "400":
+          description: Missing files
+        "500":
+          description: Server error
+  /upload-story:
+    post:
+      tags: [Uploads]
+      summary: Upload story (supports carousel)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [video, userId]
+              properties:
+                video:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                userId: { type: string }
+                description: { type: string }
+                commercialType: { type: string }
+                brandName: { type: string }
+                brandUrl: { type: string }
+      responses:
+        "200":
+          description: Upload success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessData"
+        "400":
+          description: Missing files or userId
+        "500":
+          description: Server error
+  /videos/{id}:
+    delete:
+      tags: [Videos]
+      summary: Delete video (soft delete by default)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: force
+          in: query
+          required: false
+          schema: { type: boolean }
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Delete success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessMessage"
+        "401":
+          description: Missing or invalid auth
+        "404":
+          description: Not found
+        "500":
+          description: Server error
+  /videos/{id}/restore:
+    post:
+      tags: [Videos]
+      summary: Restore deleted video
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Restore success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessMessage"
+        "500":
+          description: Server error
+  /upload-avatar:
+    post:
+      tags: [Uploads]
+      summary: Upload avatar image
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image, userId]
+              properties:
+                image:
+                  type: string
+                  format: binary
+                userId: { type: string }
+      responses:
+        "200":
+          description: Upload success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  avatarUrl: { type: string }
+        "400":
+          description: Missing image or userId
+        "500":
+          description: Server error
+  /drafts:
+    get:
+      tags: [Drafts]
+      summary: Get drafts for a user
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Draft list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessDataArray"
+        "400":
+          description: Missing userId
+        "500":
+          description: Server error
+    post:
+      tags: [Drafts]
+      summary: Create draft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, mediaUri, mediaType]
+              properties:
+                userId: { type: string }
+                mediaUri: { type: string }
+                mediaType: { type: string, enum: [video, image] }
+                thumbnailUri: { type: string }
+                description: { type: string }
+                commercialType: { type: string }
+                brandName: { type: string }
+                brandUrl: { type: string }
+                tags:
+                  type: array
+                  items: { type: string }
+                useAILabel: { type: boolean }
+                uploadMode: { type: string, enum: [video, story] }
+      responses:
+        "200":
+          description: Create success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessData"
+        "400":
+          description: Missing fields
+        "500":
+          description: Server error
+  /drafts/{id}:
+    get:
+      tags: [Drafts]
+      summary: Get single draft
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Draft detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessData"
+        "500":
+          description: Server error
+    patch:
+      tags: [Drafts]
+      summary: Update draft
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                description: { type: string }
+                commercialType: { type: string }
+                brandName: { type: string }
+                brandUrl: { type: string }
+                tags:
+                  type: array
+                  items: { type: string }
+                useAILabel: { type: boolean }
+      responses:
+        "200":
+          description: Update success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessData"
+        "500":
+          description: Server error
+    delete:
+      tags: [Drafts]
+      summary: Delete draft
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Delete success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+        "500":
+          description: Server error
+  /drafts/cleanup:
+    post:
+      tags: [Drafts]
+      summary: Cleanup expired drafts
+      responses:
+        "200":
+          description: Cleanup result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  deletedCount: { type: integer }
+        "500":
+          description: Server error
+  /migrate-assets:
+    get:
+      tags: [Internal]
+      summary: One-time migration helper
+      description: Internal use only. Do not expose publicly.
+      responses:
+        "200":
+          description: Migration started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+        "500":
+          description: Server error
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  timestamp: { type: string }
+components:
+  schemas:
+    SuccessData:
+      type: object
+      properties:
+        success: { type: boolean }
+        data: { type: object }
+    SuccessDataArray:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: array
+          items: { type: object }
+    SuccessMessage:
+      type: object
+      properties:
+        success: { type: boolean }
+        message: { type: string }
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

@@ -218,6 +218,7 @@ export const FeedManager = ({
         })
     ).current;
     const isWebViewClosingRef = useRef(false);
+    const wasPlayingBeforeWebViewRef = useRef(false);
     const activeDurationRef = useRef(0);
     const saveToastTranslateY = useRef(new RNAnimated.Value(-70)).current;
     const saveToastOpacity = useRef(new RNAnimated.Value(0)).current;
@@ -319,6 +320,25 @@ export const FeedManager = ({
             isWebViewClosingRef.current = false;
         }
     }, [isWebViewVisible, webSheetTranslateY]);
+
+    useEffect(() => {
+        if (isWebViewVisible) {
+            const isPaused = useActiveVideoStore.getState().isPaused;
+            wasPlayingBeforeWebViewRef.current = !isPaused;
+            if (!isPaused) {
+                togglePause();
+            }
+            return;
+        }
+
+        if (wasPlayingBeforeWebViewRef.current) {
+            const isPaused = useActiveVideoStore.getState().isPaused;
+            if (isPaused) {
+                togglePause();
+            }
+            wasPlayingBeforeWebViewRef.current = false;
+        }
+    }, [isWebViewVisible, togglePause]);
 
     useEffect(() => {
         return () => {
@@ -978,8 +998,8 @@ const styles = StyleSheet.create({
     webSheetContainer: {
         height: '85%',
         backgroundColor: LIGHT_COLORS.background,
-        borderTopLeftRadius: 28,
-        borderTopRightRadius: 28,
+        borderTopLeftRadius: 40,
+        borderTopRightRadius: 40,
         overflow: 'hidden',
     },
     webSheetDragArea: {
