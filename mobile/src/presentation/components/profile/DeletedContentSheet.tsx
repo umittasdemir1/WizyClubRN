@@ -1,34 +1,30 @@
-import React, { useCallback, useMemo, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert, Dimensions } from 'react-native';
-import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { Image } from 'expo-image';
+import { RotateCcw, Trash2 } from 'lucide-react-native';
 import { supabase } from '../../../core/supabase';
 import { CONFIG } from '../../../core/config';
-import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-
-interface DeletedContentSheetProps {
+interface DeletedContentMenuProps {
     isDark: boolean;
+    isActive: boolean;
 }
 
-export const DeletedContentSheet = React.forwardRef<BottomSheet, DeletedContentSheetProps>(({ isDark }, ref) => {
-    const insets = useSafeAreaInsets();
-
-    const topOffset = insets.top + 60 + 25;
-    const snapPoints = useMemo(() => [SCREEN_HEIGHT - topOffset], [insets.top]);
-
+export const DeletedContentMenu = ({ isDark, isActive }: DeletedContentMenuProps) => {
     const [deletedVideos, setDeletedVideos] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-
-    const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
-    const bgColor = isDark ? '#1c1c1e' : themeColors.background;
+    const metaColor = isDark ? '#9a9aa0' : '#6b6b72';
+    const textColor = isDark ? '#f2f2f4' : '#121214';
+    const separatorColor = isDark ? '#2c2c2e' : '#e6e6ea';
+    const thumbnailBorder = isDark ? '#2a2a2e' : '#ececf1';
+    const actionBg = isDark ? '#2c2c2e' : '#ededf0';
+    const dangerBg = '#FF3B30';
+    const dangerText = '#FFFFFF';
 
     const fetchDeletedVideos = async () => {
         setIsLoading(true);
         // Supabase NOT query: we want deleted_at NOT null
-        const { data, error } = await supabase
+        const { data } = await supabase
             .from('videos')
             .select('*')
             .not('deleted_at', 'is', null)
@@ -40,11 +36,11 @@ export const DeletedContentSheet = React.forwardRef<BottomSheet, DeletedContentS
         setIsLoading(false);
     };
 
-    // Auto-fetch when sheet opens usually, but for now we'll fetch on mount/visible
-    // Ideally parent triggers this.
     useEffect(() => {
-        fetchDeletedVideos();
-    }, []);
+        if (isActive) {
+            fetchDeletedVideos();
+        }
+    }, [isActive]);
 
     const handleRestore = async (id: string) => {
         try {
@@ -101,25 +97,44 @@ export const DeletedContentSheet = React.forwardRef<BottomSheet, DeletedContentS
         );
     };
 
+    const getDaysLeft = (deletedAt: string) => {
+        const deletedAtMs = new Date(deletedAt).getTime();
+        const diffDays = Math.floor((Date.now() - deletedAtMs) / (1000 * 60 * 60 * 24));
+        return Math.max(0, 15 - diffDays);
+    };
+
     const renderItem = ({ item }: { item: any }) => (
-        <View style={[styles.itemContainer, { backgroundColor: isDark ? '#1c1c1e' : '#f0f0f0' }]}>
-            <Image source={{ uri: item.thumbnail_url }} style={styles.thumbnail} contentFit="cover" />
+        <View style={[styles.itemContainer, { borderBottomColor: separatorColor }]}>
+            <Image
+                source={{ uri: item.thumbnail_url }}
+                style={[styles.thumbnail, { borderColor: thumbnailBorder }]}
+                contentFit="cover"
+            />
             <View style={styles.infoContainer}>
-                <Text style={[styles.dateText, { color: isDark ? '#888' : '#666' }]}>
-                    Silinme: {new Date(item.deleted_at).toLocaleDateString()}
-                </Text>
-                <View style={styles.buttonsRow}>
+                <View style={styles.metaRow}>
+                    <Text style={[styles.dateText, { color: '#FFFFFF' }]}>
+                        Silinme: {new Date(item.deleted_at).toLocaleDateString()}
+                    </Text>
+                    <View style={[styles.daysLeftPill, { backgroundColor: actionBg }]}>
+                        <Text style={[styles.daysLeftText, { color: '#FFFFFF' }]}>
+                            {getDaysLeft(item.deleted_at) === 0 ? 'Süre doldu' : `${getDaysLeft(item.deleted_at)} gün kaldı`}
+                        </Text>
+                    </View>
+                </View>
+                <View style={styles.actionsRow}>
                     <TouchableOpacity
-                        style={[styles.restoreBtn, { backgroundColor: isDark ? '#fff' : '#000' }]}
+                        style={[styles.actionButton, { backgroundColor: actionBg }]}
                         onPress={() => handleRestore(item.id)}
                     >
-                        <Text style={[styles.btnText, { color: isDark ? '#000' : '#fff' }]}>Geri Yükle</Text>
+                        <RotateCcw size={18} color={textColor} />
+                        <Text style={[styles.actionText, { color: textColor }]}>Geri yükle</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                        style={styles.deleteBtn}
+                        style={[styles.actionButton, { backgroundColor: dangerBg }]}
                         onPress={() => handlePermanentDelete(item.id)}
                     >
-                        <Text style={styles.btnTextWhite}>Sil</Text>
+                        <Trash2 size={18} color={dangerText} />
+                        <Text style={[styles.actionText, { color: dangerText }]}>Kalıcı sil</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -127,103 +142,103 @@ export const DeletedContentSheet = React.forwardRef<BottomSheet, DeletedContentS
     );
 
     return (
-        <BottomSheet
-            ref={ref}
-            index={-1}
-            snapPoints={snapPoints}
-            enablePanDownToClose={true}
-            backgroundStyle={{ backgroundColor: bgColor, borderTopLeftRadius: 40, borderTopRightRadius: 40 }}
-            handleIndicatorStyle={{ backgroundColor: isDark ? '#fff' : '#000' }}
-            backdropComponent={(props) => (
-                <BottomSheetBackdrop {...props} opacity={0.5} disappearsOnIndex={-1} />
-            )}
-            onChange={(index) => {
-                if (index >= 0) fetchDeletedVideos();
-            }}
-        >
-            <BottomSheetView style={styles.container}>
-                <Text style={[styles.title, { color: isDark ? '#fff' : '#000' }]}>
-                    Yakınlarda Silinenler
+        <View style={styles.container}>
+            <View style={styles.header}>
+                <Text style={[styles.subtitle, { color: metaColor }]}>
+                    Silinen videolar 15 gün içinde geri yüklenebilir.
                 </Text>
-                <Text style={[styles.subtitle, { color: isDark ? '#888' : '#666' }]}>
-                    Videolar 15 gün sonra kalıcı olarak silinir.
-                </Text>
+            </View>
 
-                {deletedVideos.length === 0 ? (
-                    <View style={styles.emptyState}>
-                        <Text style={{ color: isDark ? '#555' : '#aaa' }}>Silinen içerik yok.</Text>
-                    </View>
-                ) : (
-                    <FlatList
-                        data={deletedVideos}
-                        renderItem={renderItem}
-                        keyExtractor={(item) => item.id}
-                        contentContainerStyle={{ padding: 16 }}
-                    />
-                )}
-            </BottomSheetView>
-        </BottomSheet>
+            {isLoading ? (
+                <View style={styles.emptyState}>
+                    <Text style={{ color: metaColor }}>Yükleniyor...</Text>
+                </View>
+            ) : deletedVideos.length === 0 ? (
+                <View style={styles.emptyState}>
+                    <Text style={{ color: metaColor }}>Silinen içerik yok.</Text>
+                </View>
+            ) : (
+                <View style={styles.listContainer}>
+                    {deletedVideos.map((item) => (
+                        <View key={item.id}>{renderItem({ item })}</View>
+                    ))}
+                </View>
+            )}
+        </View>
     );
-});
+};
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-    title: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        textAlign: 'center',
-        marginTop: 10,
+    header: {
+        paddingHorizontal: 16,
+        paddingTop: 4,
+        paddingBottom: 12,
     },
     subtitle: {
         fontSize: 13,
+        lineHeight: 18,
         textAlign: 'center',
-        marginBottom: 20,
+    },
+    listContainer: {
+        paddingHorizontal: 16,
+        paddingBottom: 20,
     },
     itemContainer: {
         flexDirection: 'row',
-        padding: 10,
-        marginBottom: 10,
-        borderRadius: 12,
+        paddingVertical: 14,
         alignItems: 'center',
+        borderBottomWidth: 1,
     },
     thumbnail: {
-        width: 60,
-        height: 80,
-        borderRadius: 8,
+        width: 64,
+        height: 88,
+        borderRadius: 10,
         backgroundColor: '#333',
+        borderWidth: 1,
     },
     infoContainer: {
         flex: 1,
         marginLeft: 12,
     },
-    dateText: {
-        fontSize: 12,
+    metaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 8,
         marginBottom: 8,
     },
-    buttonsRow: {
+    dateText: {
+        fontSize: 12,
+        fontWeight: '400',
+    },
+    daysLeftPill: {
+        paddingVertical: 4,
+        paddingHorizontal: 8,
+        borderRadius: 999,
+    },
+    daysLeftText: {
+        fontSize: 11,
+        fontWeight: '400',
+    },
+    actionsRow: {
         flexDirection: 'row',
+        gap: 10,
+        marginTop: 6,
+    },
+    actionButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
         gap: 8,
+        paddingVertical: 10,
+        borderRadius: 12,
     },
-    restoreBtn: {
-        paddingVertical: 6,
-        paddingHorizontal: 12,
-        borderRadius: 6,
-    },
-    deleteBtn: {
-        backgroundColor: '#ff3b30',
-        paddingVertical: 6,
-        paddingHorizontal: 12,
-        borderRadius: 6,
-    },
-    btnText: {
-        fontSize: 12,
-        fontWeight: '600',
-    },
-    btnTextWhite: {
-        color: '#fff',
-        fontSize: 12,
+    actionText: {
+        fontSize: 13,
         fontWeight: '600',
     },
     emptyState: {

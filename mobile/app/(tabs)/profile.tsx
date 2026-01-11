@@ -25,9 +25,8 @@ import { VideoGrid } from '../../src/presentation/components/profile/VideoGrid';
 import { PostsGrid } from '../../src/presentation/components/profile/PostsGrid';
 import { BioBottomSheet } from '../../src/presentation/components/profile/BioBottomSheet';
 import { ClubsBottomSheet } from '../../src/presentation/components/profile/ClubsBottomSheet';
-import { SettingsBottomSheet } from '../../src/presentation/components/profile/SettingsBottomSheet';
 import { EditProfileSheet } from '../../src/presentation/components/profile/EditProfileSheet';
-import { ChevronLeft, Eye } from 'lucide-react-native';
+import { Eye, X, Menu, SunMoon, SquareActivity, ArrowLeft, EyeOff, CalendarDays, ImagePlay, Bookmark, Trash2, Heart } from 'lucide-react-native';
 import BottomSheet from '@gorhom/bottom-sheet';
 import Svg, { Path, Circle } from 'react-native-svg';
 import Animated, {
@@ -36,12 +35,11 @@ import Animated, {
   withTiming,
   useAnimatedScrollHandler,
 } from 'react-native-reanimated';
-import MoreIcon from '../../assets/icons/more.svg';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import { useProfile } from '../../src/presentation/hooks/useProfile';
 import { useSavedVideos } from '../../src/presentation/hooks/useSavedVideos';
 import { useActiveVideoStore } from '../../src/presentation/store/useActiveVideoStore';
-import { DeletedContentSheet } from '../../src/presentation/components/profile/DeletedContentSheet';
+import { DeletedContentMenu } from '../../src/presentation/components/profile/DeletedContentSheet';
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
 import { LIGHT_COLORS, DARK_COLORS } from '../../src/core/constants';
 import { ProfileSkeleton } from '../../src/presentation/components/profile/ProfileSkeleton';
@@ -98,7 +96,7 @@ const PreviewModal = ({ item, onClose }: { item: { id: string; thumbnail: string
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { isDark, toggleTheme } = useThemeStore();
+  const { isDark, theme, setTheme } = useThemeStore();
   const { user: authUser, initialize, isInitialized } = useAuthStore();
   const { drafts, fetchDrafts } = useDraftStore();
   const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
@@ -166,9 +164,11 @@ export default function ProfileScreen() {
 
   const bioSheetRef = useRef<BottomSheet>(null);
   const clubsSheetRef = useRef<BottomSheet>(null);
-  const settingsSheetRef = useRef<BottomSheet>(null);
+  const [isSettingsOpen, setSettingsOpen] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<'main' | 'actions' | 'deleted'>('main');
+  const settingsTranslateX = useSharedValue(SCREEN_WIDTH);
+  const settingsBackdropOpacity = useSharedValue(0);
   const editProfileSheetRef = useRef<BottomSheet>(null);
-  const deletedContentSheetRef = useRef<BottomSheet>(null);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -280,6 +280,50 @@ export default function ProfileScreen() {
   };
   const bioLimit = 110;
   const truncatedBio = user.bio.length > bioLimit ? user.bio.substring(0, bioLimit) + '...' : user.bio;
+  const themeOptions = [
+    { label: 'Açık', value: 'light' as const },
+    { label: 'Koyu', value: 'dark' as const },
+    { label: 'Cihaz', value: 'system' as const },
+  ];
+
+  const openSettings = useCallback(() => {
+    setSettingsSection('main');
+    setSettingsOpen(true);
+  }, []);
+
+  const closeSettings = useCallback(() => {
+    if (settingsSection === 'deleted') {
+      setSettingsSection('actions');
+      return;
+    }
+    if (settingsSection === 'actions') {
+      setSettingsSection('main');
+      return;
+    }
+    setSettingsOpen(false);
+  }, [settingsSection]);
+
+  const openActionsMenu = useCallback(() => {
+    setSettingsSection('actions');
+  }, []);
+
+  const openDeletedMenu = useCallback(() => {
+    setSettingsSection('deleted');
+  }, []);
+
+  useEffect(() => {
+    const isOpen = isSettingsOpen;
+    settingsTranslateX.value = withTiming(isOpen ? 0 : SCREEN_WIDTH, { duration: isOpen ? 220 : 180 });
+    settingsBackdropOpacity.value = withTiming(isOpen ? 1 : 0, { duration: isOpen ? 220 : 180 });
+  }, [isSettingsOpen, settingsTranslateX, settingsBackdropOpacity]);
+
+  const settingsPanelStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: settingsTranslateX.value }],
+  }));
+
+  const settingsBackdropStyle = useAnimatedStyle(() => ({
+    opacity: settingsBackdropOpacity.value,
+  }));
 
   return (
     <View style={[styles.container, { backgroundColor: bgBody }]}>
@@ -301,9 +345,9 @@ export default function ProfileScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.navIconButton}
-              onPress={() => settingsSheetRef.current?.expand()}
+              onPress={openSettings}
             >
-              <MoreIcon width={24} height={24} color={iconColor} />
+              <Menu size={24} color={iconColor} />
             </TouchableOpacity>
           </View>
         </View>
@@ -462,16 +506,6 @@ export default function ProfileScreen() {
       {previewItem && <PreviewModal item={previewItem} onClose={hidePreview} />}
       <BioBottomSheet ref={bioSheetRef} bio={currentUser.bio || ''} isDark={isDark} />
       <ClubsBottomSheet ref={clubsSheetRef} clubs={clubs} isDark={isDark} />
-      <SettingsBottomSheet
-        ref={settingsSheetRef}
-        isDark={isDark}
-        onThemeToggle={toggleTheme}
-        onDeletedContentPress={() => deletedContentSheetRef.current?.expand()}
-        onSignOut={async () => {
-          await useAuthStore.getState().signOut();
-          router.replace('/login');
-        }}
-      />
       <EditProfileSheet
         ref={editProfileSheetRef}
         user={currentUser}
@@ -479,7 +513,218 @@ export default function ProfileScreen() {
         onUploadAvatar={uploadAvatar}
         onUpdateCompleted={() => reload(true)}
       />
-      <DeletedContentSheet ref={deletedContentSheetRef} isDark={isDark} />
+      <View style={[styles.settingsOverlay, { pointerEvents: isSettingsOpen ? 'auto' : 'none' }]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={closeSettings}>
+          <Animated.View style={[styles.settingsBackdrop, settingsBackdropStyle]} />
+        </Pressable>
+        <Animated.View style={[styles.settingsPanel, { backgroundColor: bgContainer }, settingsPanelStyle]}>
+          <View style={[
+            styles.settingsHeader,
+            { paddingTop: insets.top + 10 },
+            settingsSection !== 'main' && styles.settingsHeaderSub,
+          ]}>
+            {settingsSection === 'main' ? (
+              <>
+                <View style={styles.settingsHeaderLeft}>
+                  <Text style={[styles.settingsTitle, { color: textPrimary }]}>Ayarlar ve</Text>
+                  <Text style={[styles.settingsTitle, { color: textPrimary }]}>kişisel araçlar</Text>
+                </View>
+                <TouchableOpacity onPress={closeSettings} style={styles.settingsCloseButton}>
+                  <X size={22} color={textPrimary} />
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <View style={styles.settingsHeaderLeft}>
+                  <TouchableOpacity onPress={closeSettings} style={styles.settingsBackButton}>
+                    <ArrowLeft size={22} color={textPrimary} />
+                  </TouchableOpacity>
+                  <Text style={[styles.settingsTitle, { color: textPrimary }]}>
+                    {settingsSection === 'actions' ? 'Hareketler' : 'Yakınlarda Silinenler'}
+                  </Text>
+                </View>
+                <View style={styles.settingsHeaderRight} />
+              </>
+            )}
+          </View>
+
+          <ScrollView contentContainerStyle={styles.settingsContent} showsVerticalScrollIndicator={false}>
+            {settingsSection === 'main' ? (
+              <>
+                <View style={[styles.settingsItem, { borderBottomColor: isDark ? '#2c2c2e' : '#e5e5e5' }]}>
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <SunMoon size={20} color={textPrimary} />
+                      <Text style={[styles.settingsLabel, { color: textPrimary, marginBottom: 0 }]}>Tema</Text>
+                    </View>
+                  </View>
+                  <View style={[styles.settingsSegmentGroup, { backgroundColor: isDark ? '#2c2c2e' : '#ededf0' }]}>
+                    {themeOptions.map((option) => {
+                      const isActive = theme === option.value;
+                      return (
+                        <TouchableOpacity
+                          key={option.value}
+                          style={[
+                            styles.settingsSegmentOption,
+                            isActive && { backgroundColor: '#FF3B30' },
+                          ]}
+                          onPress={() => setTheme(option.value)}
+                        >
+                          <Text style={[styles.settingsSegmentText, { color: isActive ? '#FFFFFF' : textPrimary }]}>
+                            {option.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: isDark ? '#2c2c2e' : '#e5e5e5' }]}
+                  onPress={openActionsMenu}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <SquareActivity size={20} color={textPrimary} />
+                      <Text style={[styles.settingsLabel, { color: textPrimary, marginBottom: 0 }]}>Hareketler</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: textSecondary }]}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: 'transparent' }]}
+                  onPress={async () => {
+                    closeSettings();
+                    await useAuthStore.getState().signOut();
+                    router.replace('/login');
+                  }}
+                >
+                  <Text style={[styles.settingsLabel, { color: '#FF3B30', marginTop: 10 }]}>Çıkış Yap</Text>
+                </TouchableOpacity>
+              </>
+            ) : settingsSection === 'actions' ? (
+              <>
+                <View style={styles.settingsActionsHero}>
+                  <Text style={[styles.settingsActionsHeroTitle, { color: textPrimary }]}>
+                    Hesap yönetimini tek bir yerde yapabilirsin
+                  </Text>
+                  <Text style={[styles.settingsValue, styles.settingsActionsHeroText, { color: textSecondary }]}>
+                    Tüm hesap hareketlerini incele ve yönet
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: isDark ? '#2c2c2e' : '#e5e5e5' }]}
+                  onPress={() => {}}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <Heart size={20} color={textPrimary} />
+                      <Text style={[styles.settingsLabel, { color: textPrimary, marginBottom: 0 }]}>Beğenilerin</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: textSecondary }]}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: isDark ? '#2c2c2e' : '#e5e5e5' }]}
+                  onPress={() => {}}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <Bookmark size={20} color={textPrimary} />
+                      <Text style={[styles.settingsLabel, { color: textPrimary, marginBottom: 0 }]}>Kaydedilenlerin</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: textSecondary }]}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: isDark ? '#2c2c2e' : '#e5e5e5' }]}
+                  onPress={() => {}}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <SquareActivity size={20} color={textPrimary} />
+                      <Text style={[styles.settingsLabel, { color: textPrimary, marginBottom: 0 }]}>Arşivlenenler</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: textSecondary }]}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: isDark ? '#2c2c2e' : '#e5e5e5' }]}
+                  onPress={() => {}}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <EyeOff size={20} color={textPrimary} />
+                      <Text style={[styles.settingsLabel, { color: textPrimary, marginBottom: 0 }]}>İlgilenmediklerin</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: textSecondary }]}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: isDark ? '#2c2c2e' : '#e5e5e5' }]}
+                  onPress={() => {}}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <Eye size={20} color={textPrimary} />
+                      <Text style={[styles.settingsLabel, { color: textPrimary, marginBottom: 0 }]}>İlgilendiklerin</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: textSecondary }]}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: isDark ? '#2c2c2e' : '#e5e5e5' }]}
+                  onPress={() => {}}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <CalendarDays size={20} color={textPrimary} />
+                      <Text style={[styles.settingsLabel, { color: textPrimary, marginBottom: 0 }]}>Hesap geçmişi</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: textSecondary }]}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: isDark ? '#2c2c2e' : '#e5e5e5' }]}
+                  onPress={() => {}}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <ImagePlay size={20} color={textPrimary} />
+                      <Text style={[styles.settingsLabel, { color: textPrimary, marginBottom: 0 }]}>İzleme geçmişi</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: textSecondary }]}>›</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: isDark ? '#2c2c2e' : '#e5e5e5' }]}
+                  onPress={openDeletedMenu}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <Trash2 size={20} color={textPrimary} />
+                      <Text style={[styles.settingsLabel, { color: textPrimary, marginBottom: 0 }]}>Yakınlarda Silinenler</Text>
+                    </View>
+                    <Text style={[styles.settingsValue, { color: textSecondary }]}>
+                      Son 15 gün içinde silinenleri geri yükle
+                    </Text>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: textSecondary }]}>›</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <DeletedContentMenu isDark={isDark} isActive={settingsSection === 'deleted'} />
+            )}
+          </ScrollView>
+        </Animated.View>
+      </View>
     </View>
   );
 }
@@ -517,5 +762,116 @@ const styles = StyleSheet.create({
   verticalSeparator: {
     width: 1.5,
     height: 20,
+  },
+  settingsOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1200,
+  },
+  settingsBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  settingsPanel: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    right: 0,
+    width: SCREEN_WIDTH,
+  },
+  settingsHeader: {
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'transparent',
+  },
+  settingsHeaderSub: {
+    paddingLeft: 6,
+  },
+  settingsHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  settingsTitle: {
+    fontSize: 26,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+  settingsCloseButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  settingsBackButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  settingsContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  settingsItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 18,
+    borderBottomWidth: 1,
+  },
+  settingsInfo: {
+    flex: 1,
+    paddingRight: 20,
+  },
+  settingsLabel: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  settingsLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  settingsValue: {
+    fontSize: 14,
+    fontWeight: '400',
+  },
+  settingsActionsHero: {
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  settingsActionsHeroTitle: {
+    textAlign: 'center',
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  settingsActionsHeroText: {
+    textAlign: 'center',
+  },
+  settingsSegmentGroup: {
+    flexDirection: 'row',
+    borderRadius: 12,
+    padding: 2,
+    overflow: 'hidden',
+  },
+  settingsSegmentOption: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+  },
+  settingsSegmentText: {
+    fontSize: 12,
+    fontWeight: '400',
+  },
+  settingsChevron: {
+    fontSize: 22,
   },
 });
