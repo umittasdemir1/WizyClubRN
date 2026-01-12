@@ -28,7 +28,7 @@ import { PostsGrid } from '../../src/presentation/components/profile/PostsGrid';
 import { BioBottomSheet } from '../../src/presentation/components/profile/BioBottomSheet';
 import { ClubsBottomSheet } from '../../src/presentation/components/profile/ClubsBottomSheet';
 import { EditProfileSheet } from '../../src/presentation/components/profile/EditProfileSheet';
-import { Eye, X, Menu, SunMoon, ClockFading, SquareActivity, ArrowLeft, EyeOff, CalendarDays, ImagePlay, Bookmark, Trash2, Heart } from 'lucide-react-native';
+import { Eye, X, Menu, SunMoon, ClockFading, Activity, ArrowLeft, EyeOff, CalendarDays, ImagePlay, Bookmark, Trash2, Heart } from 'lucide-react-native';
 import BottomSheet from '@gorhom/bottom-sheet';
 import Svg, { Path, Circle } from 'react-native-svg';
 import Animated, {
@@ -895,7 +895,7 @@ export default function ProfileScreen() {
                 >
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
-                      <SquareActivity size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Activity size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
                       <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.actionsLabel}</Text>
                     </View>
                   </View>
