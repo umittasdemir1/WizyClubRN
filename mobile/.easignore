@@ -8,3 +8,27 @@ ios/
 
 # Exclude node_modules
 node_modules/
+
+# Exclude backend and parent environment from EAS build
+../backend/
+../backups/
+../maintenance_scripts/
+../r2-mcp/
+../.git/
+
+# Exclude local logs and temporary files
+doctor_output*.txt
+doctor_full.txt
+doctor_output_ascii.txt
+doctor_output_final.txt
+*.zip
+*.tar.gz
+npm-debug.*
+yarn-error.*
+
+# Exclude native and generated folders
+android/
+ios/
+.expo/
+dist/
+web-build/

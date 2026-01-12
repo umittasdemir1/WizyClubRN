@@ -54,7 +54,14 @@
       "expo-secure-store",
       "expo-video",
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-navigation-bar",
+        {
+          "appearance": "light",
+          "backgroundColor": "#181818"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

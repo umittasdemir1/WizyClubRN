@@ -12,6 +12,10 @@ import { useAuthStore } from '../src/presentation/store/useAuthStore';
 import { useDraftCleanup } from '../src/presentation/hooks/useDraftCleanup';
 import { SessionLogService } from '../src/core/services/SessionLogService';
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
+import * as NavigationBar from 'expo-navigation-bar';
+import { useKeepAwake } from 'expo-keep-awake';
+import Toast from 'react-native-toast-message';
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -20,6 +24,9 @@ function RootNavigator() {
     const isDark = useThemeStore((state) => state.isDark);
     const { user, isInitialized, initialize } = useAuthStore();
 
+    // Keep the screen awake during video playback/app usage
+    useKeepAwake();
+
     // Cleanup expired drafts periodically
     useDraftCleanup();
 
@@ -27,6 +34,21 @@ function RootNavigator() {
         // Initialize auth state on app start
         initialize();
     }, []);
+
+    // Configure Navigation Bar for Android
+    useEffect(() => {
+        if (Platform.OS === 'android') {
+            const setupNav = async () => {
+                try {
+                    // Just set the button style, let Android 15 handle the color
+                    await NavigationBar.setButtonStyleAsync(isDark ? 'light' : 'dark');
+                } catch (e) {
+                    console.warn('NavigationBar setup failed:', e);
+                }
+            };
+            setupNav();
+        }
+    }, [isDark]);
 
     useEffect(() => {
         if (isInitialized) {
@@ -81,6 +103,7 @@ export default function RootLayout() {
                 <SafeAreaProvider>
                     <BottomSheetModalProvider>
                         <RootNavigator />
+                        <Toast />
                     </BottomSheetModalProvider>
                 </SafeAreaProvider>
             </ThemeProvider>
