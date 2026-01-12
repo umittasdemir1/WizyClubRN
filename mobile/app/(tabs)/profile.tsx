@@ -28,7 +28,7 @@ import { PostsGrid } from '../../src/presentation/components/profile/PostsGrid';
 import { BioBottomSheet } from '../../src/presentation/components/profile/BioBottomSheet';
 import { ClubsBottomSheet } from '../../src/presentation/components/profile/ClubsBottomSheet';
 import { EditProfileSheet } from '../../src/presentation/components/profile/EditProfileSheet';
-import { Eye, X, Menu, SunMoon, ClockFading, Activity, ArrowLeft, EyeOff, CalendarDays, ImagePlay, Bookmark, Trash2, Heart } from 'lucide-react-native';
+import { Eye, X, Menu, SunMoon, ClockFading, Activity, ArrowLeft, EyeOff, CalendarDays, ImagePlay, Bookmark, Trash2, Heart, UserCog, Lock, Mail, Phone, ShieldAlert, Bell, ShieldBan, ShieldCheck, MessageSquare, User, Sparkles, Briefcase, BadgeCheck, BadgePlus, Globe, SlidersHorizontal } from 'lucide-react-native';
 import BottomSheet from '@gorhom/bottom-sheet';
 import Svg, { Path, Circle } from 'react-native-svg';
 import Animated, {
@@ -159,6 +159,29 @@ export default function ProfileScreen() {
         themeOptionDark: getString('profile.settings.themeOptionDark') || prev.themeOptionDark,
         themeOptionSystem: getString('profile.settings.themeOptionSystem') || prev.themeOptionSystem,
         actionsLabel: getString('profile.settings.actionsLabel') || prev.actionsLabel,
+        accountSettingsLabel: getString('profile.settings.accountSettingsLabel') || prev.accountSettingsLabel,
+        notificationsLabel: getString('profile.settings.notificationsLabel') || prev.notificationsLabel,
+        notificationsItemPush: getString('profile.settings.notificationsItem.push') || prev.notificationsItemPush,
+        notificationsItemEmail: getString('profile.settings.notificationsItem.email') || prev.notificationsItemEmail,
+        notificationsItemSms: getString('profile.settings.notificationsItem.sms') || prev.notificationsItemSms,
+        inAppBrowserLabel: getString('profile.settings.inAppBrowser.label') || prev.inAppBrowserLabel,
+        browserHistoryLabel: getString('profile.settings.inAppBrowser.history.label') || prev.browserHistoryLabel,
+        browserHistoryOptionOn: getString('profile.settings.inAppBrowser.history.optionOn') || prev.browserHistoryOptionOn,
+        browserHistoryOptionOff: getString('profile.settings.inAppBrowser.history.optionOff') || prev.browserHistoryOptionOff,
+        browserHistoryViewLabel: getString('profile.settings.inAppBrowser.history.view') || prev.browserHistoryViewLabel,
+        browserHistoryClearLabel: getString('profile.settings.inAppBrowser.history.clear') || prev.browserHistoryClearLabel,
+        contentPreferencesLabel: getString('profile.settings.contentPreferences.label') || prev.contentPreferencesLabel,
+        accountSettingsItemPassword: getString('profile.settings.accountSettingsItem.password') || prev.accountSettingsItemPassword,
+        accountSettingsItemEmail: getString('profile.settings.accountSettingsItem.email') || prev.accountSettingsItemEmail,
+        accountSettingsItemPhone: getString('profile.settings.accountSettingsItem.phone') || prev.accountSettingsItemPhone,
+        accountSettingsItemStatus: getString('profile.settings.accountSettingsItem.status') || prev.accountSettingsItemStatus,
+        accountSettingsItemBlocked: getString('profile.settings.accountSettingsItem.blocked') || prev.accountSettingsItemBlocked,
+        accountSettingsItemMuted: getString('profile.settings.accountSettingsItem.muted') || prev.accountSettingsItemMuted,
+        accountSettingsItemType: getString('profile.settings.accountSettingsItem.type') || prev.accountSettingsItemType,
+        accountTypeCreator: getString('profile.settings.accountType.creator') || prev.accountTypeCreator,
+        accountTypeBranded: getString('profile.settings.accountType.branded') || prev.accountTypeBranded,
+        accountTypeVerification: getString('profile.settings.accountType.verification') || prev.accountTypeVerification,
+        accountTypeBadge: getString('profile.settings.accountType.badge') || prev.accountTypeBadge,
         actionsHeroTitle: getString('profile.settings.actionsHeroTitle') || prev.actionsHeroTitle,
         actionsHeroText: getString('profile.settings.actionsHeroText') || prev.actionsHeroText,
         logoutLabel: getString('profile.settings.logoutLabel') || prev.logoutLabel,
@@ -370,9 +393,10 @@ export default function ProfileScreen() {
   const bioSheetRef = useRef<BottomSheet>(null);
   const clubsSheetRef = useRef<BottomSheet>(null);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
-  const [settingsSection, setSettingsSection] = useState<'main' | 'actions' | 'deleted' | 'likes' | 'saved' | 'history' | 'archived' | 'notInterested' | 'interested' | 'accountHistory'>('main');
+  const [settingsSection, setSettingsSection] = useState<'main' | 'actions' | 'deleted' | 'likes' | 'saved' | 'history' | 'archived' | 'notInterested' | 'interested' | 'accountHistory' | 'accountSettings' | 'notifications' | 'accountType' | 'inAppBrowser' | 'contentPreferences'>('main');
   const [activityVideos, setActivityVideos] = useState<VideoEntity[]>([]);
   const [isActivityLoading, setIsActivityLoading] = useState(false);
+  const [browserHistoryMode, setBrowserHistoryMode] = useState<'on' | 'off'>('on');
   const [settingsCopy, setSettingsCopy] = useState({
     title: 'Ayarlar ve kişisel araçlar',
     actionsHeader: 'Hareketler',
@@ -382,6 +406,29 @@ export default function ProfileScreen() {
     themeOptionDark: 'Koyu',
     themeOptionSystem: 'Cihaz',
     actionsLabel: 'Hareketler',
+    accountSettingsLabel: 'Hesap ayarları',
+    notificationsLabel: 'Bildirimler',
+    notificationsItemPush: 'Anlık bildirimler',
+    notificationsItemEmail: 'E-posta bildirimleri',
+    notificationsItemSms: 'SMS bildirimleri',
+    inAppBrowserLabel: 'Uygulama içi tarayıcı',
+    browserHistoryLabel: 'Tarayıcı geçmişi',
+    browserHistoryOptionOn: 'Açık',
+    browserHistoryOptionOff: 'Kapalı',
+    browserHistoryViewLabel: 'Tarayıcı geçmişini gör',
+    browserHistoryClearLabel: 'Tarayıcı geçmişini temizle',
+    contentPreferencesLabel: 'İçerik tercihleri',
+    accountSettingsItemPassword: 'Şifre',
+    accountSettingsItemEmail: 'E-posta',
+    accountSettingsItemPhone: 'Telefon numarası',
+    accountSettingsItemStatus: 'Hesap durumu',
+    accountSettingsItemBlocked: 'Engellenenler',
+    accountSettingsItemMuted: 'Sessize alınanlar',
+    accountSettingsItemType: 'Hesap türü',
+    accountTypeCreator: 'İçerik üreticisi ol',
+    accountTypeBranded: 'Markalı içerik',
+    accountTypeVerification: 'Doğrulama talep et',
+    accountTypeBadge: 'Rozet için kaydol',
     actionsHeroTitle: 'Hesap yönetimini tek bir yerde yapabilirsin',
     actionsHeroText: 'Tüm hesap hareketlerini incele ve yönet',
     logoutLabel: 'Çıkış Yap',
@@ -552,6 +599,10 @@ export default function ProfileScreen() {
     { label: settingsCopy.themeOptionDark, value: 'dark' as const },
     { label: settingsCopy.themeOptionSystem, value: 'system' as const },
   ];
+  const browserHistoryOptions = [
+    { label: settingsCopy.browserHistoryOptionOn, value: 'on' as const },
+    { label: settingsCopy.browserHistoryOptionOff, value: 'off' as const },
+  ];
 
   const openSettings = useCallback(() => {
     loadAdminConfig();
@@ -569,6 +620,26 @@ export default function ProfileScreen() {
       return;
     }
     if (settingsSection === 'actions') {
+      setSettingsSection('main');
+      return;
+    }
+    if (settingsSection === 'accountType') {
+      setSettingsSection('accountSettings');
+      return;
+    }
+    if (settingsSection === 'accountSettings') {
+      setSettingsSection('main');
+      return;
+    }
+    if (settingsSection === 'notifications') {
+      setSettingsSection('main');
+      return;
+    }
+    if (settingsSection === 'inAppBrowser') {
+      setSettingsSection('main');
+      return;
+    }
+    if (settingsSection === 'contentPreferences') {
       setSettingsSection('main');
       return;
     }
@@ -599,6 +670,26 @@ export default function ProfileScreen() {
 
   const openDeletedMenu = useCallback(() => {
     setSettingsSection('deleted');
+  }, []);
+
+  const openAccountSettings = useCallback(() => {
+    setSettingsSection('accountSettings');
+  }, []);
+
+  const openNotifications = useCallback(() => {
+    setSettingsSection('notifications');
+  }, []);
+
+  const openAccountType = useCallback(() => {
+    setSettingsSection('accountType');
+  }, []);
+
+  const openInAppBrowser = useCallback(() => {
+    setSettingsSection('inAppBrowser');
+  }, []);
+
+  const openContentPreferences = useCallback(() => {
+    setSettingsSection('contentPreferences');
   }, []);
 
   useEffect(() => {
@@ -830,7 +921,12 @@ export default function ProfileScreen() {
                               settingsSection === 'notInterested' ? settingsCopy.actionsItemNotInterested :
                                 settingsSection === 'interested' ? settingsCopy.actionsItemInterested :
                                   settingsSection === 'accountHistory' ? settingsCopy.actionsItemAccountHistory :
-                                    settingsCopy.deletedHeader}
+                                    settingsSection === 'accountSettings' ? settingsCopy.accountSettingsLabel :
+                                      settingsSection === 'notifications' ? settingsCopy.notificationsLabel :
+                                          settingsSection === 'accountType' ? settingsCopy.accountSettingsItemType :
+                                            settingsSection === 'inAppBrowser' ? settingsCopy.inAppBrowserLabel :
+                                              settingsSection === 'contentPreferences' ? settingsCopy.contentPreferencesLabel :
+                                                settingsCopy.deletedHeader}
                   </Text>
                 </View>
                 <View style={styles.settingsHeaderRight} />
@@ -897,6 +993,58 @@ export default function ProfileScreen() {
                     <View style={styles.settingsLabelRow}>
                       <Activity size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
                       <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.actionsLabel}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
+                  onPress={openNotifications}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <Bell size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.notificationsLabel}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
+                  onPress={openInAppBrowser}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <Globe size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.inAppBrowserLabel}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
+                  onPress={openContentPreferences}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <SlidersHorizontal size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.contentPreferencesLabel}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
+                  onPress={openAccountSettings}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <UserCog size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.accountSettingsLabel}</Text>
                     </View>
                   </View>
                   <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
@@ -1029,6 +1177,252 @@ export default function ProfileScreen() {
                   <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
               </>
+            ) : settingsSection === 'accountSettings' ? (
+              <>
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
+                  onPress={() => {}}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <Lock size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.accountSettingsItemPassword}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
+                  onPress={() => {}}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <Mail size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.accountSettingsItemEmail}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
+                  onPress={() => {}}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <MessageSquare size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.accountSettingsItemPhone}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
+                  onPress={() => {}}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <ShieldCheck size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.accountSettingsItemStatus}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
+                  onPress={() => {}}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <ShieldBan size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.accountSettingsItemBlocked}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
+                  onPress={() => {}}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <ShieldAlert size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.accountSettingsItemMuted}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
+                  onPress={openAccountType}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <User size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.accountSettingsItemType}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
+                </TouchableOpacity>
+              </>
+            ) : settingsSection === 'notifications' ? (
+              <>
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
+                  onPress={() => {}}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <Bell size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.notificationsItemPush}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
+                  onPress={() => {}}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <Mail size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.notificationsItemEmail}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
+                  onPress={() => {}}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <MessageSquare size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.notificationsItemSms}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
+                </TouchableOpacity>
+              </>
+            ) : settingsSection === 'accountType' ? (
+              <>
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
+                  onPress={() => {}}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <Sparkles size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.accountTypeCreator}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
+                  onPress={() => {}}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <Briefcase size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.accountTypeBranded}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
+                  onPress={() => {}}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <BadgeCheck size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.accountTypeVerification}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
+                  onPress={() => {}}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <BadgePlus size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.accountTypeBadge}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
+                </TouchableOpacity>
+              </>
+            ) : settingsSection === 'inAppBrowser' ? (
+              <>
+                <View style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}>
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <Globe size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.browserHistoryLabel}</Text>
+                    </View>
+                  </View>
+                  <View style={[styles.settingsSegmentGroup, { backgroundColor: settingsSegmentBg }]}>
+                    {browserHistoryOptions.map((option) => {
+                      const isActive = browserHistoryMode === option.value;
+                      return (
+                        <TouchableOpacity
+                          key={option.value}
+                          style={[
+                            styles.settingsSegmentOption,
+                            isActive && { backgroundColor: settingsSegmentActive },
+                          ]}
+                          onPress={() => setBrowserHistoryMode(option.value)}
+                        >
+                          <Text style={[styles.settingsSegmentText, { color: isActive ? settingsSegmentActiveText : settingsSegmentText }]}>
+                            {option.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
+                  onPress={() => {}}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <ClockFading size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.browserHistoryViewLabel}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
+                  onPress={() => {}}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <Trash2 size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.browserHistoryClearLabel}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
+                </TouchableOpacity>
+              </>
+            ) : settingsSection === 'contentPreferences' ? (
+              <View style={{ paddingTop: 10 }} />
             ) : settingsSection === 'deleted' ? (
               <DeletedContentMenu isDark={isDark} isActive={settingsSection === 'deleted'} />
             ) : settingsSection === 'interested' ? (
