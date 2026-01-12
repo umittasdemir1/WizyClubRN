@@ -593,6 +593,180 @@
       "type": "text",
       "value": "İzleme geçmişi",
       "group": "Profil > Hareketler"
+    },
+    {
+      "key": "feed.header.tab.stories.text",
+      "label": "Hikayeler metni",
+      "description": "Hikayeler tab metni",
+      "type": "text",
+      "value": "Hikayeler",
+      "group": "Feed > Header Tabları"
+    },
+    {
+      "key": "feed.header.tab.foryou.text",
+      "label": "Sana Özel metni",
+      "description": "Sana Özel tab metni",
+      "type": "text",
+      "value": "Sana Özel",
+      "group": "Feed > Header Tabları"
+    },
+    {
+      "key": "feed.header.tab.fontSize",
+      "label": "Tab yazı boyutu",
+      "description": "Tab metin font boyutu",
+      "type": "number",
+      "value": 16,
+      "group": "Feed > Header Tabları",
+      "min": 12,
+      "max": 24,
+      "step": 1
+    },
+    {
+      "key": "feed.header.tab.fontWeight",
+      "label": "Tab yazı ağırlığı",
+      "description": "Tab metin font ağırlığı",
+      "type": "select",
+      "value": "600",
+      "group": "Feed > Header Tabları",
+      "options": [
+        "300",
+        "400",
+        "500",
+        "600",
+        "700",
+        "800"
+      ]
+    },
+    {
+      "key": "feed.header.tab.letterSpacing",
+      "label": "Tab harf aralığı",
+      "description": "Tab metin harf aralığı",
+      "type": "number",
+      "value": 0.3,
+      "group": "Feed > Header Tabları",
+      "min": -1,
+      "max": 6,
+      "step": 0.1
+    },
+    {
+      "key": "feed.header.tab.color",
+      "label": "Tab pasif renk",
+      "description": "Tab pasif durum metin rengi (opacity dahil)",
+      "type": "color",
+      "value": "rgba(255, 255, 255, 0.6)",
+      "group": "Feed > Header Tabları"
+    },
+    {
+      "key": "feed.header.tab.activeColor",
+      "label": "Tab aktif renk",
+      "description": "Tab aktif durum metin rengi",
+      "type": "color",
+      "value": "#FFFFFF",
+      "group": "Feed > Header Tabları"
+    },
+    {
+      "key": "feed.header.tab.paddingHorizontal",
+      "label": "Tab yatay padding",
+      "description": "Tab iç yatay boşluk",
+      "type": "number",
+      "value": 8,
+      "group": "Feed > Header Tabları",
+      "min": 0,
+      "max": 24,
+      "step": 1
+    },
+    {
+      "key": "feed.header.tab.paddingVertical",
+      "label": "Tab dikey padding",
+      "description": "Tab iç dikey boşluk",
+      "type": "number",
+      "value": 8,
+      "group": "Feed > Header Tabları",
+      "min": 0,
+      "max": 24,
+      "step": 1
+    },
+    {
+      "key": "feed.header.tab.gap",
+      "label": "Tablar arası boşluk",
+      "description": "İki tab arasındaki boşluk",
+      "type": "number",
+      "value": 8,
+      "group": "Feed > Header Tabları",
+      "min": 0,
+      "max": 32,
+      "step": 1
+    },
+    {
+      "key": "feed.header.divider.width",
+      "label": "Ayırıcı genişlik",
+      "description": "Tablar arası ayırıcı çizgi genişliği",
+      "type": "number",
+      "value": 1,
+      "group": "Feed > Header Stil",
+      "min": 0,
+      "max": 4,
+      "step": 0.5
+    },
+    {
+      "key": "feed.header.divider.height",
+      "label": "Ayırıcı yükseklik",
+      "description": "Tablar arası ayırıcı çizgi yüksekliği",
+      "type": "number",
+      "value": 12,
+      "group": "Feed > Header Stil",
+      "min": 4,
+      "max": 24,
+      "step": 1
+    },
+    {
+      "key": "feed.header.divider.color",
+      "label": "Ayırıcı renk",
+      "description": "Tablar arası ayırıcı çizgi rengi",
+      "type": "color",
+      "value": "rgba(255, 255, 255, 0.2)",
+      "group": "Feed > Header Stil"
+    },
+    {
+      "key": "feed.header.badge.size",
+      "label": "Bildirim rozeti boyut",
+      "description": "Hikayeler bildirimi rozet boyutu",
+      "type": "number",
+      "value": 8,
+      "group": "Feed > Header Stil",
+      "min": 4,
+      "max": 16,
+      "step": 1
+    },
+    {
+      "key": "feed.header.badge.color",
+      "label": "Bildirim rozeti renk",
+      "description": "Hikayeler bildirimi rozet rengi",
+      "type": "color",
+      "value": "#FF3B30",
+      "group": "Feed > Header Stil"
+    },
+    {
+      "key": "feed.header.container.paddingHorizontal",
+      "label": "Header yatay padding",
+      "description": "Header container yatay boşluk",
+      "type": "number",
+      "value": 16,
+      "group": "Feed > Header Stil",
+      "min": 0,
+      "max": 32,
+      "step": 1
+    },
+    {
+      "key": "feed.header.container.topPadding",
+      "label": "Header üst padding",
+      "description": "Header container üst ekstra boşluk (safe area'ya eklenir)",
+      "type": "number",
+      "value": 12,
+      "group": "Feed > Header Stil",
+      "min": 0,
+      "max": 32,
+      "step": 1
     }
   ]
 }

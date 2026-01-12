@@ -44,6 +44,7 @@ import React from 'react';
 import { StatusBar as RNStatusBar } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Bookmark } from 'lucide-react-native';
+import { CONFIG } from '../../../core/config';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const SCREEN_HEIGHT = Dimensions.get('window').height;
@@ -194,6 +195,147 @@ export const FeedManager = ({
     const [isWebViewVisible, setWebViewVisible] = useState(false);
     const [saveToastMessage, setSaveToastMessage] = useState<string | null>(null);
     const [saveToastActive, setSaveToastActive] = useState(false);
+
+    // Admin Config State for Header
+    const [feedHeaderConfig, setFeedHeaderConfig] = useState({
+        storiesText: 'Hikayeler',
+        foryouText: 'Sana Özel',
+        tabFontSize: 16,
+        tabFontWeight: '600',
+        tabLetterSpacing: 0.3,
+        tabColor: 'rgba(255, 255, 255, 0.6)',
+        tabActiveColor: '#FFFFFF',
+        tabPaddingHorizontal: 8,
+        tabPaddingVertical: 8,
+        tabGap: 8,
+        dividerWidth: 1,
+        dividerHeight: 12,
+        dividerColor: 'rgba(255, 255, 255, 0.2)',
+        badgeSize: 8,
+        badgeColor: '#FF3B30',
+        containerPaddingHorizontal: 16,
+        containerTopPadding: 12,
+    });
+
+    const feedAdminWsRef = useRef<WebSocket | null>(null);
+    const feedAdminWsReconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const isFeedFocusedRef = useRef(false);
+
+    // Load Admin Config
+    const loadFeedHeaderConfig = useCallback(async () => {
+        try {
+            const response = await fetch(`${CONFIG.API_URL}/admin/config?ts=${Date.now()}`);
+            if (!response.ok) return;
+            const data = await response.json();
+            const items = Array.isArray(data?.items) ? data.items : [];
+            const getValue = (key: string) => items.find((item: any) => item.key === key)?.value;
+            const getNumber = (key: string) => {
+                const value = getValue(key);
+                if (typeof value === 'number') return value;
+                const parsed = Number(value);
+                return Number.isFinite(parsed) ? parsed : undefined;
+            };
+            const getString = (key: string) => {
+                const value = getValue(key);
+                if (typeof value !== 'string') return undefined;
+                const trimmed = value.trim();
+                return trimmed;
+            };
+
+            setFeedHeaderConfig((prev) => ({
+                storiesText: getString('feed.header.tab.stories.text') || prev.storiesText,
+                foryouText: getString('feed.header.tab.foryou.text') || prev.foryouText,
+                tabFontSize: getNumber('feed.header.tab.fontSize') ?? prev.tabFontSize,
+                tabFontWeight: getString('feed.header.tab.fontWeight') || prev.tabFontWeight,
+                tabLetterSpacing: getNumber('feed.header.tab.letterSpacing') ?? prev.tabLetterSpacing,
+                tabColor: getString('feed.header.tab.color') || prev.tabColor,
+                tabActiveColor: getString('feed.header.tab.activeColor') || prev.tabActiveColor,
+                tabPaddingHorizontal: getNumber('feed.header.tab.paddingHorizontal') ?? prev.tabPaddingHorizontal,
+                tabPaddingVertical: getNumber('feed.header.tab.paddingVertical') ?? prev.tabPaddingVertical,
+                tabGap: getNumber('feed.header.tab.gap') ?? prev.tabGap,
+                dividerWidth: getNumber('feed.header.divider.width') ?? prev.dividerWidth,
+                dividerHeight: getNumber('feed.header.divider.height') ?? prev.dividerHeight,
+                dividerColor: getString('feed.header.divider.color') || prev.dividerColor,
+                badgeSize: getNumber('feed.header.badge.size') ?? prev.badgeSize,
+                badgeColor: getString('feed.header.badge.color') || prev.badgeColor,
+                containerPaddingHorizontal: getNumber('feed.header.container.paddingHorizontal') ?? prev.containerPaddingHorizontal,
+                containerTopPadding: getNumber('feed.header.container.topPadding') ?? prev.containerTopPadding,
+            }));
+        } catch (error) {
+            console.warn('[FeedManager] Admin config load failed:', error);
+        }
+    }, []);
+
+    // WebSocket connection for live updates
+    const connectFeedAdminSocket = useCallback(() => {
+        const existing = feedAdminWsRef.current;
+        if (existing && (existing.readyState === WebSocket.OPEN || existing.readyState === WebSocket.CONNECTING)) {
+            return;
+        }
+        const scheduleReconnect = () => {
+            if (feedAdminWsReconnectRef.current) return;
+            feedAdminWsReconnectRef.current = setTimeout(() => {
+                feedAdminWsReconnectRef.current = null;
+                connectFeedAdminSocket();
+            }, 2000);
+        };
+        const wsUrl = CONFIG.API_URL.replace(/^http/, 'ws') + '/admin/ws';
+        const socket = new WebSocket(wsUrl);
+        feedAdminWsRef.current = socket;
+
+        socket.onopen = () => {
+            loadFeedHeaderConfig();
+        };
+
+        socket.onmessage = (event) => {
+            try {
+                const data = JSON.parse(String(event.data || '{}'));
+                if (data?.type === 'admin-config-updated') {
+                    loadFeedHeaderConfig();
+                }
+            } catch {
+                // Ignore malformed messages
+            }
+        };
+
+        socket.onclose = () => {
+            feedAdminWsRef.current = null;
+            if (isFeedFocusedRef.current) {
+                scheduleReconnect();
+            }
+        };
+    }, [loadFeedHeaderConfig]);
+
+    // Load config on mount
+    useEffect(() => {
+        let isActive = true;
+        if (isActive) {
+            loadFeedHeaderConfig();
+        }
+        return () => {
+            isActive = false;
+        };
+    }, [loadFeedHeaderConfig]);
+
+    // WebSocket lifecycle
+    useFocusEffect(
+        useCallback(() => {
+            isFeedFocusedRef.current = true;
+            loadFeedHeaderConfig();
+            connectFeedAdminSocket();
+            return () => {
+                isFeedFocusedRef.current = false;
+                if (feedAdminWsReconnectRef.current) {
+                    clearTimeout(feedAdminWsReconnectRef.current);
+                    feedAdminWsReconnectRef.current = null;
+                }
+                if (feedAdminWsRef.current) {
+                    feedAdminWsRef.current.close();
+                    feedAdminWsRef.current = null;
+                }
+            };
+        }, [loadFeedHeaderConfig, connectFeedAdminSocket])
+    );
 
     // Sheet refs
     const descriptionSheetRef = useRef<BottomSheet>(null);
@@ -753,6 +895,7 @@ export const FeedManager = ({
                             hasUnseenStories={hasUnseenStories}
                             showBack={isCustomFeed}
                             onBack={() => router.back()}
+                            config={feedHeaderConfig}
                         />
                     </Animated.View>
                 )}
@@ -864,6 +1007,7 @@ export const FeedManager = ({
                             hasUnseenStories={hasUnseenStories}
                             showBack={isCustomFeed}
                             onBack={() => router.back()}
+                            config={feedHeaderConfig}
                         />
                     </Animated.View>
                 )}

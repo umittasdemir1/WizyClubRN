@@ -122,6 +122,25 @@ interface HeaderOverlayProps {
     onTabChange?: (tab: 'stories' | 'foryou') => void;
     showBack?: boolean;
     onBack?: () => void;
+    config?: {
+        storiesText?: string;
+        foryouText?: string;
+        tabFontSize?: number;
+        tabFontWeight?: string;
+        tabLetterSpacing?: number;
+        tabColor?: string;
+        tabActiveColor?: string;
+        tabPaddingHorizontal?: number;
+        tabPaddingVertical?: number;
+        tabGap?: number;
+        dividerWidth?: number;
+        dividerHeight?: number;
+        dividerColor?: string;
+        badgeSize?: number;
+        badgeColor?: string;
+        containerPaddingHorizontal?: number;
+        containerTopPadding?: number;
+    };
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -137,10 +156,11 @@ export function HeaderOverlay({
     onTabChange,
     showBack = false,
     onBack,
+    config,
 }: HeaderOverlayProps) {
     const insets = useSafeAreaInsets();
     const pulseOpacity = useSharedValue(1);
-    const headerTopPadding = insets.top + 12;
+    const headerTopPadding = insets.top + (config?.containerTopPadding ?? 12);
 
     // Pulse animation when unmuted
     useEffect(() => {
@@ -165,7 +185,13 @@ export function HeaderOverlay({
 
     return (
         <View
-            style={[styles.container, { paddingTop: headerTopPadding }]}
+            style={[
+                styles.container,
+                {
+                    paddingTop: headerTopPadding,
+                    paddingHorizontal: config?.containerPaddingHorizontal ?? 16,
+                }
+            ]}
             pointerEvents="box-none"
         >
             {/* Left Column: Upload & Thumbnail */}
@@ -189,38 +215,75 @@ export function HeaderOverlay({
                 style={[styles.centerOverlay, { top: headerTopPadding }]}
                 pointerEvents="box-none"
             >
-                <View style={styles.tabContainer}>
+                <View style={[styles.tabContainer, { gap: config?.tabGap ?? 8, marginLeft: 4 }]}>
                     <Pressable
                         onPress={() => {
                             onTabChange?.('stories');
                             onStoryPress();
                         }}
-                        style={styles.tabButton}
+                        style={[
+                            styles.tabButton,
+                            {
+                                paddingHorizontal: config?.tabPaddingHorizontal ?? 8,
+                                paddingVertical: config?.tabPaddingVertical ?? 8,
+                            }
+                        ]}
                         hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
                     >
                         <Text style={[
                             styles.tabText,
-                            activeTab === 'stories' && styles.tabTextActive
+                            {
+                                fontSize: config?.tabFontSize ?? 16,
+                                fontWeight: (config?.tabFontWeight as any) ?? '600',
+                                letterSpacing: config?.tabLetterSpacing ?? 0.3,
+                                color: activeTab === 'stories' ? (config?.tabActiveColor ?? '#FFFFFF') : (config?.tabColor ?? 'rgba(255, 255, 255, 0.6)'),
+                            }
                         ]}>
-                            Hikayeler
+                            {config?.storiesText ?? 'Hikayeler'}
                         </Text>
                         {hasUnseenStories && (
-                            <View style={styles.badge} />
+                            <View style={[
+                                styles.badge,
+                                {
+                                    width: config?.badgeSize ?? 8,
+                                    height: config?.badgeSize ?? 8,
+                                    borderRadius: (config?.badgeSize ?? 8) / 2,
+                                    backgroundColor: config?.badgeColor ?? '#FF3B30',
+                                }
+                            ]} />
                         )}
                     </Pressable>
 
-                    <View style={styles.tabDivider} />
+                    <View style={[
+                        styles.tabDivider,
+                        {
+                            width: config?.dividerWidth ?? 1,
+                            height: config?.dividerHeight ?? 12,
+                            backgroundColor: config?.dividerColor ?? 'rgba(255, 255, 255, 0.2)',
+                        }
+                    ]} />
 
                     <Pressable
                         onPress={() => onTabChange?.('foryou')}
-                        style={styles.tabButton}
+                        style={[
+                            styles.tabButton,
+                            {
+                                paddingHorizontal: config?.tabPaddingHorizontal ?? 8,
+                                paddingVertical: config?.tabPaddingVertical ?? 8,
+                            }
+                        ]}
                         hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
                     >
                         <Text style={[
                             styles.tabText,
-                            activeTab === 'foryou' && styles.tabTextActive
+                            {
+                                fontSize: config?.tabFontSize ?? 16,
+                                fontWeight: (config?.tabFontWeight as any) ?? '600',
+                                letterSpacing: config?.tabLetterSpacing ?? 0.3,
+                                color: activeTab === 'foryou' ? (config?.tabActiveColor ?? '#FFFFFF') : (config?.tabColor ?? 'rgba(255, 255, 255, 0.6)'),
+                            }
                         ]}>
-                            Sana Özel
+                            {config?.foryouText ?? 'Sana Özel'}
                         </Text>
                     </Pressable>
                 </View>
