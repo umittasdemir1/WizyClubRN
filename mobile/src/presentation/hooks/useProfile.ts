@@ -62,9 +62,15 @@ export const useProfile = (userId: string, viewerId?: string) => {
     const updateProfile = useCallback(async (updates: Partial<User>) => {
         try {
             const updatedUser = await profileRepo.updateProfile(userId, updates);
-
-            // Force reload from database to ensure state is in sync
-            await loadProfile();
+            setUser(updatedUser);
+            syncSocialData(
+                updatedUser.id,
+                updatedUser.isFollowing,
+                updatedUser.followersCount || 0,
+                updatedUser.followingCount || 0
+            );
+            // Silent refresh to avoid full skeleton reload
+            await loadProfile(true);
 
             return updatedUser;
         } catch (err) {
@@ -72,7 +78,7 @@ export const useProfile = (userId: string, viewerId?: string) => {
             setError('Profil güncellenirken bir hata oluştu.');
             throw err;
         }
-    }, [userId, loadProfile]);
+    }, [userId, loadProfile, syncSocialData]);
 
     const uploadAvatar = useCallback(async (fileUri: string) => {
         try {

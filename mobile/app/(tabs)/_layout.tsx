@@ -1,10 +1,12 @@
 import { Tabs } from 'expo-router';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import { useNotificationStore } from '../../src/presentation/store/useNotificationStore';
-import { COLORS } from '../../src/core/constants';
+import { COLORS, LIGHT_COLORS } from '../../src/core/constants';
 import { useEffect, useState } from 'react';
+import { useIsFocused } from '@react-navigation/native';
+import * as NavigationBar from 'expo-navigation-bar';
 
 // Import SVGs
 import HomeIcon from '../../assets/icons/home.svg';
@@ -45,17 +47,41 @@ function NotificationTabIcon({ color }: { color: string }) {
 export default function TabLayout() {
     const isDark = useThemeStore((state) => state.isDark);
     const insets = useSafeAreaInsets();
+    const isFocused = useIsFocused();
+    const tabBarBackground = isDark ? COLORS.background : LIGHT_COLORS.background;
+    const tabBarBorder = isDark ? COLORS.border : LIGHT_COLORS.border;
+
+    useEffect(() => {
+        if (Platform.OS !== 'android') return;
+        const syncNavigationBar = async () => {
+            try {
+                if (isFocused) {
+                    await NavigationBar.setPositionAsync('absolute');
+                    await NavigationBar.setBackgroundColorAsync('#00000000');
+                    await NavigationBar.setBorderColorAsync('#00000000');
+                } else {
+                    await NavigationBar.setPositionAsync('relative');
+                    await NavigationBar.setBackgroundColorAsync(tabBarBackground);
+                    await NavigationBar.setBorderColorAsync(tabBarBackground);
+                }
+                await NavigationBar.setButtonStyleAsync(isDark ? 'light' : 'dark');
+            } catch (e) {
+                console.warn('NavigationBar sync failed:', e);
+            }
+        };
+        syncNavigationBar();
+    }, [isDark, isFocused, tabBarBackground]);
 
     return (
         <Tabs
             backBehavior="history"
             screenOptions={{
                 headerShown: false,
-                lazy: true, // 🔥 FIX: Only render active tab to prevent multiple useVideoFeed instances
+                lazy: false,
                 tabBarStyle: {
-                    backgroundColor: isDark ? COLORS.background : '#fefefe',
+                    backgroundColor: tabBarBackground,
                     borderTopWidth: 0.5,
-                    borderTopColor: isDark ? COLORS.border : '#E5E5E5',
+                    borderTopColor: tabBarBorder,
                     paddingTop: 8,
                     paddingBottom: insets.bottom + 2,
                     height: 50 + insets.bottom,

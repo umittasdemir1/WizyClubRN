@@ -2,7 +2,7 @@ import React, { forwardRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Flag, EyeOff, AlertTriangle, Minimize2, Maximize2, Trash2, LampDesk, GalleryVerticalEnd, Gauge } from 'lucide-react-native';
+import { Flag, EyeOff, Minimize2, Maximize2, Trash2, LampDesk, GalleryVerticalEnd, Gauge } from 'lucide-react-native';
 import { useThemeStore } from '../../store/useThemeStore';
 import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
 import { useBrightnessStore } from '../../store/useBrightnessStore';
@@ -149,8 +149,13 @@ export const MoreOptionsSheet = forwardRef<BottomSheet, MoreOptionsSheetProps>(
                     />
                 )}
                 <OptionItem icon={<Flag color={textColor} size={24} strokeWidth={1.2} />} label="Raporla" textColor={textColor} borderColor={borderColor} />
-                <OptionItem icon={<EyeOff color={textColor} size={24} strokeWidth={1.2} />} label="İlgilenmiyorum" textColor={textColor} borderColor={borderColor} />
-                <OptionItem icon={<AlertTriangle color={textColor} size={24} strokeWidth={1.2} />} label="Başka bir şey" textColor={textColor} borderColor={borderColor} />
+                <OptionItem
+                    icon={<EyeOff color={textColor} size={24} strokeWidth={1.2} />}
+                    label="İlgilenmiyorum"
+                    textColor={textColor}
+                    borderColor={borderColor}
+                    isLast
+                />
             </BottomSheetView>
         </BottomSheet>
     );
@@ -163,6 +168,7 @@ function OptionItem({
     borderColor,
     onPress,
     labelColor,
+    isLast = false,
 }: {
     icon: React.ReactNode;
     label: string;
@@ -170,10 +176,15 @@ function OptionItem({
     labelColor?: string;
     borderColor: string;
     onPress?: () => void;
+    isLast?: boolean;
 }) {
     return (
         <TouchableOpacity
-            style={[styles.optionItem, { borderBottomColor: borderColor }]}
+            style={[
+                styles.optionItem,
+                { borderBottomColor: borderColor },
+                isLast && styles.optionItemLast,
+            ]}
             onPress={onPress}
         >
             {icon}
@@ -191,6 +202,7 @@ function SegmentedItem({
     onSelect,
     options,
     isDark,
+    isLast = false,
 }: {
     icon: React.ReactNode;
     label: string;
@@ -200,13 +212,20 @@ function SegmentedItem({
     onSelect: (label: string) => void;
     options: string[];
     isDark: boolean;
+    isLast?: boolean;
 }) {
     const activeFill = '#FF3B30';
     const activeText = '#FFFFFF';
     const groupFill = isDark ? '#2c2c2e' : '#ededf0';
 
     return (
-        <View style={[styles.optionItem, { borderBottomColor: borderColor }]}>
+        <View
+            style={[
+                styles.optionItem,
+                { borderBottomColor: borderColor },
+                isLast && styles.optionItemLast,
+            ]}
+        >
             <View style={styles.optionLeft}>
                 {icon}
                 <Text style={[styles.optionLabel, { color: textColor }]}>{label}</Text>
@@ -244,6 +263,9 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: 16,
         borderBottomWidth: 1,
+    },
+    optionItemLast: {
+        borderBottomWidth: 0,
     },
     optionLeft: {
         flexDirection: 'row',

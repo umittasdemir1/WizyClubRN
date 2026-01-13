@@ -2,11 +2,10 @@ import { useRef, useState, useEffect, useCallback, memo } from 'react';
 import { StyleSheet, View, Text, Pressable, Platform, ActivityIndicator } from 'react-native';
 import Video, { OnProgressData, OnLoadData, VideoRef, OnVideoErrorData } from 'react-native-video';
 import { Video as VideoEntity } from '../../../domain/entities/Video';
-import PlayIcon from '../../../../assets/icons/play.svg';
 import ReplayIcon from '../../../../assets/icons/replay.svg';
 import { useActiveVideoStore, saveVideoPosition, getVideoPosition, clearVideoPosition } from '../../store/useActiveVideoStore';
 import { BrightnessOverlay } from './BrightnessOverlay';
-import { RefreshCcw, AlertCircle } from 'lucide-react-native';
+import { RefreshCcw, AlertCircle, Play, Pause } from 'lucide-react-native';
 import { useNetInfo } from '@react-native-community/netinfo';
 import { getBufferConfig } from '../../../core/utils/bufferConfig';
 import { VideoSeekBar } from './VideoSeekBar';
@@ -40,6 +39,7 @@ interface VideoLayerProps {
     isScrolling?: SharedValue<boolean>;
     onResizeModeChange?: (mode: 'contain' | 'cover') => void; // NEW: Notify parent of resize mode
     onRemoveVideo?: () => void; // NEW: Callback to remove video on critical error
+    tapIndicator?: 'play' | 'pause' | null;
 }
 
 const MAX_LOOPS = 2;
@@ -56,6 +56,7 @@ export const VideoLayer = memo(function VideoLayer({
     isScrolling,
     onResizeModeChange, // NEW
     onRemoveVideo, // NEW
+    tapIndicator,
 }: VideoLayerProps) {
     const isAppActive = useActiveVideoStore((state) => state.isAppActive);
     const isScreenFocused = useActiveVideoStore((state) => state.isScreenFocused);
@@ -380,8 +381,8 @@ export const VideoLayer = memo(function VideoLayer({
     }, [isActive, seekTo, onSeekReady, hasError]);
 
     // Icons
-    const showPlayIcon = isPausedGlobal && !isSeeking && isActive && !isFinished && !hasError;
-    const showReplayIcon = isFinished && isActive && !hasError;
+    const showTapIndicator = isActive && !!tapIndicator && !hasError;
+    const showReplayIcon = isFinished && isActive && !hasError && !showTapIndicator;
     const showUiOverlays = !isCleanScreen;
 
     return (
@@ -456,12 +457,16 @@ export const VideoLayer = memo(function VideoLayer({
                 />
             )}
 
-            {/* Play/Pause Icon Overlay */}
-            {showUiOverlays && showPlayIcon && (
+            {/* Tap Play/Pause Icon Overlay */}
+            {showUiOverlays && showTapIndicator && (
                 <View style={styles.touchArea} pointerEvents="none">
                     <View style={styles.iconContainer}>
                         <View style={styles.iconBackground}>
-                            <PlayIcon width={44} height={44} color="#FFFFFF" />
+                            {tapIndicator === 'pause' ? (
+                                <Pause size={44} color="#FFFFFF" fill="#FFFFFF" strokeWidth={0} />
+                            ) : (
+                                <Play size={44} color="#FFFFFF" fill="#FFFFFF" strokeWidth={0} />
+                            )}
                         </View>
                     </View>
                 </View>
@@ -516,7 +521,8 @@ export const VideoLayer = memo(function VideoLayer({
         prev.video.id === next.video.id &&
         prev.isActive === next.isActive &&
         prev.isMuted === next.isMuted &&
-        prev.isCleanScreen === next.isCleanScreen
+        prev.isCleanScreen === next.isCleanScreen &&
+        prev.tapIndicator === next.tapIndicator
     );
 });
 

@@ -12,8 +12,6 @@ import {
     Share,
     Alert,
     TouchableOpacity,
-    BackHandler,
-    PanResponder,
     Animated as RNAnimated,
     Easing,
 } from 'react-native';
@@ -38,15 +36,14 @@ import { useUploadStore } from '../../store/useUploadStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { SwipeWrapper } from '../shared/SwipeWrapper';
 import { StoryBar } from './StoryBar';
+import { useInAppBrowserStore } from '../../store/useInAppBrowserStore';
 import { useStoryViewer } from '../../hooks/useStoryViewer';
-import { COLORS, LIGHT_COLORS } from '../../../core/constants';
+import { COLORS } from '../../../core/constants';
 import React from 'react';
 import { StatusBar as RNStatusBar } from 'react-native';
-import { WebView } from 'react-native-webview';
 import { Bookmark } from 'lucide-react-native';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const SCREEN_HEIGHT = Dimensions.get('window').height;
 const SAVE_ICON_ACTIVE = '#FFFFFF';
 
 const VIEWABILITY_CONFIG = {
@@ -106,6 +103,8 @@ export const FeedManager = ({
     const playbackRate = activeVideoStore.playbackRate;
     const viewingMode = activeVideoStore.viewingMode;
     const setPlaybackRate = activeVideoStore.setPlaybackRate;
+    const [tapIndicator, setTapIndicator] = useState<null | 'play' | 'pause'>(null);
+    const tapIndicatorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const { stories: storyListData } = useStoryViewer();
 
@@ -190,8 +189,8 @@ export const FeedManager = ({
 
     // Delete modal state
     const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
-    const [webViewUrl, setWebViewUrl] = useState<string | null>(null);
-    const [isWebViewVisible, setWebViewVisible] = useState(false);
+    const isInAppBrowserVisible = useInAppBrowserStore((state) => state.isVisible);
+    const openInAppBrowser = useInAppBrowserStore((state) => state.openUrl);
     const [saveToastMessage, setSaveToastMessage] = useState<string | null>(null);
     const [saveToastActive, setSaveToastActive] = useState(false);
 
@@ -209,15 +208,6 @@ export const FeedManager = ({
     const insets = useSafeAreaInsets();
     const router = useRouter();
     const listRef = useRef<any>(null);
-    const webSheetTranslateY = useRef(new RNAnimated.Value(0)).current;
-    const webSheetBackdropOpacity = useRef(
-        webSheetTranslateY.interpolate({
-            inputRange: [0, SCREEN_HEIGHT],
-            outputRange: [0.4, 0],
-            extrapolate: 'clamp',
-        })
-    ).current;
-    const isWebViewClosingRef = useRef(false);
     const wasPlayingBeforeWebViewRef = useRef(false);
     const activeDurationRef = useRef(0);
     const saveToastTranslateY = useRef(new RNAnimated.Value(-70)).current;
@@ -263,51 +253,8 @@ export const FeedManager = ({
             });
         }, 2000);
     }, [saveToastOpacity, saveToastTranslateY]);
-    const closeWebView = useCallback(() => {
-        if (isWebViewClosingRef.current) {
-            return;
-        }
-        isWebViewClosingRef.current = true;
-        RNAnimated.timing(webSheetTranslateY, {
-            toValue: SCREEN_HEIGHT,
-            duration: 180,
-            easing: Easing.out(Easing.quad),
-            useNativeDriver: true,
-        }).start(() => {
-            setWebViewVisible(false);
-            webSheetTranslateY.setValue(SCREEN_HEIGHT);
-            isWebViewClosingRef.current = false;
-        });
-    }, [webSheetTranslateY]);
-    const webSheetPanResponder = useRef(
-        PanResponder.create({
-            onStartShouldSetPanResponder: () => true,
-            onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 2,
-            onPanResponderMove: (_, gesture) => {
-                if (isWebViewClosingRef.current) {
-                    return;
-                }
-                if (gesture.dy > 0) {
-                    webSheetTranslateY.setValue(gesture.dy);
-                }
-            },
-            onPanResponderRelease: (_, gesture) => {
-                if (isWebViewClosingRef.current) {
-                    return;
-                }
-                if (gesture.dy > 120) {
-                    closeWebView();
-                    return;
-                }
-                RNAnimated.spring(webSheetTranslateY, {
-                    toValue: 0,
-                    useNativeDriver: true,
-                }).start();
-            },
-        })
-    ).current;
-
     const ITEM_HEIGHT = Dimensions.get('window').height;
+
 
     const videosRef = useRef(videos);
     useEffect(() => {
@@ -315,14 +262,7 @@ export const FeedManager = ({
     }, [videos]);
 
     useEffect(() => {
-        if (isWebViewVisible) {
-            webSheetTranslateY.setValue(0);
-            isWebViewClosingRef.current = false;
-        }
-    }, [isWebViewVisible, webSheetTranslateY]);
-
-    useEffect(() => {
-        if (isWebViewVisible) {
+        if (isInAppBrowserVisible) {
             const isPaused = useActiveVideoStore.getState().isPaused;
             wasPlayingBeforeWebViewRef.current = !isPaused;
             if (!isPaused) {
@@ -338,7 +278,7 @@ export const FeedManager = ({
             }
             wasPlayingBeforeWebViewRef.current = false;
         }
-    }, [isWebViewVisible, togglePause]);
+    }, [isInAppBrowserVisible, togglePause]);
 
     useEffect(() => {
         return () => {
@@ -347,18 +287,6 @@ export const FeedManager = ({
             }
         };
     }, []);
-
-    useEffect(() => {
-        const handleBackPress = () => {
-            if (isWebViewVisible) {
-                closeWebView();
-                return true;
-            }
-            return false;
-        };
-        const subscription = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
-        return () => subscription.remove();
-    }, [isWebViewVisible, closeWebView]);
 
     // Imperative StatusBar Control
     useFocusEffect(
@@ -519,13 +447,33 @@ export const FeedManager = ({
         }, 300);
     }, [togglePause]);
 
+    const showTapIndicator = useCallback((type: 'play' | 'pause') => {
+        if (tapIndicatorTimeoutRef.current) {
+            clearTimeout(tapIndicatorTimeoutRef.current);
+        }
+        setTapIndicator(type);
+        tapIndicatorTimeoutRef.current = setTimeout(() => {
+            setTapIndicator(null);
+        }, 1000);
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (tapIndicatorTimeoutRef.current) {
+                clearTimeout(tapIndicatorTimeoutRef.current);
+            }
+        };
+    }, []);
+
     const handleFeedTap = useCallback(() => {
         if (activeTab === 'stories') {
             handleCloseStoryBar();
         } else {
+            const wasPaused = useActiveVideoStore.getState().isPaused;
             togglePause();
+            showTapIndicator(wasPaused ? 'play' : 'pause');
         }
-    }, [activeTab, handleCloseStoryBar, togglePause]);
+    }, [activeTab, handleCloseStoryBar, togglePause, showTapIndicator]);
 
     const handleStoryAvatarPress = useCallback((userId: string) => {
         router.push(`/story/${userId}`);
@@ -548,9 +496,8 @@ export const FeedManager = ({
         }
 
         const url = rawUrl.match(/^https?:\/\//) ? rawUrl : `https://${rawUrl}`;
-        setWebViewUrl(url);
-        setWebViewVisible(true);
-    }, []);
+        openInAppBrowser(url);
+    }, [openInAppBrowser]);
 
     const handleDeletePress = useCallback(() => {
         if (!activeVideoId) return;
@@ -676,6 +623,7 @@ export const FeedManager = ({
                     isSeeking={isSeeking}
                     uiOpacityStyle={uiOpacityStyle}
                     isCleanScreen={isCleanScreen}
+                    tapIndicator={isActive ? tapIndicator : null}
                     currentUserId={currentUserId}
                     onDoubleTapLike={handleDoubleTapLike}
                     onFeedTap={handleFeedTap}
@@ -695,7 +643,29 @@ export const FeedManager = ({
                 />
             );
         },
-        [activeVideoId, isAppActive, isMuted, isSeeking, currentUserId, isCleanScreen, handlePressIn, handlePressOut, handleVideoEnd, handleLongPress, handleProgressUpdate]
+        [
+            activeVideoId,
+            isAppActive,
+            isMuted,
+            isSeeking,
+            currentUserId,
+            isCleanScreen,
+            tapIndicator,
+            handlePressIn,
+            handlePressOut,
+            handleVideoEnd,
+            handleLongPress,
+            handleProgressUpdate,
+            handleFeedTap,
+            handleOpenDescription,
+            handleOpenShopping,
+            handleRemoveVideo,
+            handleSeekReady,
+            handleToggleSave,
+            handleSharePress,
+            toggleFollow,
+            toggleLike,
+        ]
     );
 
     const keyExtractor = useCallback((item: Video) => item.id, []);
@@ -913,41 +883,6 @@ export const FeedManager = ({
                     }}
                 />
 
-                {isWebViewVisible && (
-                    <View style={styles.webSheetOverlay}>
-                        <View style={styles.webSheetBackdrop}>
-                            <RNAnimated.View
-                                pointerEvents="none"
-                                style={[styles.webSheetBackdropOverlay, { opacity: webSheetBackdropOpacity }]}
-                            />
-                            <Pressable
-                                style={styles.webSheetBackdropPressable}
-                                onPress={closeWebView}
-                            />
-                            <RNAnimated.View
-                            style={[
-                                styles.webSheetContainer,
-                                { transform: [{ translateY: webSheetTranslateY }] },
-                            ]}
-                            >
-                                <View style={styles.webSheetDragArea} {...webSheetPanResponder.panHandlers}>
-                                    <View style={styles.webSheetHandle} />
-                                    <View style={styles.webSheetHeader}>
-                                        <View style={styles.webSheetClose} />
-                                    </View>
-                                </View>
-                                {webViewUrl && (
-                                    <WebView
-                                        source={{ uri: webViewUrl }}
-                                        startInLoadingState={true}
-                                        originWhitelist={['*']}
-                                        style={styles.webSheetWebView}
-                                    />
-                                )}
-                            </RNAnimated.View>
-                        </View>
-                    </View>
-                )}
             </View>
         </SwipeWrapper>
     );
@@ -974,63 +909,6 @@ const styles = StyleSheet.create({
     touchInterceptor: {
         ...StyleSheet.absoluteFillObject,
         zIndex: 999,
-        backgroundColor: 'transparent',
-    },
-    webSheetBackdrop: {
-        flex: 1,
-        justifyContent: 'flex-end',
-    },
-    webSheetOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        zIndex: 200,
-    },
-    webSheetBackdropOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0,0,0,0.4)',
-    },
-    webSheetBackdropPressable: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: '85%',
-    },
-    webSheetContainer: {
-        height: '85%',
-        backgroundColor: LIGHT_COLORS.background,
-        borderTopLeftRadius: 40,
-        borderTopRightRadius: 40,
-        overflow: 'hidden',
-    },
-    webSheetDragArea: {
-        backgroundColor: LIGHT_COLORS.background,
-    },
-    webSheetHandle: {
-        alignSelf: 'center',
-        width: 32,
-        height: 3,
-        borderRadius: 2,
-        backgroundColor: LIGHT_COLORS.black,
-        marginTop: 6,
-        marginBottom: 4,
-    },
-    webSheetHeader: {
-        height: 14,
-        paddingHorizontal: 12,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        borderBottomWidth: 1,
-        borderBottomColor: LIGHT_COLORS.border,
-        backgroundColor: LIGHT_COLORS.background,
-    },
-    webSheetClose: {
-        width: 44,
-        justifyContent: 'center',
-        alignItems: 'flex-start',
-    },
-    webSheetWebView: {
-        flex: 1,
         backgroundColor: 'transparent',
     },
     saveToast: {

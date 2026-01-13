@@ -10,6 +10,7 @@ import {
   RefreshControl,
   Dimensions,
   ActivityIndicator,
+  BackHandler,
 } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import Video from 'react-native-video';
@@ -19,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import { useAuthStore } from '../../src/presentation/store/useAuthStore';
 import { useDraftStore } from '../../src/presentation/store/useDraftStore';
+import { useInAppBrowserStore } from '../../src/presentation/store/useInAppBrowserStore';
 import { ProfileStats } from '../../src/presentation/components/profile/ProfileStats';
 import { SocialTags } from '../../src/presentation/components/profile/SocialTags';
 import { ClubsCollaboration } from '../../src/presentation/components/profile/ClubsCollaboration';
@@ -393,10 +395,20 @@ export default function ProfileScreen() {
   const bioSheetRef = useRef<BottomSheet>(null);
   const clubsSheetRef = useRef<BottomSheet>(null);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
-  const [settingsSection, setSettingsSection] = useState<'main' | 'actions' | 'deleted' | 'likes' | 'saved' | 'history' | 'archived' | 'notInterested' | 'interested' | 'accountHistory' | 'accountSettings' | 'notifications' | 'accountType' | 'inAppBrowser' | 'contentPreferences'>('main');
+  const [settingsSection, setSettingsSection] = useState<'main' | 'actions' | 'deleted' | 'likes' | 'saved' | 'history' | 'archived' | 'notInterested' | 'interested' | 'accountHistory' | 'accountSettings' | 'notifications' | 'accountType' | 'inAppBrowser' | 'browserHistory' | 'contentPreferences'>('main');
   const [activityVideos, setActivityVideos] = useState<VideoEntity[]>([]);
   const [isActivityLoading, setIsActivityLoading] = useState(false);
-  const [browserHistoryMode, setBrowserHistoryMode] = useState<'on' | 'off'>('on');
+  const [historyFilter, setHistoryFilter] = useState<'today' | 'yesterday' | 'last3' | 'last7' | 'last30'>('last7');
+  const [historyFilterOpen, setHistoryFilterOpen] = useState(false);
+  const [historySort, setHistorySort] = useState<'newest' | 'oldest' | 'az'>('newest');
+  const [historySortOpen, setHistorySortOpen] = useState(false);
+  const [historySelectionMode, setHistorySelectionMode] = useState(false);
+  const [selectedHistoryKeys, setSelectedHistoryKeys] = useState<string[]>([]);
+  const browserHistoryEnabled = useInAppBrowserStore((state) => state.historyEnabled);
+  const setBrowserHistoryEnabled = useInAppBrowserStore((state) => state.setHistoryEnabled);
+  const browserHistory = useInAppBrowserStore((state) => state.history);
+  const clearBrowserHistory = useInAppBrowserStore((state) => state.clearHistory);
+  const openInAppBrowserUrl = useInAppBrowserStore((state) => state.openUrl);
   const [settingsCopy, setSettingsCopy] = useState({
     title: 'Ayarlar ve kişisel araçlar',
     actionsHeader: 'Hareketler',
@@ -603,6 +615,55 @@ export default function ProfileScreen() {
     { label: settingsCopy.browserHistoryOptionOn, value: 'on' as const },
     { label: settingsCopy.browserHistoryOptionOff, value: 'off' as const },
   ];
+  const historyFilterOptions = [
+    { label: 'Bugün', value: 'today' as const },
+    { label: 'Dün', value: 'yesterday' as const },
+    { label: 'Son 3 gün', value: 'last3' as const },
+    { label: 'Son 1 hafta', value: 'last7' as const },
+    { label: 'Son 1 ay', value: 'last30' as const },
+  ];
+  const historySortOptions = [
+    { label: 'Yeni - Eski', value: 'newest' as const },
+    { label: 'Eski - Yeni', value: 'oldest' as const },
+    { label: 'A - Z', value: 'az' as const },
+  ];
+  const historyFilterLabel = historyFilterOptions.find((o) => o.value === historyFilter)?.label || 'Son 1 hafta';
+  const historySortLabel = historySortOptions.find((o) => o.value === historySort)?.label || 'Yeni - Eski';
+
+  const historyDayMs = 24 * 60 * 60 * 1000;
+  const startOfDay = (timestamp: number) => {
+    const date = new Date(timestamp);
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  };
+  const isSameDay = (a: number, b: number) => startOfDay(a) === startOfDay(b);
+  const getHistoryRange = (filter: typeof historyFilter) => {
+    const now = Date.now();
+    const todayStart = startOfDay(now);
+    if (filter === 'today') {
+      return { start: todayStart, end: now };
+    }
+    if (filter === 'yesterday') {
+      const yesterdayStart = startOfDay(now - historyDayMs);
+      return { start: yesterdayStart, end: todayStart - 1 };
+    }
+    if (filter === 'last3') {
+      return { start: startOfDay(now - historyDayMs * 2), end: now };
+    }
+    if (filter === 'last7') {
+      return { start: startOfDay(now - historyDayMs * 6), end: now };
+    }
+    return { start: startOfDay(now - historyDayMs * 29), end: now };
+  };
+  const getHistoryDateLabel = (timestamp: number) => {
+    const now = Date.now();
+    if (isSameDay(timestamp, now)) return 'Bugün';
+    if (isSameDay(timestamp, now - historyDayMs)) return 'Dün';
+    return new Date(timestamp).toLocaleDateString('tr-TR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+  };
 
   const openSettings = useCallback(() => {
     loadAdminConfig();
@@ -637,6 +698,10 @@ export default function ProfileScreen() {
     }
     if (settingsSection === 'inAppBrowser') {
       setSettingsSection('main');
+      return;
+    }
+    if (settingsSection === 'browserHistory') {
+      setSettingsSection('inAppBrowser');
       return;
     }
     if (settingsSection === 'contentPreferences') {
@@ -692,11 +757,41 @@ export default function ProfileScreen() {
     setSettingsSection('contentPreferences');
   }, []);
 
+  const openHistoryEntry = useCallback((url: string) => {
+    openInAppBrowserUrl(url);
+  }, [openInAppBrowserUrl]);
+
+  const toggleHistorySelection = useCallback((key: string) => {
+    setSelectedHistoryKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      const nextList = Array.from(next);
+      if (nextList.length === 0) {
+        setHistorySelectionMode(false);
+      }
+      return nextList;
+    });
+  }, []);
+
   useEffect(() => {
     const isOpen = isSettingsOpen;
     settingsTranslateX.value = withTiming(isOpen ? 0 : SCREEN_WIDTH, { duration: isOpen ? 220 : 180 });
     settingsBackdropOpacity.value = withTiming(isOpen ? 1 : 0, { duration: isOpen ? 220 : 180 });
   }, [isSettingsOpen, settingsTranslateX, settingsBackdropOpacity]);
+
+  useEffect(() => {
+    const onBackPress = () => {
+      if (!isSettingsOpen) return false;
+      closeSettings();
+      return true;
+    };
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
+  }, [isSettingsOpen, closeSettings]);
 
   const settingsPanelStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: settingsTranslateX.value }],
@@ -923,6 +1018,7 @@ export default function ProfileScreen() {
                                   settingsSection === 'accountHistory' ? settingsCopy.actionsItemAccountHistory :
                                     settingsSection === 'accountSettings' ? settingsCopy.accountSettingsLabel :
                                       settingsSection === 'notifications' ? settingsCopy.notificationsLabel :
+                                        settingsSection === 'browserHistory' ? settingsCopy.browserHistoryViewLabel :
                                           settingsSection === 'accountType' ? settingsCopy.accountSettingsItemType :
                                             settingsSection === 'inAppBrowser' ? settingsCopy.inAppBrowserLabel :
                                               settingsSection === 'contentPreferences' ? settingsCopy.contentPreferencesLabel :
@@ -1376,7 +1472,7 @@ export default function ProfileScreen() {
                   </View>
                   <View style={[styles.settingsSegmentGroup, { backgroundColor: settingsSegmentBg }]}>
                     {browserHistoryOptions.map((option) => {
-                      const isActive = browserHistoryMode === option.value;
+                      const isActive = browserHistoryEnabled ? option.value === 'on' : option.value === 'off';
                       return (
                         <TouchableOpacity
                           key={option.value}
@@ -1384,7 +1480,7 @@ export default function ProfileScreen() {
                             styles.settingsSegmentOption,
                             isActive && { backgroundColor: settingsSegmentActive },
                           ]}
-                          onPress={() => setBrowserHistoryMode(option.value)}
+                          onPress={() => setBrowserHistoryEnabled(option.value === 'on')}
                         >
                           <Text style={[styles.settingsSegmentText, { color: isActive ? settingsSegmentActiveText : settingsSegmentText }]}>
                             {option.label}
@@ -1397,7 +1493,7 @@ export default function ProfileScreen() {
 
                 <TouchableOpacity
                   style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
-                  onPress={() => {}}
+                  onPress={() => setSettingsSection('browserHistory')}
                 >
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
@@ -1410,7 +1506,7 @@ export default function ProfileScreen() {
 
                 <TouchableOpacity
                   style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
-                  onPress={() => {}}
+                  onPress={clearBrowserHistory}
                 >
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
@@ -1421,6 +1517,158 @@ export default function ProfileScreen() {
                   <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
               </>
+            ) : settingsSection === 'browserHistory' ? (
+              <View style={{ paddingTop: 6 }}>
+                <View style={styles.historyControlsRow}>
+                  <View style={styles.historyControl}>
+                    <TouchableOpacity
+                      style={[styles.historyControlButton, { borderColor: settingsItemBorderColor }]}
+                      onPress={() => {
+                        setHistoryFilterOpen((prev) => !prev);
+                        setHistorySortOpen(false);
+                      }}
+                    >
+                      <Text style={[styles.historyControlText, { color: textPrimary }]}>{historyFilterLabel}</Text>
+                      <Text style={[styles.historyControlChevron, { color: settingsChevronColor }]}>▾</Text>
+                    </TouchableOpacity>
+                    {historyFilterOpen && (
+                      <View style={[styles.historyControlMenu, { borderColor: settingsItemBorderColor, backgroundColor: bgContainer }]}>
+                        {historyFilterOptions.map((option) => {
+                          const isActive = historyFilter === option.value;
+                          return (
+                            <TouchableOpacity
+                              key={option.value}
+                              style={styles.historyControlOption}
+                              onPress={() => {
+                                setHistoryFilter(option.value);
+                                setHistoryFilterOpen(false);
+                              }}
+                            >
+                              <Text style={[styles.historyControlOptionText, { color: isActive ? '#FF3B30' : textPrimary }]}>
+                                {option.label}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    )}
+                  </View>
+                  <View style={styles.historyControl}>
+                    <TouchableOpacity
+                      style={[styles.historyControlButton, { borderColor: settingsItemBorderColor }]}
+                      onPress={() => {
+                        setHistorySortOpen((prev) => !prev);
+                        setHistoryFilterOpen(false);
+                      }}
+                    >
+                      <Text style={[styles.historyControlText, { color: textPrimary }]}>{historySortLabel}</Text>
+                      <Text style={[styles.historyControlChevron, { color: settingsChevronColor }]}>▾</Text>
+                    </TouchableOpacity>
+                    {historySortOpen && (
+                      <View style={[styles.historyControlMenu, { borderColor: settingsItemBorderColor, backgroundColor: bgContainer }]}>
+                        {historySortOptions.map((option) => {
+                          const isActive = historySort === option.value;
+                          return (
+                            <TouchableOpacity
+                              key={option.value}
+                              style={styles.historyControlOption}
+                              onPress={() => {
+                                setHistorySort(option.value);
+                                setHistorySortOpen(false);
+                              }}
+                            >
+                              <Text style={[styles.historyControlOptionText, { color: isActive ? '#FF3B30' : textPrimary }]}>
+                                {option.label}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                {(() => {
+                  const range = getHistoryRange(historyFilter);
+                  const filtered = browserHistory.filter(
+                    (entry) => entry.timestamp >= range.start && entry.timestamp <= range.end
+                  );
+                  if (filtered.length === 0) {
+                    return (
+                      <View style={{ padding: 20 }}>
+                        <Text style={[styles.settingsLabel, { color: textSecondary }]}>Geçmiş boş</Text>
+                      </View>
+                    );
+                  }
+
+                  const sorted = [...filtered].sort((a, b) => {
+                    if (historySort === 'newest') return b.timestamp - a.timestamp;
+                    if (historySort === 'oldest') return a.timestamp - b.timestamp;
+                    const aLabel = (a.title || a.url).toLowerCase();
+                    const bLabel = (b.title || b.url).toLowerCase();
+                    return aLabel.localeCompare(bLabel, 'tr');
+                  });
+                  const grouped: { label: string; entries: typeof sorted }[] = [];
+                  sorted.forEach((entry) => {
+                    const label = getHistoryDateLabel(entry.timestamp);
+                    const last = grouped[grouped.length - 1];
+                    if (!last || last.label !== label) {
+                      grouped.push({ label, entries: [entry] });
+                    } else {
+                      last.entries.push(entry);
+                    }
+                  });
+
+                  return grouped.map((group) => (
+                    <View key={group.label}>
+                      <Text style={[styles.historyDateLabel, { color: textSecondary }]}>
+                        {group.label}
+                      </Text>
+                      {group.entries.map((entry, idx) => (
+                        (() => {
+                          const entryKey = `${entry.url}-${entry.timestamp}-${idx}`;
+                          const isSelected = selectedHistoryKeys.includes(entryKey);
+                          return (
+                        <TouchableOpacity
+                          key={entryKey}
+                          style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor, paddingHorizontal: 20 }]}
+                          onPress={() => {
+                            if (historySelectionMode) {
+                              toggleHistorySelection(entryKey);
+                            } else {
+                              openHistoryEntry(entry.url);
+                            }
+                          }}
+                          onLongPress={() => {
+                            if (!historySelectionMode) {
+                              setHistorySelectionMode(true);
+                              setSelectedHistoryKeys([entryKey]);
+                              return;
+                            }
+                            toggleHistorySelection(entryKey);
+                          }}
+                        >
+                          <View style={styles.historyRow}>
+                            {historySelectionMode && (
+                              <View style={[styles.historySelectBox, isSelected && styles.historySelectBoxActive]} />
+                            )}
+                            <View style={styles.settingsInfo}>
+                            <Text style={[styles.settingsLabel, { color: textPrimary }]} numberOfLines={1}>
+                              {entry.title || entry.url}
+                            </Text>
+                            <Text style={[styles.settingsLabel, { color: textSecondary, fontSize: 12, marginTop: 4 }]} numberOfLines={1}>
+                              {entry.url}
+                            </Text>
+                            </View>
+                          </View>
+                        </TouchableOpacity>
+                          );
+                        })()
+                      ))}
+                    </View>
+                  ));
+                })()}
+              </View>
             ) : settingsSection === 'contentPreferences' ? (
               <View style={{ paddingTop: 10 }} />
             ) : settingsSection === 'deleted' ? (
@@ -1633,6 +1881,74 @@ const styles = StyleSheet.create({
   settingsSegmentText: {
     fontSize: 12,
     fontWeight: '400',
+  },
+  historyControlsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  historyControl: {
+    flex: 1,
+    position: 'relative',
+  },
+  historyControlButton: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(0,0,0,0.04)',
+  },
+  historyControlText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  historyControlChevron: {
+    fontSize: 12,
+  },
+  historyControlMenu: {
+    position: 'absolute',
+    top: 46,
+    left: 0,
+    right: 0,
+    borderWidth: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+    zIndex: 10,
+  },
+  historyControlOption: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  historyControlOptionText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  historyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  historySelectBox: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: '#9CA3AF',
+    marginRight: 10,
+  },
+  historySelectBoxActive: {
+    backgroundColor: '#FF3B30',
+    borderColor: '#FF3B30',
+  },
+  historyDateLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 6,
   },
   settingsChevron: {
     fontSize: 22,

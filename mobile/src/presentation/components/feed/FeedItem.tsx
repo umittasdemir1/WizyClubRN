@@ -22,6 +22,7 @@ interface FeedItemProps {
     isSeeking: boolean;
     uiOpacityStyle: any;
     isCleanScreen: boolean;
+    tapIndicator?: 'play' | 'pause' | null;
     onDoubleTapLike: (videoId: string) => void;
     onFeedTap: () => void;
     onSeekReady?: (seekFn: (time: number) => void) => void;
@@ -48,6 +49,7 @@ export const FeedItem = memo(function FeedItem({
     isSeeking,
     uiOpacityStyle,
     isCleanScreen,
+    tapIndicator,
     currentUserId,
     onDoubleTapLike,
     onFeedTap,
@@ -112,6 +114,7 @@ export const FeedItem = memo(function FeedItem({
                         onVideoEnd={onVideoEnd}
                         onProgressUpdate={isActive ? onProgressUpdate : undefined}
                         isCleanScreen={isCleanScreen}
+                        tapIndicator={tapIndicator}
                     />
                 </View>
             </DoubleTapLike>
@@ -157,7 +160,8 @@ export const FeedItem = memo(function FeedItem({
         prevProps.video.isLiked === nextProps.video.isLiked &&
         prevProps.video.isSaved === nextProps.video.isSaved &&
         prevProps.video.user.isFollowing === nextProps.video.user.isFollowing &&
-        prevProps.isCleanScreen === nextProps.isCleanScreen
+        prevProps.isCleanScreen === nextProps.isCleanScreen &&
+        prevProps.tapIndicator === nextProps.tapIndicator
     );
 });
 

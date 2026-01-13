@@ -1,5 +1,5 @@
 import '../src/utils/ignoreWarnings';
-import { Stack } from 'expo-router';
+import { Stack, useSegments } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
@@ -11,11 +11,13 @@ import { useThemeStore } from '../src/presentation/store/useThemeStore';
 import { useAuthStore } from '../src/presentation/store/useAuthStore';
 import { useDraftCleanup } from '../src/presentation/hooks/useDraftCleanup';
 import { SessionLogService } from '../src/core/services/SessionLogService';
+import { COLORS, LIGHT_COLORS } from '../src/core/constants';
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import * as NavigationBar from 'expo-navigation-bar';
 import { useKeepAwake } from 'expo-keep-awake';
 import Toast from 'react-native-toast-message';
+import { InAppBrowserOverlay } from '../src/presentation/components/shared/InAppBrowserOverlay';
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -23,6 +25,8 @@ SplashScreen.preventAutoHideAsync();
 function RootNavigator() {
     const isDark = useThemeStore((state) => state.isDark);
     const { user, isInitialized, initialize } = useAuthStore();
+    const segments = useSegments();
+    const isTabsRoute = segments[0] === '(tabs)';
 
     // Keep the screen awake during video playback/app usage
     useKeepAwake();
@@ -37,18 +41,20 @@ function RootNavigator() {
 
     // Configure Navigation Bar for Android
     useEffect(() => {
-        if (Platform.OS === 'android') {
+        if (Platform.OS === 'android' && !isTabsRoute) {
             const setupNav = async () => {
                 try {
-                    // Just set the button style, let Android 15 handle the color
+                    const navBackground = isDark ? COLORS.background : LIGHT_COLORS.background;
+                    await NavigationBar.setBackgroundColorAsync(navBackground);
                     await NavigationBar.setButtonStyleAsync(isDark ? 'light' : 'dark');
+                    await NavigationBar.setBorderColorAsync(navBackground);
                 } catch (e) {
                     console.warn('NavigationBar setup failed:', e);
                 }
             };
             setupNav();
         }
-    }, [isDark]);
+    }, [isDark, isTabsRoute]);
 
     useEffect(() => {
         if (isInitialized) {
@@ -103,6 +109,7 @@ export default function RootLayout() {
                 <SafeAreaProvider>
                     <BottomSheetModalProvider>
                         <RootNavigator />
+                        <InAppBrowserOverlay />
                         <Toast />
                     </BottomSheetModalProvider>
                 </SafeAreaProvider>
