@@ -30,7 +30,7 @@ import { PostsGrid } from '../../src/presentation/components/profile/PostsGrid';
 import { BioBottomSheet } from '../../src/presentation/components/profile/BioBottomSheet';
 import { ClubsBottomSheet } from '../../src/presentation/components/profile/ClubsBottomSheet';
 import { EditProfileSheet } from '../../src/presentation/components/profile/EditProfileSheet';
-import { Eye, X, Menu, SunMoon, ClockFading, Activity, ArrowLeft, EyeOff, CalendarDays, ImagePlay, Bookmark, Trash2, Heart, UserCog, Lock, Mail, Phone, ShieldAlert, Bell, ShieldBan, ShieldCheck, MessageSquare, User, Sparkles, Briefcase, BadgeCheck, BadgePlus, Globe, SlidersHorizontal } from 'lucide-react-native';
+import { Eye, X, Menu, SunMoon, ClockFading, Activity, ArrowLeft, EyeOff, CalendarDays, ImagePlay, Bookmark, Trash2, Heart, UserCog, Lock, Mail, Phone, ShieldAlert, Bell, ShieldBan, ShieldCheck, MessageSquare, User, Sparkles, Briefcase, BadgeCheck, BadgePlus, Globe, SlidersHorizontal, RectangleEllipsis, UserLock, UserX } from 'lucide-react-native';
 import BottomSheet from '@gorhom/bottom-sheet';
 import Svg, { Path, Circle } from 'react-native-svg';
 import Animated, {
@@ -162,10 +162,26 @@ export default function ProfileScreen() {
         themeOptionSystem: getString('profile.settings.themeOptionSystem') || prev.themeOptionSystem,
         actionsLabel: getString('profile.settings.actionsLabel') || prev.actionsLabel,
         accountSettingsLabel: getString('profile.settings.accountSettingsLabel') || prev.accountSettingsLabel,
+        accountSettingsHeroTitle: getString('profile.settings.accountSettingsHeroTitle') || prev.accountSettingsHeroTitle,
+        accountSettingsHeroText: getString('profile.settings.accountSettingsHeroText') || prev.accountSettingsHeroText,
+        accountSettingsNoticeText: getString('profile.settings.accountSettingsNoticeText') || prev.accountSettingsNoticeText,
+        accountSettingsNoticeLinkLabel: getString('profile.settings.accountSettingsNoticeLinkLabel') || prev.accountSettingsNoticeLinkLabel,
         notificationsLabel: getString('profile.settings.notificationsLabel') || prev.notificationsLabel,
+        notificationsHeroTitle: getString('profile.settings.notificationsHeroTitle') || prev.notificationsHeroTitle,
+        notificationsHeroText: getString('profile.settings.notificationsHeroText') || prev.notificationsHeroText,
+        notificationsNoticeText: getString('profile.settings.notificationsNoticeText') || prev.notificationsNoticeText,
         notificationsItemPush: getString('profile.settings.notificationsItem.push') || prev.notificationsItemPush,
         notificationsItemEmail: getString('profile.settings.notificationsItem.email') || prev.notificationsItemEmail,
         notificationsItemSms: getString('profile.settings.notificationsItem.sms') || prev.notificationsItemSms,
+        notificationsItemPushHelper: getString('profile.settings.notificationsItem.pushHelper') || prev.notificationsItemPushHelper,
+        notificationsItemEmailHelper: getString('profile.settings.notificationsItem.emailHelper') || prev.notificationsItemEmailHelper,
+        notificationsItemSmsHelper: getString('profile.settings.notificationsItem.smsHelper') || prev.notificationsItemSmsHelper,
+        inAppBrowserHeroTitle: getString('profile.settings.inAppBrowser.heroTitle') || prev.inAppBrowserHeroTitle,
+        inAppBrowserHeroText: getString('profile.settings.inAppBrowser.heroText') || prev.inAppBrowserHeroText,
+        inAppBrowserNoticeText: getString('profile.settings.inAppBrowser.noticeText') || prev.inAppBrowserNoticeText,
+        inAppBrowserHistoryToggleHelper: getString('profile.settings.inAppBrowser.history.toggleHelper') || prev.inAppBrowserHistoryToggleHelper,
+        inAppBrowserHistoryViewHelper: getString('profile.settings.inAppBrowser.history.viewHelper') || prev.inAppBrowserHistoryViewHelper,
+        inAppBrowserHistoryClearHelper: getString('profile.settings.inAppBrowser.history.clearHelper') || prev.inAppBrowserHistoryClearHelper,
         inAppBrowserLabel: getString('profile.settings.inAppBrowser.label') || prev.inAppBrowserLabel,
         browserHistoryLabel: getString('profile.settings.inAppBrowser.history.label') || prev.browserHistoryLabel,
         browserHistoryOptionOn: getString('profile.settings.inAppBrowser.history.optionOn') || prev.browserHistoryOptionOn,
@@ -176,14 +192,31 @@ export default function ProfileScreen() {
         accountSettingsItemPassword: getString('profile.settings.accountSettingsItem.password') || prev.accountSettingsItemPassword,
         accountSettingsItemEmail: getString('profile.settings.accountSettingsItem.email') || prev.accountSettingsItemEmail,
         accountSettingsItemPhone: getString('profile.settings.accountSettingsItem.phone') || prev.accountSettingsItemPhone,
+        accountSettingsItemTwoFactor: getString('profile.settings.accountSettingsItem.twoFactor') || prev.accountSettingsItemTwoFactor,
         accountSettingsItemStatus: getString('profile.settings.accountSettingsItem.status') || prev.accountSettingsItemStatus,
         accountSettingsItemBlocked: getString('profile.settings.accountSettingsItem.blocked') || prev.accountSettingsItemBlocked,
         accountSettingsItemMuted: getString('profile.settings.accountSettingsItem.muted') || prev.accountSettingsItemMuted,
         accountSettingsItemType: getString('profile.settings.accountSettingsItem.type') || prev.accountSettingsItemType,
+        accountSettingsItemPasswordHelper: getString('profile.settings.accountSettingsItem.passwordHelper') || prev.accountSettingsItemPasswordHelper,
+        accountSettingsItemEmailHelper: getString('profile.settings.accountSettingsItem.emailHelper') || prev.accountSettingsItemEmailHelper,
+        accountSettingsItemPhoneHelper: getString('profile.settings.accountSettingsItem.phoneHelper') || prev.accountSettingsItemPhoneHelper,
+        accountSettingsItemTwoFactorHelper: getString('profile.settings.accountSettingsItem.twoFactorHelper') || prev.accountSettingsItemTwoFactorHelper,
+        accountSettingsItemStatusHelper: getString('profile.settings.accountSettingsItem.statusHelper') || prev.accountSettingsItemStatusHelper,
+        accountSettingsItemBlockedHelper: getString('profile.settings.accountSettingsItem.blockedHelper') || prev.accountSettingsItemBlockedHelper,
+        accountSettingsItemMutedHelper: getString('profile.settings.accountSettingsItem.mutedHelper') || prev.accountSettingsItemMutedHelper,
+        accountSettingsItemTypeHelper: getString('profile.settings.accountSettingsItem.typeHelper') || prev.accountSettingsItemTypeHelper,
         accountTypeCreator: getString('profile.settings.accountType.creator') || prev.accountTypeCreator,
         accountTypeBranded: getString('profile.settings.accountType.branded') || prev.accountTypeBranded,
         accountTypeVerification: getString('profile.settings.accountType.verification') || prev.accountTypeVerification,
         accountTypeBadge: getString('profile.settings.accountType.badge') || prev.accountTypeBadge,
+        accountTypeCreatorHelper: getString('profile.settings.accountType.creatorHelper') || prev.accountTypeCreatorHelper,
+        accountTypeBrandedHelper: getString('profile.settings.accountType.brandedHelper') || prev.accountTypeBrandedHelper,
+        accountTypeVerificationHelper: getString('profile.settings.accountType.verificationHelper') || prev.accountTypeVerificationHelper,
+        accountTypeBadgeHelper: getString('profile.settings.accountType.badgeHelper') || prev.accountTypeBadgeHelper,
+        accountTypePause: getString('profile.settings.accountType.pause') || prev.accountTypePause,
+        accountTypeTerminate: getString('profile.settings.accountType.terminate') || prev.accountTypeTerminate,
+        accountTypePauseHelper: getString('profile.settings.accountType.pauseHelper') || prev.accountTypePauseHelper,
+        accountTypeTerminateHelper: getString('profile.settings.accountType.terminateHelper') || prev.accountTypeTerminateHelper,
         actionsHeroTitle: getString('profile.settings.actionsHeroTitle') || prev.actionsHeroTitle,
         actionsHeroText: getString('profile.settings.actionsHeroText') || prev.actionsHeroText,
         logoutLabel: getString('profile.settings.logoutLabel') || prev.logoutLabel,
@@ -196,6 +229,10 @@ export default function ProfileScreen() {
         actionsItemInterested: getString('profile.settings.actionsItem.interested') || prev.actionsItemInterested,
         actionsItemAccountHistory: getString('profile.settings.actionsItem.accountHistory') || prev.actionsItemAccountHistory,
         actionsItemWatchHistory: getString('profile.settings.actionsItem.watchHistory') || prev.actionsItemWatchHistory,
+        actionsItemNotInterestedHelper: getString('profile.settings.actionsItem.notInterestedHelper') || prev.actionsItemNotInterestedHelper,
+        actionsItemInterestedHelper: getString('profile.settings.actionsItem.interestedHelper') || prev.actionsItemInterestedHelper,
+        actionsItemAccountHistoryHelper: getString('profile.settings.actionsItem.accountHistoryHelper') || prev.actionsItemAccountHistoryHelper,
+        actionsItemWatchHistoryHelper: getString('profile.settings.actionsItem.watchHistoryHelper') || prev.actionsItemWatchHistoryHelper,
         interestedTopics: getString('profile.settings.interested.topics') || prev.interestedTopics,
         accountHistoryTitle: getString('profile.settings.accountHistory.title') || prev.accountHistoryTitle,
         accountHistoryDateLabel: getString('profile.settings.accountHistory.dateLabel') || prev.accountHistoryDateLabel,
@@ -419,10 +456,26 @@ export default function ProfileScreen() {
     themeOptionSystem: 'Cihaz',
     actionsLabel: 'Hareketler',
     accountSettingsLabel: 'Hesap ayarları',
+    accountSettingsHeroTitle: 'Hesap güvenliğin önemli',
+    accountSettingsHeroText: 'Giriş ve güvenlik ayarlarını kontrol edip güncelleyebilirsin',
+    accountSettingsNoticeText: 'Hesap güvenliğin, sağlığın ve uygulama erişiminde sorun yaşıyorsan, verilerinin izinsiz ele geçirildiğini ve paylaşıldığını düşünüyorsan, engellenen ve ya sessize alınan bir kullanıcıdan bildirimler almaya ve içerikler görmeye devam ediyorsan lütfen Güven Merkezi\'ni ziyaret et',
+    accountSettingsNoticeLinkLabel: 'Güven Merkezi',
     notificationsLabel: 'Bildirimler',
+    notificationsHeroTitle: 'Tercihlerini önemsiyoruz',
+    notificationsHeroText: 'Bildirim tercihlerini istediğin zaman değiştirebilirsin',
+    notificationsNoticeText: 'Tercihlerinize saygı duyar, istemediğiniz bildirimleri size göndermeyiz. Şeffaflık ilkemiz gereği sizi önemli güncellemeler hakkında bilgilendirmeye devam ederiz. Hesap güvenliğinizle ilgili bildirimler, bu tercihlerden bağımsız olarak her zaman size ulaşır.',
     notificationsItemPush: 'Anlık bildirimler',
     notificationsItemEmail: 'E-posta bildirimleri',
     notificationsItemSms: 'SMS bildirimleri',
+    notificationsItemPushHelper: 'Uygulama bildirimlerini tercihlerinize göre yönetebilirsiniz.',
+    notificationsItemEmailHelper: 'İstenmeyen e-postaları yönetebilir ve iletişim tercihlerinizi güncelleyebilirsiniz.',
+    notificationsItemSmsHelper: 'SMS bildirimlerini kontrol edebilir ve almak istemediklerinizi kapatabilirsiniz.',
+    inAppBrowserHeroTitle: 'Göz atma geçmişi sizin kontrolünüzde',
+    inAppBrowserHeroText: 'Geçmişinizi inceleyebilir, yönetebilir ve isterseniz temizleyebilirsiniz',
+    inAppBrowserNoticeText: 'Göz atma geçmişinizi 90 gün sonra siliyoruz.\nBu verileri size daha uygun içerikler ve reklamlar göstermek için kullanıyoruz.',
+    inAppBrowserHistoryToggleHelper: 'Tarayıcı geçmişinin kaydedilmesini Açık veya Kapalı olarak yönetebilirsiniz.\nVarsayılan ayar Açık’tır.',
+    inAppBrowserHistoryViewHelper: 'Göz atma geçmişinizi görüntüleyebilir ve daha sonra tekrar ziyaret edebilirsiniz.',
+    inAppBrowserHistoryClearHelper: 'Göz atma geçmişinizi tercihlerinize göre temizleyebilirsiniz.\nBu veriler temizlendikten sonra görüntülenmez ve kullanılmaz.',
     inAppBrowserLabel: 'Uygulama içi tarayıcı',
     browserHistoryLabel: 'Tarayıcı geçmişi',
     browserHistoryOptionOn: 'Açık',
@@ -433,14 +486,31 @@ export default function ProfileScreen() {
     accountSettingsItemPassword: 'Şifre',
     accountSettingsItemEmail: 'E-posta',
     accountSettingsItemPhone: 'Telefon numarası',
+    accountSettingsItemTwoFactor: 'İki adımlı doğrulama',
     accountSettingsItemStatus: 'Hesap durumu',
     accountSettingsItemBlocked: 'Engellenenler',
     accountSettingsItemMuted: 'Sessize alınanlar',
     accountSettingsItemType: 'Hesap türü',
+    accountSettingsItemPasswordHelper: 'Hesap şifreniz size özeldir. Güvenliğiniz için şifrenizi düzenli aralıklarla değiştirmenizi ve İki Adımlı Doğrulama’yı aktif etmenizi öneririz.',
+    accountSettingsItemEmailHelper: 'Hesabınızla ilişkili e-posta adresi giriş, bildirim ve güvenlik doğrulamaları için kullanılır. Güncel ve erişiminizin olduğu bir adres kullandığınızdan emin olun.',
+    accountSettingsItemPhoneHelper: 'Telefon numaranız hesap güvenliği, doğrulama ve önemli bilgilendirmeler için kullanılır. Güncel ve size ait bir numara kullandığınızdan emin olun.',
+    accountSettingsItemTwoFactorHelper: 'E-posta adresinizi veya telefon numaranızı iki adımlı doğrulama için kullanın.',
+    accountSettingsItemStatusHelper: 'Hesap durumunuzu buradan görüntüleyebilir ve hesabınızla ilgili önemli bilgilere erişebilirsiniz.',
+    accountSettingsItemBlockedHelper: 'Engellediğiniz hesapları buradan görüntüleyebilir ve dilediğiniz zaman engellemeyi kaldırabilirsiniz.',
+    accountSettingsItemMutedHelper: 'Sessize aldığınız hesapları buradan görüntüleyebilir ve dilediğiniz zaman sessize alma işlemini kaldırabilirsiniz.',
+    accountSettingsItemTypeHelper: 'Hesap türünüzü ve ilgili seçenekleri buradan yönetebilirsiniz.',
     accountTypeCreator: 'İçerik üreticisi ol',
     accountTypeBranded: 'Markalı içerik',
     accountTypeVerification: 'Doğrulama talep et',
     accountTypeBadge: 'Rozet için kaydol',
+    accountTypeCreatorHelper: 'İçerik üreticisi araçlarına erişmek için başvur.',
+    accountTypeBrandedHelper: 'Markalı içerik seçeneklerini ve işbirliklerini yönet.',
+    accountTypeVerificationHelper: 'Hesabını doğrulatmak için talep oluştur.',
+    accountTypeBadgeHelper: 'Rozet başvurunu tamamla ve süreci takip et.',
+    accountTypePause: 'Hesabına ara ver',
+    accountTypeTerminate: 'Hesabını sonlandır',
+    accountTypePauseHelper: 'Hesabını geçici olarak devre dışı bırakır. Dilediğinde tekrar devam edebilirsin.',
+    accountTypeTerminateHelper: 'Hesabını kalıcı olarak kapatır. Bu işlem geri alınamaz.',
     actionsHeroTitle: 'Hesap yönetimini tek bir yerde yapabilirsin',
     actionsHeroText: 'Tüm hesap hareketlerini incele ve yönet',
     logoutLabel: 'Çıkış Yap',
@@ -453,12 +523,25 @@ export default function ProfileScreen() {
     actionsItemInterested: 'İlgilendiklerin',
     actionsItemAccountHistory: 'Hesap geçmişi',
     actionsItemWatchHistory: 'İzleme geçmişi',
+    actionsItemNotInterestedHelper: 'İlgilenmediğini işaretlediğin içerikleri yönet.',
+    actionsItemInterestedHelper: 'İlgilendiğini işaretlediğin içerikleri burada gör.',
+    actionsItemAccountHistoryHelper: 'Hesap bilgilerini ve oluşturma tarihini görüntüle.',
+    actionsItemWatchHistoryHelper: 'İzlediğin içerikleri ve tekrar ziyaret ettiklerini gör.',
     interestedTopics: 'Müzik, Teknoloji, Yaşam, Spor, Eğlence, Seyahat',
     accountHistoryTitle: 'Hesap Bilgileri',
     accountHistoryDateLabel: 'Hesabın oluşturulma tarihi',
     accountHistoryEmailLabel: 'E-posta',
     accountHistoryIdLabel: 'Kullanıcı Kimliği (ID)',
   });
+  const accountSettingsNoticeText = settingsCopy.accountSettingsNoticeText || '';
+  const accountSettingsNoticeLinkLabel = settingsCopy.accountSettingsNoticeLinkLabel || 'Güven Merkezi';
+  const accountSettingsNoticeLinkIndex = accountSettingsNoticeText.indexOf(accountSettingsNoticeLinkLabel);
+  const accountSettingsNoticePrefix = accountSettingsNoticeLinkIndex >= 0
+    ? accountSettingsNoticeText.slice(0, accountSettingsNoticeLinkIndex)
+    : accountSettingsNoticeText;
+  const accountSettingsNoticeSuffix = accountSettingsNoticeLinkIndex >= 0
+    ? accountSettingsNoticeText.slice(accountSettingsNoticeLinkIndex + accountSettingsNoticeLinkLabel.length)
+    : '';
   const [settingsTitleOverrides, setSettingsTitleOverrides] = useState<Record<string, any>>({});
   const [settingsSectionTitleOverrides, setSettingsSectionTitleOverrides] = useState<Record<string, any>>({});
   const [settingsItemLabelOverrides, setSettingsItemLabelOverrides] = useState<Record<string, any>>({});
@@ -1215,6 +1298,9 @@ export default function ProfileScreen() {
                       <EyeOff size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
                       <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.actionsItemNotInterested}</Text>
                     </View>
+                    <Text style={[styles.settingsHintText, { color: textSecondary }, settingsHelperOverrides]}>
+                      {settingsCopy.actionsItemNotInterestedHelper}
+                    </Text>
                   </View>
                   <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
@@ -1228,6 +1314,9 @@ export default function ProfileScreen() {
                       <Eye size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
                       <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.actionsItemInterested}</Text>
                     </View>
+                    <Text style={[styles.settingsHintText, { color: textSecondary }, settingsHelperOverrides]}>
+                      {settingsCopy.actionsItemInterestedHelper}
+                    </Text>
                   </View>
                   <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
@@ -1241,6 +1330,9 @@ export default function ProfileScreen() {
                       <CalendarDays size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
                       <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.actionsItemAccountHistory}</Text>
                     </View>
+                    <Text style={[styles.settingsHintText, { color: textSecondary }, settingsHelperOverrides]}>
+                      {settingsCopy.actionsItemAccountHistoryHelper}
+                    </Text>
                   </View>
                   <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
@@ -1254,6 +1346,9 @@ export default function ProfileScreen() {
                       <ImagePlay size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
                       <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.actionsItemWatchHistory}</Text>
                     </View>
+                    <Text style={[styles.settingsHintText, { color: textSecondary }, settingsHelperOverrides]}>
+                      {settingsCopy.actionsItemWatchHistoryHelper}
+                    </Text>
                   </View>
                   <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
@@ -1266,7 +1361,7 @@ export default function ProfileScreen() {
                       <Trash2 size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
                       <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.deletedLabel}</Text>
                     </View>
-                    <Text style={[styles.settingsValue, { color: textSecondary }, settingsHelperOverrides]}>
+                    <Text style={[styles.settingsHintText, { color: textSecondary }, settingsHelperOverrides]}>
                       {settingsCopy.deletedHelper}
                     </Text>
                   </View>
@@ -1275,6 +1370,14 @@ export default function ProfileScreen() {
               </>
             ) : settingsSection === 'accountSettings' ? (
               <>
+                <View style={styles.settingsActionsHero}>
+                  <Text style={[styles.settingsActionsHeroTitle, { color: textPrimary }, settingsSectionTitleOverrides]}>
+                    {settingsCopy.accountSettingsHeroTitle}
+                  </Text>
+                  <Text style={[styles.settingsValue, styles.settingsActionsHeroText, { color: textSecondary }, settingsHelperOverrides]}>
+                    {settingsCopy.accountSettingsHeroText}
+                  </Text>
+                </View>
                 <TouchableOpacity
                   style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
                   onPress={() => {}}
@@ -1284,6 +1387,9 @@ export default function ProfileScreen() {
                       <Lock size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
                       <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.accountSettingsItemPassword}</Text>
                     </View>
+                    <Text style={[styles.settingsHintText, { color: textSecondary }, settingsHelperOverrides]}>
+                      {settingsCopy.accountSettingsItemPasswordHelper}
+                    </Text>
                   </View>
                   <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
@@ -1297,6 +1403,9 @@ export default function ProfileScreen() {
                       <Mail size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
                       <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.accountSettingsItemEmail}</Text>
                     </View>
+                    <Text style={[styles.settingsHintText, { color: textSecondary }, settingsHelperOverrides]}>
+                      {settingsCopy.accountSettingsItemEmailHelper}
+                    </Text>
                   </View>
                   <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
@@ -1310,6 +1419,25 @@ export default function ProfileScreen() {
                       <MessageSquare size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
                       <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.accountSettingsItemPhone}</Text>
                     </View>
+                    <Text style={[styles.settingsHintText, { color: textSecondary }, settingsHelperOverrides]}>
+                      {settingsCopy.accountSettingsItemPhoneHelper}
+                    </Text>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
+                  onPress={() => {}}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <RectangleEllipsis size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.accountSettingsItemTwoFactor}</Text>
+                    </View>
+                    <Text style={[styles.settingsHintText, { color: textSecondary }, settingsHelperOverrides]}>
+                      {settingsCopy.accountSettingsItemTwoFactorHelper}
+                    </Text>
                   </View>
                   <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
@@ -1323,6 +1451,9 @@ export default function ProfileScreen() {
                       <ShieldCheck size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
                       <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.accountSettingsItemStatus}</Text>
                     </View>
+                    <Text style={[styles.settingsHintText, { color: textSecondary }, settingsHelperOverrides]}>
+                      {settingsCopy.accountSettingsItemStatusHelper}
+                    </Text>
                   </View>
                   <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
@@ -1336,6 +1467,9 @@ export default function ProfileScreen() {
                       <ShieldBan size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
                       <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.accountSettingsItemBlocked}</Text>
                     </View>
+                    <Text style={[styles.settingsHintText, { color: textSecondary }, settingsHelperOverrides]}>
+                      {settingsCopy.accountSettingsItemBlockedHelper}
+                    </Text>
                   </View>
                   <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
@@ -1349,6 +1483,9 @@ export default function ProfileScreen() {
                       <ShieldAlert size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
                       <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.accountSettingsItemMuted}</Text>
                     </View>
+                    <Text style={[styles.settingsHintText, { color: textSecondary }, settingsHelperOverrides]}>
+                      {settingsCopy.accountSettingsItemMutedHelper}
+                    </Text>
                   </View>
                   <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
@@ -1362,12 +1499,70 @@ export default function ProfileScreen() {
                       <User size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
                       <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.accountSettingsItemType}</Text>
                     </View>
+                    <Text style={[styles.settingsHintText, { color: textSecondary }, settingsHelperOverrides]}>
+                      {settingsCopy.accountSettingsItemTypeHelper}
+                    </Text>
                   </View>
                   <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
+                  onPress={() => {}}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <UserLock size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.accountTypePause}</Text>
+                    </View>
+                    <Text style={[styles.settingsHintText, { color: textSecondary }, settingsHelperOverrides]}>
+                      {settingsCopy.accountTypePauseHelper}
+                    </Text>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
+                  onPress={() => {}}
+                >
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <UserX size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.accountTypeTerminate}</Text>
+                    </View>
+                    <Text style={[styles.settingsHintText, { color: textSecondary }, settingsHelperOverrides]}>
+                      {settingsCopy.accountTypeTerminateHelper}
+                    </Text>
+                  </View>
+                  <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
+                </TouchableOpacity>
+                <View style={styles.settingsActionsHero}>
+                  <Text style={[styles.settingsValue, styles.settingsActionsHeroText, { color: textSecondary }, settingsHelperOverrides]}>
+                    {accountSettingsNoticePrefix}
+                    {accountSettingsNoticeLinkIndex >= 0 ? (
+                      <Text
+                        style={styles.settingsLinkText}
+                        onPress={() => router.push('/security-center')}
+                        accessibilityRole="link"
+                        suppressHighlighting
+                      >
+                        {accountSettingsNoticeLinkLabel}
+                      </Text>
+                    ) : null}
+                    {accountSettingsNoticeSuffix}
+                  </Text>
+                </View>
               </>
             ) : settingsSection === 'notifications' ? (
               <>
+                <View style={styles.settingsActionsHero}>
+                  <Text style={[styles.settingsActionsHeroTitle, { color: textPrimary }, settingsSectionTitleOverrides]}>
+                    {settingsCopy.notificationsHeroTitle}
+                  </Text>
+                  <Text style={[styles.settingsValue, styles.settingsActionsHeroText, { color: textSecondary }, settingsHelperOverrides]}>
+                    {settingsCopy.notificationsHeroText}
+                  </Text>
+                </View>
                 <TouchableOpacity
                   style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
                   onPress={() => {}}
@@ -1377,6 +1572,9 @@ export default function ProfileScreen() {
                       <Bell size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
                       <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.notificationsItemPush}</Text>
                     </View>
+                    <Text style={[styles.settingsHintText, { color: textSecondary }, settingsHelperOverrides]}>
+                      {settingsCopy.notificationsItemPushHelper}
+                    </Text>
                   </View>
                   <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
@@ -1390,6 +1588,9 @@ export default function ProfileScreen() {
                       <Mail size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
                       <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.notificationsItemEmail}</Text>
                     </View>
+                    <Text style={[styles.settingsHintText, { color: textSecondary }, settingsHelperOverrides]}>
+                      {settingsCopy.notificationsItemEmailHelper}
+                    </Text>
                   </View>
                   <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
@@ -1403,9 +1604,17 @@ export default function ProfileScreen() {
                       <MessageSquare size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
                       <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.notificationsItemSms}</Text>
                     </View>
+                    <Text style={[styles.settingsHintText, { color: textSecondary }, settingsHelperOverrides]}>
+                      {settingsCopy.notificationsItemSmsHelper}
+                    </Text>
                   </View>
                   <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
+                <View style={styles.settingsActionsHero}>
+                  <Text style={[styles.settingsValue, styles.settingsActionsHeroText, { color: textSecondary }, settingsHelperOverrides]}>
+                    {settingsCopy.notificationsNoticeText}
+                  </Text>
+                </View>
               </>
             ) : settingsSection === 'accountType' ? (
               <>
@@ -1418,6 +1627,9 @@ export default function ProfileScreen() {
                       <Sparkles size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
                       <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.accountTypeCreator}</Text>
                     </View>
+                    <Text style={[styles.settingsHintText, { color: textSecondary }, settingsHelperOverrides]}>
+                      {settingsCopy.accountTypeCreatorHelper}
+                    </Text>
                   </View>
                   <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
@@ -1431,6 +1643,9 @@ export default function ProfileScreen() {
                       <Briefcase size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
                       <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.accountTypeBranded}</Text>
                     </View>
+                    <Text style={[styles.settingsHintText, { color: textSecondary }, settingsHelperOverrides]}>
+                      {settingsCopy.accountTypeBrandedHelper}
+                    </Text>
                   </View>
                   <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
@@ -1444,6 +1659,9 @@ export default function ProfileScreen() {
                       <BadgeCheck size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
                       <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.accountTypeVerification}</Text>
                     </View>
+                    <Text style={[styles.settingsHintText, { color: textSecondary }, settingsHelperOverrides]}>
+                      {settingsCopy.accountTypeVerificationHelper}
+                    </Text>
                   </View>
                   <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
@@ -1457,18 +1675,32 @@ export default function ProfileScreen() {
                       <BadgePlus size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
                       <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.accountTypeBadge}</Text>
                     </View>
+                    <Text style={[styles.settingsHintText, { color: textSecondary }, settingsHelperOverrides]}>
+                      {settingsCopy.accountTypeBadgeHelper}
+                    </Text>
                   </View>
                   <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
               </>
             ) : settingsSection === 'inAppBrowser' ? (
               <>
+                <View style={styles.settingsActionsHero}>
+                  <Text style={[styles.settingsActionsHeroTitle, { color: textPrimary }, settingsSectionTitleOverrides]}>
+                    {settingsCopy.inAppBrowserHeroTitle}
+                  </Text>
+                  <Text style={[styles.settingsValue, styles.settingsActionsHeroText, { color: textSecondary }, settingsHelperOverrides]}>
+                    {settingsCopy.inAppBrowserHeroText}
+                  </Text>
+                </View>
                 <View style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}>
                   <View style={styles.settingsInfo}>
                     <View style={styles.settingsLabelRow}>
                       <Globe size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
                       <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.browserHistoryLabel}</Text>
                     </View>
+                    <Text style={[styles.settingsHintText, { color: textSecondary }, settingsHelperOverrides]}>
+                      {settingsCopy.inAppBrowserHistoryToggleHelper}
+                    </Text>
                   </View>
                   <View style={[styles.settingsSegmentGroup, { backgroundColor: settingsSegmentBg }]}>
                     {browserHistoryOptions.map((option) => {
@@ -1500,6 +1732,9 @@ export default function ProfileScreen() {
                       <ClockFading size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
                       <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.browserHistoryViewLabel}</Text>
                     </View>
+                    <Text style={[styles.settingsHintText, { color: textSecondary }, settingsHelperOverrides]}>
+                      {settingsCopy.inAppBrowserHistoryViewHelper}
+                    </Text>
                   </View>
                   <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
@@ -1513,9 +1748,17 @@ export default function ProfileScreen() {
                       <Trash2 size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
                       <Text style={[styles.settingsLabel, styles.settingsLabelSub, { color: textPrimary, marginBottom: 0 }, settingsItemLabelOverrides]}>{settingsCopy.browserHistoryClearLabel}</Text>
                     </View>
+                    <Text style={[styles.settingsHintText, { color: textSecondary }, settingsHelperOverrides]}>
+                      {settingsCopy.inAppBrowserHistoryClearHelper}
+                    </Text>
                   </View>
                   <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
                 </TouchableOpacity>
+                <View style={styles.settingsActionsHero}>
+                  <Text style={[styles.settingsValue, styles.settingsActionsHeroText, { color: textSecondary }, settingsHelperOverrides]}>
+                    {settingsCopy.inAppBrowserNoticeText}
+                  </Text>
+                </View>
               </>
             ) : settingsSection === 'browserHistory' ? (
               <View style={{ paddingTop: 6 }}>
@@ -1850,6 +2093,17 @@ const styles = StyleSheet.create({
   settingsValue: {
     fontSize: 14,
     fontWeight: '400',
+  },
+  settingsHintText: {
+    fontSize: 11,
+    fontWeight: '300',
+    lineHeight: 15,
+    opacity: 0.68,
+    marginTop: 2,
+  },
+  settingsLinkText: {
+    color: '#1A73E8',
+    fontWeight: '500',
   },
   settingsActionsHero: {
     paddingVertical: 14,

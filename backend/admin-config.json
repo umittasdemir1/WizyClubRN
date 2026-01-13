@@ -515,6 +515,270 @@
       "group": "Profil > Metinler"
     },
     {
+      "key": "profile.settings.accountSettingsHeroTitle",
+      "label": "Hesap ayarları - Üst başlık",
+      "description": "Hesap ayarları sayfası üst başlığı",
+      "type": "text",
+      "value": "Hesap güvenliğin önemli",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.accountSettingsHeroText",
+      "label": "Hesap ayarları - Alt metin",
+      "description": "Hesap ayarları sayfası açıklama metni",
+      "type": "text",
+      "value": "Giriş ve güvenlik ayarlarını kontrol edip güncelleyebilirsin",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.accountSettingsNoticeText",
+      "label": "Hesap ayarları - Uyarı metni",
+      "description": "Hesap ayarları sayfası alt uyarı metni",
+      "type": "text",
+      "value": "Hesap güvenliğin, sağlığın ve uygulama erişiminde sorun yaşıyorsan, verilerinin izinsiz ele geçirildiğini ve paylaşıldığını düşünüyorsan, engellenen ve ya sessize alınan bir kullanıcıdan bildirimler almaya ve içerikler görmeye devam ediyorsan lütfen Güven Merkezi'ni ziyaret et",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.accountSettingsNoticeLinkLabel",
+      "label": "Hesap ayarları - Güven Merkezi etiket",
+      "description": "Hesap ayarları sayfası link metni",
+      "type": "text",
+      "value": "Güven Merkezi",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.accountSettingsItem.twoFactor",
+      "label": "Hesap ayarları - İki adımlı doğrulama",
+      "description": "Hesap ayarları menüsü item metni",
+      "type": "text",
+      "value": "İki adımlı doğrulama",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.accountSettingsItem.twoFactorHelper",
+      "label": "Hesap ayarları - İki adımlı doğrulama açıklaması",
+      "description": "Hesap ayarları menüsü item açıklama metni",
+      "type": "text",
+      "value": "E-posta adresinizi veya telefon numaranızı iki adımlı doğrulama için kullanın.",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.accountSettingsItem.passwordHelper",
+      "label": "Hesap ayarları - Şifre açıklaması",
+      "description": "Hesap ayarları menüsü item açıklama metni",
+      "type": "text",
+      "value": "Hesap şifreniz size özeldir. Güvenliğiniz için şifrenizi düzenli aralıklarla değiştirmenizi ve İki Adımlı Doğrulama’yı aktif etmenizi öneririz.",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.accountSettingsItem.emailHelper",
+      "label": "Hesap ayarları - E-posta açıklaması",
+      "description": "Hesap ayarları menüsü item açıklama metni",
+      "type": "text",
+      "value": "Hesabınızla ilişkili e-posta adresi giriş, bildirim ve güvenlik doğrulamaları için kullanılır. Güncel ve erişiminizin olduğu bir adres kullandığınızdan emin olun.",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.accountSettingsItem.phoneHelper",
+      "label": "Hesap ayarları - Telefon numarası açıklaması",
+      "description": "Hesap ayarları menüsü item açıklama metni",
+      "type": "text",
+      "value": "Telefon numaranız hesap güvenliği, doğrulama ve önemli bilgilendirmeler için kullanılır. Güncel ve size ait bir numara kullandığınızdan emin olun.",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.accountSettingsItem.statusHelper",
+      "label": "Hesap ayarları - Hesap durumu açıklaması",
+      "description": "Hesap ayarları menüsü item açıklama metni",
+      "type": "text",
+      "value": "Hesap durumunuzu buradan görüntüleyebilir ve hesabınızla ilgili önemli bilgilere erişebilirsiniz.",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.accountSettingsItem.blockedHelper",
+      "label": "Hesap ayarları - Engellenenler açıklaması",
+      "description": "Hesap ayarları menüsü item açıklama metni",
+      "type": "text",
+      "value": "Engellediğiniz hesapları buradan görüntüleyebilir ve dilediğiniz zaman engellemeyi kaldırabilirsiniz.",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.accountSettingsItem.mutedHelper",
+      "label": "Hesap ayarları - Sessize alınanlar açıklaması",
+      "description": "Hesap ayarları menüsü item açıklama metni",
+      "type": "text",
+      "value": "Sessize aldığınız hesapları buradan görüntüleyebilir ve dilediğiniz zaman sessize alma işlemini kaldırabilirsiniz.",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.accountSettingsItem.typeHelper",
+      "label": "Hesap ayarları - Hesap türü açıklaması",
+      "description": "Hesap ayarları menüsü item açıklama metni",
+      "type": "text",
+      "value": "Hesap türünüzü ve ilgili seçenekleri buradan yönetebilirsiniz.",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.accountType.pause",
+      "label": "Hesap türü - Hesabına ara ver",
+      "description": "Hesap türü menüsü item metni",
+      "type": "text",
+      "value": "Hesabına ara ver",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.accountType.creatorHelper",
+      "label": "Hesap türü - İçerik üreticisi açıklaması",
+      "description": "Hesap türü menüsü item açıklama metni",
+      "type": "text",
+      "value": "İçerik üreticisi araçlarına erişmek için başvur.",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.accountType.brandedHelper",
+      "label": "Hesap türü - Markalı içerik açıklaması",
+      "description": "Hesap türü menüsü item açıklama metni",
+      "type": "text",
+      "value": "Markalı içerik seçeneklerini ve işbirliklerini yönet.",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.accountType.verificationHelper",
+      "label": "Hesap türü - Doğrulama açıklaması",
+      "description": "Hesap türü menüsü item açıklama metni",
+      "type": "text",
+      "value": "Hesabını doğrulatmak için talep oluştur.",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.accountType.badgeHelper",
+      "label": "Hesap türü - Rozet açıklaması",
+      "description": "Hesap türü menüsü item açıklama metni",
+      "type": "text",
+      "value": "Rozet başvurunu tamamla ve süreci takip et.",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.accountType.pauseHelper",
+      "label": "Hesap türü - Hesabına ara ver açıklaması",
+      "description": "Hesap türü menüsü item açıklama metni",
+      "type": "text",
+      "value": "Hesabını geçici olarak devre dışı bırakır. Dilediğinde tekrar devam edebilirsin.",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.accountType.terminate",
+      "label": "Hesap türü - Hesabını sonlandır",
+      "description": "Hesap türü menüsü item metni",
+      "type": "text",
+      "value": "Hesabını sonlandır",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.accountType.terminateHelper",
+      "label": "Hesap türü - Hesabını sonlandır açıklaması",
+      "description": "Hesap türü menüsü item açıklama metni",
+      "type": "text",
+      "value": "Hesabını kalıcı olarak kapatır. Bu işlem geri alınamaz.",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.notificationsHeroTitle",
+      "label": "Bildirimler - Üst başlık",
+      "description": "Bildirimler sayfası üst başlığı",
+      "type": "text",
+      "value": "Tercihlerini önemsiyoruz",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.notificationsHeroText",
+      "label": "Bildirimler - Alt metin",
+      "description": "Bildirimler sayfası açıklama metni",
+      "type": "text",
+      "value": "Bildirim tercihlerini istediğin zaman değiştirebilirsin",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.notificationsNoticeText",
+      "label": "Bildirimler - Uyarı metni",
+      "description": "Bildirimler sayfası alt uyarı metni",
+      "type": "text",
+      "value": "Tercihlerinize saygı duyar, istemediğiniz bildirimleri size göndermeyiz. Şeffaflık ilkemiz gereği sizi önemli güncellemeler hakkında bilgilendirmeye devam ederiz. Hesap güvenliğinizle ilgili bildirimler, bu tercihlerden bağımsız olarak her zaman size ulaşır.",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.notificationsItem.pushHelper",
+      "label": "Bildirimler - Anlık bildirimler açıklaması",
+      "description": "Bildirimler menüsü item açıklama metni",
+      "type": "text",
+      "value": "Uygulama bildirimlerini tercihlerinize göre yönetebilirsiniz.",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.notificationsItem.emailHelper",
+      "label": "Bildirimler - E-posta bildirimleri açıklaması",
+      "description": "Bildirimler menüsü item açıklama metni",
+      "type": "text",
+      "value": "İstenmeyen e-postaları yönetebilir ve iletişim tercihlerinizi güncelleyebilirsiniz.",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.notificationsItem.smsHelper",
+      "label": "Bildirimler - SMS bildirimleri açıklaması",
+      "description": "Bildirimler menüsü item açıklama metni",
+      "type": "text",
+      "value": "SMS bildirimlerini kontrol edebilir ve almak istemediklerinizi kapatabilirsiniz.",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.inAppBrowser.heroTitle",
+      "label": "Uygulama içi tarayıcı - Üst başlık",
+      "description": "Uygulama içi tarayıcı sayfası üst başlığı",
+      "type": "text",
+      "value": "Göz atma geçmişi sizin kontrolünüzde",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.inAppBrowser.heroText",
+      "label": "Uygulama içi tarayıcı - Alt metin",
+      "description": "Uygulama içi tarayıcı sayfası açıklama metni",
+      "type": "text",
+      "value": "Geçmişinizi inceleyebilir, yönetebilir ve isterseniz temizleyebilirsiniz",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.inAppBrowser.noticeText",
+      "label": "Uygulama içi tarayıcı - Uyarı metni",
+      "description": "Uygulama içi tarayıcı sayfası alt uyarı metni",
+      "type": "text",
+      "value": "Göz atma geçmişinizi 90 gün sonra siliyoruz.\nBu verileri size daha uygun içerikler ve reklamlar göstermek için kullanıyoruz.",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.inAppBrowser.history.toggleHelper",
+      "label": "Uygulama içi tarayıcı - Geçmiş seçeneği açıklaması",
+      "description": "Tarayıcı geçmişi Açık/Kapalı açıklama metni",
+      "type": "text",
+      "value": "Tarayıcı geçmişinin kaydedilmesini Açık veya Kapalı olarak yönetebilirsiniz.\nVarsayılan ayar Açık’tır.",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.inAppBrowser.history.viewHelper",
+      "label": "Uygulama içi tarayıcı - Geçmişi gör açıklaması",
+      "description": "Tarayıcı geçmişini gör açıklama metni",
+      "type": "text",
+      "value": "Göz atma geçmişinizi görüntüleyebilir ve daha sonra tekrar ziyaret edebilirsiniz.",
+      "group": "Profil > Metinler"
+    },
+    {
+      "key": "profile.settings.inAppBrowser.history.clearHelper",
+      "label": "Uygulama içi tarayıcı - Geçmişi temizle açıklaması",
+      "description": "Tarayıcı geçmişini temizle açıklama metni",
+      "type": "text",
+      "value": "Göz atma geçmişinizi tercihlerinize göre temizleyebilirsiniz.\nBu veriler temizlendikten sonra görüntülenmez ve kullanılmaz.",
+      "group": "Profil > Metinler"
+    },
+    {
       "key": "profile.settings.logoutLabel",
       "label": "Profil ayar etiketi - Çıkış Yap",
       "description": "Çıkış yap seçeneği etiketi",
@@ -571,11 +835,27 @@
       "group": "Profil > Hareketler"
     },
     {
+      "key": "profile.settings.actionsItem.notInterestedHelper",
+      "label": "Hareketler - İlgilenmediklerin açıklaması",
+      "description": "Hareketler menüsü item açıklama metni",
+      "type": "text",
+      "value": "İlgilenmediğini işaretlediğin içerikleri yönet.",
+      "group": "Profil > Hareketler"
+    },
+    {
       "key": "profile.settings.actionsItem.interested",
       "label": "Hareketler - İlgilendiklerin",
       "description": "Hareketler menüsü item metni",
       "type": "text",
       "value": "İlgilendiklerin",
+      "group": "Profil > Hareketler"
+    },
+    {
+      "key": "profile.settings.actionsItem.interestedHelper",
+      "label": "Hareketler - İlgilendiklerin açıklaması",
+      "description": "Hareketler menüsü item açıklama metni",
+      "type": "text",
+      "value": "İlgilendiğini işaretlediğin içerikleri burada gör.",
       "group": "Profil > Hareketler"
     },
     {
@@ -587,11 +867,27 @@
       "group": "Profil > Hareketler"
     },
     {
+      "key": "profile.settings.actionsItem.accountHistoryHelper",
+      "label": "Hareketler - Hesap geçmişi açıklaması",
+      "description": "Hareketler menüsü item açıklama metni",
+      "type": "text",
+      "value": "Hesap bilgilerini ve oluşturma tarihini görüntüle.",
+      "group": "Profil > Hareketler"
+    },
+    {
       "key": "profile.settings.actionsItem.watchHistory",
       "label": "Hareketler - İzleme geçmişi",
       "description": "Hareketler menüsü item metni",
       "type": "text",
       "value": "İzleme geçmişi",
+      "group": "Profil > Hareketler"
+    },
+    {
+      "key": "profile.settings.actionsItem.watchHistoryHelper",
+      "label": "Hareketler - İzleme geçmişi açıklaması",
+      "description": "Hareketler menüsü item açıklama metni",
+      "type": "text",
+      "value": "İzlediğin içerikleri ve tekrar ziyaret ettiklerini gör.",
       "group": "Profil > Hareketler"
     }
   ]
