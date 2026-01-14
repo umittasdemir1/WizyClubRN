@@ -337,7 +337,7 @@ export function UploadModal({ isVisible, onClose, initialAssets, uploadMode = 'v
                         </View>
                         <View style={styles.headerCenter}>
                             <Text style={[styles.headerTitle, { color: textColor }]}>
-                                {uploadMode === 'story' ? 'Yeni Hikaye' : 'Yeni Video'}
+                                {uploadMode === 'story' ? 'Yeni Hikaye' : 'Yeni Gönderi'}
                             </Text>
                         </View>
                         <View style={styles.headerRight} />
@@ -633,7 +633,7 @@ const styles = StyleSheet.create({
         flexGrow: 0,
     },
     previewScrollContent: {
-        paddingHorizontal: (SCREEN_WIDTH - (SCREEN_WIDTH * 0.5)) / 2,
+        paddingHorizontal: (SCREEN_WIDTH - (SCREEN_WIDTH * 0.7)) / 2,
         alignItems: 'center',
     },
     carouselIndicator: {
@@ -689,7 +689,7 @@ const styles = StyleSheet.create({
         paddingVertical: 20,
     },
     previewContainer: {
-        width: SCREEN_WIDTH * 0.5,
+        width: SCREEN_WIDTH * 0.7,
         aspectRatio: 9 / 16,
         borderRadius: 16,
         overflow: 'hidden',
