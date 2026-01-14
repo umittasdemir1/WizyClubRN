@@ -521,10 +521,10 @@ const styles = StyleSheet.create({
     galleryButton: {
         width: 56,
         height: 56,
-        borderRadius: 6,
+        borderRadius: 8,
         overflow: 'hidden',
         borderWidth: 1,
-        borderColor: '#FFFFFF',
+        borderColor: '#9E9E9E',
         zIndex: 999,
         transform: [{ translateY: -5 }],
     },
