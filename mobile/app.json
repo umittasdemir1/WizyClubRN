@@ -16,7 +16,8 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.anonymous.wizyclup"
+      "package": "com.anonymous.wizyclup",
+      "edgeToEdgeEnabled": false
     },
     "web": {
       "bundler": "metro",
@@ -52,14 +53,22 @@
         }
       ],
       "expo-secure-store",
-      "expo-video",
-      "expo-font",
       "expo-web-browser",
+      "react-native-compressor",
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "$(PRODUCT_NAME) needs access to your camera.",
+          "enableMicrophonePermission": true,
+          "microphonePermissionText": "$(PRODUCT_NAME) needs access to your microphone."
+        }
+      ],
       [
         "expo-navigation-bar",
         {
-          "appearance": "light",
-          "backgroundColor": "#181818"
+          "position": "absolute",
+          "visibility": "visible",
+          "behavior": "overlay-swipe"
         }
       ]
     ],

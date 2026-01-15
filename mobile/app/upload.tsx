@@ -6,7 +6,9 @@ import {
     Pressable,
     Image,
     Dimensions,
-    ScrollView,
+    FlatList,
+    NativeSyntheticEvent,
+    NativeScrollEvent,
 } from 'react-native';
 import { CameraView, CameraType, FlashMode, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
@@ -24,7 +26,8 @@ const MODES = ['HİKAYE', 'GÖNDERİ', 'TASLAK'];
 export default function CameraScreen() {
     const insets = useSafeAreaInsets();
     const cameraRef = useRef<any>(null);
-    const modeScrollRef = useRef<ScrollView>(null);
+    const modeScrollRef = useRef<FlatList<string>>(null);
+    const isProgrammaticScroll = useRef(false);
 
     const [facing, setFacing] = useState<CameraType>('back');
     const [flash, setFlash] = useState<FlashMode>('off');
@@ -83,12 +86,13 @@ export default function CameraScreen() {
 
         const selectedIndex = MODES.indexOf(selectedMode);
         if (selectedIndex >= 0) {
-            modeScrollRef.current?.scrollTo({ x: offsets[selectedIndex], animated: false });
+            modeScrollRef.current?.scrollToOffset({ offset: offsets[selectedIndex], animated: false });
         }
     }, [modeLayouts, modeContainerWidth, selectedMode]);
 
     const snapModeToCenter = (scrollX: number) => {
-        if (!modeContainerWidth) return;
+        if (!modeContainerWidth || Object.keys(modeLayouts).length === 0) return;
+
         let closestMode = selectedMode;
         let closestDistance = Number.POSITIVE_INFINITY;
         const centerX = scrollX + modeContainerWidth / 2;
@@ -102,6 +106,7 @@ export default function CameraScreen() {
             }
         });
 
+        // Only update state, let snapToOffsets handle positioning
         if (closestMode !== selectedMode) {
             setSelectedMode(closestMode);
         }
@@ -225,31 +230,31 @@ export default function CameraScreen() {
                         flash={flash}
                     >
                         {/* Top Header - Overlay on Camera */}
-                    <View style={[styles.topBar, { paddingTop: 12 }]}>
-                        <Pressable onPress={() => router.back()} style={[styles.iconButton, styles.topIconShiftLeft, styles.topBarLeft]}>
+                        <View style={[styles.topBar, { paddingTop: 12 }]}>
+                            <Pressable onPress={() => router.back()} style={[styles.iconButton, styles.topIconShiftLeft, styles.topBarLeft]}>
                                 <X color="#FFFFFF" size={32} strokeWidth={1.8} />
-                        </Pressable>
+                            </Pressable>
 
-                        <View style={styles.topBarCenter}>
-                            {isRecording && (
-                                <View style={styles.recordingIndicator}>
-                                    <View style={styles.recordingDot} />
-                                    <Text style={styles.recordingText}>Kaydediliyor</Text>
-                                </View>
-                            )}
-                            <Pressable onPress={toggleFlash} style={[styles.iconButton, styles.topIconShift]}>
-                                {flash === 'off' ? (
-                                    <ZapOff color="#FFFFFF" size={30} strokeWidth={2} fill="#FFFFFF" />
-                                ) : (
-                                    <Zap color="#FFD60A" size={30} strokeWidth={2} fill="#FFD60A" />
+                            <View style={styles.topBarCenter}>
+                                {isRecording && (
+                                    <View style={styles.recordingIndicator}>
+                                        <View style={styles.recordingDot} />
+                                        <Text style={styles.recordingText}>Kaydediliyor</Text>
+                                    </View>
                                 )}
+                                <Pressable onPress={toggleFlash} style={[styles.iconButton, styles.topIconShift]}>
+                                    {flash === 'off' ? (
+                                        <ZapOff color="#FFFFFF" size={30} strokeWidth={2} fill="#FFFFFF" />
+                                    ) : (
+                                        <Zap color="#FFD60A" size={30} strokeWidth={2} fill="#FFD60A" />
+                                    )}
+                                </Pressable>
+                            </View>
+
+                            <Pressable onPress={() => console.log('Settings')} style={[styles.iconButton, styles.topIconShiftRight, styles.topBarRight]}>
+                                <Cog color="#FFFFFF" size={30} strokeWidth={1.4} fill="none" />
                             </Pressable>
                         </View>
-
-                        <Pressable onPress={() => console.log('Settings')} style={[styles.iconButton, styles.topIconShiftRight, styles.topBarRight]}>
-                            <Cog color="#FFFFFF" size={30} strokeWidth={1.4} fill="none" />
-                        </Pressable>
-                    </View>
                     </CameraView>
                 </View>
             </View>
@@ -280,7 +285,7 @@ export default function CameraScreen() {
                     {/* Flip Camera */}
                     <View style={styles.sideSlot}>
                         <Pressable onPress={toggleCameraFacing} style={styles.flipButton}>
-                            <RefreshCcw color="#FFFFFF" size={32} strokeWidth={1.75} />
+                            <RefreshCcw color="#FFFFFF" size={32} strokeWidth={1.8} />
                         </Pressable>
                     </View>
                 </View>
@@ -288,48 +293,57 @@ export default function CameraScreen() {
                 {/* Mode Selector - Aligned with thumbnail top */}
                 <View
                     style={[styles.modeSelector, styles.modeSelectorOverlay, styles.modeSelectorShift]}
-                    onLayout={event => setModeContainerWidth(event.nativeEvent.layout.width)}
+                    onLayout={(event) => setModeContainerWidth(event.nativeEvent.layout.width)}
                 >
-                    <ScrollView
+                    <FlatList
                         ref={modeScrollRef}
+                        data={MODES}
                         horizontal
                         showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={[
-                            styles.modeScrollContent,
-                            { paddingHorizontal: Math.max(0, modeContainerWidth / 2 - 40) - 2 },
-                        ]}
-                        decelerationRate="fast"
-                        snapToOffsets={modeOffsets}
+                        keyExtractor={(item: string) => item}
+                        getItemLayout={(_, index) => ({
+                            length: 100,
+                            offset: 100 * index,
+                            index,
+                        })}
+                        contentContainerStyle={{
+                            paddingHorizontal: modeContainerWidth > 0 ? (modeContainerWidth - 100) / 2 : 50,
+                        }}
+                        snapToInterval={100}
                         snapToAlignment="start"
-                        onMomentumScrollEnd={event => snapModeToCenter(event.nativeEvent.contentOffset.x)}
-                    >
-                        {MODES.map((mode) => (
+                        decelerationRate="fast"
+                        onScroll={(event: NativeSyntheticEvent<NativeScrollEvent>) => {
+                            if (isProgrammaticScroll.current) return;
+                            const index = Math.round(event.nativeEvent.contentOffset.x / 100);
+                            const clampedIndex = Math.max(0, Math.min(index, MODES.length - 1));
+                            if (MODES[clampedIndex] !== selectedMode) {
+                                setSelectedMode(MODES[clampedIndex]);
+                            }
+                        }}
+                        scrollEventThrottle={16}
+                        renderItem={({ item, index }: { item: string; index: number }) => (
                             <Pressable
-                                key={mode}
                                 onPress={() => {
-                                    setSelectedMode(mode);
-                                    const layout = modeLayouts[mode];
-                                    if (!layout || !modeContainerWidth) return;
-                                    const targetX = Math.max(0, layout.x + layout.width / 2 - modeContainerWidth / 2);
-                                    modeScrollRef.current?.scrollTo({ x: targetX, animated: true });
+                                    isProgrammaticScroll.current = true;
+                                    setSelectedMode(item);
+                                    modeScrollRef.current?.scrollToIndex({ index, animated: true });
+                                    setTimeout(() => {
+                                        isProgrammaticScroll.current = false;
+                                    }, 300);
                                 }}
                                 style={styles.modeButton}
-                                onLayout={event => {
-                                    const { x, width } = event.nativeEvent.layout;
-                                    setModeLayouts(prev => ({ ...prev, [mode]: { x, width } }));
-                                }}
                             >
                                 <Text
                                     style={[
                                         styles.modeText,
-                                        selectedMode === mode ? styles.modeTextActive : styles.modeTextInactive,
+                                        selectedMode === item ? styles.modeTextActive : styles.modeTextInactive,
                                     ]}
                                 >
-                                    {mode}
+                                    {item}
                                 </Text>
                             </Pressable>
-                        ))}
-                    </ScrollView>
+                        )}
+                    />
                     <LinearGradient
                         pointerEvents="none"
                         colors={['#000000', 'rgba(0, 0, 0, 0)']}
@@ -456,8 +470,8 @@ const styles = StyleSheet.create({
     },
     modeSelectorOverlay: {
         position: 'absolute',
-        left: 108,
-        right: 108,
+        left: 90,
+        right: 90,
         top: 0,
         height: 28,
         justifyContent: 'center',
@@ -468,10 +482,10 @@ const styles = StyleSheet.create({
         transform: [{ translateY: 50 }],
     },
     modeButton: {
+        width: 100,
         paddingVertical: 0,
-        paddingHorizontal: 8,
-        marginHorizontal: 6,
         alignItems: 'center',
+        justifyContent: 'center',
     },
     modeText: {
         color: 'rgba(255, 255, 255, 0.5)',
@@ -479,7 +493,7 @@ const styles = StyleSheet.create({
         fontWeight: '500',
     },
     modeTextInactive: {
-        opacity: 0.6,
+        opacity: 0.8,
     },
     modeTextActive: {
         color: '#FFFFFF',
@@ -519,14 +533,14 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     galleryButton: {
-        width: 56,
-        height: 56,
-        borderRadius: 8,
+        width: 44,
+        height: 44,
+        borderRadius: 6,
         overflow: 'hidden',
         borderWidth: 1,
         borderColor: '#9E9E9E',
         zIndex: 999,
-        transform: [{ translateY: -5 }],
+        transform: [{ translateX: -20 }, { translateY: -15 }],
     },
     galleryPreview: {
         width: '100%',
@@ -567,7 +581,7 @@ const styles = StyleSheet.create({
         height: 44,
         justifyContent: 'center',
         alignItems: 'center',
-        transform: [{ translateY: -17.5 }],
+        transform: [{ translateX: 20 }, { translateY: -15 }],
     },
     recordingIndicator: {
         flexDirection: 'row',

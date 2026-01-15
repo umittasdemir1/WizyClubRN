@@ -5,7 +5,6 @@ import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import { useNotificationStore } from '../../src/presentation/store/useNotificationStore';
 import { COLORS, LIGHT_COLORS } from '../../src/core/constants';
 import { useEffect, useState } from 'react';
-import { useIsFocused } from '@react-navigation/native';
 import * as NavigationBar from 'expo-navigation-bar';
 
 // Import SVGs
@@ -47,7 +46,6 @@ function NotificationTabIcon({ color }: { color: string }) {
 export default function TabLayout() {
     const isDark = useThemeStore((state) => state.isDark);
     const insets = useSafeAreaInsets();
-    const isFocused = useIsFocused();
     const tabBarBackground = isDark ? COLORS.background : LIGHT_COLORS.background;
     const tabBarBorder = isDark ? COLORS.border : LIGHT_COLORS.border;
 
@@ -55,22 +53,17 @@ export default function TabLayout() {
         if (Platform.OS !== 'android') return;
         const syncNavigationBar = async () => {
             try {
-                if (isFocused) {
-                    await NavigationBar.setPositionAsync('absolute');
-                    await NavigationBar.setBackgroundColorAsync('#00000000');
-                    await NavigationBar.setBorderColorAsync('#00000000');
-                } else {
-                    await NavigationBar.setPositionAsync('relative');
-                    await NavigationBar.setBackgroundColorAsync(tabBarBackground);
-                    await NavigationBar.setBorderColorAsync(tabBarBackground);
-                }
+                // Edge-to-edge disabled: match footer color for seamless look
+                // Use same color for border to eliminate visible line between tab bar and nav bar
+                await NavigationBar.setBackgroundColorAsync(tabBarBackground);
                 await NavigationBar.setButtonStyleAsync(isDark ? 'light' : 'dark');
+                await NavigationBar.setBorderColorAsync(tabBarBackground); // Same as background = no visible border
             } catch (e) {
                 console.warn('NavigationBar sync failed:', e);
             }
         };
         syncNavigationBar();
-    }, [isDark, isFocused, tabBarBackground]);
+    }, [isDark]);
 
     return (
         <Tabs

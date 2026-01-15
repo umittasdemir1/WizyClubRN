@@ -6,6 +6,7 @@ import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { ThemeProvider } from '../src/presentation/contexts/ThemeContext';
 import '../global.css';
 import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
 
 import { useThemeStore } from '../src/presentation/store/useThemeStore';
 import { useAuthStore } from '../src/presentation/store/useAuthStore';
@@ -103,8 +104,11 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
+    const isDark = useThemeStore((state) => state.isDark);
+
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
+            <StatusBar style={isDark ? 'light' : 'dark'} backgroundColor="transparent" translucent />
             <ThemeProvider>
                 <SafeAreaProvider>
                     <BottomSheetModalProvider>
