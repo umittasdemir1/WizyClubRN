@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   SafeAreaView,
-  StatusBar,
   Alert,
   ScrollView,
 } from 'react-native';
@@ -77,11 +76,6 @@ export default function DraftsScreen() {
         }}
       />
       <SafeAreaView style={[styles.container, { backgroundColor: bgColor }]}>
-        <StatusBar
-          barStyle={isDark ? 'light-content' : 'dark-content'}
-          backgroundColor={bgColor}
-        />
-
         <ScrollView style={styles.content}>
           <DraftsGrid
             drafts={drafts}

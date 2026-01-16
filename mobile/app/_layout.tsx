@@ -14,8 +14,6 @@ import { useDraftCleanup } from '../src/presentation/hooks/useDraftCleanup';
 import { SessionLogService } from '../src/core/services/SessionLogService';
 import { COLORS, LIGHT_COLORS } from '../src/core/constants';
 import { useEffect } from 'react';
-import { Platform } from 'react-native';
-import * as NavigationBar from 'expo-navigation-bar';
 import { useKeepAwake } from 'expo-keep-awake';
 import Toast from 'react-native-toast-message';
 import { InAppBrowserOverlay } from '../src/presentation/components/shared/InAppBrowserOverlay';
@@ -40,22 +38,7 @@ function RootNavigator() {
         initialize();
     }, []);
 
-    // Configure Navigation Bar for Android
-    useEffect(() => {
-        if (Platform.OS === 'android' && !isTabsRoute) {
-            const setupNav = async () => {
-                try {
-                    const navBackground = isDark ? COLORS.background : LIGHT_COLORS.background;
-                    await NavigationBar.setBackgroundColorAsync(navBackground);
-                    await NavigationBar.setButtonStyleAsync(isDark ? 'light' : 'dark');
-                    await NavigationBar.setBorderColorAsync(navBackground);
-                } catch (e) {
-                    console.warn('NavigationBar setup failed:', e);
-                }
-            };
-            setupNav();
-        }
-    }, [isDark, isTabsRoute]);
+    // NavigationBar styling handled by native edge-to-edge config
 
     useEffect(() => {
         if (isInitialized) {
@@ -105,10 +88,13 @@ function RootNavigator() {
 
 export default function RootLayout() {
     const isDark = useThemeStore((state) => state.isDark);
-
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
-            <StatusBar style={isDark ? 'light' : 'dark'} backgroundColor="transparent" translucent />
+            <StatusBar
+                style={isDark ? 'light' : 'dark'}
+                backgroundColor="transparent"
+                translucent
+            />
             <ThemeProvider>
                 <SafeAreaProvider>
                     <BottomSheetModalProvider>

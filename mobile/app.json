@@ -14,10 +14,19 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#000000"
       },
       "package": "com.anonymous.wizyclup",
-      "edgeToEdgeEnabled": false
+      "edgeToEdgeEnabled": true
+    },
+    "androidStatusBar": {
+      "backgroundColor": "#00000000",
+      "barStyle": "light-content",
+      "translucent": true
+    },
+    "androidNavigationBar": {
+      "backgroundColor": "#00000000",
+      "barStyle": "light-content"
     },
     "web": {
       "bundler": "metro",
@@ -32,7 +41,7 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#000000"
         }
       ],
       [
@@ -66,6 +75,7 @@
       [
         "expo-navigation-bar",
         {
+          "backgroundColor": "#00000000",
           "position": "absolute",
           "visibility": "visible",
           "behavior": "overlay-swipe"

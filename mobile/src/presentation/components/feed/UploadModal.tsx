@@ -12,8 +12,7 @@ import {
     Switch,
     ScrollView,
     Image,
-    Dimensions,
-    StatusBar as RNStatusBar
+    Dimensions
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Video, ResizeMode } from 'expo-av';
@@ -68,14 +67,6 @@ export function UploadModal({ isVisible, onClose, initialAssets, uploadMode = 'v
     const [currentTagInput, setCurrentTagInput] = useState('');
 
     const triggerStoryRefresh = useStoryStore(state => state.triggerRefresh);
-
-    // Set StatusBar when modal opens
-    useEffect(() => {
-        if (isVisible) {
-            RNStatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
-            RNStatusBar.setHidden(false, 'none'); // Show StatusBar
-        }
-    }, [isVisible, isDark]);
 
     // Sync with initialAssets when it changes
     useEffect(() => {

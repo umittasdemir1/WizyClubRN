@@ -1,5 +1,5 @@
-import { View, StyleSheet, ScrollView, StatusBar as RNStatusBar, RefreshControl, Text, Pressable, Dimensions, Modal } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { View, StyleSheet, ScrollView, RefreshControl, Text, Pressable, Dimensions, Modal } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { useCallback, useState, useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -216,13 +216,6 @@ export default function ExploreScreen() {
     const gridColumnWidth = (SCREEN_WIDTH - (gridPadding * 2) - (gridGap * 2)) / 3;
     const gridSmallHeight = gridColumnWidth;
     const gridLargeHeight = (gridSmallHeight * 2) + gridGap;
-
-    // Imperative StatusBar Control
-    useFocusEffect(
-        useCallback(() => {
-            RNStatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
-        }, [isDark])
-    );
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);

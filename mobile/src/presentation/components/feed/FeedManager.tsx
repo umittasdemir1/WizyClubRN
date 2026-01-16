@@ -40,7 +40,6 @@ import { useInAppBrowserStore } from '../../store/useInAppBrowserStore';
 import { useStoryViewer } from '../../hooks/useStoryViewer';
 import { COLORS } from '../../../core/constants';
 import React from 'react';
-import { StatusBar as RNStatusBar } from 'react-native';
 import { Bookmark } from 'lucide-react-native';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -287,13 +286,6 @@ export const FeedManager = ({
             }
         };
     }, []);
-
-    // Imperative StatusBar Control
-    useFocusEffect(
-        useCallback(() => {
-            RNStatusBar.setBarStyle('light-content', true);
-        }, [])
-    );
 
     const isScreenFocusedRef = useRef(false);
 

@@ -6,13 +6,12 @@ import {
   TouchableOpacity,
   ScrollView,
   Pressable,
-  StatusBar as RNStatusBar,
   RefreshControl,
   Dimensions,
 } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import Video from 'react-native-video';
-import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import { ProfileStats } from '../../src/presentation/components/profile/ProfileStats';
@@ -171,12 +170,6 @@ export default function UserProfileScreen() {
   const animatedHeaderStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: headerTranslateY.value }],
   }));
-
-  useFocusEffect(
-    useCallback(() => {
-      RNStatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
-    }, [isDark])
-  );
 
   const { toggleFollow: globalToggleFollow } = useSocialStore();
   const [isNotificationsOn, setIsNotificationsOn] = useState(false);

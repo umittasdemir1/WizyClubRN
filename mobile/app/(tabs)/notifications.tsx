@@ -1,5 +1,5 @@
-import { View, Text, StyleSheet, StatusBar as RNStatusBar, ScrollView, RefreshControl } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useCallback, useState, useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ShoppingBag, User, Heart, Bell } from 'lucide-react-native';
@@ -40,12 +40,6 @@ export default function NotificationsScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
     const bgBody = isDark ? COLORS.background : '#f9fafb';
-
-    useFocusEffect(
-        useCallback(() => {
-            RNStatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
-        }, [isDark])
-    );
 
     const pullToRefresh = useCallback(async () => {
         setRefreshing(true);

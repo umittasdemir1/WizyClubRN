@@ -1,11 +1,10 @@
 import { Tabs } from 'expo-router';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import { useNotificationStore } from '../../src/presentation/store/useNotificationStore';
 import { COLORS, LIGHT_COLORS } from '../../src/core/constants';
 import { useEffect, useState } from 'react';
-import * as NavigationBar from 'expo-navigation-bar';
 
 // Import SVGs
 import HomeIcon from '../../assets/icons/home.svg';
@@ -47,23 +46,8 @@ export default function TabLayout() {
     const isDark = useThemeStore((state) => state.isDark);
     const insets = useSafeAreaInsets();
     const tabBarBackground = isDark ? COLORS.background : LIGHT_COLORS.background;
-    const tabBarBorder = isDark ? COLORS.border : LIGHT_COLORS.border;
 
-    useEffect(() => {
-        if (Platform.OS !== 'android') return;
-        const syncNavigationBar = async () => {
-            try {
-                // Edge-to-edge disabled: match footer color for seamless look
-                // Use same color for border to eliminate visible line between tab bar and nav bar
-                await NavigationBar.setBackgroundColorAsync(tabBarBackground);
-                await NavigationBar.setButtonStyleAsync(isDark ? 'light' : 'dark');
-                await NavigationBar.setBorderColorAsync(tabBarBackground); // Same as background = no visible border
-            } catch (e) {
-                console.warn('NavigationBar sync failed:', e);
-            }
-        };
-        syncNavigationBar();
-    }, [isDark]);
+    // NavigationBar styling handled by native edge-to-edge config
 
     return (
         <Tabs
@@ -73,8 +57,8 @@ export default function TabLayout() {
                 lazy: false,
                 tabBarStyle: {
                     backgroundColor: tabBarBackground,
-                    borderTopWidth: 0.5,
-                    borderTopColor: tabBarBorder,
+                    borderTopWidth: 0,
+                    borderTopColor: tabBarBackground,
                     paddingTop: 8,
                     paddingBottom: insets.bottom + 2,
                     height: 50 + insets.bottom,
