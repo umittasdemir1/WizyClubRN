@@ -26,7 +26,8 @@
     },
     "androidNavigationBar": {
       "backgroundColor": "#00000000",
-      "barStyle": "light-content"
+      "barStyle": "light-content",
+      "enforceContrast": false
     },
     "web": {
       "bundler": "metro",
@@ -56,6 +57,15 @@
         }
       ],
       [
+        "react-native-edge-to-edge",
+        {
+          "android": {
+            "parentTheme": "Default",
+            "enforceNavigationBarContrast": false
+          }
+        }
+      ],
+      [
         "expo-tracking-transparency",
         {
           "userTrackingPermission": "Sana özel içerik önermek için izin gerekiyor"
@@ -70,15 +80,6 @@
           "cameraPermissionText": "$(PRODUCT_NAME) needs access to your camera.",
           "enableMicrophonePermission": true,
           "microphonePermissionText": "$(PRODUCT_NAME) needs access to your microphone."
-        }
-      ],
-      [
-        "expo-navigation-bar",
-        {
-          "backgroundColor": "#00000000",
-          "position": "absolute",
-          "visibility": "visible",
-          "behavior": "overlay-swipe"
         }
       ]
     ],

@@ -1,0 +1,11 @@
+/.git
+/.github
+/backend
+/backups
+/maintenance_scripts
+/r2-mcp
+/ngrok
+/ngrok-*
+/Kontrol Edilecek md Dosyaları
+/BACKEND_SETUP_GUIDE.md
+/future_packages_analysis.md

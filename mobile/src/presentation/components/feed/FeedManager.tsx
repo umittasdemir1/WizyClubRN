@@ -40,6 +40,7 @@ import { useInAppBrowserStore } from '../../store/useInAppBrowserStore';
 import { useStoryViewer } from '../../hooks/useStoryViewer';
 import { COLORS } from '../../../core/constants';
 import React from 'react';
+import { SystemBars } from 'react-native-edge-to-edge';
 import { Bookmark } from 'lucide-react-native';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -286,6 +287,15 @@ export const FeedManager = ({
             }
         };
     }, []);
+
+    useFocusEffect(
+        useCallback(() => {
+            SystemBars.setStyle({
+                statusBar: 'light',
+                navigationBar: 'light',
+            });
+        }, [])
+    );
 
     const isScreenFocusedRef = useRef(false);
 

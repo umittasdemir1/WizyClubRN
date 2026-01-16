@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState, useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ShoppingBag, User, Heart, Bell } from 'lucide-react-native';
@@ -8,6 +8,7 @@ import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import { useNotificationStore } from '../../src/presentation/store/useNotificationStore';
 import { COLORS } from '../../src/core/constants';
 import { TrendingHeader } from '../../src/presentation/components/explore/TrendingHeader';
+import { SystemBars } from 'react-native-edge-to-edge';
 
 interface Notification {
     id: string;
@@ -40,6 +41,15 @@ export default function NotificationsScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
     const bgBody = isDark ? COLORS.background : '#f9fafb';
+
+    useFocusEffect(
+        useCallback(() => {
+            SystemBars.setStyle({
+                statusBar: isDark ? 'light' : 'dark',
+                navigationBar: isDark ? 'light' : 'dark',
+            });
+        }, [isDark])
+    );
 
     const pullToRefresh = useCallback(async () => {
         setRefreshing(true);

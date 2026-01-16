@@ -1,5 +1,5 @@
 import { View, StyleSheet, ScrollView, RefreshControl, Text, Pressable, Dimensions, Modal } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { useCallback, useState, useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,6 +29,7 @@ import { TrendingCarousel } from '../../src/presentation/components/explore/Tren
 import { MasonryFeed } from '../../src/presentation/components/explore/MasonryFeed';
 import { useActiveVideoStore } from '../../src/presentation/store/useActiveVideoStore';
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
+import { SystemBars } from 'react-native-edge-to-edge';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CATEGORIES = ['Senin İçin', 'Takip Edilen', 'Popüler'];
@@ -216,6 +217,15 @@ export default function ExploreScreen() {
     const gridColumnWidth = (SCREEN_WIDTH - (gridPadding * 2) - (gridGap * 2)) / 3;
     const gridSmallHeight = gridColumnWidth;
     const gridLargeHeight = (gridSmallHeight * 2) + gridGap;
+
+    useFocusEffect(
+        useCallback(() => {
+            SystemBars.setStyle({
+                statusBar: isDark ? 'light' : 'dark',
+                navigationBar: isDark ? 'light' : 'dark',
+            });
+        }, [isDark])
+    );
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);

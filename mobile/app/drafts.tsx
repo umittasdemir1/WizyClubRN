@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,8 @@ import {
   Alert,
   ScrollView,
 } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
+import { SystemBars } from 'react-native-edge-to-edge';
 import BottomSheet from '@gorhom/bottom-sheet';
 import { useThemeStore } from '../src/presentation/store/useThemeStore';
 import { useDraftStore } from '../src/presentation/store/useDraftStore';
@@ -34,6 +35,15 @@ export default function DraftsScreen() {
       fetchDrafts(user.id);
     }
   }, [user?.id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      SystemBars.setStyle({
+        statusBar: isDark ? 'light' : 'dark',
+        navigationBar: isDark ? 'light' : 'dark',
+      });
+    }, [isDark])
+  );
 
   const handleDraftPress = (draft: Draft) => {
     // TODO: Navigate to upload modal with draft data

@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import Video from 'react-native-video';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
+import { SystemBars } from 'react-native-edge-to-edge';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import { ProfileStats } from '../../src/presentation/components/profile/ProfileStats';
@@ -170,6 +171,15 @@ export default function UserProfileScreen() {
   const animatedHeaderStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: headerTranslateY.value }],
   }));
+
+  useFocusEffect(
+    useCallback(() => {
+      SystemBars.setStyle({
+        statusBar: isDark ? 'light' : 'dark',
+        navigationBar: isDark ? 'light' : 'dark',
+      });
+    }, [isDark])
+  );
 
   const { toggleFollow: globalToggleFollow } = useSocialStore();
   const [isNotificationsOn, setIsNotificationsOn] = useState(false);

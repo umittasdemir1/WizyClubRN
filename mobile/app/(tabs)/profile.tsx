@@ -28,6 +28,7 @@ import { BioBottomSheet } from '../../src/presentation/components/profile/BioBot
 import { ClubsBottomSheet } from '../../src/presentation/components/profile/ClubsBottomSheet';
 import { EditProfileSheet } from '../../src/presentation/components/profile/EditProfileSheet';
 import { Menu } from 'lucide-react-native';
+import { SystemBars } from 'react-native-edge-to-edge';
 import BottomSheet from '@gorhom/bottom-sheet';
 import Svg, { Path, Circle } from 'react-native-svg';
 import Animated, {
@@ -390,9 +391,13 @@ export default function ProfileScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      SystemBars.setStyle({
+        statusBar: isDark ? 'light' : 'dark',
+        navigationBar: isDark ? 'light' : 'dark',
+      });
       // Reload data when profile is focused
       refreshSavedVideos();
-    }, [refreshSavedVideos])
+    }, [isDark, refreshSavedVideos])
   );
 
   // Collapsible Header Logic

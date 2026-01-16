@@ -6,8 +6,7 @@ import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { ThemeProvider } from '../src/presentation/contexts/ThemeContext';
 import '../global.css';
 import * as SplashScreen from 'expo-splash-screen';
-import { StatusBar } from 'expo-status-bar';
-
+import { SystemBars } from 'react-native-edge-to-edge';
 import { useThemeStore } from '../src/presentation/store/useThemeStore';
 import { useAuthStore } from '../src/presentation/store/useAuthStore';
 import { useDraftCleanup } from '../src/presentation/hooks/useDraftCleanup';
@@ -37,8 +36,6 @@ function RootNavigator() {
         // Initialize auth state on app start
         initialize();
     }, []);
-
-    // NavigationBar styling handled by native edge-to-edge config
 
     useEffect(() => {
         if (isInitialized) {
@@ -90,10 +87,11 @@ export default function RootLayout() {
     const isDark = useThemeStore((state) => state.isDark);
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
-            <StatusBar
-                style={isDark ? 'light' : 'dark'}
-                backgroundColor="transparent"
-                translucent
+            <SystemBars
+                style={{
+                    statusBar: isDark ? 'light' : 'dark',
+                    navigationBar: isDark ? 'light' : 'dark',
+                }}
             />
             <ThemeProvider>
                 <SafeAreaProvider>

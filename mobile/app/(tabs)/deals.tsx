@@ -2,7 +2,8 @@ import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCallback, useState } from 'react';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { SystemBars } from 'react-native-edge-to-edge';
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
 import { Search } from 'lucide-react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
@@ -26,6 +27,15 @@ export default function DealsScreen() {
     const isDark = useThemeStore((state) => state.isDark);
     const bgBody = isDark ? COLORS.background : '#FFFFFF';
     const textColor = isDark ? '#FFFFFF' : '#111827';
+
+    useFocusEffect(
+        useCallback(() => {
+            SystemBars.setStyle({
+                statusBar: isDark ? 'light' : 'dark',
+                navigationBar: isDark ? 'light' : 'dark',
+            });
+        }, [isDark])
+    );
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);

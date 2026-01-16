@@ -14,7 +14,8 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "APP_VARIANT": "preview"
+        "APP_VARIANT": "preview",
+        "npm_config_legacy_peer_deps": "true"
       }
     },
     "production": {

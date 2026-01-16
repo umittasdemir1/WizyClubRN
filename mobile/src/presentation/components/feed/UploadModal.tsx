@@ -12,7 +12,7 @@ import {
     Switch,
     ScrollView,
     Image,
-    Dimensions
+    Dimensions,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Video, ResizeMode } from 'expo-av';
@@ -26,6 +26,7 @@ import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
 import { CONFIG } from '../../../core/config';
 import { router } from 'expo-router';
 import { useStoryStore } from '../../store/useStoryStore';
+import { SystemBars } from 'react-native-edge-to-edge';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -67,6 +68,16 @@ export function UploadModal({ isVisible, onClose, initialAssets, uploadMode = 'v
     const [currentTagInput, setCurrentTagInput] = useState('');
 
     const triggerStoryRefresh = useStoryStore(state => state.triggerRefresh);
+
+    useEffect(() => {
+        if (isVisible) {
+            SystemBars.setStyle({
+                statusBar: isDark ? 'light' : 'dark',
+                navigationBar: isDark ? 'light' : 'dark',
+            });
+            SystemBars.setHidden({ statusBar: false, navigationBar: false });
+        }
+    }, [isVisible, isDark]);
 
     // Sync with initialAssets when it changes
     useEffect(() => {
