@@ -12,6 +12,7 @@ import { Image } from 'expo-image';
 import { useActiveVideoStore } from '../store/useActiveVideoStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useSocialStore } from '../store/useSocialStore';
+import { useStartupStore, initStartupTimer } from '../store/useStartupStore';
 
 // Interfaces
 interface UseVideoFeedReturn {
@@ -68,7 +69,10 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
     // Initialize Cache
     useEffect(() => {
         VideoCacheService.initialize();
+        initStartupTimer();
     }, []);
+
+    const isStartupComplete = useStartupStore((state) => state.isStartupComplete);
 
     // ============================================
     // PREFETCH MECHANISM (TikTok-style)
@@ -77,6 +81,8 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
     // 1. Initial Prefetch: When feed loads, prefetch first 3 videos
     const hasInitialPrefetched = useRef(false);
     useEffect(() => {
+        if (!isStartupComplete) return; // Startup penceresi bitene kadar bekle
+
         if (videos.length > 0 && !hasInitialPrefetched.current) {
             hasInitialPrefetched.current = true;
             console.log('[Prefetch] 🚀 Initial prefetch starting...');
@@ -92,7 +98,7 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
                 }
             });
         }
-    }, [videos.length]); // Fixed: Use videos.length instead of boolean expression
+    }, [videos.length, isStartupComplete]);
 
     // 2. Scroll Prefetch: When user scrolls to new video, prefetch next 3 videos
     const lastPrefetchedIndex = useRef(-1);

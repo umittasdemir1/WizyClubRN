@@ -12,7 +12,7 @@
 
 import React, { useRef, useState, useCallback, useEffect, memo, useMemo } from 'react';
 import { View, StyleSheet, Dimensions } from 'react-native';
-import Video, { VideoRef, OnLoadData, OnProgressData, OnVideoErrorData } from 'react-native-video';
+import Video, { VideoRef, OnLoadData, OnProgressData, OnVideoErrorData, SelectedTrackType } from 'react-native-video';
 import { Video as VideoEntity } from '../../../domain/entities/Video';
 import { VideoCacheService } from '../../../data/services/VideoCacheService';
 import { Image } from 'expo-image';
@@ -217,6 +217,7 @@ export const VideoPlayerPool = memo(function VideoPlayerPool({
                     resizeMode={slot.resizeMode}
                     paused={!shouldPlay}
                     muted={isMuted}
+                    selectedAudioTrack={isMuted ? { type: SelectedTrackType.DISABLED } : undefined}
                     repeat={false}
                     bufferConfig={bufferConfig}
                     onLoad={(data) => handleLoad(slotIndex, data)}
@@ -226,6 +227,8 @@ export const VideoPlayerPool = memo(function VideoPlayerPool({
                     playInBackground={false}
                     playWhenInactive={false}
                     ignoreSilentSwitch="ignore"
+                    mixWithOthers={isMuted ? "mix" : undefined}
+                    disableFocus={isMuted}
                     progressUpdateInterval={100}
                 />
             </View>

@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback, memo } from 'react';
 import { StyleSheet, View, Text, Pressable, Platform, ActivityIndicator } from 'react-native';
-import Video, { OnProgressData, OnLoadData, VideoRef, OnVideoErrorData } from 'react-native-video';
+import Video, { OnProgressData, OnLoadData, VideoRef, OnVideoErrorData, SelectedTrackType } from 'react-native-video';
 import { Video as VideoEntity } from '../../../domain/entities/Video';
 import PlayIcon from '../../../../assets/icons/play.svg';
 import { useActiveVideoStore, saveVideoPosition, getVideoPosition, clearVideoPosition } from '../../store/useActiveVideoStore';
@@ -407,6 +407,7 @@ export const VideoLayer = memo(function VideoLayer({
                         controls={false}
                         paused={!shouldPlay}
                         muted={isMuted}
+                        selectedAudioTrack={isMuted ? { type: SelectedTrackType.DISABLED } : undefined}
                         rate={playbackRate}
                         bufferConfig={bufferConfig}
                         onLoad={handleLoad}
@@ -421,6 +422,8 @@ export const VideoLayer = memo(function VideoLayer({
                         playInBackground={false}
                         playWhenInactive={false}
                         ignoreSilentSwitch="ignore"
+                        mixWithOthers={isMuted ? "mix" : undefined}
+                        disableFocus={isMuted}
                         progressUpdateInterval={33}
                         automaticallyWaitsToMinimizeStalling={true}
                         preventsDisplaySleepDuringVideoPlayback={true}

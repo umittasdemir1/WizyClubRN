@@ -80,7 +80,6 @@ const purpose = {
   zustand: 'State yönetimi',
   '@gorhom/bottom-sheet': 'Bottom sheet UI',
   '@shopify/flash-list': 'Performanslı liste',
-  '@shopify/react-native-skia': 'Skia grafik',
   '@supabase/supabase-js': 'Supabase istemcisi',
   'expo-av': 'Audio/Video API',
   'expo-image': 'Image component',

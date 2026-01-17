@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Dimensions } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
-import Video from 'react-native-video';
+import Video, { SelectedTrackType } from 'react-native-video';
 import { Image } from 'expo-image';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -85,9 +85,12 @@ function CarouselMediaItem({ item, isActive, isMuted }: CarouselItemProps) {
                     repeat={true}
                     paused={!isActive}
                     muted={isMuted}
+                    selectedAudioTrack={isMuted ? { type: SelectedTrackType.DISABLED } : undefined}
                     playInBackground={false}
                     playWhenInactive={false}
                     ignoreSilentSwitch="ignore"
+                    mixWithOthers={isMuted ? "mix" : undefined}
+                    disableFocus={isMuted}
                 />
             </View>
         );

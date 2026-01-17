@@ -60,10 +60,6 @@ function RootNavigator() {
         }
     }, [user]);
 
-    if (!isInitialized) {
-        return null; // Or a custom loading view, but Splash Screen covers this
-    }
-
     return (
         <Stack screenOptions={{ headerShown: false }}>
             {/* Auth screens */}

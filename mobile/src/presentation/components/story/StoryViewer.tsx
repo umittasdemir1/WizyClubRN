@@ -2,7 +2,7 @@ import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { View, StyleSheet, Dimensions, Pressable, ImageBackground, Share, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
-import Video from 'react-native-video';
+import Video, { SelectedTrackType } from 'react-native-video';
 import { useSharedValue, withTiming, Easing, cancelAnimation, runOnJS, useAnimatedReaction } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Story } from '../../../domain/entities/Story';
@@ -15,6 +15,7 @@ import { COLORS } from '../../../core/constants';
 import { useStoryStore } from '../../store/useStoryStore';
 import { StoryRepositoryImpl } from '../../../data/repositories/StoryRepositoryImpl';
 import { useInAppBrowserStore } from '../../store/useInAppBrowserStore';
+import { useActiveVideoStore } from '../../store/useActiveVideoStore';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('screen');
 const DEFAULT_STORY_DURATION = 10000; // 10 seconds for images
@@ -42,6 +43,7 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
     const [isPaused, setIsPaused] = useState(false);
     const [isLiked, setIsLiked] = useState(stories[initialIndex]?.isLiked || false);
     const [flyingEmojis, setFlyingEmojis] = useState<FlyingEmojiData[]>([]);
+    const isMuted = useActiveVideoStore((state) => state.isMuted);
     const holdTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const storyIdRef = useRef<string | null>(null); // For tracking distinct expanded story IDs
 
@@ -226,6 +228,8 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
         }
     }, [expandedStories, currentIndex, rawProgress, progress, markUserAsViewed]);
 
+    const activeStory = expandedStories[currentIndex];
+
     // Tap handlers
     const handleHoldStart = useCallback(() => {
         holdTimeoutRef.current = setTimeout(() => {
@@ -291,8 +295,6 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
         }, 2000);
     }, []);
 
-    const activeStory = expandedStories[currentIndex];
-
     // 🔥 Image progress simulation (Only for images)
     useEffect(() => {
         if (activeStory?.mediaType === 'image' && !isPaused) {
@@ -342,17 +344,20 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
                             {story.mediaType === 'video' ? (
                                 <Video
                                     ref={(ref) => { videoRefs.current[story.id] = ref; }}
-                                    key={`video-${story.id}`}
                                     source={{ uri: story.videoUrl }}
                                     style={styles.video}
                                     resizeMode="contain"
                                     repeat={false}
                                     paused={isPaused || index !== currentIndex}
-                                    muted={false}
+                                    muted={isMuted}
+                                    selectedAudioTrack={isMuted ? { type: SelectedTrackType.DISABLED } : undefined}
                                     progressUpdateInterval={50}
                                     onLoad={handleVideoLoad(story.id, index)}
                                     onProgress={index === currentIndex ? handleVideoProgress : undefined}
                                     onEnd={index === currentIndex ? handleVideoEnd : undefined}
+                                    ignoreSilentSwitch="ignore"
+                                    mixWithOthers={isMuted ? "mix" : undefined}
+                                    disableFocus={isMuted}
                                 />
                             ) : (
                                 <Image

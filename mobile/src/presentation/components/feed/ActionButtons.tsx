@@ -231,7 +231,6 @@ export const ActionButtons = memo(forwardRef<ActionButtonsRef, ActionButtonsProp
     return (
         <View style={styles.container} pointerEvents="box-none">
             <Animated.View style={[styles.actionsStack, shakeStyle]}>
-                <View style={styles.glassPill} pointerEvents="none" />
                 <ActionButton
                     ref={likeButtonRef}
                     IconComponent={Heart}
@@ -300,8 +299,8 @@ const styles = StyleSheet.create({
     container: {
         position: 'absolute',
         right: 18,
-        top: 0,
-        bottom: 0,
+        top: 150,
+        bottom: -150,
         flexDirection: 'column',
         gap: 14,
         alignItems: 'center',
@@ -312,22 +311,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         gap: 14,
-    },
-    glassPill: {
-        position: 'absolute',
-        top: -10,
-        bottom: -10,
-        width: 56,
-        borderRadius: 28,
-        backgroundColor: 'rgba(255, 255, 255, 0.12)',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.28)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.25,
-        shadowRadius: 10,
-        elevation: 6,
-        alignItems: 'center',
     },
     buttonContainer: {
         alignItems: 'center',

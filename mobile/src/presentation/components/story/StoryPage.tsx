@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, ComponentRef } from 'react';
 import { View, StyleSheet, Pressable, Dimensions, ImageBackground, Share, Alert } from 'react-native';
 import { BlurView } from 'expo-blur';
-import Video from 'react-native-video';
+import Video, { SelectedTrackType } from 'react-native-video';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, {
     useAnimatedStyle,
@@ -19,6 +19,7 @@ import { StoryActions } from './StoryActions';
 import { FlyingEmoji } from './FlyingEmoji';
 import { COLORS } from '../../../core/constants';
 import { useInAppBrowserStore } from '../../store/useInAppBrowserStore';
+import { useActiveVideoStore } from '../../store/useActiveVideoStore';
 
 const STORY_DURATION = 5000; // 5 seconds
 const HOLD_PAUSE_DELAY = 200; // 200ms like Instagram
@@ -58,6 +59,7 @@ export function StoryPage({
     const videoRef = useRef<ComponentRef<typeof Video>>(null);
     const [isLiked, setIsLiked] = useState(story.isLiked || false);
     const [flyingEmojis, setFlyingEmojis] = useState<FlyingEmojiData[]>([]);
+    const isMuted = useActiveVideoStore((state) => state.isMuted);
     const openInAppBrowser = useInAppBrowserStore((state) => state.openUrl);
     const [videoDimensions, setVideoDimensions] = useState({ width: 0, height: 0 });
 
@@ -246,8 +248,12 @@ export function StoryPage({
                         resizeMode="contain"
                         repeat={false}
                         paused={isPaused || !isActive}
-                        muted={false}
+                        muted={isMuted}
+                        selectedAudioTrack={isMuted ? { type: SelectedTrackType.DISABLED } : undefined}
                         onLoad={handleLoad}
+                        ignoreSilentSwitch="ignore"
+                        mixWithOthers={isMuted ? "mix" : undefined}
+                        disableFocus={isMuted}
                     />
 
                     {/* Tap Zones inside video container */}

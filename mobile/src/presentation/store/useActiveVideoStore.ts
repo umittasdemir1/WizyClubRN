@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { AppState, AppStateStatus } from 'react-native';
 import { useEffect, useRef } from 'react';
-
 // ===================================
 // 🎬 GLOBAL ACTIVE VIDEO STORE
 // ===================================
@@ -256,3 +255,4 @@ export function useMuteControls() {
 
     return { isMuted, toggleMute, setMuted };
 }
+

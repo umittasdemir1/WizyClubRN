@@ -34,6 +34,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { FeedSkeleton } from './FeedSkeleton';
 import { useUploadStore } from '../../store/useUploadStore';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useStartupStore } from '../../store/useStartupStore';
 import { SwipeWrapper } from '../shared/SwipeWrapper';
 import { StoryBar } from './StoryBar';
 import { useInAppBrowserStore } from '../../store/useInAppBrowserStore';
@@ -130,6 +131,7 @@ export const FeedManager = ({
     const uploadStatus = useUploadStore(state => state.status);
     const uploadedVideoId = useUploadStore(state => state.uploadedVideoId);
     const resetUpload = useUploadStore(state => state.reset);
+    const markStartupComplete = useStartupStore(state => state.markStartupComplete);
     // Watch for upload success -> Fetch new video and prepend to feed
     useEffect(() => {
         if (uploadedVideoId && uploadStatus === 'success' && prependVideo && !isCustomFeed) {
@@ -834,6 +836,7 @@ export const FeedManager = ({
                         isScrollingSV.value = true;
                         setActiveTab('foryou');
                         setCleanScreen(false);
+                        markStartupComplete();
                     }}
                     onScrollEndDrag={() => { isScrollingSV.value = false; }}
                     onMomentumScrollEnd={(e) => {

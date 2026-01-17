@@ -7,7 +7,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "deps:check": "node scripts/deps-check.js"
+    "deps:check": "node scripts/deps-check.js",
+    "postinstall": "node scripts/patch-react-native-video.js"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -16,17 +17,13 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/netinfo": "11.4.1",
     "@react-native-community/slider": "5.0.1",
-    "@react-native-firebase/analytics": "^23.7.0",
-    "@react-native-firebase/app": "^23.7.0",
-    "@react-native-firebase/crashlytics": "^23.7.0",
-    "@react-native-firebase/messaging": "^23.7.0",
     "@react-native-google-signin/google-signin": "^16.0.0",
     "@react-native-masked-view/masked-view": "0.3.2",
     "@shopify/flash-list": "2.0.2",
-    "@shopify/react-native-skia": "2.2.12",
     "@supabase/supabase-js": "^2.47.0",
     "expo": "~54.0.0",
     "expo-apple-authentication": "~8.0.0",
+    "expo-audio": "~1.1.1",
     "expo-av": "~16.0.0",
     "expo-background-fetch": "~14.0.0",
     "expo-blur": "~15.0.0",

@@ -10,7 +10,7 @@ import Animated, {
     runOnJS,
     withTiming
 } from 'react-native-reanimated';
-import Video from 'react-native-video';
+import Video, { SelectedTrackType } from 'react-native-video';
 import MoreIcon from '../../../../assets/icons/more.svg';
 import { VideoCacheService } from '../../../../src/data/services/VideoCacheService';
 
@@ -152,6 +152,7 @@ const TrendingCard = memo(({ item, index, scrollX, onPress, onPreview, onPreview
                             repeat={true}
                             paused={!isActive || isPaused || isPreviewActive || !isScreenFocused}
                             muted={isMuted}
+                            selectedAudioTrack={isMuted ? { type: SelectedTrackType.DISABLED } : undefined}
                             onEnd={triggerEnd}
                             onReadyForDisplay={() => {
                                 if (isActive) {
@@ -169,6 +170,9 @@ const TrendingCard = memo(({ item, index, scrollX, onPress, onPreview, onPreview
                             }}
                             shutterColor="transparent"
                             automaticallyWaitsToMinimizeStalling={false}
+                            ignoreSilentSwitch="ignore"
+                            mixWithOthers={isMuted ? "mix" : undefined}
+                            disableFocus={isMuted}
                         />
                     </View>
                 )}
