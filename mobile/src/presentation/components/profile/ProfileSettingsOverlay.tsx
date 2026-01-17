@@ -227,6 +227,11 @@ export function ProfileSettingsOverlay({
   accountSettingsNoticeLinkIndex,
   accountSettingsNoticeLinkLabel,
 }: ProfileSettingsOverlayProps) {
+  const handleBadgeSignup = () => {
+    closeSettings();
+    router.push('/paywall/badge');
+  };
+
   return (
     <View style={[styles.settingsOverlay, { pointerEvents: isOpen ? 'auto' : 'none' }]}>
       <Pressable style={StyleSheet.absoluteFill} onPress={closeSettings}>
@@ -1147,7 +1152,7 @@ export function ProfileSettingsOverlay({
 
               <TouchableOpacity
                 style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
-                onPress={() => {}}
+                onPress={handleBadgeSignup}
               >
                 <View style={styles.settingsInfo}>
                   <View style={styles.settingsLabelRow}>

@@ -12,20 +12,33 @@ import { useAuthStore } from '../src/presentation/store/useAuthStore';
 import { useDraftCleanup } from '../src/presentation/hooks/useDraftCleanup';
 import { SessionLogService } from '../src/core/services/SessionLogService';
 import { COLORS, LIGHT_COLORS } from '../src/core/constants';
-import { useEffect } from 'react';
-import { StatusBar } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Platform, StatusBar } from 'react-native';
 import { useKeepAwake } from 'expo-keep-awake';
 import Toast from 'react-native-toast-message';
 import { InAppBrowserOverlay } from '../src/presentation/components/shared/InAppBrowserOverlay';
+import Purchases from 'react-native-purchases';
+import { CONFIG } from '../src/core/config';
+import * as Notifications from 'expo-notifications';
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
+
+Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+        sound: 'default',
+    }),
+});
 
 function RootNavigator() {
     const isDark = useThemeStore((state) => state.isDark);
     const { user, isInitialized, initialize } = useAuthStore();
     const segments = useSegments();
     const isTabsRoute = segments[0] === '(tabs)';
+    const hasConfiguredPurchases = useRef(false);
 
     // Keep the screen awake during video playback/app usage
     useKeepAwake();
@@ -59,6 +72,30 @@ function RootNavigator() {
             logSession();
         }
     }, [user]);
+
+    useEffect(() => {
+        const apiKey = Platform.OS === 'ios'
+            ? CONFIG.REVENUECAT_IOS_API_KEY
+            : CONFIG.REVENUECAT_ANDROID_API_KEY;
+        if (!apiKey) {
+            return;
+        }
+        if (!hasConfiguredPurchases.current) {
+            Purchases.setLogLevel(Purchases.LOG_LEVEL.WARN);
+            Purchases.configure({ apiKey, appUserID: user?.id || undefined });
+            hasConfiguredPurchases.current = true;
+            return;
+        }
+        if (user?.id) {
+            Purchases.logIn(user.id).catch((err) => {
+                console.warn('[Purchases] logIn failed:', err);
+            });
+        } else {
+            Purchases.logOut().catch((err) => {
+                console.warn('[Purchases] logOut failed:', err);
+            });
+        }
+    }, [user?.id]);
 
     return (
         <Stack screenOptions={{ headerShown: false }}>

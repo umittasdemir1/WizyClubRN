@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState, useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,6 +9,7 @@ import { useNotificationStore } from '../../src/presentation/store/useNotificati
 import { COLORS } from '../../src/core/constants';
 import { TrendingHeader } from '../../src/presentation/components/explore/TrendingHeader';
 import { SystemBars } from 'react-native-edge-to-edge';
+import * as Notifications from 'expo-notifications';
 
 import { MOCK_NOTIFICATIONS, Notification } from '../../src/data/mock/notifications';
 
@@ -35,6 +36,33 @@ export default function NotificationsScreen() {
         // Simulate refresh
         await new Promise((resolve) => setTimeout(resolve, 1500));
         setRefreshing(false);
+    }, []);
+
+    const sendTestNotification = useCallback(async () => {
+        const { status } = await Notifications.requestPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('İzin gerekli', 'Bildirim izni verilmedi.');
+            return;
+        }
+        await Notifications.setNotificationChannelAsync('default', {
+            name: 'Default',
+            importance: Notifications.AndroidImportance.DEFAULT,
+            sound: 'default',
+        });
+        await Notifications.cancelAllScheduledNotificationsAsync();
+        await Notifications.scheduleNotificationAsync({
+            content: {
+                title: 'WizyClub Test',
+                body: 'Mavi rozet için özel teklif seni bekliyor ✨',
+                sound: 'default',
+            },
+            trigger: {
+                type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+                seconds: 10,
+                repeats: false,
+                channelId: 'default',
+            },
+        });
     }, []);
 
     const getIcon = (type: Notification['type']) => {
@@ -145,6 +173,19 @@ export default function NotificationsScreen() {
                         />
                     }
                 >
+                    <View style={[styles.testCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#fff' }]}>
+                        <View>
+                            <Text style={[styles.testTitle, { color: isDark ? COLORS.textPrimary : '#111827' }]}>
+                                Test bildirimi
+                            </Text>
+                            <Text style={[styles.testDesc, { color: isDark ? 'rgba(255,255,255,0.7)' : '#6B7280' }]}>
+                                Cihazına örnek bir bildirim gönder.
+                            </Text>
+                        </View>
+                        <TouchableOpacity style={styles.testButton} onPress={sendTestNotification}>
+                            <Text style={styles.testButtonText}>Gönder</Text>
+                        </TouchableOpacity>
+                    </View>
                     {notifications.map(renderItem)}
                 </ScrollView>
             </View>
@@ -174,6 +215,34 @@ const styles = StyleSheet.create({
     listContent: {
         paddingHorizontal: 20,
         paddingTop: 8,
+    },
+    testCard: {
+        borderRadius: 14,
+        padding: 16,
+        marginBottom: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+    },
+    testTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    testDesc: {
+        fontSize: 12,
+        marginTop: 4,
+    },
+    testButton: {
+        backgroundColor: '#0B84FF',
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 10,
+    },
+    testButtonText: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: '700',
     },
     notificationCard: {
         flexDirection: 'row',
