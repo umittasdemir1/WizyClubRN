@@ -103,6 +103,7 @@ export const FeedManager = ({
     const playbackRate = activeVideoStore.playbackRate;
     const viewingMode = activeVideoStore.viewingMode;
     const setPlaybackRate = activeVideoStore.setPlaybackRate;
+    const setPaused = activeVideoStore.setPaused;
     const [tapIndicator, setTapIndicator] = useState<null | 'play' | 'pause'>(null);
     const tapIndicatorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -210,6 +211,8 @@ export const FeedManager = ({
     const listRef = useRef<any>(null);
     const wasPlayingBeforeWebViewRef = useRef(false);
     const activeDurationRef = useRef(0);
+    const activeTimeRef = useRef(0);
+    const wasPlayingBeforeShareRef = useRef(false);
     const saveToastTranslateY = useRef(new RNAnimated.Value(-70)).current;
     const saveToastOpacity = useRef(new RNAnimated.Value(0)).current;
     const saveToastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -542,6 +545,7 @@ export const FeedManager = ({
 
     const autoAdvanceGuardRef = useRef<string | null>(null);
     const handleProgressUpdate = useCallback((currentTime: number, duration: number) => {
+        activeTimeRef.current = currentTime;
         if (viewingMode !== 'fast') return;
         if (!activeVideoId) return;
         if (duration > 0) {
@@ -592,13 +596,31 @@ export const FeedManager = ({
         const shareUrl = `wizyclub://video/${videoId}`;
         const message = video.description ? `${video.description}\n${shareUrl}` : shareUrl;
 
+        const wasPaused = useActiveVideoStore.getState().isPaused;
+        wasPlayingBeforeShareRef.current = !wasPaused;
+
         try {
+            useActiveVideoStore.getState().setIgnoreAppState(true);
+            if (!wasPaused) {
+                useActiveVideoStore.getState().setPaused(true);
+            }
             await Share.share({ message, url: shareUrl });
             toggleShare(videoId);
         } catch (error) {
             console.error('[Share] Failed to open share sheet:', error);
+        } finally {
+            if (activeVideoId === videoId) {
+                const resumeTime = activeTimeRef.current;
+                if (resumeTime > 0) {
+                    videoSeekRef.current?.(resumeTime);
+                }
+                if (wasPlayingBeforeShareRef.current) {
+                    useActiveVideoStore.getState().setPaused(false);
+                }
+            }
+            useActiveVideoStore.getState().setIgnoreAppState(false);
         }
-    }, [toggleShare]);
+    }, [activeVideoId, toggleShare]);
 
     const handleToggleSave = useCallback((videoId: string) => {
         const video = videosRef.current.find((v) => v.id === videoId);
@@ -615,7 +637,7 @@ export const FeedManager = ({
 
     const renderItem = useCallback(
         ({ item }: { item: Video }) => {
-            const isActive = item.id === activeVideoId && isAppActive;
+            const isActive = item.id === activeVideoId;
             return (
                 <FeedItem
                     video={item}

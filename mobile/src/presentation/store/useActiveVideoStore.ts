@@ -17,6 +17,8 @@ export interface ActiveVideoState {
     isMuted: boolean;
     // App foreground durumu
     isAppActive: boolean;
+    // Ignore app state transitions (e.g. native share sheet)
+    ignoreAppState: boolean;
     // Screen focus status (Pause on blur)
     isScreenFocused: boolean;
     // Seek durumu (SeekBar'dan)
@@ -39,6 +41,7 @@ export interface ActiveVideoState {
     setMuted: (muted: boolean) => void;
     toggleMute: () => void;
     setAppActive: (active: boolean) => void;
+    setIgnoreAppState: (ignore: boolean) => void;
     setScreenFocused: (focused: boolean) => void;
     setSeeking: (seeking: boolean) => void;
     togglePause: () => void;
@@ -55,6 +58,7 @@ export const useActiveVideoStore = create<ActiveVideoState>((set, get) => ({
     activeIndex: 0,
     isMuted: false,
     isAppActive: true,
+    ignoreAppState: false,
     isScreenFocused: true,
     isSeeking: false,
     isPaused: false,
@@ -86,6 +90,7 @@ export const useActiveVideoStore = create<ActiveVideoState>((set, get) => ({
     toggleMute: () => set((state) => ({ isMuted: !state.isMuted })),
 
     setAppActive: (active) => set({ isAppActive: active }),
+    setIgnoreAppState: (ignore) => set({ ignoreAppState: ignore }),
     setScreenFocused: (focused) => set({ isScreenFocused: focused }),
 
     setSeeking: (seeking) => set({ isSeeking: seeking }),
@@ -142,8 +147,12 @@ export function useAppStateSync() {
 
     useEffect(() => {
         const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
-            const isActive = nextAppState === 'active';
-            const wasActive = appStateRef.current === 'active';
+            if (useActiveVideoStore.getState().ignoreAppState) {
+                appStateRef.current = nextAppState;
+                return;
+            }
+            const isActive = nextAppState !== 'background';
+            const wasActive = appStateRef.current !== 'background';
 
             if (isActive !== wasActive) {
                 setAppActive(isActive);

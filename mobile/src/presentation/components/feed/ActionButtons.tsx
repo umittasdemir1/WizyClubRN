@@ -52,6 +52,7 @@ const SAVE_PARTICLE_COLORS = ['#FFD700', '#FFC107', '#FFB300', '#FFE082'];
 
 interface ActionButtonProps {
     onPress: () => void;
+    onLongPress?: () => void;
     IconComponent: typeof Heart;
     count: string;
     zeroText: string;
@@ -87,7 +88,7 @@ function BurstParticle({ angle, color, burst }: { angle: number; color: string; 
 }
 
 const ActionButton = forwardRef<ActionButtonRef, ActionButtonProps>(
-    ({ onPress, IconComponent, count, zeroText, videoId, isActive, activeColor, canToggle = true, enableBurst = false, burstColors = LIKE_PARTICLE_COLORS }, ref) => {
+    ({ onPress, onLongPress, IconComponent, count, zeroText, videoId, isActive, activeColor, canToggle = true, enableBurst = false, burstColors = LIKE_PARTICLE_COLORS }, ref) => {
         const [localActive, setLocalActive] = useState(isActive);
         const scale = useSharedValue(1);
         const isZero = count === '0';
@@ -144,6 +145,8 @@ const ActionButton = forwardRef<ActionButtonRef, ActionButtonProps>(
         return (
             <Pressable
                 onPress={handlePress}
+                onLongPress={onLongPress}
+                delayLongPress={200}
                 style={styles.buttonContainer}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
@@ -200,6 +203,7 @@ export const ActionButtons = memo(forwardRef<ActionButtonsRef, ActionButtonsProp
     showShop = true,
 }, ref) {
     const likeButtonRef = useRef<ActionButtonRef>(null);
+    const shake = useSharedValue(0);
 
     useImperativeHandle(ref, () => ({
         animateLike: () => {
@@ -207,9 +211,26 @@ export const ActionButtons = memo(forwardRef<ActionButtonsRef, ActionButtonsProp
         },
     }));
 
+    const triggerShake = useCallback(() => {
+        shake.value = withSequence(
+            withTiming(-4, { duration: 50, easing: Easing.out(Easing.quad) }),
+            withTiming(4, { duration: 50, easing: Easing.out(Easing.quad) }),
+            withTiming(-3, { duration: 50, easing: Easing.out(Easing.quad) }),
+            withTiming(3, { duration: 50, easing: Easing.out(Easing.quad) }),
+            withTiming(0, { duration: 60, easing: Easing.out(Easing.quad) })
+        );
+    }, [shake]);
+
+    const shakeStyle = useAnimatedStyle(() => {
+        const rotation = interpolate(shake.value, [-4, 4], [-1, 1], Extrapolate.CLAMP);
+        return {
+            transform: [{ translateX: shake.value }, { rotateZ: `${rotation}deg` }],
+        };
+    });
+
     return (
         <View style={styles.container} pointerEvents="box-none">
-            <View style={styles.actionsStack}>
+            <Animated.View style={[styles.actionsStack, shakeStyle]}>
                 <View style={styles.glassPill} pointerEvents="none" />
                 <ActionButton
                     ref={likeButtonRef}
@@ -218,6 +239,7 @@ export const ActionButtons = memo(forwardRef<ActionButtonsRef, ActionButtonsProp
                     zeroText="Beğen"
                     videoId={videoId}
                     onPress={onLike}
+                    onLongPress={triggerShake}
                     isActive={isLiked}
                     activeColor={LIKE_COLOR}
                     enableBurst={true}
@@ -230,6 +252,7 @@ export const ActionButtons = memo(forwardRef<ActionButtonsRef, ActionButtonsProp
                     zeroText="Kaydet"
                     videoId={videoId}
                     onPress={onSave}
+                    onLongPress={triggerShake}
                     isActive={isSaved}
                     activeColor={SAVE_COLOR}
                     enableBurst={true}
@@ -242,6 +265,7 @@ export const ActionButtons = memo(forwardRef<ActionButtonsRef, ActionButtonsProp
                     zeroText="Gönder"
                     videoId={videoId}
                     onPress={onShare}
+                    onLongPress={triggerShake}
                     isActive={false}
                     activeColor={WHITE}
                     canToggle={false}
@@ -254,12 +278,13 @@ export const ActionButtons = memo(forwardRef<ActionButtonsRef, ActionButtonsProp
                         zeroText="Göz At"
                         videoId={videoId}
                         onPress={onShop}
+                        onLongPress={triggerShake}
                         isActive={false}
                         activeColor={WHITE}
                         canToggle={false}
                     />
                 ) : null}
-            </View>
+            </Animated.View>
         </View>
     );
 }));
@@ -302,6 +327,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.25,
         shadowRadius: 10,
         elevation: 6,
+        alignItems: 'center',
     },
     buttonContainer: {
         alignItems: 'center',

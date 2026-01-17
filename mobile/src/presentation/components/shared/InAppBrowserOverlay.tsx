@@ -9,6 +9,8 @@ import {
     Easing,
     BackHandler,
 } from 'react-native';
+import { useSegments } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { LIGHT_COLORS } from '../../../core/constants';
 import { useInAppBrowserStore } from '../../store/useInAppBrowserStore';
@@ -20,6 +22,11 @@ export function InAppBrowserOverlay() {
     const currentUrl = useInAppBrowserStore((state) => state.currentUrl);
     const close = useInAppBrowserStore((state) => state.close);
     const addHistoryEntry = useInAppBrowserStore((state) => state.addHistoryEntry);
+    const insets = useSafeAreaInsets();
+    const segments = useSegments();
+    const isTabsRoute = segments[0] === '(tabs)';
+    const tabBarOffset = isTabsRoute ? 50 + insets.bottom : 0;
+    const sheetHeight = SCREEN_HEIGHT * 0.85 - tabBarOffset;
 
     const [isMounted, setIsMounted] = useState(false);
     const translateY = useRef(new RNAnimated.Value(SCREEN_HEIGHT)).current;
@@ -34,6 +41,7 @@ export function InAppBrowserOverlay() {
 
     const animateOpen = useCallback(() => {
         isClosingRef.current = false;
+        translateY.stopAnimation();
         RNAnimated.timing(translateY, {
             toValue: 0,
             duration: 180,
@@ -42,38 +50,45 @@ export function InAppBrowserOverlay() {
         }).start();
     }, [translateY]);
 
-    const animateClose = useCallback(() => {
-        if (isClosingRef.current) return;
-        isClosingRef.current = true;
-        RNAnimated.timing(translateY, {
-            toValue: SCREEN_HEIGHT,
-            duration: 180,
-            easing: Easing.out(Easing.quad),
-            useNativeDriver: true,
-        }).start(() => {
-            setIsMounted(false);
-            isClosingRef.current = false;
-        });
-    }, [translateY]);
+    const animateClose = useCallback(
+        (closeStore: boolean) => {
+            if (isClosingRef.current) return;
+            isClosingRef.current = true;
+            translateY.stopAnimation();
+            RNAnimated.timing(translateY, {
+                toValue: SCREEN_HEIGHT,
+                duration: 180,
+                easing: Easing.out(Easing.quad),
+                useNativeDriver: true,
+            }).start(() => {
+                setIsMounted(false);
+                isClosingRef.current = false;
+                if (closeStore) {
+                    close();
+                }
+            });
+        },
+        [close, translateY]
+    );
 
     useEffect(() => {
         if (isVisible) {
             setIsMounted(true);
             animateOpen();
         } else if (isMounted) {
-            animateClose();
+            animateClose(false);
         }
     }, [isVisible, isMounted, animateOpen, animateClose]);
 
     useEffect(() => {
         if (!isVisible) return;
         const handleBackPress = () => {
-            close();
+            animateClose(true);
             return true;
         };
         const subscription = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
         return () => subscription.remove();
-    }, [isVisible, close]);
+    }, [isVisible, animateClose]);
 
     const handleWebViewNavigation = useCallback(
         (navState: { url?: string; title?: string }) => {
@@ -101,7 +116,7 @@ export function InAppBrowserOverlay() {
             onPanResponderRelease: (_, gesture) => {
                 if (isClosingRef.current) return;
                 if (gesture.dy > 120) {
-                    close();
+                    animateClose(true);
                     return;
                 }
                 RNAnimated.spring(translateY, {
@@ -123,10 +138,11 @@ export function InAppBrowserOverlay() {
                     pointerEvents="none"
                     style={[styles.webSheetBackdropOverlay, { opacity: backdropOpacity }]}
                 />
-                <Pressable style={styles.webSheetBackdropPressable} onPress={close} />
+                <Pressable style={styles.webSheetBackdropPressable} onPress={() => animateClose(true)} />
                 <RNAnimated.View
                     style={[
                         styles.webSheetContainer,
+                        { height: sheetHeight, marginBottom: tabBarOffset },
                         { transform: [{ translateY }] },
                     ]}
                 >
