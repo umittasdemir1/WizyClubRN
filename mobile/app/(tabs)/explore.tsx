@@ -1,4 +1,4 @@
-import { View, StyleSheet, ScrollView, RefreshControl, Text, Pressable, Dimensions, Modal } from 'react-native';
+import { View, StyleSheet, ScrollView, RefreshControl, Text, Pressable, Dimensions, Modal, ActivityIndicator } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { useCallback, useState, useEffect } from 'react';
@@ -8,7 +8,6 @@ import { useStoryViewer } from '../../src/presentation/hooks/useStoryViewer';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import Video from 'react-native-video';
 import { Image } from 'expo-image';
-import { Skeleton } from 'moti/skeleton';
 import { VideoCacheService } from '../../src/data/services/VideoCacheService';
 import { useMuteControls } from '../../src/presentation/store/useActiveVideoStore';
 import { Volume2, VolumeX } from 'lucide-react-native';
@@ -209,7 +208,6 @@ export default function ExploreScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [previewItem, setPreviewItem] = useState<{ id: string; thumbnailUrl: string; videoUrl: string; username?: string; fullName?: string; avatarUrl?: string } | null>(null);
     const showSkeleton = videos.length === 0 || isLoading;
-    const skeletonMode = isDark ? 'dark' : 'light';
     const carouselItemWidth = SCREEN_WIDTH * 0.38;
     const carouselItemHeight = carouselItemWidth * (16 / 9);
     const gridGap = 2;
@@ -301,6 +299,20 @@ export default function ExploreScreen() {
         isLarge: i % 3 === 0
     }));
 
+    if (showSkeleton) {
+        return (
+            <SwipeWrapper
+                onSwipeLeft={previewItem ? undefined : () => router.push('/deals')}
+                onSwipeRight={previewItem ? undefined : () => router.push('/')}
+                edgeOnly={!!previewItem}
+            >
+                <View style={[styles.container, styles.loadingContainer, { backgroundColor: bgBody }]}>
+                    <ActivityIndicator size="large" color={isDark ? '#fff' : '#000'} />
+                </View>
+            </SwipeWrapper>
+        );
+    }
+
     return (
         <>
             <SwipeWrapper
@@ -352,102 +364,25 @@ export default function ExploreScreen() {
                             </Text>
                             <MoreIcon width={24} height={24} color={isDark ? '#FFFFFF' : '#000000'} />
                         </View>
-                        {showSkeleton ? (
-                            <View style={styles.carouselSkeletonContainer}>
-                                <ScrollView
-                                    horizontal
-                                    showsHorizontalScrollIndicator={false}
-                                    contentContainerStyle={styles.carouselSkeletonRow}
-                                >
-                                    {[0, 1, 2].map((index) => (
-                                        <Skeleton
-                                            key={`carousel-skeleton-${index}`}
-                                            colorMode={skeletonMode}
-                                            width={carouselItemWidth}
-                                            height={carouselItemHeight}
-                                            radius={10}
-                                            style={styles.carouselSkeletonCard}
-                                        />
-                                    ))}
-                                    <View style={{ width: SCREEN_WIDTH - carouselItemWidth - 24 }} />
-                                </ScrollView>
-                            </View>
-                        ) : (
-                            <TrendingCarousel
-                                data={trendingData}
-                                onItemPress={handleVideoPress}
-                                onPreview={showPreview}
-                                onPreviewEnd={hidePreview}
-                                isDark={isDark}
-                                scrollEnabled={!previewItem}
-                                isPreviewActive={!!previewItem}
-                                isScreenFocused={isFocused}
-                            />
-                        )}
+                        <TrendingCarousel
+                            data={trendingData}
+                            onItemPress={handleVideoPress}
+                            onPreview={showPreview}
+                            onPreviewEnd={hidePreview}
+                            isDark={isDark}
+                            scrollEnabled={!previewItem}
+                            isPreviewActive={!!previewItem}
+                            isScreenFocused={isFocused}
+                        />
 
                         {/* 3. Masonry Grid */}
-                        {showSkeleton ? (
-                            <View style={[styles.gridSkeletonContainer, { paddingHorizontal: gridPadding }]}>
-                                {[0, 1].map((rowIndex) => {
-                                    const isEvenRow = rowIndex % 2 === 0;
-                                    const LargeColumn = (
-                                        <View key={`large-${rowIndex}`} style={styles.gridSkeletonColumn}>
-                                            <Skeleton
-                                                colorMode={skeletonMode}
-                                                width={gridColumnWidth}
-                                                height={gridLargeHeight}
-                                                radius={0}
-                                                style={styles.gridSkeletonItem}
-                                            />
-                                        </View>
-                                    );
-                                    const SmallColumn = (keyPrefix: string) => (
-                                        <View key={keyPrefix} style={[styles.gridSkeletonColumn, { gap: gridGap }]}>
-                                            <Skeleton
-                                                colorMode={skeletonMode}
-                                                width={gridColumnWidth}
-                                                height={gridSmallHeight}
-                                                radius={0}
-                                                style={styles.gridSkeletonItem}
-                                            />
-                                            <Skeleton
-                                                colorMode={skeletonMode}
-                                                width={gridColumnWidth}
-                                                height={gridSmallHeight}
-                                                radius={0}
-                                                style={styles.gridSkeletonItem}
-                                            />
-                                        </View>
-                                    );
-
-                                    return (
-                                        <View key={`row-${rowIndex}`} style={[styles.gridSkeletonRow, { marginBottom: gridGap }]}>
-                                            {isEvenRow ? (
-                                                <>
-                                                    {LargeColumn}
-                                                    {SmallColumn(`small-a-${rowIndex}`)}
-                                                    {SmallColumn(`small-b-${rowIndex}`)}
-                                                </>
-                                            ) : (
-                                                <>
-                                                    {SmallColumn(`small-a-${rowIndex}`)}
-                                                    {SmallColumn(`small-b-${rowIndex}`)}
-                                                    {LargeColumn}
-                                                </>
-                                            )}
-                                        </View>
-                                    );
-                                })}
-                            </View>
-                        ) : (
-                            <MasonryFeed
-                                data={discoveryItems}
-                                onItemPress={handleVideoPress}
-                                onPreview={showPreview}
-                                onPreviewEnd={hidePreview}
-                                isDark={isDark}
-                            />
-                        )}
+                        <MasonryFeed
+                            data={discoveryItems}
+                            onItemPress={handleVideoPress}
+                            onPreview={showPreview}
+                            onPreviewEnd={hidePreview}
+                            isDark={isDark}
+                        />
                     </ScrollView>
                 </View>
             </SwipeWrapper>
@@ -466,6 +401,10 @@ export default function ExploreScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+    },
+    loadingContainer: {
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     sectionHeader: {
         flexDirection: 'row',
@@ -486,33 +425,6 @@ const styles = StyleSheet.create({
         marginTop: 0,
         marginBottom: 8,
         paddingHorizontal: 12,
-    },
-    carouselSkeletonContainer: {
-        height: 320,
-        marginTop: -10,
-    },
-    carouselSkeletonRow: {
-        paddingHorizontal: 16,
-        alignItems: 'center',
-    },
-    carouselSkeletonCard: {
-        marginRight: 16,
-        borderRadius: 10,
-        overflow: 'hidden',
-    },
-    gridSkeletonContainer: {
-        paddingBottom: 100,
-    },
-    gridSkeletonRow: {
-        flexDirection: 'row',
-        gap: 2,
-    },
-    gridSkeletonColumn: {
-        flexDirection: 'column',
-    },
-    gridSkeletonItem: {
-        borderRadius: 0,
-        overflow: 'hidden',
     },
     previewOverlay: {
         ...StyleSheet.absoluteFillObject,

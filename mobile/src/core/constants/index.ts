@@ -34,8 +34,8 @@ export const LIGHT_COLORS = {
 export const DARK_COLORS = {
     primary: '#FF3B30',
     accent: '#7C3AED',
-    background: '#181818',       // Lighter dark background
-    videoBackground: '#000000',  // Videos stay true black
+    background: '#080A0F',       // Dark mode test background
+    videoBackground: '#080A0F',  // Match dark mode background
     card: '#222222',             // Cards slightly lighter
     white: '#FFFFFF',
     black: '#000000',

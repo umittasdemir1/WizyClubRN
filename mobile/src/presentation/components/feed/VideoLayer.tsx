@@ -2,10 +2,10 @@ import { useRef, useState, useEffect, useCallback, memo } from 'react';
 import { StyleSheet, View, Text, Pressable, Platform, ActivityIndicator } from 'react-native';
 import Video, { OnProgressData, OnLoadData, VideoRef, OnVideoErrorData } from 'react-native-video';
 import { Video as VideoEntity } from '../../../domain/entities/Video';
-import ReplayIcon from '../../../../assets/icons/replay.svg';
+import PlayIcon from '../../../../assets/icons/play.svg';
 import { useActiveVideoStore, saveVideoPosition, getVideoPosition, clearVideoPosition } from '../../store/useActiveVideoStore';
 import { BrightnessOverlay } from './BrightnessOverlay';
-import { RefreshCcw, AlertCircle, Play, Pause } from 'lucide-react-native';
+import { RefreshCcw, AlertCircle, Pause, Repeat1 } from 'lucide-react-native';
 import { useNetInfo } from '@react-native-community/netinfo';
 import { getBufferConfig } from '../../../core/utils/bufferConfig';
 import { VideoSeekBar } from './VideoSeekBar';
@@ -465,7 +465,7 @@ export const VideoLayer = memo(function VideoLayer({
                             {tapIndicator === 'pause' ? (
                                 <Pause size={44} color="#FFFFFF" fill="#FFFFFF" strokeWidth={0} />
                             ) : (
-                                <Play size={44} color="#FFFFFF" fill="#FFFFFF" strokeWidth={0} />
+                                <PlayIcon width={44} height={44} color="#FFFFFF" style={{ marginLeft: 5 }} />
                             )}
                         </View>
                     </View>
@@ -477,7 +477,7 @@ export const VideoLayer = memo(function VideoLayer({
                 <View style={styles.touchArea} pointerEvents="none">
                     <View style={styles.iconContainer}>
                         <View style={styles.iconBackground}>
-                            <ReplayIcon width={44} height={44} color="#FFFFFF" />
+                            <Repeat1 size={44} color="#FFFFFF" strokeWidth={1.2} />
                         </View>
                     </View>
                 </View>

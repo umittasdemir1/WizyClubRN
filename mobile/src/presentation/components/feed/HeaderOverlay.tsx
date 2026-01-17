@@ -51,7 +51,7 @@ function UploadButton({ onPress }: { onPress: () => void }) {
             onPress={onPress}
             hitSlop={12}
         >
-            <Plus width={24} height={24} color="#FFFFFF" />
+            <Plus width={28} height={28} color="#FFFFFF" />
         </Pressable>
     );
 }
@@ -176,7 +176,7 @@ export function HeaderOverlay({
                         onPress={onBack}
                         hitSlop={12}
                     >
-                        <ChevronLeft width={28} height={28} color="#FFFFFF" />
+                    <ChevronLeft width={28} height={28} color="#FFFFFF" />
                     </Pressable>
                 ) : (
                     onUploadPress && <UploadButton onPress={onUploadPress} />
@@ -236,9 +236,9 @@ export function HeaderOverlay({
                     activeOpacity={0.7}
                 >
                     {isMuted ? (
-                        <VolumeX size={24} color="#FFFFFF" strokeWidth={1.2} />
+                        <VolumeX size={28} color="#FFFFFF" strokeWidth={1.2} />
                     ) : (
-                        <Volume2 size={24} color="#FFFFFF" strokeWidth={1.2} />
+                        <Volume2 size={28} color="#FFFFFF" strokeWidth={1.2} />
                     )}
                 </TouchableOpacity>
 
@@ -290,8 +290,8 @@ const styles = StyleSheet.create({
     },
     tabText: {
         color: 'rgba(255, 255, 255, 0.6)',
-        fontSize: 16,
-        fontWeight: '600',
+        fontSize: 17,
+        fontWeight: '700',
         letterSpacing: 0.3,
     },
     tabTextActive: {

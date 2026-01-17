@@ -1,5 +1,5 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { View, StyleSheet, Dimensions, Pressable, ImageBackground } from 'react-native';
+import { View, StyleSheet, Dimensions, Pressable, ImageBackground, Share, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
 import Video from 'react-native-video';
@@ -14,6 +14,7 @@ import PagerView from 'react-native-pager-view';
 import { COLORS } from '../../../core/constants';
 import { useStoryStore } from '../../store/useStoryStore';
 import { StoryRepositoryImpl } from '../../../data/repositories/StoryRepositoryImpl';
+import { useInAppBrowserStore } from '../../store/useInAppBrowserStore';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('screen');
 const DEFAULT_STORY_DURATION = 10000; // 10 seconds for images
@@ -66,6 +67,7 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
     }, [stories]);
 
     const markUserAsViewed = useStoryStore((state) => state.markUserAsViewed);
+    const openInAppBrowser = useInAppBrowserStore((state) => state.openUrl);
 
     // 🔥 FIX: Track video durations for each story
     const videoDurationsRef = useRef<{ [storyId: string]: number }>({});
@@ -251,7 +253,30 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
 
     // Actions
     const handleLike = useCallback(() => setIsLiked(prev => !prev), []);
-    const handleShare = useCallback(() => console.log('Share story'), []);
+    const handleShare = useCallback(async () => {
+        const shareUrl = activeStory?.videoUrl || activeStory?.thumbnailUrl;
+        if (!shareUrl) return;
+        const wasPaused = isPaused;
+        setIsPaused(true);
+        try {
+            await Share.share({ message: shareUrl, url: shareUrl });
+        } catch (error) {
+            console.error('Share story failed:', error);
+        } finally {
+            setIsPaused(wasPaused);
+        }
+    }, [activeStory?.thumbnailUrl, activeStory?.videoUrl, isPaused]);
+
+    const handleShop = useCallback(() => {
+        const rawUrl = activeStory?.brandUrl;
+        if (!rawUrl) {
+            Alert.alert('Link bulunamadı', 'Bu story için bir alışveriş linki yok.');
+            return;
+        }
+        const url = rawUrl.match(/^https?:\/\//) ? rawUrl : `https://${rawUrl}`;
+        setIsPaused(true);
+        openInAppBrowser(url);
+    }, [activeStory?.brandUrl, openInAppBrowser]);
 
     const handleEmojiSelect = useCallback((emoji: string) => {
         const newEmoji: FlyingEmojiData = {
@@ -299,7 +324,7 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
             </ImageBackground>
 
             {/* Top Spacer */}
-            <View style={{ height: insets.top + 30, backgroundColor: '#000000', width: '100%' }} />
+            <View style={{ height: insets.top + 30, backgroundColor: COLORS.videoBackground, width: '100%' }} />
 
             {/* Video Layer - Only videos inside PagerView */}
             <View style={styles.videoArea}>
@@ -373,6 +398,8 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
                 isLiked={isLiked}
                 onLike={handleLike}
                 onShare={handleShare}
+                onShop={handleShop}
+                showShop={!!activeStory?.brandUrl}
                 onEmojiSelect={handleEmojiSelect}
             />
 
@@ -396,15 +423,15 @@ const styles = StyleSheet.create({
     },
     videoArea: {
         flex: 1,
-        backgroundColor: '#000000',
+        backgroundColor: COLORS.videoBackground,
     },
     page: {
         flex: 1,
-        backgroundColor: '#000000',
+        backgroundColor: COLORS.videoBackground,
     },
     video: {
         flex: 1,
-        backgroundColor: '#000000',
+        backgroundColor: COLORS.videoBackground,
     },
     tapZones: {
         position: 'absolute',

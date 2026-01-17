@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, ComponentRef } from 'react';
-import { View, StyleSheet, Pressable, Dimensions, ImageBackground } from 'react-native';
+import { View, StyleSheet, Pressable, Dimensions, ImageBackground, Share, Alert } from 'react-native';
 import { BlurView } from 'expo-blur';
 import Video from 'react-native-video';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
@@ -18,6 +18,7 @@ import { StoryHeader } from './StoryHeader';
 import { StoryActions } from './StoryActions';
 import { FlyingEmoji } from './FlyingEmoji';
 import { COLORS } from '../../../core/constants';
+import { useInAppBrowserStore } from '../../store/useInAppBrowserStore';
 
 const STORY_DURATION = 5000; // 5 seconds
 const HOLD_PAUSE_DELAY = 200; // 200ms like Instagram
@@ -57,6 +58,7 @@ export function StoryPage({
     const videoRef = useRef<ComponentRef<typeof Video>>(null);
     const [isLiked, setIsLiked] = useState(story.isLiked || false);
     const [flyingEmojis, setFlyingEmojis] = useState<FlyingEmojiData[]>([]);
+    const openInAppBrowser = useInAppBrowserStore((state) => state.openUrl);
     const [videoDimensions, setVideoDimensions] = useState({ width: 0, height: 0 });
 
     const holdTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -167,9 +169,30 @@ export function StoryPage({
         setIsLiked(prev => !prev);
     }, []);
 
-    const handleShare = useCallback(() => {
-        console.log('Share story');
-    }, []);
+    const handleShare = useCallback(async () => {
+        const shareUrl = story.videoUrl || story.thumbnailUrl;
+        if (!shareUrl) return;
+        const wasPaused = isPaused;
+        onPauseToggle(true);
+        try {
+            await Share.share({ message: shareUrl, url: shareUrl });
+        } catch (error) {
+            console.error('Share story failed:', error);
+        } finally {
+            onPauseToggle(wasPaused);
+        }
+    }, [isPaused, onPauseToggle, story.thumbnailUrl, story.videoUrl]);
+
+    const handleShop = useCallback(() => {
+        const rawUrl = story.brandUrl;
+        if (!rawUrl) {
+            Alert.alert('Link bulunamadı', 'Bu story için bir alışveriş linki yok.');
+            return;
+        }
+        const url = rawUrl.match(/^https?:\/\//) ? rawUrl : `https://${rawUrl}`;
+        onPauseToggle(true);
+        openInAppBrowser(url);
+    }, [onPauseToggle, openInAppBrowser, story.brandUrl]);
 
     const handleEmojiSelect = useCallback((emoji: string) => {
         const newEmoji: FlyingEmojiData = {
@@ -259,6 +282,8 @@ export function StoryPage({
                     isLiked={isLiked}
                     onLike={handleLike}
                     onShare={handleShare}
+                    onShop={handleShop}
+                    showShop={!!story.brandUrl}
                     onEmojiSelect={handleEmojiSelect}
                 />
 
@@ -287,7 +312,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         width: '100%',
         overflow: 'hidden',
-        backgroundColor: '#000000',
+        backgroundColor: COLORS.videoBackground,
     },
     videoCover: {
         width: SCREEN_WIDTH,

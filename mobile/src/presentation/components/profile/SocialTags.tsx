@@ -76,7 +76,7 @@ export const SocialTags: React.FC<SocialTagsProps> = ({ isDark, user }) => {
                     >
                         <FontAwesome6
                             name={iconConfig.name}
-                            size={22}
+                            size={18}
                             color={iconColor}
                         />
                     </TouchableOpacity>
@@ -90,12 +90,12 @@ const styles = StyleSheet.create({
     container: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        gap: 4,
     },
     socialTag: {
-        width: 38,
-        height: 38,
-        borderRadius: 10, // Match brand logos
+        width: 32,
+        height: 32,
+        borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: '#fff', // Solid white for the 3D effect

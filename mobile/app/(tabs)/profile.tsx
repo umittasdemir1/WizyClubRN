@@ -8,6 +8,8 @@ import {
   RefreshControl,
   Dimensions,
   BackHandler,
+  InteractionManager,
+  ActivityIndicator,
 } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import Video from 'react-native-video';
@@ -20,12 +22,9 @@ import { useDraftStore } from '../../src/presentation/store/useDraftStore';
 import { useInAppBrowserStore } from '../../src/presentation/store/useInAppBrowserStore';
 import { ProfileStats } from '../../src/presentation/components/profile/ProfileStats';
 import { SocialTags } from '../../src/presentation/components/profile/SocialTags';
-import { ClubsCollaboration } from '../../src/presentation/components/profile/ClubsCollaboration';
-import { HighlightPills } from '../../src/presentation/components/profile/HighlightPills';
 import { VideoGrid } from '../../src/presentation/components/profile/VideoGrid';
 import { PostsGrid } from '../../src/presentation/components/profile/PostsGrid';
 import { BioBottomSheet } from '../../src/presentation/components/profile/BioBottomSheet';
-import { ClubsBottomSheet } from '../../src/presentation/components/profile/ClubsBottomSheet';
 import { EditProfileSheet } from '../../src/presentation/components/profile/EditProfileSheet';
 import { Menu } from 'lucide-react-native';
 import { SystemBars } from 'react-native-edge-to-edge';
@@ -35,7 +34,6 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
-  useAnimatedScrollHandler,
 } from 'react-native-reanimated';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import { useProfile } from '../../src/presentation/hooks/useProfile';
@@ -44,7 +42,6 @@ import { useActiveVideoStore } from '../../src/presentation/store/useActiveVideo
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
 import { LIGHT_COLORS, DARK_COLORS } from '../../src/core/constants';
 import { CONFIG } from '../../src/core/config';
-import { ProfileSkeleton } from '../../src/presentation/components/profile/ProfileSkeleton';
 import { VerifiedBadge } from '../../src/presentation/components/shared/VerifiedBadge';
 import { ProfileSettingsOverlay } from '../../src/presentation/components/profile/ProfileSettingsOverlay';
 import { UserActivityRepositoryImpl } from '../../src/data/repositories/UserActivityRepositoryImpl';
@@ -346,16 +343,6 @@ export default function ProfileScreen() {
   }, [loadAdminConfig]);
 
   useEffect(() => {
-    let isActive = true;
-    if (isActive) {
-      loadAdminConfig();
-    }
-    return () => {
-      isActive = false;
-    };
-  }, [loadAdminConfig]);
-
-  useEffect(() => {
     isProfileFocusedRef.current = isFocused;
     if (isFocused) {
       loadAdminConfig();
@@ -395,42 +382,20 @@ export default function ProfileScreen() {
         statusBar: isDark ? 'light' : 'dark',
         navigationBar: isDark ? 'light' : 'dark',
       });
-      // Reload data when profile is focused
-      refreshSavedVideos();
+      const task = InteractionManager.runAfterInteractions(() => {
+        // Reload data after transition settles
+        refreshSavedVideos();
+      });
+      return () => {
+        task.cancel();
+      };
     }, [isDark, refreshSavedVideos])
   );
-
-  // Collapsible Header Logic
-  const headerTranslateY = useSharedValue(0);
-  const lastScrollY = useSharedValue(0);
-  const headerHeight = 60 + insets.top;
-
-  const scrollHandler = useAnimatedScrollHandler({
-    onScroll: (event) => {
-      const currentY = event.contentOffset.y;
-      const diff = currentY - lastScrollY.value;
-
-      if (currentY <= 0) {
-        headerTranslateY.value = withTiming(0, { duration: 200 });
-      } else if (diff > 10 && currentY > 50) {
-        headerTranslateY.value = withTiming(-headerHeight, { duration: 250 });
-      } else if (diff < -10) {
-        headerTranslateY.value = withTiming(0, { duration: 200 });
-      }
-
-      lastScrollY.value = currentY;
-    },
-  });
-
-  const animatedHeaderStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: headerTranslateY.value }],
-  }));
 
   const [refreshing, setRefreshing] = useState(false);
   const [previewItem, setPreviewItem] = useState<{ id: string; thumbnail: string; videoUrl: string } | null>(null);
 
   const bioSheetRef = useRef<BottomSheet>(null);
-  const clubsSheetRef = useRef<BottomSheet>(null);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState<'main' | 'actions' | 'deleted' | 'likes' | 'saved' | 'history' | 'archived' | 'notInterested' | 'interested' | 'accountHistory' | 'accountSettings' | 'notifications' | 'accountType' | 'inAppBrowser' | 'browserHistory' | 'contentPreferences'>('main');
   const [activityVideos, setActivityVideos] = useState<VideoEntity[]>([]);
@@ -624,30 +589,12 @@ export default function ProfileScreen() {
   const user = {
     name: currentUser?.fullName || 'User',
     username: currentUser?.username || 'user',
-    avatarUrl: currentUser?.avatarUrl || 'https://i.pravatar.cc/300?img=12',
+    avatarUrl: currentUser?.avatarUrl || '',
     bio: currentUser?.bio || "Welcome to WizyClub",
     followingCount: currentUser?.followingCount?.toString() || '0',
     followersCount: currentUser?.followersCount?.toString() || '0',
     entity: currentUser,
   };
-
-  const clubLogos = [
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Amazon_logo.svg/200px-Amazon_logo.svg.png',
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/Tesla_Motors.svg/200px-Tesla_Motors.svg.png',
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Logo_NIKE.svg/200px-Logo_NIKE.svg.png',
-  ];
-
-  const clubs = [
-    { id: '1', name: 'Amazon', logo: clubLogos[0], collaborationCount: 12 },
-    { id: '2', name: 'Tesla', logo: clubLogos[1], collaborationCount: 8 },
-    { id: '3', name: 'Nike', logo: clubLogos[2], collaborationCount: 15 },
-  ];
-
-  const highlights = [
-    { id: '1', title: 'Friends', thumbnail: 'https://picsum.photos/100/100?random=1' },
-    { id: '2', title: 'Pet Dog', thumbnail: 'https://picsum.photos/100/100?random=2' },
-    { id: '3', title: 'Travel', thumbnail: 'https://picsum.photos/100/100?random=3' },
-  ];
 
   const safeVideos = videos || [];
   const postsData = safeVideos.map((v: any) => ({ id: v.id, thumbnail: v.thumbnailUrl, views: v.likesCount?.toString() || '0', type: 'video' as const, videoUrl: v.videoUrl }));
@@ -892,10 +839,9 @@ export default function ProfileScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: bgBody }]}>
-      <Animated.View style={[
+      <View style={[
         styles.topNavContainer,
         { paddingTop: insets.top, backgroundColor: bgContainer },
-        animatedHeaderStyle
       ]}>
         <View style={styles.topNav}>
           <View style={styles.navIcon} />
@@ -909,18 +855,18 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
         </View>
-      </Animated.View>
+      </View>
 
       <SwipeWrapper enableLeft={false} onSwipeRight={() => router.push('/notifications')} edgeOnly={true}>
         <Animated.ScrollView
-          onScroll={scrollHandler}
-          scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingTop: insets.top + 60 }}
+          contentContainerStyle={{ paddingTop: insets.top + 60, flexGrow: isLoading ? 1 : 0 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={isDark ? "#fff" : "#000"} progressViewOffset={insets.top + 60} />}
         >
           {isLoading ? (
-            <ProfileSkeleton />
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={isDark ? '#fff' : '#000'} />
+            </View>
           ) : (
             <View style={styles.profileContainer}>
               <ProfileStats
@@ -969,14 +915,6 @@ export default function ProfileScreen() {
 
               <View style={styles.socialClubsRow}>
                 <SocialTags isDark={isDark} user={user.entity} />
-                <View style={[styles.verticalSeparator, { backgroundColor: isDark ? '#444' : '#ccc' }]} />
-
-                <ClubsCollaboration
-                  clubsCount={clubs.length}
-                  clubLogos={clubLogos}
-                  isDark={isDark}
-                  onPress={() => clubsSheetRef.current?.expand()}
-                />
               </View>
             </View>
           )}
@@ -1011,8 +949,6 @@ export default function ProfileScreen() {
               <SaveTabIcon color={activeTab === 3 ? textPrimary : textSecondary} />
             </Pressable>
           </View>
-
-          <HighlightPills highlights={highlights} isDark={isDark} />
 
           <PagerView
             ref={pagerRef}
@@ -1063,7 +999,6 @@ export default function ProfileScreen() {
 
       {previewItem && <PreviewModal item={previewItem} onClose={hidePreview} />}
       <BioBottomSheet ref={bioSheetRef} bio={currentUser.bio || ''} isDark={isDark} />
-      <ClubsBottomSheet ref={clubsSheetRef} clubs={clubs} isDark={isDark} />
       <EditProfileSheet
         ref={editProfileSheetRef}
         user={currentUser}
@@ -1176,6 +1111,7 @@ const styles = StyleSheet.create({
   btnIconOnly: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#e5e5e5' },
   navTabs: { flexDirection: 'row', borderBottomWidth: 1 },
   tab: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12 },
+  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   activeTab: { borderBottomWidth: 2 },
   previewOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', zIndex: 999 },
   previewCard: { width: '80%', height: 480, borderRadius: 30, overflow: 'hidden', backgroundColor: '#000', elevation: 20, shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 15, shadowOffset: { width: 0, height: 10 } },

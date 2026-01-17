@@ -5,6 +5,7 @@ import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import { useNotificationStore } from '../../src/presentation/store/useNotificationStore';
 import { COLORS, LIGHT_COLORS } from '../../src/core/constants';
 import { useEffect, useState } from 'react';
+import { MOCK_NOTIFICATIONS } from '../../src/data/mock/notifications';
 
 // Import SVGs
 import HomeIcon from '../../assets/icons/home.svg';
@@ -46,6 +47,12 @@ export default function TabLayout() {
     const isDark = useThemeStore((state) => state.isDark);
     const insets = useSafeAreaInsets();
     const tabBarBackground = isDark ? COLORS.background : LIGHT_COLORS.background;
+    const setUnreadCount = useNotificationStore((state) => state.setUnreadCount);
+
+    useEffect(() => {
+        const unread = MOCK_NOTIFICATIONS.filter((item) => !item.read).length;
+        setUnreadCount(unread);
+    }, [setUnreadCount]);
 
     // NavigationBar styling handled by native edge-to-edge config
 
@@ -54,7 +61,8 @@ export default function TabLayout() {
             backBehavior="history"
             screenOptions={{
                 headerShown: false,
-                lazy: false,
+                lazy: true,
+                detachInactiveScreens: true,
                 tabBarStyle: {
                     backgroundColor: tabBarBackground,
                     borderTopWidth: 0,

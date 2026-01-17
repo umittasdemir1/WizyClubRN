@@ -137,6 +137,7 @@ export const FeedItem = memo(function FeedItem({
                         onSave={() => onToggleSave(video.id)}
                         onShare={() => onToggleShare(video.id)}
                         onShop={() => onOpenShopping(video.id)}
+                        showShop={!!video.brandUrl}
                         onProfilePress={() => router.push(profileRoute)}
                     />
 

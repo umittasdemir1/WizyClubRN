@@ -8,6 +8,7 @@ import {
   Pressable,
   RefreshControl,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import Video from 'react-native-video';
@@ -16,13 +17,11 @@ import { SystemBars } from 'react-native-edge-to-edge';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import { ProfileStats } from '../../src/presentation/components/profile/ProfileStats';
+import { Avatar } from '../../src/presentation/components/shared/Avatar';
 import { SocialTags } from '../../src/presentation/components/profile/SocialTags';
-import { ClubsCollaboration } from '../../src/presentation/components/profile/ClubsCollaboration';
-import { HighlightPills } from '../../src/presentation/components/profile/HighlightPills';
 import { VideoGrid } from '../../src/presentation/components/profile/VideoGrid';
 import { PostsGrid } from '../../src/presentation/components/profile/PostsGrid';
 import { BioBottomSheet } from '../../src/presentation/components/profile/BioBottomSheet';
-import { ClubsBottomSheet } from '../../src/presentation/components/profile/ClubsBottomSheet';
 import { ChevronLeft, MoreVertical } from 'lucide-react-native';
 import BottomSheet from '@gorhom/bottom-sheet';
 import Svg, { Path, Circle } from 'react-native-svg';
@@ -32,14 +31,12 @@ import Animated, {
   withSequence,
   withTiming,
   Easing,
-  useAnimatedScrollHandler,
 } from 'react-native-reanimated';
 import LikeIcon from '../../assets/icons/like.svg';
 import ShareIcon from '../../assets/icons/share.svg';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import { useProfile } from '../../src/presentation/hooks/useProfile';
 import { LIGHT_COLORS, DARK_COLORS } from '../../src/core/constants';
-import { ProfileSkeleton } from '../../src/presentation/components/profile/ProfileSkeleton';
 import { UserOptionsModal } from '../../src/presentation/components/profile/UserOptionsModal';
 import { useAuthStore } from '../../src/presentation/store/useAuthStore';
 import { InteractionRepositoryImpl } from '../../src/data/repositories/InteractionRepositoryImpl';
@@ -146,32 +143,6 @@ export default function UserProfileScreen() {
   const { isDark } = useThemeStore();
   const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
 
-  // Collapsible Header Logic
-  const headerTranslateY = useSharedValue(0);
-  const lastScrollY = useSharedValue(0);
-  const headerHeight = 60 + insets.top;
-
-  const scrollHandler = useAnimatedScrollHandler({
-    onScroll: (event) => {
-      const currentY = event.contentOffset.y;
-      const diff = currentY - lastScrollY.value;
-
-      if (currentY <= 0) {
-        headerTranslateY.value = withTiming(0, { duration: 200 });
-      } else if (diff > 10 && currentY > 50) {
-        headerTranslateY.value = withTiming(-headerHeight, { duration: 250 });
-      } else if (diff < -10) {
-        headerTranslateY.value = withTiming(0, { duration: 200 });
-      }
-
-      lastScrollY.value = currentY;
-    },
-  });
-
-  const animatedHeaderStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: headerTranslateY.value }],
-  }));
-
   useFocusEffect(
     useCallback(() => {
       SystemBars.setStyle({
@@ -188,7 +159,6 @@ export default function UserProfileScreen() {
   const [previewItem, setPreviewItem] = useState<{ id: string; thumbnail: string; videoUrl: string } | null>(null);
 
   const bioSheetRef = useRef<BottomSheet>(null);
-  const clubsSheetRef = useRef<BottomSheet>(null);
 
   const { user: authUser } = useAuthStore();
   const currentUserId = authUser?.id;
@@ -233,30 +203,12 @@ export default function UserProfileScreen() {
   const user = {
     name: profileUser?.fullName || profileUser?.username || 'User',
     username: profileUser?.username || 'user',
-    avatarUrl: profileUser?.avatarUrl || 'https://i.pravatar.cc/300?img=12',
+    avatarUrl: profileUser?.avatarUrl || '',
     bio: profileUser?.bio || 'No bio available.',
     followersCount: profileUser?.followersCount || 0,
     followingCount: profileUser?.followingCount || 0,
   };
   // --------------------------
-
-  const clubLogos = [
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Amazon_logo.svg/200px-Amazon_logo.svg.png',
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/Tesla_Motors.svg/200px-Tesla_Motors.svg.png',
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Logo_NIKE.svg/200px-Logo_NIKE.svg.png',
-  ];
-
-  const clubs = [
-    { id: '1', name: 'Amazon', logo: clubLogos[0], collaborationCount: 12 },
-    { id: '2', name: 'Tesla', logo: clubLogos[1], collaborationCount: 8 },
-    { id: '3', name: 'Nike', logo: clubLogos[2], collaborationCount: 15 },
-  ];
-
-  const highlights = [
-    { id: '1', title: 'Friends', thumbnail: 'https://picsum.photos/100/100?random=1' },
-    { id: '2', title: 'Pet Dog', thumbnail: 'https://picsum.photos/100/100?random=2' },
-    { id: '3', title: 'Travel', thumbnail: 'https://picsum.photos/100/100?random=3' },
-  ];
 
   const safeVideos = videos || [];
   const postsData = safeVideos.map(v => ({ id: v.id, thumbnail: v.thumbnailUrl, views: v.likesCount?.toString() || '0', type: 'video' as const, videoUrl: v.videoUrl }));
@@ -277,21 +229,25 @@ export default function UserProfileScreen() {
   const hidePreview = () => setPreviewItem(null);
   const bioLimit = 110;
   const truncatedBio = user.bio.length > bioLimit ? user.bio.substring(0, bioLimit) + '...' : user.bio;
+  const [showHeaderAvatar, setShowHeaderAvatar] = useState(false);
+  const headerAvatarVisibleRef = useRef(false);
 
   return (
     <View style={[styles.container, { backgroundColor: bgBody }]}>
       {/* 
           TOP NAVIGATION - ANIMATED & INDEPENDENT
       */}
-      <Animated.View style={[
+      <View style={[
         styles.topNavContainer,
         { paddingTop: insets.top, backgroundColor: bgContainer },
-        animatedHeaderStyle
       ]}>
         <View style={styles.topNav}>
-          <TouchableOpacity style={styles.navIcon} onPress={() => router.back()}>
-            <ChevronLeft size={24} color={iconColor} />
-          </TouchableOpacity>
+          <View style={styles.leftNav}>
+            <TouchableOpacity style={styles.navIcon} onPress={() => router.back()}>
+              <ChevronLeft size={24} color={iconColor} />
+            </TouchableOpacity>
+            {showHeaderAvatar && user.avatarUrl ? <Avatar url={user.avatarUrl} size={32} /> : null}
+          </View>
           <Text style={[styles.headerUsername, { color: textPrimary }]}>{!isLoading ? `@${user.username}` : ''}</Text>
           <TouchableOpacity
             style={[styles.navIcon, { alignItems: 'flex-end' }]}
@@ -301,17 +257,25 @@ export default function UserProfileScreen() {
             <MoreVertical size={24} color={iconColor} />
           </TouchableOpacity>
         </View>
-      </Animated.View>
+      </View>
 
       <Animated.ScrollView
-        onScroll={scrollHandler}
+        onScroll={(event) => {
+          const shouldShow = event.nativeEvent.contentOffset.y > 40;
+          if (headerAvatarVisibleRef.current !== shouldShow) {
+            headerAvatarVisibleRef.current = shouldShow;
+            setShowHeaderAvatar(shouldShow);
+          }
+        }}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: insets.top + 60 }}
+        contentContainerStyle={{ paddingTop: insets.top + 60, flexGrow: isLoading ? 1 : 0 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={isDark ? "#fff" : "#000"} progressViewOffset={insets.top + 60} />}
       >
         {isLoading ? (
-          <ProfileSkeleton />
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={isDark ? '#fff' : '#000'} />
+          </View>
         ) : (
           <View style={styles.profileContainer}>
             <ProfileStats
@@ -389,18 +353,8 @@ export default function UserProfileScreen() {
 
             <View style={styles.socialClubsRow}>
               {(profileUser?.instagramUrl || profileUser?.tiktokUrl || profileUser?.youtubeUrl || profileUser?.xUrl || profileUser?.website) && (
-                <>
-                  <SocialTags isDark={isDark} user={profileUser} />
-                  <View style={[styles.verticalSeparator, { backgroundColor: isDark ? '#444' : '#ccc' }]} />
-                </>
+                <SocialTags isDark={isDark} user={profileUser} />
               )}
-
-              <ClubsCollaboration
-                clubsCount={clubs.length}
-                clubLogos={clubLogos}
-                isDark={isDark}
-                onPress={() => clubsSheetRef.current?.expand()}
-              />
             </View>
           </View>
         )}
@@ -410,8 +364,6 @@ export default function UserProfileScreen() {
           <TouchableOpacity style={[styles.tab, activeTab === 1 && [styles.activeTab, { borderBottomColor: textPrimary }]]} onPress={() => handleTabPress(1)}><VideoIcon color={activeTab === 1 ? textPrimary : textSecondary} /></TouchableOpacity>
           <TouchableOpacity style={[styles.tab, activeTab === 2 && [styles.activeTab, { borderBottomColor: textPrimary }]]} onPress={() => handleTabPress(2)}><TagsIcon color={activeTab === 2 ? textPrimary : textSecondary} /></TouchableOpacity>
         </View>
-
-        <HighlightPills highlights={highlights} isDark={isDark} />
 
         <PagerView ref={pagerRef} style={{ width: '100%', height: activeTab === 0 ? gridHeight : activeTab === 1 ? videosHeight : tagsHeight }} initialPage={0} onPageSelected={(e) => setActiveTab(e.nativeEvent.position)}>
           <View key="0"><PostsGrid posts={postsData} isDark={isDark} onPreview={showPreview} onPreviewEnd={hidePreview} /></View>
@@ -427,7 +379,6 @@ export default function UserProfileScreen() {
       {/* Overlays & Modals */}
       {previewItem && <PreviewModal item={previewItem} onClose={hidePreview} />}
       <BioBottomSheet ref={bioSheetRef} bio={user.bio} isDark={isDark} />
-      <ClubsBottomSheet ref={clubsSheetRef} clubs={clubs} isDark={isDark} />
       <UserOptionsModal visible={isUserOptionsVisible} username={user.username} onClose={() => setIsUserOptionsVisible(false)} onAction={(type) => console.log('User action:', type)} />
     </View>
   );
@@ -436,9 +387,10 @@ export default function UserProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   topNavContainer: { width: '100%', zIndex: 1000, position: 'absolute', top: 0, left: 0, right: 0 },
-  topNav: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 10, height: 60 },
+  topNav: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 10, height: 60, position: 'relative' },
+  leftNav: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   navIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  headerUsername: { fontSize: 20, fontWeight: '600', flex: 1, textAlign: 'center' },
+  headerUsername: { fontSize: 20, fontWeight: '600', position: 'absolute', left: 0, right: 0, textAlign: 'center', zIndex: -1 },
   profileContainer: { alignItems: 'center', paddingHorizontal: 10, marginTop: 5 },
   userNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
   userNameText: { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
@@ -451,7 +403,7 @@ const styles = StyleSheet.create({
   tab: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12 },
   activeTab: { borderBottomWidth: 2 },
   socialClubsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15, marginVertical: 10, width: '100%' },
-  verticalSeparator: { width: 1.5, height: 20 },
+  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   previewOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', zIndex: 999 },
   previewCard: { width: '80%', height: 480, borderRadius: 30, overflow: 'hidden', backgroundColor: '#000', elevation: 20, shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 15, shadowOffset: { width: 0, height: 10 } },
   previewVideo: { width: '100%', height: '100%' },

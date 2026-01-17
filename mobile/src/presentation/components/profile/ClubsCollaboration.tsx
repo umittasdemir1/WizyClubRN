@@ -34,7 +34,7 @@ export const ClubsCollaboration: React.FC<ClubsCollaborationProps> = ({
                             {
                                 zIndex: 10 - index,
                                 borderColor: borderColor,
-                                marginLeft: index === 0 ? 0 : -12, // More overlap for a tighter look
+                                marginLeft: index === 0 ? 0 : -10, // More overlap for a tighter look
                             },
                         ]}
                     >
@@ -70,9 +70,9 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     avatarContainer: {
-        width: 38,
-        height: 38,
-        borderRadius: 10,
+        width: 32,
+        height: 32,
+        borderRadius: 8,
         borderWidth: 1,
         overflow: 'hidden',
         backgroundColor: '#fff',
@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
     textWrapper: {
         flexDirection: 'column',
         justifyContent: 'center',
-        height: 38,
+        height: 32,
     },
     title: {
         fontSize: 12,

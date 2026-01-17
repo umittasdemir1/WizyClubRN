@@ -171,6 +171,7 @@ export const FeedItemOverlay = memo(function FeedItemOverlay({
                     onSave={() => onToggleSave(video.id)}
                     onShare={() => onToggleShare(video.id)}
                     onShop={onOpenShopping}
+                    showShop={!!video.brandUrl}
                     onProfilePress={() => router.push(profileRoute)}
                 />
 

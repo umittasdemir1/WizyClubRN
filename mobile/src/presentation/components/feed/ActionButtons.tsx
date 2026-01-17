@@ -1,6 +1,5 @@
 import React, { memo, useState, useEffect, forwardRef, useImperativeHandle, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -27,15 +26,15 @@ interface ActionButtonsProps {
     onShare: () => void;
     onShop: () => void;
     onProfilePress: () => void;
+    showShop?: boolean;
 }
 
 export interface ActionButtonsRef {
     animateLike: () => void;
 }
 
-const BASE_BOTTOM_POSITION = 120;
-const SAFE_AREA_OFFSET = 100;
-const ICON_SIZE = 34;
+const ICON_SIZE = 38;
+const ACTION_BUTTON_GAP = 14;
 
 const LIKE_COLOR = '#FF2146';
 const SAVE_COLOR = '#FFD700';
@@ -198,9 +197,8 @@ export const ActionButtons = memo(forwardRef<ActionButtonsRef, ActionButtonsProp
     onSave,
     onShare,
     onShop,
+    showShop = true,
 }, ref) {
-    const insets = useSafeAreaInsets();
-    const bottom = Math.max(BASE_BOTTOM_POSITION, insets.bottom + SAFE_AREA_OFFSET);
     const likeButtonRef = useRef<ActionButtonRef>(null);
 
     useImperativeHandle(ref, () => ({
@@ -210,53 +208,58 @@ export const ActionButtons = memo(forwardRef<ActionButtonsRef, ActionButtonsProp
     }));
 
     return (
-        <View style={[styles.container, { bottom }]} pointerEvents="box-none">
-            <ActionButton
-                ref={likeButtonRef}
-                IconComponent={Heart}
-                count={formatCount(likesCount)}
-                zeroText="Beğen"
-                videoId={videoId}
-                onPress={onLike}
-                isActive={isLiked}
-                activeColor={LIKE_COLOR}
-                enableBurst={true}
-                burstColors={LIKE_PARTICLE_COLORS}
-            />
+        <View style={styles.container} pointerEvents="box-none">
+            <View style={styles.actionsStack}>
+                <View style={styles.glassPill} pointerEvents="none" />
+                <ActionButton
+                    ref={likeButtonRef}
+                    IconComponent={Heart}
+                    count={formatCount(likesCount)}
+                    zeroText="Beğen"
+                    videoId={videoId}
+                    onPress={onLike}
+                    isActive={isLiked}
+                    activeColor={LIKE_COLOR}
+                    enableBurst={true}
+                    burstColors={LIKE_PARTICLE_COLORS}
+                />
 
-            <ActionButton
-                IconComponent={Bookmark}
-                count={formatCount(savesCount || 0)}
-                zeroText="Kaydet"
-                videoId={videoId}
-                onPress={onSave}
-                isActive={isSaved}
-                activeColor={SAVE_COLOR}
-                enableBurst={true}
-                burstColors={SAVE_PARTICLE_COLORS}
-            />
+                <ActionButton
+                    IconComponent={Bookmark}
+                    count={formatCount(savesCount || 0)}
+                    zeroText="Kaydet"
+                    videoId={videoId}
+                    onPress={onSave}
+                    isActive={isSaved}
+                    activeColor={SAVE_COLOR}
+                    enableBurst={true}
+                    burstColors={SAVE_PARTICLE_COLORS}
+                />
 
-            <ActionButton
-                IconComponent={Send}
-                count={formatCount(sharesCount)}
-                zeroText="Gönder"
-                videoId={videoId}
-                onPress={onShare}
-                isActive={false}
-                activeColor={WHITE}
-                canToggle={false}
-            />
+                <ActionButton
+                    IconComponent={Send}
+                    count={formatCount(sharesCount)}
+                    zeroText="Gönder"
+                    videoId={videoId}
+                    onPress={onShare}
+                    isActive={false}
+                    activeColor={WHITE}
+                    canToggle={false}
+                />
 
-            <ActionButton
-                IconComponent={PictureInPicture}
-                count={formatCount(shopsCount || 0)}
-                zeroText="Göz At"
-                videoId={videoId}
-                onPress={onShop}
-                isActive={false}
-                activeColor={WHITE}
-                canToggle={false}
-            />
+                {showShop ? (
+                    <ActionButton
+                        IconComponent={PictureInPicture}
+                        count={formatCount(shopsCount || 0)}
+                        zeroText="Göz At"
+                        videoId={videoId}
+                        onPress={onShop}
+                        isActive={false}
+                        activeColor={WHITE}
+                        canToggle={false}
+                    />
+                ) : null}
+            </View>
         </View>
     );
 }));
@@ -271,11 +274,34 @@ function formatCount(count: number): string {
 const styles = StyleSheet.create({
     container: {
         position: 'absolute',
-        right: 8,
+        right: 18,
+        top: 0,
+        bottom: 0,
         flexDirection: 'column',
         gap: 14,
         alignItems: 'center',
+        justifyContent: 'center',
         zIndex: 50,
+    },
+    actionsStack: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 14,
+    },
+    glassPill: {
+        position: 'absolute',
+        top: -10,
+        bottom: -10,
+        width: 56,
+        borderRadius: 28,
+        backgroundColor: 'rgba(255, 255, 255, 0.12)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.28)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.25,
+        shadowRadius: 10,
+        elevation: 6,
     },
     buttonContainer: {
         alignItems: 'center',

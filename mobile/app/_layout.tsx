@@ -13,6 +13,7 @@ import { useDraftCleanup } from '../src/presentation/hooks/useDraftCleanup';
 import { SessionLogService } from '../src/core/services/SessionLogService';
 import { COLORS, LIGHT_COLORS } from '../src/core/constants';
 import { useEffect } from 'react';
+import { StatusBar } from 'react-native';
 import { useKeepAwake } from 'expo-keep-awake';
 import Toast from 'react-native-toast-message';
 import { InAppBrowserOverlay } from '../src/presentation/components/shared/InAppBrowserOverlay';
@@ -92,6 +93,10 @@ export default function RootLayout() {
                     statusBar: isDark ? 'light' : 'dark',
                     navigationBar: isDark ? 'light' : 'dark',
                 }}
+            />
+            <StatusBar
+                barStyle={isDark ? 'light-content' : 'dark-content'}
+                backgroundColor={isDark ? COLORS.background : LIGHT_COLORS.background}
             />
             <ThemeProvider>
                 <SafeAreaProvider>
