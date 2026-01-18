@@ -13,6 +13,8 @@ import { useActiveVideoStore } from '../store/useActiveVideoStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useSocialStore } from '../store/useSocialStore';
 import { useStartupStore, initStartupTimer } from '../store/useStartupStore';
+import { useProfileCacheStore } from '../store/useProfileCacheStore';
+import { useFeedCacheStore } from '../store/useFeedCacheStore';
 
 // Interfaces
 interface UseVideoFeedReturn {
@@ -35,6 +37,10 @@ interface UseVideoFeedReturn {
 }
 
 export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
+    const cacheKey = filterUserId ?? 'global';
+    const cachedFeed = useFeedCacheStore((state) => state.feeds[cacheKey]);
+    const setFeedCache = useFeedCacheStore((state) => state.setFeed);
+
     // Repository & UseCases (Memoized to prevent recreation)
     const videoRepository = useRef(new VideoRepositoryImpl()).current;
     const interactionRepository = useRef(new InteractionRepositoryImpl()).current;
@@ -45,8 +51,8 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
     const toggleFollowUseCase = useRef(new ToggleFollowUseCase(interactionRepository)).current;
 
     // State
-    const [videos, setVideos] = useState<Video[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [videos, setVideos] = useState<Video[]>(cachedFeed?.videos ?? []);
+    const [isLoading, setIsLoading] = useState(!(cachedFeed?.videos?.length));
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -65,12 +71,30 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
     const followingMap = useSocialStore((state) => state.followingMap);
     const globalToggleFollow = useSocialStore((state) => state.toggleFollow);
     const syncSocialData = useSocialStore((state) => state.syncSocialData);
+    const setProfileCache = useProfileCacheStore((state) => state.setProfile);
+    const hasCachedVideos = !!cachedFeed?.videos?.length;
 
     // Initialize Cache
     useEffect(() => {
         VideoCacheService.initialize();
         initStartupTimer();
     }, []);
+
+    useEffect(() => {
+        if (!cachedFeed?.videos?.length) {
+            if (cacheKey !== 'global' && videos.length === 0) {
+                setIsLoading(true);
+            }
+            return;
+        }
+
+        if (videos.length === 0) {
+            setVideos(cachedFeed.videos);
+            setIsLoading(false);
+            setHasMore(cachedFeed.videos.length >= 10);
+            setPage(2);
+        }
+    }, [cacheKey, cachedFeed?.updatedAt, videos.length]);
 
     const isStartupComplete = useStartupStore((state) => state.isStartupComplete);
 
@@ -141,7 +165,7 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
 
     const fetchFeed = useCallback(async () => {
         try {
-            setIsLoading(true);
+            setIsLoading(!hasCachedVideos);
             setError(null);
 
             // Get fresh userId from store to avoid stale closure
@@ -161,6 +185,7 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
                         v.user.followersCount || 0,
                         v.user.followingCount || 0
                     );
+                    setProfileCache(v.user);
                 });
             }
         } catch (err) {
@@ -173,7 +198,7 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
                 setIsLoading(false);
             }
         }
-    }, [getVideoFeedUseCase, filterUserId, syncSocialData]); // Removed currentUserId from dependencies
+    }, [getVideoFeedUseCase, filterUserId, syncSocialData, setProfileCache, hasCachedVideos]); // Removed currentUserId from dependencies
 
     const refreshFeed = useCallback(async () => {
         if (isRefreshing) return;
@@ -202,6 +227,7 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
                         v.user.followersCount || 0,
                         v.user.followingCount || 0
                     );
+                    setProfileCache(v.user);
                 });
             }
         } catch (err) {
@@ -214,7 +240,7 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
                 setIsRefreshing(false);
             }
         }
-    }, [isRefreshing, getVideoFeedUseCase, filterUserId, syncSocialData]); // Removed currentUserId
+    }, [isRefreshing, getVideoFeedUseCase, filterUserId, syncSocialData, setProfileCache]); // Removed currentUserId
 
     const loadMore = useCallback(async () => {
         if (isLoadingMore || !hasMore || isLoading) return;
@@ -240,6 +266,7 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
                             v.user.followersCount || 0,
                             v.user.followingCount || 0
                         );
+                        setProfileCache(v.user);
                     });
                 } else {
                     setHasMore(false);
@@ -252,7 +279,13 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
                 setIsLoadingMore(false);
             }
         }
-    }, [isLoadingMore, hasMore, isLoading, page, getVideoFeedUseCase, filterUserId, syncSocialData]); // Removed currentUserId
+    }, [isLoadingMore, hasMore, isLoading, page, getVideoFeedUseCase, filterUserId, syncSocialData, setProfileCache]); // Removed currentUserId
+
+    useEffect(() => {
+        if (videos) {
+            setFeedCache(cacheKey, videos);
+        }
+    }, [videos, cacheKey, setFeedCache]);
 
     // Optimistic Update with Rollback
     const toggleLike = useCallback(async (videoId: string) => {

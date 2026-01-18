@@ -2,12 +2,19 @@ import { useState, useEffect, useCallback } from 'react';
 import { User } from '../../domain/entities';
 import { ProfileRepositoryImpl } from '../../data/repositories/ProfileRepositoryImpl';
 import { useSocialStore } from '../store/useSocialStore';
+import { useProfileCacheStore } from '../store/useProfileCacheStore';
+import { useAuthStore } from '../store/useAuthStore';
 
 const profileRepo = new ProfileRepositoryImpl();
 
 export const useProfile = (userId: string, viewerId?: string) => {
-    const [user, setUser] = useState<User | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const cachedProfile = useProfileCacheStore((state) => (userId ? state.profilesById[userId] : null));
+    const setProfileCache = useProfileCacheStore((state) => state.setProfile);
+    const authUserId = useAuthStore((state) => state.user?.id);
+    const effectiveViewerId = viewerId || authUserId;
+
+    const [user, setUser] = useState<User | null>(cachedProfile ?? null);
+    const [isLoading, setIsLoading] = useState(!cachedProfile);
     const [error, setError] = useState<string | null>(null);
 
     const followingMap = useSocialStore((state) => state.followingMap);
@@ -30,9 +37,10 @@ export const useProfile = (userId: string, viewerId?: string) => {
         }
 
         try {
-            const profileData = await profileRepo.getProfile(userId, viewerId);
+            const profileData = await profileRepo.getProfile(userId, effectiveViewerId);
             if (profileData) {
                 setUser(profileData);
+                setProfileCache(profileData);
                 // Sync to global store
                 syncSocialData(
                     profileData.id,
@@ -49,20 +57,37 @@ export const useProfile = (userId: string, viewerId?: string) => {
                 setIsLoading(false);
             }
         }
-    }, [userId, viewerId, syncSocialData]);
+    }, [userId, effectiveViewerId, syncSocialData, setProfileCache]);
 
     useEffect(() => {
         // Only load if userId is valid (not a fallback or invalid ID)
         if (userId && userId.length > 0) {
-            loadProfile();
+            loadProfile(!!cachedProfile);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [userId]); // Only load on mount/userId change
+
+    useEffect(() => {
+        if (!userId) {
+            setUser(null);
+            setIsLoading(false);
+            return;
+        }
+
+        if (cachedProfile) {
+            setUser(cachedProfile);
+            setIsLoading(false);
+        } else {
+            setUser(null);
+            setIsLoading(true);
+        }
+    }, [userId, cachedProfile]);
 
     const updateProfile = useCallback(async (updates: Partial<User>) => {
         try {
             const updatedUser = await profileRepo.updateProfile(userId, updates);
             setUser(updatedUser);
+            setProfileCache(updatedUser);
             syncSocialData(
                 updatedUser.id,
                 updatedUser.isFollowing,
@@ -78,7 +103,7 @@ export const useProfile = (userId: string, viewerId?: string) => {
             setError('Profil güncellenirken bir hata oluştu.');
             throw err;
         }
-    }, [userId, loadProfile, syncSocialData]);
+    }, [userId, loadProfile, syncSocialData, setProfileCache]);
 
     const uploadAvatar = useCallback(async (fileUri: string) => {
         try {

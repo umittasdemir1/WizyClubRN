@@ -4,6 +4,22 @@ import { CONFIG } from '../../core/config';
 
 export class SupabaseProfileDataSource {
     async getProfile(userId: string, viewerId?: string): Promise<any> {
+        const { data: rpcData, error: rpcError } = await supabase.rpc('get_profile_summary', {
+            target_user_id: userId,
+            viewer_user_id: viewerId ?? null
+        });
+
+        if (!rpcError && Array.isArray(rpcData)) {
+            if (rpcData.length === 0) {
+                return null;
+            }
+            return rpcData[0];
+        }
+
+        if (rpcError) {
+            console.warn('[SupabaseDataSource] ⚠️ get_profile_summary RPC failed, falling back:', rpcError);
+        }
+
         const { data, error } = await supabase
             .from('profiles')
             .select('*')
@@ -20,24 +36,26 @@ export class SupabaseProfileDataSource {
             return null;
         }
 
-        if (viewerId) {
-            const { count } = await supabase
+        const now = new Date().toISOString();
+        const followPromise = viewerId
+            ? supabase
                 .from('follows')
                 .select('*', { count: 'exact', head: true })
                 .eq('follower_id', viewerId)
-                .eq('following_id', userId);
+                .eq('following_id', userId)
+            : Promise.resolve({ count: null } as { count: number | null });
 
-            data.is_following = count ? count > 0 : false;
-        }
-
-        // Check for active stories
-        const now = new Date().toISOString();
-        // Check for active stories and if they are unseen
-        const { data: stories } = await supabase
+        const storiesPromise = supabase
             .from('stories')
             .select('id')
             .eq('user_id', userId)
             .gt('expires_at', now);
+
+        const [{ count }, { data: stories }] = await Promise.all([followPromise, storiesPromise]);
+
+        if (viewerId) {
+            data.is_following = count ? count > 0 : false;
+        }
 
         const storyIds = stories?.map(s => s.id) || [];
         const hasStories = storyIds.length > 0;

@@ -8,7 +8,6 @@ import {
   Pressable,
   RefreshControl,
   Dimensions,
-  ActivityIndicator,
 } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import Video from 'react-native-video';
@@ -68,6 +67,29 @@ const TagsIcon = ({ color }: { color: string }) => (
   </Svg>
 );
 
+const ProfileHeaderSkeleton = ({ isDark }: { isDark: boolean }) => {
+  const blockColor = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)';
+  return (
+    <View style={styles.skeletonWrapper}>
+      <View style={styles.skeletonRow}>
+        <View style={[styles.skeletonCircle, { backgroundColor: blockColor }]} />
+        <View style={styles.skeletonTextBlock}>
+          <View style={[styles.skeletonLineLg, { backgroundColor: blockColor }]} />
+          <View style={[styles.skeletonLineSm, { backgroundColor: blockColor }]} />
+        </View>
+      </View>
+      <View style={styles.skeletonStatsRow}>
+        <View style={[styles.skeletonStat, { backgroundColor: blockColor }]} />
+        <View style={[styles.skeletonStat, { backgroundColor: blockColor }]} />
+        <View style={[styles.skeletonStat, { backgroundColor: blockColor }]} />
+      </View>
+      <View style={styles.skeletonButtonsRow}>
+        <View style={[styles.skeletonButton, { backgroundColor: blockColor }]} />
+        <View style={[styles.skeletonButton, { backgroundColor: blockColor }]} />
+      </View>
+    </View>
+  );
+};
 // Animated IconButton
 const AnimatedIconButton = ({
   icon: Icon,
@@ -273,9 +295,7 @@ export default function UserProfileScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={isDark ? "#fff" : "#000"} progressViewOffset={insets.top + 60} />}
       >
         {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={isDark ? '#fff' : '#000'} />
-          </View>
+          <ProfileHeaderSkeleton isDark={isDark} />
         ) : (
           <View style={styles.profileContainer}>
             <ProfileStats
@@ -404,6 +424,16 @@ const styles = StyleSheet.create({
   activeTab: { borderBottomWidth: 2 },
   socialClubsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15, marginVertical: 10, width: '100%' },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  skeletonWrapper: { paddingHorizontal: 16, paddingTop: 12 },
+  skeletonRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 },
+  skeletonCircle: { width: 86, height: 86, borderRadius: 43 },
+  skeletonTextBlock: { flex: 1, gap: 8 },
+  skeletonLineLg: { width: '70%', height: 14, borderRadius: 7 },
+  skeletonLineSm: { width: '45%', height: 10, borderRadius: 5 },
+  skeletonStatsRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
+  skeletonStat: { flex: 1, height: 44, borderRadius: 10 },
+  skeletonButtonsRow: { flexDirection: 'row', gap: 10 },
+  skeletonButton: { flex: 1, height: 36, borderRadius: 8 },
   previewOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', zIndex: 999 },
   previewCard: { width: '80%', height: 480, borderRadius: 30, overflow: 'hidden', backgroundColor: '#000', elevation: 20, shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 15, shadowOffset: { width: 0, height: 10 } },
   previewVideo: { width: '100%', height: '100%' },

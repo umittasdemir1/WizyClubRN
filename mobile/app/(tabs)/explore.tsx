@@ -1,4 +1,4 @@
-import { View, StyleSheet, ScrollView, RefreshControl, Text, Pressable, Dimensions, Modal, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, ScrollView, RefreshControl, Text, Pressable, Dimensions, Modal } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { useCallback, useState, useEffect } from 'react';
@@ -194,6 +194,40 @@ const PreviewModal = ({ item, onClose, onAction }: PreviewModalProps) => {
     );
 };
 
+const ExploreSkeleton = ({ isDark }: { isDark: boolean }) => {
+    const blockColor = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)';
+    const pillColor = isDark ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0.1)';
+    return (
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.skeletonContainer}>
+            <View style={[styles.skeletonHeader, { backgroundColor: blockColor }]} />
+            <View style={styles.skeletonPillsRow}>
+                {Array.from({ length: 3 }).map((_, idx) => (
+                    <View key={`pill-${idx}`} style={[styles.skeletonPill, { backgroundColor: pillColor }]} />
+                ))}
+            </View>
+            <View style={styles.skeletonStoryRow}>
+                {Array.from({ length: 6 }).map((_, idx) => (
+                    <View key={`story-${idx}`} style={[styles.skeletonStoryCircle, { backgroundColor: blockColor }]} />
+                ))}
+            </View>
+            <View style={styles.skeletonSectionRow}>
+                <View style={[styles.skeletonSectionTitle, { backgroundColor: blockColor }]} />
+                <View style={[styles.skeletonSectionIcon, { backgroundColor: blockColor }]} />
+            </View>
+            <View style={styles.skeletonCarouselRow}>
+                {Array.from({ length: 4 }).map((_, idx) => (
+                    <View key={`carousel-${idx}`} style={[styles.skeletonCarouselItem, { backgroundColor: blockColor }]} />
+                ))}
+            </View>
+            <View style={styles.skeletonGrid}>
+                {Array.from({ length: 12 }).map((_, idx) => (
+                    <View key={`grid-${idx}`} style={[styles.skeletonGridItem, { backgroundColor: blockColor }]} />
+                ))}
+            </View>
+        </ScrollView>
+    );
+};
+
 export default function ExploreScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
@@ -306,8 +340,8 @@ export default function ExploreScreen() {
                 onSwipeRight={previewItem ? undefined : () => router.push('/')}
                 edgeOnly={!!previewItem}
             >
-                <View style={[styles.container, styles.loadingContainer, { backgroundColor: bgBody }]}>
-                    <ActivityIndicator size="large" color={isDark ? '#fff' : '#000'} />
+                <View style={[styles.container, { backgroundColor: bgBody }]}>
+                    <ExploreSkeleton isDark={isDark} />
                 </View>
             </SwipeWrapper>
         );
@@ -402,9 +436,72 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-    loadingContainer: {
-        justifyContent: 'center',
+    skeletonContainer: {
+        paddingHorizontal: 14,
+        paddingTop: 12,
+        paddingBottom: 24,
+    },
+    skeletonHeader: {
+        height: 26,
+        width: '52%',
+        borderRadius: 12,
+        marginBottom: 14,
+    },
+    skeletonPillsRow: {
+        flexDirection: 'row',
+        gap: 8,
+        marginBottom: 16,
+    },
+    skeletonPill: {
+        height: 28,
+        flex: 1,
+        borderRadius: 14,
+    },
+    skeletonStoryRow: {
+        flexDirection: 'row',
+        gap: 10,
+        marginBottom: 20,
+    },
+    skeletonStoryCircle: {
+        width: 54,
+        height: 54,
+        borderRadius: 27,
+    },
+    skeletonSectionRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
         alignItems: 'center',
+        marginBottom: 12,
+    },
+    skeletonSectionTitle: {
+        height: 18,
+        width: 120,
+        borderRadius: 9,
+    },
+    skeletonSectionIcon: {
+        height: 18,
+        width: 18,
+        borderRadius: 9,
+    },
+    skeletonCarouselRow: {
+        flexDirection: 'row',
+        gap: 10,
+        marginBottom: 18,
+    },
+    skeletonCarouselItem: {
+        width: SCREEN_WIDTH * 0.32,
+        height: (SCREEN_WIDTH * 0.32) * (16 / 9),
+        borderRadius: 14,
+    },
+    skeletonGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 2,
+    },
+    skeletonGridItem: {
+        width: (SCREEN_WIDTH - 28 - 4) / 3,
+        height: (SCREEN_WIDTH - 28 - 4) / 3,
+        borderRadius: 8,
     },
     sectionHeader: {
         flexDirection: 'row',
