@@ -4,6 +4,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TouchableOpacity,
   View,
@@ -33,6 +34,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
+  Store,
   SunMoon,
   Trash2,
   User,
@@ -112,6 +114,9 @@ type ProfileSettingsOverlayProps = {
   browserHistoryEnabled: boolean;
   setBrowserHistoryEnabled: (enabled: boolean) => void;
   clearBrowserHistory: () => void;
+  isVerified: boolean;
+  shopEnabled: boolean;
+  setShopEnabled: (enabled: boolean) => void;
   browserHistory: Array<{ url: string; title?: string; timestamp: number }>;
   openHistoryEntry: (url: string) => void;
   getHistoryRange: (filter: 'today' | 'yesterday' | 'last3' | 'last7' | 'last30') => { start: number; end: number };
@@ -195,6 +200,9 @@ export function ProfileSettingsOverlay({
   browserHistoryEnabled,
   setBrowserHistoryEnabled,
   clearBrowserHistory,
+  isVerified,
+  shopEnabled,
+  setShopEnabled,
   browserHistory,
   openHistoryEntry,
   getHistoryRange,
@@ -1174,6 +1182,35 @@ export function ProfileSettingsOverlay({
                 </View>
                 <Text style={[styles.settingsChevron, { color: settingsChevronColor }]}>›</Text>
               </TouchableOpacity>
+              {isVerified && (
+                <View style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}>
+                  <View style={styles.settingsInfo}>
+                    <View style={styles.settingsLabelRow}>
+                      <Store size={settingsIconSize} color={settingsIconColor} strokeWidth={settingsIconStroke} />
+                      <Text
+                        style={[
+                          styles.settingsLabel,
+                          styles.settingsLabelSub,
+                          { color: textPrimary, marginBottom: 0 },
+                          settingsItemLabelOverrides,
+                        ]}
+                      >
+                        {settingsCopy.accountTypeShop}
+                      </Text>
+                    </View>
+                    <Text style={[styles.settingsHintText, { color: textSecondary }, settingsHelperOverrides]}>
+                      {settingsCopy.accountTypeShopHelper}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={shopEnabled}
+                    onValueChange={setShopEnabled}
+                    trackColor={{ false: '#767577', true: settingsSegmentActive }}
+                    thumbColor={shopEnabled ? '#FFFFFF' : '#F4F3F4'}
+                    ios_backgroundColor="#3e3e3e"
+                  />
+                </View>
+              )}
             </>
           ) : settingsSection === 'inAppBrowser' ? (
             <>

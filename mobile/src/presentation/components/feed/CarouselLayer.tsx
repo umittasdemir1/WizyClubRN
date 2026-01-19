@@ -224,7 +224,7 @@ export function CarouselLayer({
                 <View
                     style={[
                         styles.photoIndexBadge,
-                        { top: insets.top + 52 },
+                        { top: insets.top + 72 },
                     ]}
                     pointerEvents="none"
                 >

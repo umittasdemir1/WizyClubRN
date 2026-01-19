@@ -4,6 +4,7 @@ export interface User {
     fullName?: string;
     avatarUrl: string;
     isVerified?: boolean;
+    shopEnabled?: boolean;
     isFollowing: boolean;
     country?: string;
     age?: number;

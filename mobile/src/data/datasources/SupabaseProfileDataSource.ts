@@ -161,6 +161,7 @@ export class SupabaseProfileDataSource {
         if ('country' in user) dto.country = user.country;
         if ('age' in user) dto.age = user.age;
         if ('website' in user) dto.website = user.website;
+        if ('shopEnabled' in user) dto.shop_enabled = user.shopEnabled;
         // Social Links
         if ('instagramUrl' in user) dto.instagram_url = user.instagramUrl;
         if ('tiktokUrl' in user) dto.tiktok_url = user.tiktokUrl;

@@ -54,6 +54,7 @@ export class ProfileRepositoryImpl implements IProfileRepository {
             age: dto.age,
             website: dto.website,
             isVerified: dto.is_verified,
+            shopEnabled: dto.shop_enabled,
             followersCount: dto.followers_count,
             followingCount: dto.following_count,
             postsCount: dto.posts_count,

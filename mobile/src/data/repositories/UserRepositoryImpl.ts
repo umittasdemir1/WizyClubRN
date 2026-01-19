@@ -43,6 +43,8 @@ export class UserRepositoryImpl implements IUserRepository {
             country: data.country,
             age: data.age,
             bio: data.bio,
+            isVerified: data.is_verified,
+            shopEnabled: data.shop_enabled,
             followersCount: data.followers_count || 0,
             followingCount: data.following_count || 0
         };

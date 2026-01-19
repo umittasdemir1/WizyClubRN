@@ -128,6 +128,7 @@ export const useAuthStore = create<AuthState>((set) => ({
             username: username,
             full_name: fullName,
             avatar_url: `https://api.dicebear.com/7.x/avataaars/png?seed=${username}`,
+            shop_enabled: false,
           });
 
         if (profileError) {

@@ -9,13 +9,18 @@ import {
   Dimensions,
   BackHandler,
   InteractionManager,
+  Modal,
   ActivityIndicator,
+  Animated as RNAnimated,
+  Easing,
 } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import Video from 'react-native-video';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as NavigationBar from 'expo-navigation-bar';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import { useAuthStore } from '../../src/presentation/store/useAuthStore';
 import { useDraftStore } from '../../src/presentation/store/useDraftStore';
@@ -26,10 +31,10 @@ import { VideoGrid } from '../../src/presentation/components/profile/VideoGrid';
 import { PostsGrid } from '../../src/presentation/components/profile/PostsGrid';
 import { BioBottomSheet } from '../../src/presentation/components/profile/BioBottomSheet';
 import { EditProfileSheet } from '../../src/presentation/components/profile/EditProfileSheet';
-import { Menu } from 'lucide-react-native';
+import { Menu, Store } from 'lucide-react-native';
 import { SystemBars } from 'react-native-edge-to-edge';
 import BottomSheet from '@gorhom/bottom-sheet';
-import Svg, { Path, Circle } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Path, Stop, Text as SvgText } from 'react-native-svg';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -49,23 +54,23 @@ import { Video as VideoEntity } from '../../src/domain/entities/Video';
 
 const activityRepository = new UserActivityRepositoryImpl();
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // SVG Icons
 const GridIcon = ({ color }: { color: string }) => (
-  <Svg width="22" height="22" viewBox="0 -960 960 960" fill={color}>
+  <Svg width="26" height="26" viewBox="0 -960 960 960" fill={color}>
     <Path d="M240-160q-33 0-56.5-23.5T160-240q0-33 23.5-56.5T240-320q33 0 56.5 23.5T320-240q0 33-23.5 56.5T240-160Zm240 0q-33 0-56.5-23.5T400-240q0-33 23.5-56.5T480-320q33 0 56.5 23.5T560-240q0 33-23.5 56.5T480-160Zm240 0q-33 0-56.5-23.5T640-240q0-33 23.5-56.5T720-320q33 0 56.5 23.5T800-240q0 33-23.5 56.5T720-160ZM240-400q-33 0-56.5-23.5T160-480q0-33 23.5-56.5T240-560q33 0 56.5 23.5T320-480q0 33-23.5 56.5T240-400Zm240 0q-33 0-56.5-23.5T400-480q0-33 23.5-56.5T480-560q33 0 56.5 23.5T560-480q0 33-23.5 56.5T480-400Zm240 0q-33 0-56.5-23.5T640-480q0-33 23.5-56.5T720-560q33 0 56.5 23.5T800-480q0 33-23.5 56.5T720-400ZM240-640q-33 0-56.5-23.5T160-720q0-33 23.5-56.5T240-800q33 0 56.5 23.5T320-720q0 33-23.5 56.5T240-640Zm240 0q-33 0-56.5-23.5T400-720q0-33 23.5-56.5T480-800q33 0 56.5 23.5T560-720q0 33-23.5 56.5T480-640Zm240 0q-33 0-56.5-23.5T640-720q0-33 23.5-56.5T720-800q33 0 56.5 23.5T800-720q0 33-23.5 56.5T720-640Z" />
   </Svg>
 );
 
 const VideoIcon = ({ color }: { color: string }) => (
-  <Svg width="22" height="22" viewBox="0 -960 960 960" fill={color}>
+  <Svg width="26" height="26" viewBox="0 -960 960 960" fill={color}>
     <Path d="m480-420+240-160-240-160v320Zm28+220h224q-7+26-24+42t-44+20L228-85q-33+5-59.5-15.5T138-154L85-591q-4-33+16-59t53-30l46-6v80l-36+5+54+437+290-36Zm-148-80q-33+0-56.5-23.5T280-360v-440q0-33+23.5-56.5T360-880h440q33+0+56.5+23.5T880-800v440q0+33-23.5+56.5T800-280H360Zm0-80h440v-440H360v440Zm220-220ZM218-164Z" />
   </Svg>
 );
 
 const TagsIcon = ({ color }: { color: string }) => (
-  <Svg width="22" height="22" viewBox="0 0 24 24" fill={color}>
+  <Svg width="26" height="26" viewBox="0 0 24 24" fill={color}>
     <Path d="M0 0h24v24H0V0z" fill="none" />
     <Path d="M2.53 19.65l1.34.56v-9.03l-2.43 5.86c-.41 1.02.08 2.19 1.09 2.61zm19.5-3.7L17.07 3.98c-.31-.75-1.04-1.21-1.81-1.23-.26 0-.53.04-.79.15L7.1 5.95c-.75.31-1.21 1.03-1.23 1.8-.01.27.04.54.15.8l4.96 11.97c.31.76 1.05 1.22 1.83 1.23.26 0 .52-.05.77-.15l7.36-3.05c1.02-.42 1.51-1.59 1.09-2.6zm-9.2 3.8L7.87 7.79l7.35-3.04h.01l4.95 11.95-7.35 3.05z" />
     <Circle cx="11" cy="9" r="1" />
@@ -74,9 +79,91 @@ const TagsIcon = ({ color }: { color: string }) => (
 );
 
 const SaveTabIcon = ({ color }: { color: string }) => (
-  <Svg width="22" height="22" viewBox="0 -960 960 960" fill={color}>
+  <Svg width="26" height="26" viewBox="0 -960 960 960" fill={color}>
     <Path d="M200-120v-640q0-33 23.5-56.5T280-840h400q33 0 56.5 23.5T760-760v640L480-240 200-120Zm80-122 200-86 200 86v-518H280v518Zm0-518h400-400Z" />
   </Svg>
+);
+
+const ShoppingBag = Store;
+
+const ShopFireworks = ({ triggerKey }: { triggerKey: number }) => {
+  const centers = React.useMemo(() => (
+    Array.from({ length: 8 }, () => ({
+      x: SCREEN_WIDTH * (0.15 + Math.random() * 0.7),
+      y: SCREEN_HEIGHT / 2 - (70 + Math.random() * 140),
+    }))
+  ), [triggerKey]);
+  const particles = React.useMemo(() => (
+    centers.flatMap((center, centerIndex) => (
+      Array.from({ length: 18 }, (_, index) => {
+        const angle = (index / 18) * 360 + Math.random() * 16;
+        return {
+          id: `${triggerKey}-${centerIndex}-${index}`,
+          angle,
+          distance: 90 + Math.random() * 80,
+          size: 6 + Math.random() * 6,
+        delay: Math.floor(Math.random() * 2000),
+          color: ['#F472B6', '#FB7185', '#F59E0B'][index % 3],
+          centerX: center.x,
+          centerY: center.y,
+        };
+      })
+    ))
+  ), [centers, triggerKey]);
+  const anims = React.useRef(particles.map(() => new RNAnimated.Value(0))).current;
+
+  React.useEffect(() => {
+    const animations = anims.map((val, index) => (
+      RNAnimated.timing(val, {
+        toValue: 1,
+        duration: 1800,
+        delay: particles[index]?.delay ?? 0,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      })
+    ));
+    RNAnimated.parallel(animations).start();
+  }, [anims, particles, triggerKey]);
+
+  return (
+    <View style={styles.shopModalFx} pointerEvents="none">
+      {particles.map((particle, index) => {
+        const angleRad = (particle.angle * Math.PI) / 180;
+        const translateX = Math.cos(angleRad) * particle.distance;
+        const translateY = Math.sin(angleRad) * particle.distance;
+        const anim = anims[index];
+        const animatedStyle = {
+          opacity: anim.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0, 1, 0] }),
+          transform: [
+            { translateX: anim.interpolate({ inputRange: [0, 1], outputRange: [0, translateX] }) },
+            { translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [0, translateY] }) },
+            { scale: anim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) },
+          ],
+        };
+        return (
+          <RNAnimated.View
+            key={particle.id}
+            style={[
+              styles.shopModalFxParticle,
+              {
+                width: particle.size,
+                height: particle.size,
+                borderRadius: particle.size / 2,
+                backgroundColor: particle.color,
+                left: particle.centerX - particle.size / 2,
+                top: particle.centerY - particle.size / 2,
+              },
+              animatedStyle,
+            ]}
+          />
+        );
+      })}
+    </View>
+  );
+};
+
+const StoreTabIcon = ({ color }: { color: string }) => (
+  <Store size={26} color={color} strokeWidth={1.7} />
 );
 
 // Preview Modal Component
@@ -203,10 +290,12 @@ export default function ProfileScreen() {
         accountTypeBranded: getString('profile.settings.accountType.branded') || prev.accountTypeBranded,
         accountTypeVerification: getString('profile.settings.accountType.verification') || prev.accountTypeVerification,
         accountTypeBadge: getString('profile.settings.accountType.badge') || prev.accountTypeBadge,
+        accountTypeShop: getString('profile.settings.accountType.shop') || prev.accountTypeShop,
         accountTypeCreatorHelper: getString('profile.settings.accountType.creatorHelper') || prev.accountTypeCreatorHelper,
         accountTypeBrandedHelper: getString('profile.settings.accountType.brandedHelper') || prev.accountTypeBrandedHelper,
         accountTypeVerificationHelper: getString('profile.settings.accountType.verificationHelper') || prev.accountTypeVerificationHelper,
         accountTypeBadgeHelper: getString('profile.settings.accountType.badgeHelper') || prev.accountTypeBadgeHelper,
+        accountTypeShopHelper: getString('profile.settings.accountType.shopHelper') || prev.accountTypeShopHelper,
         accountTypePause: getString('profile.settings.accountType.pause') || prev.accountTypePause,
         accountTypeTerminate: getString('profile.settings.accountType.terminate') || prev.accountTypeTerminate,
         accountTypePauseHelper: getString('profile.settings.accountType.pauseHelper') || prev.accountTypePauseHelper,
@@ -406,11 +495,15 @@ export default function ProfileScreen() {
   const [historySortOpen, setHistorySortOpen] = useState(false);
   const [historySelectionMode, setHistorySelectionMode] = useState(false);
   const [selectedHistoryKeys, setSelectedHistoryKeys] = useState<string[]>([]);
+  const [isShopModalOpen, setIsShopModalOpen] = useState(false);
   const browserHistoryEnabled = useInAppBrowserStore((state) => state.historyEnabled);
   const setBrowserHistoryEnabled = useInAppBrowserStore((state) => state.setHistoryEnabled);
   const browserHistory = useInAppBrowserStore((state) => state.history);
   const clearBrowserHistory = useInAppBrowserStore((state) => state.clearHistory);
   const openInAppBrowserUrl = useInAppBrowserStore((state) => state.openUrl);
+  const [shopEnabled, setShopEnabled] = useState(false);
+  const [showShopFx, setShowShopFx] = useState(false);
+  const [shopFxKey, setShopFxKey] = useState(0);
   const [settingsCopy, setSettingsCopy] = useState({
     title: 'Ayarlar ve kişisel araçlar',
     actionsHeader: 'Hareketler',
@@ -468,10 +561,12 @@ export default function ProfileScreen() {
     accountTypeBranded: 'Markalı içerik',
     accountTypeVerification: 'Doğrulama talep et',
     accountTypeBadge: 'Rozet için kaydol',
+    accountTypeShop: 'Senin Mağazan',
     accountTypeCreatorHelper: 'İçerik üreticisi araçlarına erişmek için başvur.',
     accountTypeBrandedHelper: 'Markalı içerik seçeneklerini ve işbirliklerini yönet.',
     accountTypeVerificationHelper: 'Hesabını doğrulatmak için talep oluştur.',
     accountTypeBadgeHelper: 'Rozet başvurunu tamamla ve süreci takip et.',
+    accountTypeShopHelper: 'Onaylı hesaplar için kendi mağazanı oluştur.',
     accountTypePause: 'Hesabına ara ver',
     accountTypeTerminate: 'Hesabını sonlandır',
     accountTypePauseHelper: 'Hesabını geçici olarak devre dışı bırakır. Dilediğinde tekrar devam edebilirsin.',
@@ -558,6 +653,8 @@ export default function ProfileScreen() {
   const settingsSegmentActive = settingsSegmentActiveColorOverride || '#FF3B30';
   const settingsSegmentActiveText = settingsSegmentActiveTextColorOverride || '#FFFFFF';
   const settingsSegmentText = settingsSegmentTextColorOverride || textPrimary;
+  const accentColor = settingsSegmentActive;
+  const tabBarBackground = isDark ? DARK_COLORS.background : LIGHT_COLORS.background;
 
   // Button Colors
   const btnEditBg = isDark ? '#333333' : '#E5E5E5';
@@ -580,6 +677,7 @@ export default function ProfileScreen() {
     isFollowing: false,
     website: '',
     isVerified: false,
+    shopEnabled: false,
     followersCount: 0,
     followingCount: 0,
     postsCount: 0
@@ -601,6 +699,8 @@ export default function ProfileScreen() {
   const videosData = safeVideos.map((v: any) => ({ id: v.id, thumbnail: v.thumbnailUrl, views: v.likesCount?.toString() || '0', videoUrl: v.videoUrl }));
   const savedData = (savedVideosData || []).map((v: any) => ({ id: v.id, thumbnail: v.thumbnailUrl, views: v.likesCount?.toString() || '0', type: 'video' as const, videoUrl: v.videoUrl }));
   const tagsData: any[] = [];
+  const tabBarHeight = useBottomTabBarHeight();
+  const modalBackdropBottom = tabBarHeight;
 
   // Calculate grid height including the Drafts folder (always shown)
   const totalGridItems = postsData.length + 1;
@@ -611,11 +711,110 @@ export default function ProfileScreen() {
   const videosHeight = Math.ceil(videosData.length / 3) * (gridItemSize * (16 / 9) + 1) + 20;
   const savedHeight = Math.ceil(savedData.length / 3) * (gridItemHeight + 2) + 20;
   const tagsHeight = 300;
+  const shopHeight = 260;
+  const showShopTab = currentUser?.isVerified === true && shopEnabled;
 
   const handleTabPress = (index: number) => {
     setActiveTab(index);
     pagerRef.current?.setPageWithoutAnimation(index);
   };
+
+  const handleShopToggle = useCallback((value: boolean) => {
+    if (!value) {
+      setActiveTab((prev) => (prev > 3 ? 3 : prev));
+      pagerRef.current?.setPageWithoutAnimation(3);
+    }
+    setShopEnabled(value);
+    if (value) {
+      setIsShopModalOpen(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!showShopTab && activeTab > 3) {
+      setActiveTab(3);
+      pagerRef.current?.setPageWithoutAnimation(3);
+    }
+  }, [activeTab, showShopTab]);
+
+  useEffect(() => {
+    if (!isShopModalOpen) return;
+    NavigationBar.setBackgroundColorAsync(tabBarBackground);
+    NavigationBar.setButtonStyleAsync(isDark ? 'light' : 'dark');
+  }, [isShopModalOpen, tabBarBackground, isDark]);
+
+  useEffect(() => {
+    if (!isShopModalOpen) return;
+    setShopFxKey((prev) => prev + 1);
+    setShowShopFx(true);
+    const timer = setTimeout(() => setShowShopFx(false), 5000);
+    return () => clearTimeout(timer);
+  }, [isShopModalOpen]);
+
+  const pagerPages = [
+    (
+      <View key="0">
+        <PostsGrid
+          posts={postsData}
+          isDark={isDark}
+          onPreview={showPreview}
+          onPress={handleVideoPress}
+          onPreviewEnd={hidePreview}
+          showDraftsFolder={true}
+          drafts={drafts}
+          onDraftsFolderPress={handleDraftsFolderPress}
+        />
+      </View>
+    ),
+    (
+      <View key="1">
+        <VideoGrid
+          videos={videosData}
+          isDark={isDark}
+          onPress={handleVideoPress}
+          onPreview={showPreview}
+          onPreviewEnd={hidePreview}
+        />
+      </View>
+    ),
+    (
+      <View key="2">
+        <PostsGrid posts={tagsData} isDark={isDark} onPreview={showPreview} onPreviewEnd={hidePreview} />
+        {tagsData.length === 0 && (
+          <View style={{ padding: 40, alignItems: 'center' }}>
+            <Text style={{ color: textSecondary }}>Etiketlenmiş gönderi yok</Text>
+          </View>
+        )}
+      </View>
+    ),
+    (
+      <View key="3">
+        <PostsGrid
+          posts={savedData}
+          isDark={isDark}
+          onPress={handleSavedPress}
+          onPreview={showPreview}
+          onPreviewEnd={hidePreview}
+          showDraftsFolder={false}
+        />
+        {savedData.length === 0 && (
+          <View style={{ padding: 40, alignItems: 'center' }}>
+            <Text style={{ color: textSecondary }}>Henüz kaydedilen gönderi yok</Text>
+          </View>
+        )}
+      </View>
+    ),
+  ];
+
+  if (showShopTab) {
+    pagerPages.push(
+      <View key="4">
+        <View style={{ padding: 40, alignItems: 'center' }}>
+          <Text style={{ color: textSecondary }}>Mağaza henüz boş</Text>
+        </View>
+      </View>
+    );
+  }
 
   const showPreview = (item: any) => setPreviewItem(item);
   const hidePreview = () => setPreviewItem(null);
@@ -948,50 +1147,35 @@ export default function ProfileScreen() {
             >
               <SaveTabIcon color={activeTab === 3 ? textPrimary : textSecondary} />
             </Pressable>
+            {showShopTab && (
+              <Pressable
+                style={[styles.tab, activeTab === 4 && [styles.activeTab, { borderBottomColor: textPrimary }]]}
+                onPress={() => handleTabPress(4)}
+                hitSlop={{ top: 15, bottom: 15, left: 10, right: 10 }}
+              >
+                <StoreTabIcon color={activeTab === 4 ? textPrimary : textSecondary} />
+              </Pressable>
+            )}
           </View>
 
           <PagerView
             ref={pagerRef}
-            style={{ width: '100%', height: activeTab === 0 ? gridHeight : activeTab === 1 ? videosHeight : activeTab === 2 ? tagsHeight : savedHeight }}
+            style={{
+              width: '100%',
+              height: activeTab === 0
+                ? gridHeight
+                : activeTab === 1
+                  ? videosHeight
+                  : activeTab === 2
+                    ? tagsHeight
+                    : activeTab === 3
+                      ? savedHeight
+                      : shopHeight,
+            }}
             initialPage={0}
             onPageSelected={(e) => setActiveTab(e.nativeEvent.position)}
           >
-            <View key="0">
-              <PostsGrid
-                posts={postsData}
-                isDark={isDark}
-                onPreview={showPreview}
-                onPress={handleVideoPress}
-                onPreviewEnd={hidePreview}
-                showDraftsFolder={true}
-                drafts={drafts}
-                onDraftsFolderPress={handleDraftsFolderPress}
-              />
-            </View>
-            <View key="1">
-              <VideoGrid
-                videos={videosData}
-                isDark={isDark}
-                onPress={handleVideoPress}
-                onPreview={showPreview}
-                onPreviewEnd={hidePreview}
-              />
-            </View>
-            <View key="2">
-              <PostsGrid posts={tagsData} isDark={isDark} onPreview={showPreview} onPreviewEnd={hidePreview} />
-              {tagsData.length === 0 && <View style={{ padding: 40, alignItems: 'center' }}><Text style={{ color: textSecondary }}>Etiketlenmiş gönderi yok</Text></View>}
-            </View>
-            <View key="3">
-              <PostsGrid
-                posts={savedData}
-                isDark={isDark}
-                onPress={handleSavedPress}
-                onPreview={showPreview}
-                onPreviewEnd={hidePreview}
-                showDraftsFolder={false}
-              />
-              {savedData.length === 0 && <View style={{ padding: 40, alignItems: 'center' }}><Text style={{ color: textSecondary }}>Henüz kaydedilen gönderi yok</Text></View>}
-            </View>
+            {pagerPages}
           </PagerView>
           <View style={{ height: 100 }} />
         </Animated.ScrollView>
@@ -1006,6 +1190,121 @@ export default function ProfileScreen() {
         onUploadAvatar={uploadAvatar}
         onUpdateCompleted={() => reload(true)}
       />
+      <Modal
+        transparent
+        visible={isShopModalOpen}
+        animationType="fade"
+        onRequestClose={() => setIsShopModalOpen(false)}
+      >
+        <View style={styles.shopModalOverlay}>
+          <View style={[styles.shopModalBackdrop, { bottom: modalBackdropBottom }]} />
+          <View style={[styles.shopModalCenter, { paddingBottom: modalBackdropBottom }]}>
+            <View
+              style={[
+                styles.shopModalContainer,
+                { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF', borderColor: isDark ? '#2A2A2A' : '#E9E9E9' },
+              ]}
+            >
+              <View style={styles.shopModalContent}>
+                <View style={styles.shopModalIconWrap}>
+                  <Store size={100} color={isDark ? '#FFFFFF' : textPrimary} strokeWidth={0.7} />
+                  <Svg width={68} height={68} viewBox="0 0 60 60" style={styles.shopModalCircle}>
+                    <Defs>
+                      <SvgLinearGradient id="shopModalRing" x1="0" y1="0" x2="1" y2="1">
+                        <Stop offset="0%" stopColor="#F472B6" />
+                        <Stop offset="55%" stopColor="#FB7185" />
+                        <Stop offset="100%" stopColor="#F59E0B" />
+                      </SvgLinearGradient>
+                    </Defs>
+                    <Circle cx="30" cy="30" r="24" stroke="url(#shopModalRing)" strokeWidth="2" fill="#FFFFFF" />
+                    <Path
+                      d="M20 6 9 17l-5-5"
+                      transform="translate(18 18)"
+                      stroke="url(#shopModalRing)"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      fill="none"
+                    />
+                  </Svg>
+                </View>
+                <Svg width={220} height={40} viewBox="0 0 220 40" style={styles.shopModalTitleOffset}>
+                  <Defs>
+                    <SvgLinearGradient id="shopModalTitleGradient" x1="0" y1="0" x2="1" y2="1">
+                      <Stop offset="0%" stopColor="#F472B6" />
+                      <Stop offset="55%" stopColor="#FB7185" />
+                      <Stop offset="100%" stopColor="#F59E0B" />
+                    </SvgLinearGradient>
+                  </Defs>
+                  <SvgText
+                    x="110"
+                    y="30"
+                    fontSize="32"
+                    fontWeight="800"
+                    letterSpacing="2"
+                    textAnchor="middle"
+                    fill="none"
+                    stroke="url(#shopModalTitleGradient)"
+                    strokeWidth="6"
+                    opacity="0.35"
+                  >
+                    Tebrikler!
+                  </SvgText>
+                  <SvgText
+                    x="110"
+                    y="30"
+                    fontSize="32"
+                    fontWeight="800"
+                    letterSpacing="2"
+                    textAnchor="middle"
+                    fill="url(#shopModalTitleGradient)"
+                  >
+                    Tebrikler!
+                  </SvgText>
+                </Svg>
+                <Text style={[styles.shopModalSubtitle, styles.shopModalSubtitleOffset, { color: textPrimary }]}>
+                  Mağazan Yayında
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.shopModalSeparator,
+                  styles.shopModalSeparatorOffset,
+                  { backgroundColor: isDark ? '#2A2A2A' : '#E9E9E9' },
+                ]}
+              />
+              <TouchableOpacity
+                style={[styles.shopModalButton, styles.shopModalButtonOffset]}
+                onPress={() => {
+                  setIsShopModalOpen(false);
+                  setActiveTab(4);
+                  pagerRef.current?.setPageWithoutAnimation(4);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Mağazaya Git"
+              >
+                <Text style={[styles.shopModalLinkText, { color: accentColor }]}>Mağazaya Git</Text>
+              </TouchableOpacity>
+              <View
+                style={[
+                  styles.shopModalSeparator,
+                  styles.shopModalSeparatorOffset,
+                  { backgroundColor: isDark ? '#2A2A2A' : '#E9E9E9' },
+                ]}
+              />
+              <TouchableOpacity
+                style={[styles.shopModalButton, styles.shopModalButtonOffset, styles.shopModalLastButton]}
+                onPress={() => setIsShopModalOpen(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Şimdi Değil"
+              >
+                <Text style={[styles.shopModalSecondaryText, { color: isDark ? '#BFC3C9' : '#6B7280' }]}>Şimdi Değil</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+          {showShopFx && <ShopFireworks key={shopFxKey} triggerKey={shopFxKey} />}
+        </View>
+      </Modal>
       <ProfileSettingsOverlay
         styles={styles}
         insets={insets}
@@ -1056,6 +1355,9 @@ export default function ProfileScreen() {
         browserHistoryEnabled={browserHistoryEnabled}
         setBrowserHistoryEnabled={setBrowserHistoryEnabled}
         clearBrowserHistory={clearBrowserHistory}
+        isVerified={currentUser?.isVerified === true}
+        shopEnabled={shopEnabled}
+        setShopEnabled={handleShopToggle}
         browserHistory={browserHistory}
         openHistoryEntry={openHistoryEntry}
         getHistoryRange={getHistoryRange}
@@ -1116,6 +1418,110 @@ const styles = StyleSheet.create({
   previewOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', zIndex: 999 },
   previewCard: { width: '80%', height: 480, borderRadius: 30, overflow: 'hidden', backgroundColor: '#000', elevation: 20, shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 15, shadowOffset: { width: 0, height: 10 } },
   previewVideo: { width: '100%', height: '100%' },
+  shopModalOverlay: {
+    flex: 1,
+  },
+  shopModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  shopModalCenter: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  shopModalFx: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 2,
+  },
+  shopModalFxParticle: {
+    position: 'absolute',
+  },
+  shopModalContainer: {
+    width: 300,
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    shadowColor: '#000000',
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+  },
+  shopModalContent: {
+    paddingTop: 26,
+    paddingHorizontal: 20,
+    paddingBottom: 14,
+    alignItems: 'center',
+    gap: 4,
+  },
+  shopModalIconWrap: {
+    width: 180,
+    height: 180,
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ translateY: -30 }],
+  },
+  shopModalCircle: {
+    position: 'absolute',
+    right: 22,
+    bottom: 22,
+  },
+  shopModalCheck: {
+    position: 'absolute',
+    right: -6,
+    bottom: -6,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  shopModalTitle: {
+    fontSize: 30,
+    fontWeight: '800',
+    textAlign: 'center',
+    lineHeight: 34,
+  },
+  shopModalSubtitle: {
+    fontSize: 22,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  shopModalSubtitleOffset: {
+    transform: [{ translateY: -43 }],
+  },
+  shopModalTitleOffset: {
+    transform: [{ translateY: -45 }],
+  },
+  shopModalSeparator: {
+    height: 1,
+    width: '100%',
+  },
+  shopModalSeparatorOffset: {
+    transform: [{ translateY: -40 }],
+  },
+  shopModalButton: {
+    width: '100%',
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  shopModalButtonOffset: {
+    transform: [{ translateY: -40 }],
+  },
+  shopModalLastButton: {
+    marginBottom: -34,
+  },
+  shopModalLinkText: {
+    fontSize: 20,
+    fontWeight: '500',
+  },
+  shopModalSecondaryText: {
+    fontSize: 20,
+    fontWeight: '400',
+  },
   socialClubsRow: {
     flexDirection: 'row',
     alignItems: 'center',

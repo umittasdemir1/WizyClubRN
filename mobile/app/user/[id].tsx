@@ -22,7 +22,7 @@ import { SocialTags } from '../../src/presentation/components/profile/SocialTags
 import { VideoGrid } from '../../src/presentation/components/profile/VideoGrid';
 import { PostsGrid } from '../../src/presentation/components/profile/PostsGrid';
 import { BioBottomSheet } from '../../src/presentation/components/profile/BioBottomSheet';
-import { ChevronLeft, MoreVertical } from 'lucide-react-native';
+import { ChevronLeft, MoreVertical, Store } from 'lucide-react-native';
 import BottomSheet from '@gorhom/bottom-sheet';
 import Svg, { Path, Circle } from 'react-native-svg';
 import Animated, {
@@ -48,24 +48,28 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // SVG Icons
 const GridIcon = ({ color }: { color: string }) => (
-  <Svg width="22" height="22" viewBox="0 -960 960 960" fill={color}>
+  <Svg width="26" height="26" viewBox="0 -960 960 960" fill={color}>
     <Path d="M240-160q-33 0-56.5-23.5T160-240q0-33 23.5-56.5T240-320q33 0 56.5 23.5T320-240q0 33-23.5 56.5T240-160Zm240 0q-33 0-56.5-23.5T400-240q0-33 23.5-56.5T480-320q33 0 56.5 23.5T560-240q0 33-23.5 56.5T480-160Zm240 0q-33 0-56.5-23.5T640-240q0-33 23.5-56.5T720-320q33 0 56.5 23.5T800-240q0 33-23.5 56.5T720-160ZM240-400q-33 0-56.5-23.5T160-480q0-33 23.5-56.5T240-560q33 0 56.5 23.5T320-480q0 33-23.5 56.5T240-400Zm240 0q-33 0-56.5-23.5T400-480q0-33 23.5-56.5T480-560q33 0 56.5 23.5T560-480q0 33-23.5 56.5T480-400Zm240 0q-33 0-56.5-23.5T640-480q0-33 23.5-56.5T720-560q33 0 56.5 23.5T800-480q0 33-23.5 56.5T720-400ZM240-640q-33 0-56.5-23.5T160-720q0-33 23.5-56.5T240-800q33 0 56.5 23.5T320-720q0 33-23.5 56.5T240-640Zm240 0q-33 0-56.5-23.5T400-720q0-33 23.5-56.5T480-800q33 0 56.5 23.5T560-720q0 33-23.5 56.5T480-640Zm240 0q-33 0-56.5-23.5T640-720q0-33 23.5-56.5T720-800q33 0 56.5 23.5T800-720q0 33-23.5 56.5T720-640Z" />
   </Svg>
 );
 
 const VideoIcon = ({ color }: { color: string }) => (
-  <Svg width="22" height="22" viewBox="0 -960 960 960" fill={color}>
+  <Svg width="26" height="26" viewBox="0 -960 960 960" fill={color}>
     <Path d="m480-420+240-160-240-160v320Zm28+220h224q-7+26-24+42t-44+20L228-85q-33+5-59.5-15.5T138-154L85-591q-4-33+16-59t53-30l46-6v80l-36+5+54+437+290-36Zm-148-80q-33+0-56.5-23.5T280-360v-440q0-33+23.5-56.5T360-880h440q33+0+56.5+23.5T880-800v440q0+33-23.5+56.5T800-280H360Zm0-80h440v-440H360v440Zm220-220ZM218-164Z" />
   </Svg>
 );
 
 const TagsIcon = ({ color }: { color: string }) => (
-  <Svg width="22" height="22" viewBox="0 0 24 24" fill={color}>
+  <Svg width="26" height="26" viewBox="0 0 24 24" fill={color}>
     <Path d="M0 0h24v24H0V0z" fill="none" />
     <Path d="M2.53 19.65l1.34.56v-9.03l-2.43 5.86c-.41 1.02.08 2.19 1.09 2.61zm19.5-3.7L17.07 3.98c-.31-.75-1.04-1.21-1.81-1.23-.26 0-.53.04-.79.15L7.1 5.95c-.75.31-1.21 1.03-1.23 1.8-.01.27.04.54.15.8l4.96 11.97c.31.76 1.05 1.22 1.83 1.23.26 0 .52-.05.77-.15l7.36-3.05c1.02-.42 1.51-1.59 1.09-2.6zm-9.2 3.8L7.87 7.79l7.35-3.04h.01l4.95 11.95-7.35 3.05z" />
     <Circle cx="11" cy="9" r="1" />
     <Path d="M5.88 19.75c0 1.1.9 2 2 2h1.45l-3.45-8.34v6.34z" />
   </Svg>
+);
+
+const StoreTabIcon = ({ color }: { color: string }) => (
+  <Store size={26} color={color} strokeWidth={1.7} />
 );
 
 // Animated IconButton
@@ -223,8 +227,40 @@ export default function UserProfileScreen() {
 
   const videosHeight = Math.ceil(videosData.length / 3) * (gridItemSize * (16 / 9) + 1) + 20;
   const tagsHeight = 300;
+  const shopHeight = 260;
+  const showShopTab = profileUser?.isVerified === true && profileUser?.shopEnabled === true;
 
   const handleTabPress = (index: number) => { setActiveTab(index); pagerRef.current?.setPage(index); };
+
+  const pagerPages = [
+    <View key="0"><PostsGrid posts={postsData} isDark={isDark} onPreview={showPreview} onPreviewEnd={hidePreview} /></View>,
+    <View key="1"><VideoGrid videos={videosData} isDark={isDark} onPreview={showPreview} onPreviewEnd={hidePreview} /></View>,
+    <View key="2">
+      <PostsGrid posts={tagsData} isDark={isDark} onPreview={showPreview} onPreviewEnd={hidePreview} />
+      {tagsData.length === 0 && (
+        <View style={{ padding: 40, alignItems: 'center' }}>
+          <Text style={{ color: textSecondary }}>Etiketlenmiş gönderi yok</Text>
+        </View>
+      )}
+    </View>,
+  ];
+
+  if (showShopTab) {
+    pagerPages.push(
+      <View key="3">
+        <View style={{ padding: 40, alignItems: 'center' }}>
+          <Text style={{ color: textSecondary }}>Mağaza henüz boş</Text>
+        </View>
+      </View>
+    );
+  }
+
+  useEffect(() => {
+    if (!showShopTab && activeTab > 2) {
+      setActiveTab(2);
+      pagerRef.current?.setPage(2);
+    }
+  }, [activeTab, showShopTab]);
   const showPreview = (item: any) => setPreviewItem(item);
   const hidePreview = () => setPreviewItem(null);
   const bioLimit = 110;
@@ -363,15 +399,20 @@ export default function UserProfileScreen() {
           <TouchableOpacity style={[styles.tab, activeTab === 0 && [styles.activeTab, { borderBottomColor: textPrimary }]]} onPress={() => handleTabPress(0)}><GridIcon color={activeTab === 0 ? textPrimary : textSecondary} /></TouchableOpacity>
           <TouchableOpacity style={[styles.tab, activeTab === 1 && [styles.activeTab, { borderBottomColor: textPrimary }]]} onPress={() => handleTabPress(1)}><VideoIcon color={activeTab === 1 ? textPrimary : textSecondary} /></TouchableOpacity>
           <TouchableOpacity style={[styles.tab, activeTab === 2 && [styles.activeTab, { borderBottomColor: textPrimary }]]} onPress={() => handleTabPress(2)}><TagsIcon color={activeTab === 2 ? textPrimary : textSecondary} /></TouchableOpacity>
+          {showShopTab && (
+            <TouchableOpacity style={[styles.tab, activeTab === 3 && [styles.activeTab, { borderBottomColor: textPrimary }]]} onPress={() => handleTabPress(3)}>
+              <StoreTabIcon color={activeTab === 3 ? textPrimary : textSecondary} />
+            </TouchableOpacity>
+          )}
         </View>
 
-        <PagerView ref={pagerRef} style={{ width: '100%', height: activeTab === 0 ? gridHeight : activeTab === 1 ? videosHeight : tagsHeight }} initialPage={0} onPageSelected={(e) => setActiveTab(e.nativeEvent.position)}>
-          <View key="0"><PostsGrid posts={postsData} isDark={isDark} onPreview={showPreview} onPreviewEnd={hidePreview} /></View>
-          <View key="1"><VideoGrid videos={videosData} isDark={isDark} onPreview={showPreview} onPreviewEnd={hidePreview} /></View>
-          <View key="2">
-            <PostsGrid posts={tagsData} isDark={isDark} onPreview={showPreview} onPreviewEnd={hidePreview} />
-            {tagsData.length === 0 && <View style={{ padding: 40, alignItems: 'center' }}><Text style={{ color: textSecondary }}>Etiketlenmiş gönderi yok</Text></View>}
-          </View>
+        <PagerView
+          ref={pagerRef}
+          style={{ width: '100%', height: activeTab === 0 ? gridHeight : activeTab === 1 ? videosHeight : activeTab === 2 ? tagsHeight : shopHeight }}
+          initialPage={0}
+          onPageSelected={(e) => setActiveTab(e.nativeEvent.position)}
+        >
+          {pagerPages}
         </PagerView>
         <View style={{ height: 100 }} />
       </Animated.ScrollView>

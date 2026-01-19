@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   username text UNIQUE NOT NULL,
   full_name text,
   avatar_url text,
+  shop_enabled boolean DEFAULT false,
   country text,
   age integer,
   bio text,
