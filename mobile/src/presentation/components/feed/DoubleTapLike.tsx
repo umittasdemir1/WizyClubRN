@@ -25,7 +25,7 @@ export interface DoubleTapLikeRef {
 
 const HEART_COLOR = '#FF2146';
 const HEART_SIZE = 100;
-const DOUBLE_TAP_DELAY = 250;
+const DOUBLE_TAP_DELAY = 350;
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const TAP_Y_OFFSET = HEART_SIZE * 0.6;
 
@@ -40,6 +40,7 @@ const DoubleTapLikeComponent = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
         const tapTimer = useRef<NodeJS.Timeout | null>(null);
         const longPressTriggered = useRef(false);
         const containerSizeRef = useRef({ width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
+        const lastTapTimeRef = useRef(0);
 
         const performAnimation = useCallback((x?: number, y?: number) => {
             const randomAngle = Math.random() * 30 - 15;
@@ -69,6 +70,8 @@ const DoubleTapLikeComponent = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
                 return;
             }
             tapCount.current += 1;
+            const tapTime = Date.now();
+            lastTapTimeRef.current = tapTime;
             const rawX = event.nativeEvent.locationX;
             const rawY = event.nativeEvent.locationY - TAP_Y_OFFSET;
             const { width, height } = containerSizeRef.current;
@@ -77,10 +80,11 @@ const DoubleTapLikeComponent = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
 
             if (tapCount.current === 1) {
                 tapTimer.current = setTimeout(() => {
-                    if (tapCount.current === 1 && onSingleTap) {
+                    if (tapCount.current === 1 && onSingleTap && lastTapTimeRef.current === tapTime) {
                         onSingleTap();
                     }
                     tapCount.current = 0;
+                    lastTapTimeRef.current = 0;
                 }, DOUBLE_TAP_DELAY);
             } else if (tapCount.current === 2) {
                 if (tapTimer.current) {
@@ -88,8 +92,9 @@ const DoubleTapLikeComponent = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
                     tapTimer.current = null;
                 }
                 tapCount.current = 0;
+                lastTapTimeRef.current = 0;
 
-                // 🔥 Animation FIRST, then callback
+                // Animation first, then callback
                 performAnimation(tapX, tapY);
                 onDoubleTap();
             }
@@ -103,6 +108,7 @@ const DoubleTapLikeComponent = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
                 tapTimer.current = null;
             }
             tapCount.current = 0;
+            lastTapTimeRef.current = 0;
             onLongPress(event);
         }, [onLongPress]);
 

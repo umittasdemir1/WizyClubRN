@@ -13,6 +13,7 @@ import {
     ScrollView,
     Image,
     Dimensions,
+    FlatList,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Video, ResizeMode } from 'expo-av';
@@ -29,6 +30,10 @@ import { useStoryStore } from '../../store/useStoryStore';
 import { SystemBars } from 'react-native-edge-to-edge';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const PREVIEW_ITEM_WIDTH = SCREEN_WIDTH * 0.7;
+const PREVIEW_ITEM_SPACING = 16;
+const PREVIEW_SNAP_INTERVAL = PREVIEW_ITEM_WIDTH + PREVIEW_ITEM_SPACING;
+const PREVIEW_SIDE_PADDING = Math.max(0, (SCREEN_WIDTH - PREVIEW_ITEM_WIDTH) / 2);
 
 interface UploadModalProps {
     isVisible: boolean;
@@ -349,18 +354,27 @@ export function UploadModal({ isVisible, onClose, initialAssets, uploadMode = 'v
                         {/* Multi-Media Preview */}
                         {selectedAssets.length > 0 && (
                             <View style={styles.previewSection}>
-                                <ScrollView
+                                <FlatList
                                     horizontal
+                                    data={selectedAssets}
+                                    keyExtractor={(_, index) => `preview-${index}`}
                                     showsHorizontalScrollIndicator={false}
-                                    pagingEnabled
+                                    decelerationRate="fast"
+                                    snapToOffsets={selectedAssets.map((_, index) => index * PREVIEW_SNAP_INTERVAL)}
+                                    snapToAlignment="start"
+                                    bounces={false}
                                     style={styles.previewScroll}
                                     contentContainerStyle={styles.previewScrollContent}
-                                >
-                                    {selectedAssets.map((asset, index) => (
-                                        <View key={index} style={styles.previewContainer}>
-                                            {asset.type === 'video' ? (
+                                    renderItem={({ item, index }) => (
+                                        <View style={styles.previewContainer}>
+                                            <View style={styles.previewIndexBadge} pointerEvents="none">
+                                                <Text style={styles.previewIndexText}>
+                                                    {index + 1}/{selectedAssets.length}
+                                                </Text>
+                                            </View>
+                                            {item.type === 'video' ? (
                                                 <Video
-                                                    source={{ uri: asset.uri }}
+                                                    source={{ uri: item.uri }}
                                                     style={styles.previewImage}
                                                     resizeMode={ResizeMode.COVER}
                                                     shouldPlay={false}
@@ -370,19 +384,14 @@ export function UploadModal({ isVisible, onClose, initialAssets, uploadMode = 'v
                                                 />
                                             ) : (
                                                 <Image
-                                                    source={{ uri: asset.uri }}
+                                                    source={{ uri: item.uri }}
                                                     style={styles.previewImage}
                                                     resizeMode="cover"
                                                 />
                                             )}
                                         </View>
-                                    ))}
-                                </ScrollView>
-                                <View style={styles.carouselIndicator}>
-                                    <Text style={styles.carouselIndicatorText}>
-                                        {selectedAssets.length} Parça
-                                    </Text>
-                                </View>
+                                    )}
+                                />
                             </View>
                         )}
 
@@ -635,7 +644,7 @@ const styles = StyleSheet.create({
         flexGrow: 0,
     },
     previewScrollContent: {
-        paddingHorizontal: (SCREEN_WIDTH - (SCREEN_WIDTH * 0.7)) / 2,
+        paddingHorizontal: PREVIEW_SIDE_PADDING,
         alignItems: 'center',
     },
     carouselIndicator: {
@@ -691,15 +700,31 @@ const styles = StyleSheet.create({
         paddingVertical: 20,
     },
     previewContainer: {
-        width: SCREEN_WIDTH * 0.7,
+        width: PREVIEW_ITEM_WIDTH,
         aspectRatio: 9 / 16,
         borderRadius: 16,
         overflow: 'hidden',
         backgroundColor: '#2C2C2E',
+        marginHorizontal: PREVIEW_ITEM_SPACING / 2,
     },
     previewImage: {
         width: '100%',
         height: '100%',
+    },
+    previewIndexBadge: {
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 10,
+        backgroundColor: 'rgba(0, 0, 0, 0.55)',
+        zIndex: 2,
+    },
+    previewIndexText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '700',
     },
     coverEditButton: {
         position: 'absolute',

@@ -37,12 +37,8 @@ interface FeedItemProps {
     onLongPress?: (event: GestureResponderEvent) => void;
     onPressOut?: () => void;
     onPressIn?: (event: GestureResponderEvent) => void;
-    onActionPressIn?: () => void;
-    onActionPressOut?: () => void;
     onVideoEnd?: () => void;
     onProgressUpdate?: (progress: number, duration: number) => void;
-    onCarouselTouchStart?: () => void;
-    onCarouselTouchEnd?: () => void;
 }
 
 export const FeedItem = memo(function FeedItem({
@@ -68,43 +64,40 @@ export const FeedItem = memo(function FeedItem({
     onLongPress,
     onPressOut,
     onPressIn,
-    onActionPressIn,
-    onActionPressOut,
     onVideoEnd,
     onProgressUpdate,
-    onCarouselTouchStart,
-    onCarouselTouchEnd,
 }: FeedItemProps) {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const doubleTapRef = useRef<DoubleTapLikeRef>(null);
     const actionButtonsRef = useRef<ActionButtonsRef>(null);
-    const isCarousel = video.postType === 'carousel' && (video.mediaUrls?.length ?? 0) > 0;
     const isSelfProfile = !!currentUserId && video.user.id === currentUserId;
-    const profileRoute = isSelfProfile ? '/profile' : `/user/${video.user.id}`;
+    const profileRoute = isSelfProfile ? '/profile' : `/user/${video.user.id}` as const;
 
     const handleDoubleTap = useCallback(() => {
-        // DoubleTapLike already handles the center heart animation
-        // We just need to trigger the BUTTON animation
         actionButtonsRef.current?.animateLike();
-
-        // 🔥 DELAY state update (like button press does it immediately, but double-tap needs delay)
         setTimeout(() => {
             onDoubleTapLike(video.id);
-        }, 16); // Single frame delay
+        }, 16);
     }, [video.id, onDoubleTapLike]);
 
     const handleLikePress = useCallback(() => {
         if (!video.isLiked) {
             doubleTapRef.current?.animateLike();
         }
-        // 🔥 IMMEDIATE: No delay, no InteractionManager
         onToggleLike(video.id);
     }, [video.isLiked, video.id, onToggleLike]);
 
     return (
         <View style={[styles.itemContainer, { height: ITEM_HEIGHT }]}>
-            {isCarousel ? (
+            <DoubleTapLike
+                ref={doubleTapRef}
+                onDoubleTap={handleDoubleTap}
+                onSingleTap={onFeedTap}
+                onLongPress={onLongPress}
+                onPressOut={onPressOut}
+                onPressIn={onPressIn}
+            >
                 <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', paddingTop: insets.top }]}>
                     <VideoLayer
                         video={video}
@@ -117,40 +110,9 @@ export const FeedItem = memo(function FeedItem({
                         onProgressUpdate={isActive ? onProgressUpdate : undefined}
                         isCleanScreen={isCleanScreen}
                         tapIndicator={tapIndicator}
-                        onCarouselTouchStart={onCarouselTouchStart}
-                        onCarouselTouchEnd={onCarouselTouchEnd}
-                        onDoubleTap={handleDoubleTap}
-                        onSingleTap={undefined}
-                        onLongPress={onLongPress}
-                        onPressOut={onPressOut}
-                        onPressIn={onPressIn}
                     />
                 </View>
-            ) : (
-                <DoubleTapLike
-                    ref={doubleTapRef}
-                    onDoubleTap={handleDoubleTap}
-                    onSingleTap={onFeedTap}
-                    onLongPress={onLongPress}
-                    onPressOut={onPressOut}
-                    onPressIn={onPressIn}
-                >
-                    <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', paddingTop: insets.top }]}>
-                        <VideoLayer
-                            video={video}
-                            isActive={isActive}
-                            isMuted={isMuted}
-                            isScrolling={isScrolling}
-                            onSeekReady={isActive ? onSeekReady : undefined}
-                            onRemoveVideo={() => onRemoveVideo(video.id)}
-                            onVideoEnd={onVideoEnd}
-                            onProgressUpdate={isActive ? onProgressUpdate : undefined}
-                            isCleanScreen={isCleanScreen}
-                            tapIndicator={tapIndicator}
-                        />
-                    </View>
-                </DoubleTapLike>
-            )}
+            </DoubleTapLike>
 
             {!isCleanScreen && (
                 <Animated.View
@@ -171,15 +133,13 @@ export const FeedItem = memo(function FeedItem({
                         onShare={() => onToggleShare(video.id)}
                         onShop={() => onOpenShopping(video.id)}
                         showShop={!!video.brandUrl}
-                        onProfilePress={() => router.push(profileRoute as any)}
-                        onPressIn={onActionPressIn}
-                        onPressOut={onActionPressOut}
+                        onProfilePress={() => router.push(profileRoute)}
                     />
 
                     <MetadataLayer
                         video={video}
                         currentUserId={currentUserId}
-                        onAvatarPress={() => router.push(profileRoute as any)}
+                        onAvatarPress={() => router.push(profileRoute)}
                         onFollowPress={() => onToggleFollow(video.id)}
                         onReadMorePress={onOpenDescription}
                         onCommercialTagPress={() => console.log('Open Commercial Info')}
@@ -189,15 +149,22 @@ export const FeedItem = memo(function FeedItem({
         </View>
     );
 }, (prevProps, nextProps) => {
+    // 🚀 Optimized memo comparison - Only re-render when truly necessary
+    // Skip comparing callback functions (they're stable via useCallback)
+    // Skip comparing SharedValues (they update without re-render)
     return (
         prevProps.video.id === nextProps.video.id &&
         prevProps.isActive === nextProps.isActive &&
         prevProps.isMuted === nextProps.isMuted &&
         prevProps.video.isLiked === nextProps.video.isLiked &&
         prevProps.video.isSaved === nextProps.video.isSaved &&
+        prevProps.video.likesCount === nextProps.video.likesCount &&
+        prevProps.video.savesCount === nextProps.video.savesCount &&
+        prevProps.video.sharesCount === nextProps.video.sharesCount &&
         prevProps.video.user.isFollowing === nextProps.video.user.isFollowing &&
         prevProps.isCleanScreen === nextProps.isCleanScreen &&
-        prevProps.tapIndicator === nextProps.tapIndicator
+        prevProps.tapIndicator === nextProps.tapIndicator &&
+        prevProps.currentUserId === nextProps.currentUserId
     );
 });
 

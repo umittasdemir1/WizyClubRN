@@ -68,8 +68,6 @@ export const useActiveVideoStore = create<ActiveVideoState>((set, get) => ({
     preloadIndices: [],
 
     setActiveVideo: (id, index) => {
-        const currentIndex = get().activeIndex;
-
         // Preload hesapla: Sonraki 2 ve önceki 1 video
         const preloadIndices: number[] = [];
         if (index > 0) preloadIndices.push(index - 1);

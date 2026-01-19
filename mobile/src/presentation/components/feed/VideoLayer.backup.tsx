@@ -1,17 +1,20 @@
 import { useRef, useState, useEffect, useCallback, memo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, Text, Pressable, Platform, ActivityIndicator } from 'react-native';
 import Video, { OnProgressData, OnLoadData, VideoRef, OnVideoErrorData, SelectedTrackType } from 'react-native-video';
 import { Video as VideoEntity } from '../../../domain/entities/Video';
-import { useActiveVideoStore, clearVideoPosition } from '../../store/useActiveVideoStore';
+import PlayIcon from '../../../../assets/icons/play.svg';
+import { useActiveVideoStore, saveVideoPosition, getVideoPosition, clearVideoPosition } from '../../store/useActiveVideoStore';
+import { BrightnessOverlay } from './BrightnessOverlay';
+import { RefreshCcw, AlertCircle, Pause, Repeat1 } from 'lucide-react-native';
 import { useNetInfo } from '@react-native-community/netinfo';
 import { getBufferConfig } from '../../../core/utils/bufferConfig';
+import { VideoSeekBar } from './VideoSeekBar';
 import { useSharedValue, SharedValue } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import { VideoCacheService } from '../../../data/services/VideoCacheService';
 import { Image } from 'expo-image';
 import { PerformanceLogger } from '../../../core/services/PerformanceLogger';
 import { CarouselLayer } from './CarouselLayer';
-import { VideoOverlays } from './VideoOverlays';
-import { BrightnessOverlay } from './BrightnessOverlay';
 import { SupabaseVideoDataSource } from '../../../data/datasources/SupabaseVideoDataSource';
 import { useAuthStore } from '../../store/useAuthStore';
 
@@ -30,20 +33,18 @@ interface VideoLayerProps {
     isActive: boolean;
     isMuted: boolean;
     isCleanScreen?: boolean;
-    tapIndicator?: 'play' | 'pause' | null;
     onVideoEnd?: () => void;
     onProgressUpdate?: (progress: number, duration: number) => void;
     onSeekReady?: (seekFn: (time: number) => void) => void;
     isScrolling?: SharedValue<boolean>;
-    onResizeModeChange?: (mode: 'contain' | 'cover') => void;
-    onRemoveVideo?: () => void;
+    onResizeModeChange?: (mode: 'contain' | 'cover') => void; // NEW: Notify parent of resize mode
+    onRemoveVideo?: () => void; // NEW: Callback to remove video on critical error
+    tapIndicator?: 'play' | 'pause' | null;
     onDoubleTap?: () => void;
     onSingleTap?: () => void;
     onLongPress?: (event: any) => void;
     onPressOut?: () => void;
     onPressIn?: (event: any) => void;
-    onCarouselTouchStart?: () => void;
-    onCarouselTouchEnd?: () => void;
 }
 
 const MAX_LOOPS = 2;
@@ -54,20 +55,18 @@ export const VideoLayer = memo(function VideoLayer({
     isActive,
     isMuted,
     isCleanScreen = false,
-    tapIndicator,
     onVideoEnd,
     onProgressUpdate,
     onSeekReady,
     isScrolling,
-    onResizeModeChange,
-    onRemoveVideo,
+    onResizeModeChange, // NEW
+    onRemoveVideo, // NEW
+    tapIndicator,
     onDoubleTap,
     onSingleTap,
     onLongPress,
     onPressOut,
     onPressIn,
-    onCarouselTouchStart,
-    onCarouselTouchEnd,
 }: VideoLayerProps) {
     const isAppActive = useActiveVideoStore((state) => state.isAppActive);
     const isScreenFocused = useActiveVideoStore((state) => state.isScreenFocused);
@@ -78,6 +77,8 @@ export const VideoLayer = memo(function VideoLayer({
     const viewingMode = useActiveVideoStore((state) => state.viewingMode);
     const maxLoops = viewingMode === 'off' ? MAX_LOOPS : 1;
 
+    // Debug state changes only when there's an issue (removed constant spam)
+
     const { type: networkType } = useNetInfo();
     const defaultBufferConfig = getBufferConfig(networkType);
 
@@ -85,7 +86,7 @@ export const VideoLayer = memo(function VideoLayer({
     const [duration, setDuration] = useState(0);
     const [hasError, setHasError] = useState(false);
     const [retryCount, setRetryCount] = useState(0);
-    const [key, setKey] = useState(0);
+    const [key, setKey] = useState(0); // For forcing re-render implementation
 
     const shouldPlay = isActive && isAppActive && isScreenFocused && !isSeeking && !isPausedGlobal && !isFinished && !hasError;
 
@@ -101,37 +102,40 @@ export const VideoLayer = memo(function VideoLayer({
             ? (Number.isInteger(playbackRate) ? `${playbackRate}x` : `${playbackRate.toFixed(1)}x`)
             : null;
 
-    const isCarousel = video.postType === 'carousel' && (video.mediaUrls?.length ?? 0) > 0;
-
-    // Calculate resizeMode UPFRONT using pre-stored dimensions
-    const [resizeMode] = useState<'cover' | 'contain' | 'stretch'>(() => {
+    // 🔥 CRITICAL: Calculate resizeMode UPFRONT using pre-stored dimensions
+    // This prevents re-render during video load which causes 2-3 second delay!
+    const [resizeMode, setResizeMode] = useState<'cover' | 'contain' | 'stretch'>(() => {
         if (video.width && video.height) {
             const aspectRatio = video.width / video.height;
+            // Vertical videos (aspectRatio < 0.8) = cover, Landscape/Square = contain
             return aspectRatio < 0.8 ? 'cover' : 'contain';
         }
-        return 'cover';
+        return 'cover'; // Default for unknown dimensions
     });
 
     // Poster State (Manual Overlay)
-    const [showPoster, setShowPoster] = useState(!isCarousel);
+    const [showPoster, setShowPoster] = useState(true);
+    // Removed isReadyForDisplay - causes 1.4s delay on scroll because paused videos don't trigger onReadyForDisplay
 
     // Cache-First Strategy: Don't set source until we check cache
     const [videoSource, setVideoSource] = useState<any>(null);
     const [isSourceReady, setIsSourceReady] = useState(false);
 
-    // Optimize buffer based on source type
+    // Optimize buffer based on source type (TikTok-style aggressive buffering)
     const isLocal = videoSource?.uri?.startsWith('file://');
     const isHLS = typeof video.videoUrl === 'string' && video.videoUrl.endsWith('.m3u8');
 
     const bufferConfig = isLocal
         ? {
+            // 🔥 AGGRESSIVE: Cached files - start playing ASAP
             minBufferMs: 250,
             maxBufferMs: 1500,
-            bufferForPlaybackMs: 50,
+            bufferForPlaybackMs: 50,  // TikTok-style: minimal buffer before play
             bufferForPlaybackAfterRebufferMs: 100
         }
         : isHLS
             ? {
+                // HLS: larger buffer for segment streaming
                 minBufferMs: 2000,
                 maxBufferMs: 10000,
                 bufferForPlaybackMs: 500,
@@ -145,13 +149,14 @@ export const VideoLayer = memo(function VideoLayer({
 
     const videoRef = useRef<VideoRef>(null);
     const loopCount = useRef(0);
-    const memoryCachedRef = useRef(false);
-    const hasInitialSeekPerformed = useRef(false);
+    const memoryCachedRef = useRef(false); // Track if loaded from memory cache
+    const hasInitialSeekPerformed = useRef(false); // Prevent seek loop
 
     // Cache-First Strategy: Check cache BEFORE setting source
+    // Always init source for mounted videos (FlashList handles recycling correctly with proper keys)
     useEffect(() => {
         let isCancelled = false;
-        const startTime = Date.now();
+        const startTime = Date.now(); // ⏱️ TIMING START
 
         const initVideoSource = async () => {
             if (typeof video.videoUrl !== 'string') {
@@ -197,7 +202,7 @@ export const VideoLayer = memo(function VideoLayer({
 
         // Reset states
         setIsSourceReady(false);
-        setShowPoster(!isCarousel);
+        setShowPoster(true);
         memoryCachedRef.current = false;
         hasInitialSeekPerformed.current = false;
 
@@ -205,20 +210,22 @@ export const VideoLayer = memo(function VideoLayer({
         initVideoSource();
 
         return () => { isCancelled = true; };
-    }, [video.id]);
+    }, [video.id]); // Reinit when video changes (FlashList cell recycling)
 
-    // Reset finished state if video changes
+
+    // Reset finished state if video changes (NO KEY INCREMENT - Faz 4 optimization)
     useEffect(() => {
         setIsFinished(false);
         setHasError(false);
         setRetryCount(0);
+        // setKey(prev => prev + 1); // REMOVED: Prevents unnecessary remount
         loopCount.current = 0;
         currentTimeSV.value = 0;
         durationSV.value = 0;
-        videoRef.current?.seek(0);
+        videoRef.current?.seek(0); // Use seek instead of remount
     }, [video.id]);
 
-    // ALWAYS start from beginning when becoming active
+    // 🔥 ALWAYS start from beginning when becoming active
     useEffect(() => {
         if (isActive) {
             console.log(`[VideoTransition] ⏱️ Video ${video.id} became ACTIVE at ${Date.now()}`);
@@ -241,27 +248,38 @@ export const VideoLayer = memo(function VideoLayer({
         return () => {
             if (ScreenOrientation) {
                 ScreenOrientation.unlockAsync?.().catch((e: any) => {
+                    // This error "The current activity is no longer available" is common during unmount
+                    // and can be safely ignored as we're cleaning up anyway.
                     console.log('[VideoLayer] Orientation unlock skipped:', e.message);
                 });
             }
         };
     }, []);
 
+    // 🎬 POSITION MEMORY: REMOVED - Videos always start from beginning
+    // User requested: Video should restart when returning, not resume from saved position
+
     // Track if user toggled pause (for replay detection)
     const wasPausedBefore = useRef(isPausedGlobal);
 
-    // Handle Manual Replay
+    // Handle Manual Replay (only when user TAPS to unpause a finished video)
     useEffect(() => {
+        // Detect if isPausedGlobal changed from true to false (user tapped)
         const userToggledToUnpause = wasPausedBefore.current === true && isPausedGlobal === false;
         wasPausedBefore.current = isPausedGlobal;
 
+        // Only restart if: user tapped to unpause + video was finished + video is active
         if (userToggledToUnpause && isFinished && isActive) {
+            // Silently restart
             setIsFinished(false);
             loopCount.current = 0;
             clearVideoPosition(video.id);
             videoRef.current?.seek(0);
         }
     }, [isPausedGlobal, isFinished, isActive, video.id]);
+
+    // shouldPlay logic moved to top of component to include isScreenFocused
+    // const shouldPlay = isActive && isAppActive && !isSeeking && !isPausedGlobal && !isFinished && !hasError;
 
     const handleLoad = useCallback((data: OnLoadData) => {
         console.log(`[VideoTransition] 📦 onLoad triggered for ${video.id} at ${Date.now()}`);
@@ -270,7 +288,8 @@ export const VideoLayer = memo(function VideoLayer({
         durationSV.value = data.duration;
         setHasError(false);
 
-        // Hide poster immediately for cached videos
+        // 🔥 FIX: Hide poster immediately for cached videos (they load fast)
+        // For network videos, wait for onReadyForDisplay to avoid flickering
         const source = videoSource?.uri?.startsWith('file://')
             ? 'disk-cache'
             : isHLS ? 'network' : memoryCachedRef.current ? 'memory-cache' : 'network';
@@ -282,6 +301,8 @@ export const VideoLayer = memo(function VideoLayer({
 
         PerformanceLogger.endTransition(video.id, source);
 
+        // Note: resizeMode is pre-calculated from video.width/height in useState
+        // onResizeModeChange is called if parent needs to know
         if (data.naturalSize) {
             const aspectRatio = data.naturalSize.width / data.naturalSize.height;
             onResizeModeChange?.(aspectRatio < 0.8 ? 'cover' : 'contain');
@@ -290,6 +311,11 @@ export const VideoLayer = memo(function VideoLayer({
 
     const handleVideoError = useCallback(async (error: OnVideoErrorData) => {
         console.error(`[VideoLayer] Error playing video ${video.id}:`, error);
+
+        // Auto-Remove Logic: If 404 or max retries
+        // Note: react-native-video error structure varies. Check payload.
+        // If it's a 404 or access denied, no point retrying.
+        // For now, let's rely on MAX_RETRIES + 1 or specific error codes if available.
 
         if (retryCount >= MAX_RETRIES) {
             console.log(`[VideoLayer] Max retries (${MAX_RETRIES}) reached for ${video.id}. Removing from feed.`);
@@ -300,7 +326,11 @@ export const VideoLayer = memo(function VideoLayer({
         // Fallback Logic: Cache -> Network
         if (videoSource?.uri?.startsWith('file://')) {
             console.warn(`[VideoLayer] Cache file failed for ${video.id}. Deleting corrupt cache and falling back to Network.`);
+
+            // Delete corrupt cache file
             await VideoCacheService.deleteCachedVideo(video.videoUrl);
+
+            // Switch to network
             setVideoSource(typeof video.videoUrl === 'string' ? { uri: video.videoUrl } : video.videoUrl);
             setHasError(false);
             setKey(prev => prev + 1);
@@ -310,17 +340,21 @@ export const VideoLayer = memo(function VideoLayer({
         console.error(`[VideoLayer] Faulty URL:`, video.videoUrl);
         console.error(`[VideoLayer] Current Source:`, videoSource);
         setHasError(true);
+
+        // Auto-retry via handleRetry (which user usually presses, but we can also auto-trigger if needed,
+        // but let's stick to manual retry for UI feedback, UNLESS it's a critical 'Not Found' error)
     }, [video.id, video.videoUrl, videoSource, retryCount, onRemoveVideo]);
 
     const handleRetry = useCallback(() => {
         setRetryCount(prev => prev + 1);
         setHasError(false);
-        setKey(prev => prev + 1);
+        setKey(prev => prev + 1); // Force re-mount of video component
     }, []);
 
     const handleProgress = useCallback((data: OnProgressData) => {
         onProgressUpdate?.(data.currentTime, duration);
         currentTimeSV.value = data.currentTime;
+        // Update durationSV only once when duration is available (avoid reading .value)
         if (duration > 0) {
             durationSV.value = duration;
         }
@@ -333,13 +367,13 @@ export const VideoLayer = memo(function VideoLayer({
         if (loopCount.current >= maxLoops) {
             console.log(`[Loop] ✅ Max loops reached, showing replay icon`);
             setIsFinished(true);
-            clearVideoPosition(video.id);
+            clearVideoPosition(video.id); // Clear position on finish
             onVideoEnd?.();
         } else {
             console.log(`[Loop] ⏪ Looping video from start`);
             videoRef.current?.seek(0);
         }
-    }, [onVideoEnd, video.id, maxLoops]);
+    }, [onVideoEnd, video.id]);
 
     const seekTo = useCallback((time: number) => {
         videoRef.current?.seek(time);
@@ -349,29 +383,31 @@ export const VideoLayer = memo(function VideoLayer({
         }
     }, [isFinished, setPaused]);
 
-    // Provide seek function to parent when active
+    // Provide seek function to parent when active (NO auto-reset - position memory handles it)
     useEffect(() => {
         if (isActive && !hasError) {
             onSeekReady?.(seekTo);
         }
     }, [isActive, seekTo, onSeekReady, hasError]);
 
+    // Icons
+    const showTapIndicator = isActive && !!tapIndicator && !hasError;
+    const showReplayIcon = isFinished && isActive && !hasError && !showTapIndicator;
+    const showUiOverlays = !isCleanScreen;
+
     return (
         <View style={styles.container}>
             {/* Carousel Content */}
-            {isCarousel ? (
+            {video.postType === 'carousel' && video.mediaUrls ? (
                 <CarouselLayer
-                    mediaUrls={video.mediaUrls ?? []}
+                    mediaUrls={video.mediaUrls}
                     isActive={isActive && isAppActive && isScreenFocused && !isPausedGlobal}
                     isMuted={isMuted}
-                    isCleanScreen={isCleanScreen}
                     onDoubleTap={onDoubleTap}
                     onSingleTap={onSingleTap}
                     onLongPress={onLongPress}
                     onPressOut={onPressOut}
                     onPressIn={onPressIn}
-                    onCarouselTouchStart={onCarouselTouchStart}
-                    onCarouselTouchEnd={onCarouselTouchEnd}
                 />
             ) : (
                 /* Only render Video component when source is ready */
@@ -380,7 +416,7 @@ export const VideoLayer = memo(function VideoLayer({
                         key={`${video.id}-${key}`}
                         ref={videoRef}
                         source={videoSource}
-                        style={[styles.video, { backgroundColor: '#000' }]}
+                        style={[styles.video, { backgroundColor: '#000' }]} // Black bg to prevent white flash
                         resizeMode={resizeMode}
                         repeat={false}
                         controls={false}
@@ -388,8 +424,10 @@ export const VideoLayer = memo(function VideoLayer({
                         muted={isMuted}
                         selectedAudioTrack={isMuted ? { type: SelectedTrackType.DISABLED } : undefined}
                         rate={playbackRate}
+                        bufferConfig={bufferConfig}
                         onLoad={handleLoad}
                         onReadyForDisplay={() => {
+                            // 🔥 CRITICAL: Hide poster when first frame is ready
                             console.log(`[VideoTransition] 🎬 onReadyForDisplay for ${video.id} at ${Date.now()}`);
                             setShowPoster(false);
                         }}
@@ -408,43 +446,95 @@ export const VideoLayer = memo(function VideoLayer({
                 )
             )}
 
-            {/* Manual Poster Overlay */}
+            {/* Manual Poster Overlay (Only show before video starts loading) */}
             {showPoster && video.thumbnailUrl && (
                 <Image
                     source={{ uri: video.thumbnailUrl }}
                     style={[StyleSheet.absoluteFill, { zIndex: 1 }]}
-                    contentFit="cover"
+                    contentFit="cover" // Always use cover for poster
                     priority="high"
                     cachePolicy="memory-disk"
                 />
             )}
 
-            {/* Brightness Overlay (works for video + carousel) */}
+            {/* Brightness Overlay */}
             <BrightnessOverlay />
 
-            {/* UI Overlays (for standard videos only) */}
-            {video.postType !== 'carousel' && (
-                <VideoOverlays
-                    videoId={video.id}
-                    isActive={isActive}
-                    hasError={hasError}
-                    isFinished={isFinished}
-                    retryCount={retryCount}
-                    isCleanScreen={isCleanScreen}
-                    showPoster={showPoster}
-                    tapIndicator={tapIndicator}
-                    rateLabel={rateLabel}
+            {rateLabel && (
+                <View style={styles.rateBadge} pointerEvents="none">
+                    <Text style={styles.rateText}>{rateLabel}</Text>
+                </View>
+            )}
+
+            {showUiOverlays && (
+                <LinearGradient
+                    colors={['rgba(0,0,0,0.15)', 'transparent', 'transparent', 'rgba(0,0,0,0.5)']}
+                    locations={[0, 0.2, 0.6, 1]}
+                    style={StyleSheet.absoluteFill}
+                    pointerEvents="none"
+                />
+            )}
+
+            {/* Tap Play/Pause Icon Overlay */}
+            {showUiOverlays && showTapIndicator && (
+                <View style={styles.touchArea} pointerEvents="none">
+                    <View style={styles.iconContainer}>
+                        <View style={styles.iconBackground}>
+                            {tapIndicator === 'pause' ? (
+                                <Pause size={44} color="#FFFFFF" fill="#FFFFFF" strokeWidth={0} />
+                            ) : (
+                                <PlayIcon width={44} height={44} color="#FFFFFF" style={{ marginLeft: 5 }} />
+                            )}
+                        </View>
+                    </View>
+                </View>
+            )}
+
+            {/* Replay Icon Overlay */}
+            {showUiOverlays && showReplayIcon && (
+                <View style={styles.touchArea} pointerEvents="none">
+                    <View style={styles.iconContainer}>
+                        <View style={styles.iconBackground}>
+                            <Repeat1 size={44} color="#FFFFFF" strokeWidth={1.2} />
+                        </View>
+                    </View>
+                </View>
+            )}
+
+            {/* Error Overlay */}
+            {hasError && (
+                <View style={[styles.touchArea, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
+                    <View style={styles.errorContainer}>
+                        <AlertCircle color="#EF4444" size={48} style={{ marginBottom: 12 }} />
+                        <Text style={styles.errorText}>Video oynatılamadı</Text>
+                        <Pressable style={styles.retryButton} onPress={handleRetry}>
+                            <RefreshCcw color="#FFF" size={20} />
+                            <Text style={styles.retryText}>Tekrar Dene</Text>
+                        </Pressable>
+                        {retryCount > 0 && (
+                            <Text style={styles.retryCountText}>Deneme {retryCount}/{MAX_RETRIES}</Text>
+                        )}
+                    </View>
+                </View>
+            )}
+
+
+            {/* Per-Video Seekbar (Only for standard videos) */}
+            {showUiOverlays && video.postType !== 'carousel' && (
+                <VideoSeekBar
                     currentTime={currentTimeSV}
                     duration={durationSV}
                     isScrolling={isScrolling}
-                    spriteUrl={video.spriteUrl}
-                    onRetry={handleRetry}
                     onSeek={seekTo}
+                    isActive={isActive}
+                    spriteUrl={video.spriteUrl}
                 />
             )}
         </View>
     );
 }, (prev, next) => {
+    // Return TRUE to SKIP re-render (props haven't changed)
+    // Return FALSE to re-render (props changed)
     return (
         prev.video.id === next.video.id &&
         prev.isActive === next.isActive &&
@@ -462,6 +552,92 @@ const styles = StyleSheet.create({
         paddingBottom: 25,
     },
     video: {
-        flex: 1,
+        flex: 1, // Respects container padding for black bars
     },
+    touchArea: {
+        ...StyleSheet.absoluteFillObject,
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 10,
+    },
+    iconContainer: {
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    iconBackground: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    errorContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    errorText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '600',
+        marginBottom: 16,
+    },
+    retryButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 25,
+        gap: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.3)'
+    },
+    retryText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    retryCountText: {
+        color: '#9CA3AF',
+        fontSize: 12,
+        marginTop: 12,
+    },
+    rateBadge: {
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: [{ translateX: -24 }, { translateY: -16 }],
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 14,
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        zIndex: 12,
+    },
+    rateText: {
+        color: '#FFFFFF',
+        fontSize: 24,
+        fontWeight: '600',
+    },
+    fullScreenButton: {
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: [{ translateX: -60 }, { translateY: -20 }], // Half width/height
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 20,
+        gap: 8,
+        zIndex: 50,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.2)'
+    },
+    fullScreenText: {
+        color: '#FFFFFF',
+        fontWeight: '600',
+        fontSize: 14
+    }
 });

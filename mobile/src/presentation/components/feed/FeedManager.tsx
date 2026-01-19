@@ -196,6 +196,7 @@ export const FeedManager = ({
     const openInAppBrowser = useInAppBrowserStore((state) => state.openUrl);
     const [saveToastMessage, setSaveToastMessage] = useState<string | null>(null);
     const [saveToastActive, setSaveToastActive] = useState(false);
+    const [isCarouselInteracting, setIsCarouselInteracting] = useState(false);
 
     // Sheet refs
     const descriptionSheetRef = useRef<BottomSheet>(null);
@@ -218,6 +219,8 @@ export const FeedManager = ({
     const saveToastTranslateY = useRef(new RNAnimated.Value(-70)).current;
     const saveToastOpacity = useRef(new RNAnimated.Value(0)).current;
     const saveToastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const actionButtonsPressingRef = useRef(false);
+    const doubleTapBlockUntilRef = useRef(0);
 
     const showSaveToast = useCallback((message: string) => {
         setSaveToastMessage(message);
@@ -311,6 +314,7 @@ export const FeedManager = ({
             setActiveTab('foryou');
 
             if (videosRef.current.length > 0 && !lastActiveIdRef.current) {
+                // 🔧 FIX: İlk video için direkt active yap (deprecated method kullan)
                 setActiveVideo(videosRef.current[0].id, 0);
             }
 
@@ -473,6 +477,12 @@ export const FeedManager = ({
     }, []);
 
     const handleFeedTap = useCallback(() => {
+        if (Date.now() < doubleTapBlockUntilRef.current) {
+            return;
+        }
+        if (actionButtonsPressingRef.current) {
+            return;
+        }
         if (activeTab === 'stories') {
             handleCloseStoryBar();
         } else {
@@ -481,6 +491,14 @@ export const FeedManager = ({
             showTapIndicator(wasPaused ? 'play' : 'pause');
         }
     }, [activeTab, handleCloseStoryBar, togglePause, showTapIndicator]);
+
+    const handleActionButtonsPressIn = useCallback(() => {
+        actionButtonsPressingRef.current = true;
+    }, []);
+
+    const handleActionButtonsPressOut = useCallback(() => {
+        actionButtonsPressingRef.current = false;
+    }, []);
 
     const handleStoryAvatarPress = useCallback((userId: string) => {
         router.push(`/story/${userId}`);
@@ -518,6 +536,7 @@ export const FeedManager = ({
 
     const handleDoubleTapLike = useCallback(
         (videoId: string) => {
+            doubleTapBlockUntilRef.current = Date.now() + 350;
             const video = videos.find((v) => v.id === videoId);
             if (video && !video.isLiked) {
                 toggleLike(videoId);
@@ -632,6 +651,14 @@ export const FeedManager = ({
         showSaveToast(nextSaved ? 'Kaydedilenlere eklendi' : 'Kaydedilenlerden kaldırıldı');
     }, [showSaveToast, toggleSave]);
 
+    const handleCarouselTouchStart = useCallback(() => {
+        setIsCarouselInteracting(true);
+    }, []);
+
+    const handleCarouselTouchEnd = useCallback(() => {
+        setIsCarouselInteracting(false);
+    }, []);
+
     const { user } = useAuthStore();
     const currentUserId = user?.id;
     const activeVideo = videos.find((v) => v.id === activeVideoId) || null;
@@ -664,8 +691,12 @@ export const FeedManager = ({
                     onLongPress={handleLongPress}
                     onPressOut={handlePressOut}
                     onPressIn={handlePressIn}
+                    onActionPressIn={handleActionButtonsPressIn}
+                    onActionPressOut={handleActionButtonsPressOut}
                     onVideoEnd={handleVideoEnd}
                     onProgressUpdate={handleProgressUpdate}
+                    onCarouselTouchStart={handleCarouselTouchStart}
+                    onCarouselTouchEnd={handleCarouselTouchEnd}
                 />
             );
         },
@@ -679,6 +710,8 @@ export const FeedManager = ({
             tapIndicator,
             handlePressIn,
             handlePressOut,
+            handleActionButtonsPressIn,
+            handleActionButtonsPressOut,
             handleVideoEnd,
             handleLongPress,
             handleProgressUpdate,
@@ -686,6 +719,8 @@ export const FeedManager = ({
             handleOpenDescription,
             handleOpenShopping,
             handleRemoveVideo,
+            handleCarouselTouchStart,
+            handleCarouselTouchEnd,
             handleSeekReady,
             handleToggleSave,
             handleSharePress,
@@ -832,6 +867,8 @@ export const FeedManager = ({
                     initialNumToRender={1}  // Only render first video on mount
                     bounces={false}
                     overScrollMode="never"
+                    scrollEnabled={!isCarouselInteracting}
+                    nestedScrollEnabled={true}
                     onScrollBeginDrag={() => {
                         isScrollingSV.value = true;
                         setActiveTab('foryou');

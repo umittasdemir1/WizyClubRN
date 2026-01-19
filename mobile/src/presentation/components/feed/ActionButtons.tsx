@@ -27,6 +27,8 @@ interface ActionButtonsProps {
     onShop: () => void;
     onProfilePress: () => void;
     showShop?: boolean;
+    onPressIn?: () => void;
+    onPressOut?: () => void;
 }
 
 export interface ActionButtonsRef {
@@ -53,6 +55,8 @@ const SAVE_PARTICLE_COLORS = ['#FFD700', '#FFC107', '#FFB300', '#FFE082'];
 interface ActionButtonProps {
     onPress: () => void;
     onLongPress?: () => void;
+    onPressIn?: () => void;
+    onPressOut?: () => void;
     IconComponent: typeof Heart;
     count: string;
     zeroText: string;
@@ -88,7 +92,7 @@ function BurstParticle({ angle, color, burst }: { angle: number; color: string; 
 }
 
 const ActionButton = forwardRef<ActionButtonRef, ActionButtonProps>(
-    ({ onPress, onLongPress, IconComponent, count, zeroText, videoId, isActive, activeColor, canToggle = true, enableBurst = false, burstColors = LIKE_PARTICLE_COLORS }, ref) => {
+    ({ onPress, onLongPress, onPressIn, onPressOut, IconComponent, count, zeroText, videoId, isActive, activeColor, canToggle = true, enableBurst = false, burstColors = LIKE_PARTICLE_COLORS }, ref) => {
         const [localActive, setLocalActive] = useState(isActive);
         const scale = useSharedValue(1);
         const isZero = count === '0';
@@ -146,6 +150,8 @@ const ActionButton = forwardRef<ActionButtonRef, ActionButtonProps>(
             <Pressable
                 onPress={handlePress}
                 onLongPress={onLongPress}
+                onPressIn={onPressIn}
+                onPressOut={onPressOut}
                 delayLongPress={200}
                 style={styles.buttonContainer}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -201,6 +207,8 @@ export const ActionButtons = memo(forwardRef<ActionButtonsRef, ActionButtonsProp
     onShare,
     onShop,
     showShop = true,
+    onPressIn,
+    onPressOut,
 }, ref) {
     const likeButtonRef = useRef<ActionButtonRef>(null);
     const shake = useSharedValue(0);
@@ -239,6 +247,8 @@ export const ActionButtons = memo(forwardRef<ActionButtonsRef, ActionButtonsProp
                     videoId={videoId}
                     onPress={onLike}
                     onLongPress={triggerShake}
+                    onPressIn={onPressIn}
+                    onPressOut={onPressOut}
                     isActive={isLiked}
                     activeColor={LIKE_COLOR}
                     enableBurst={true}
@@ -252,6 +262,8 @@ export const ActionButtons = memo(forwardRef<ActionButtonsRef, ActionButtonsProp
                     videoId={videoId}
                     onPress={onSave}
                     onLongPress={triggerShake}
+                    onPressIn={onPressIn}
+                    onPressOut={onPressOut}
                     isActive={isSaved}
                     activeColor={SAVE_COLOR}
                     enableBurst={true}
@@ -265,6 +277,8 @@ export const ActionButtons = memo(forwardRef<ActionButtonsRef, ActionButtonsProp
                     videoId={videoId}
                     onPress={onShare}
                     onLongPress={triggerShake}
+                    onPressIn={onPressIn}
+                    onPressOut={onPressOut}
                     isActive={false}
                     activeColor={WHITE}
                     canToggle={false}
@@ -278,6 +292,8 @@ export const ActionButtons = memo(forwardRef<ActionButtonsRef, ActionButtonsProp
                         videoId={videoId}
                         onPress={onShop}
                         onLongPress={triggerShake}
+                        onPressIn={onPressIn}
+                        onPressOut={onPressOut}
                         isActive={false}
                         activeColor={WHITE}
                         canToggle={false}
