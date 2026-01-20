@@ -105,25 +105,25 @@ export const VideoLayer = memo(function VideoLayer({
     });
 
     const { type: networkType } = useNetInfo();
-    const defaultBufferConfig = getBufferConfig(networkType);
     const isLocal = videoSource?.uri?.startsWith('file://');
     const isHls = typeof video.videoUrl === 'string' && video.videoUrl.endsWith('.m3u8');
 
-    const bufferConfig = isLocal
+    // 🚀 Use unified buffer config with local file detection
+    const bufferConfig = isHls
         ? {
-            minBufferMs: 250,
-            maxBufferMs: 1500,
-            bufferForPlaybackMs: 50,
-            bufferForPlaybackAfterRebufferMs: 100,
+            // HLS streams need more conservative buffering
+            minBufferMs: 2000,
+            maxBufferMs: 10000,
+            bufferForPlaybackMs: 500,
+            bufferForPlaybackAfterRebufferMs: 1000,
         }
-        : isHls
-            ? {
-                minBufferMs: 2000,
-                maxBufferMs: 10000,
-                bufferForPlaybackMs: 500,
-                bufferForPlaybackAfterRebufferMs: 1000,
-            }
-            : defaultBufferConfig;
+        : getBufferConfig(networkType, isLocal);
+
+    // ✅ NEW API: bufferConfig inside source object (not as separate prop)
+    const sourceWithBuffer = videoSource ? {
+        ...videoSource,
+        bufferConfig,
+    } : null;
 
     if (!shouldLoad) {
         return (
@@ -158,11 +158,11 @@ export const VideoLayer = memo(function VideoLayer({
                     onCarouselTouchEnd={onCarouselTouchEnd}
                 />
             ) : (
-                isSourceReady && videoSource && (
+                isSourceReady && sourceWithBuffer && (
                     <Video
                         key={`${video.id}-${playerKey}`}
                         ref={videoRef}
-                        source={videoSource}
+                        source={sourceWithBuffer}
                         style={[styles.video, { backgroundColor: '#000' }]}
                         resizeMode={resizeMode}
                         repeat={false}
@@ -176,7 +176,6 @@ export const VideoLayer = memo(function VideoLayer({
                         onError={handleError}
                         onProgress={handleProgress}
                         onEnd={handleEnd}
-                        bufferConfig={bufferConfig}
                         playInBackground={false}
                         playWhenInactive={false}
                         ignoreSilentSwitch="ignore"

@@ -670,7 +670,15 @@ export const FeedManager = ({
     const renderItem = useCallback(
         ({ item, index }: { item: Video; index: number }) => {
             const isActive = item.id === activeVideoId;
-            const shouldLoad = Math.abs(index - activeIndex) <= 1;
+
+            // 🚀 PRE-MOUNTING STRATEGY (Zero-Latency Feed)
+            // Mount players for: Previous + Current + Next
+            // Only CURRENT plays, others stay paused but initialized
+            const shouldLoad =
+                index === activeIndex ||      // Current video (playing)
+                index === activeIndex - 1 ||  // Previous video (paused, ready for swipe up)
+                index === activeIndex + 1;    // Next video (paused, ready for swipe down)
+
             return (
                 <FeedItem
                     video={item}
