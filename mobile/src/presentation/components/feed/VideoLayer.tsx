@@ -1,32 +1,20 @@
-import { useRef, useState, useEffect, useCallback, memo } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Video, { OnProgressData, OnLoadData, VideoRef, OnVideoErrorData, SelectedTrackType } from 'react-native-video';
-import { Video as VideoEntity } from '../../../domain/entities/Video';
-import { useActiveVideoStore, clearVideoPosition } from '../../store/useActiveVideoStore';
+import Video, { SelectedTrackType } from 'react-native-video';
 import { useNetInfo } from '@react-native-community/netinfo';
-import { getBufferConfig } from '../../../core/utils/bufferConfig';
-import { useSharedValue, SharedValue } from 'react-native-reanimated';
-import { VideoCacheService } from '../../../data/services/VideoCacheService';
+import { SharedValue } from 'react-native-reanimated';
 import { Image } from 'expo-image';
-import { PerformanceLogger } from '../../../core/services/PerformanceLogger';
+import { getBufferConfig } from '../../../core/utils/bufferConfig';
+import { Video as VideoEntity } from '../../../domain/entities/Video';
 import { CarouselLayer } from './CarouselLayer';
 import { VideoOverlays } from './VideoOverlays';
 import { BrightnessOverlay } from './BrightnessOverlay';
-import { SupabaseVideoDataSource } from '../../../data/datasources/SupabaseVideoDataSource';
-import { useAuthStore } from '../../store/useAuthStore';
-
-const videoDataSource = new SupabaseVideoDataSource();
-
-// Optional: Screen orientation (requires native build)
-let ScreenOrientation: any = null;
-try {
-    ScreenOrientation = require('expo-screen-orientation');
-} catch (e) {
-    console.log('[VideoLayer] expo-screen-orientation not available (native build required)');
-}
+import { useVideoSource } from '../../hooks/useVideoSource';
+import { useVideoPlayback } from '../../hooks/useVideoPlayback';
 
 interface VideoLayerProps {
     video: VideoEntity;
+    shouldLoad?: boolean;
     isActive: boolean;
     isMuted: boolean;
     isCleanScreen?: boolean;
@@ -46,11 +34,9 @@ interface VideoLayerProps {
     onCarouselTouchEnd?: () => void;
 }
 
-const MAX_LOOPS = 2;
-const MAX_RETRIES = 3;
-
 export const VideoLayer = memo(function VideoLayer({
     video,
+    shouldLoad = true,
     isActive,
     isMuted,
     isCleanScreen = false,
@@ -69,41 +55,8 @@ export const VideoLayer = memo(function VideoLayer({
     onCarouselTouchStart,
     onCarouselTouchEnd,
 }: VideoLayerProps) {
-    const isAppActive = useActiveVideoStore((state) => state.isAppActive);
-    const isScreenFocused = useActiveVideoStore((state) => state.isScreenFocused);
-    const isSeeking = useActiveVideoStore((state) => state.isSeeking);
-    const isPausedGlobal = useActiveVideoStore((state) => state.isPaused);
-    const setPaused = useActiveVideoStore((state) => state.setPaused);
-    const playbackRate = useActiveVideoStore((state) => state.playbackRate);
-    const viewingMode = useActiveVideoStore((state) => state.viewingMode);
-    const maxLoops = viewingMode === 'off' ? MAX_LOOPS : 1;
-
-    const { type: networkType } = useNetInfo();
-    const defaultBufferConfig = getBufferConfig(networkType);
-
-    const [isFinished, setIsFinished] = useState(false);
-    const [duration, setDuration] = useState(0);
-    const [hasError, setHasError] = useState(false);
-    const [retryCount, setRetryCount] = useState(0);
-    const [key, setKey] = useState(0);
-
-    const shouldPlay = isActive && isAppActive && isScreenFocused && !isSeeking && !isPausedGlobal && !isFinished && !hasError;
-
-    // Debug: Log when shouldPlay changes
-    useEffect(() => {
-        if (isActive) {
-            console.log(`[VideoTransition] 🎮 shouldPlay=${shouldPlay} for ${video.id} at ${Date.now()}`);
-        }
-    }, [shouldPlay, isActive, video.id]);
-
-    const rateLabel =
-        isActive && playbackRate > 1
-            ? (Number.isInteger(playbackRate) ? `${playbackRate}x` : `${playbackRate.toFixed(1)}x`)
-            : null;
-
     const isCarousel = video.postType === 'carousel' && (video.mediaUrls?.length ?? 0) > 0;
 
-    // Calculate resizeMode UPFRONT using pre-stored dimensions
     const [resizeMode] = useState<'cover' | 'contain' | 'stretch'>(() => {
         if (video.width && video.height) {
             const aspectRatio = video.width / video.height;
@@ -112,257 +65,88 @@ export const VideoLayer = memo(function VideoLayer({
         return 'cover';
     });
 
-    // Poster State (Manual Overlay)
     const [showPoster, setShowPoster] = useState(!isCarousel);
 
-    // Cache-First Strategy: Don't set source until we check cache
-    const [videoSource, setVideoSource] = useState<any>(null);
-    const [isSourceReady, setIsSourceReady] = useState(false);
+    useEffect(() => {
+        setShowPoster(!isCarousel);
+    }, [video.id, isCarousel, shouldLoad]);
 
-    // Optimize buffer based on source type
+    const { videoSource, isSourceReady, fallbackToNetwork } = useVideoSource(video, shouldLoad);
+
+    const {
+        videoRef,
+        playerKey,
+        shouldPlay,
+        rateLabel,
+        hasError,
+        isFinished,
+        retryCount,
+        playbackRate,
+        currentTimeSV,
+        durationSV,
+        handleLoad,
+        handleProgress,
+        handleError,
+        handleEnd,
+        handleRetry,
+        seekTo,
+    } = useVideoPlayback({
+        video,
+        shouldLoad,
+        isActive,
+        videoSource,
+        onVideoEnd,
+        onProgressUpdate,
+        onSeekReady,
+        onRemoveVideo,
+        onResizeModeChange,
+        onCachedSourceLoaded: () => setShowPoster(false),
+        onUseNetworkSource: fallbackToNetwork,
+    });
+
+    const { type: networkType } = useNetInfo();
+    const defaultBufferConfig = getBufferConfig(networkType);
     const isLocal = videoSource?.uri?.startsWith('file://');
-    const isHLS = typeof video.videoUrl === 'string' && video.videoUrl.endsWith('.m3u8');
+    const isHls = typeof video.videoUrl === 'string' && video.videoUrl.endsWith('.m3u8');
 
     const bufferConfig = isLocal
         ? {
             minBufferMs: 250,
             maxBufferMs: 1500,
             bufferForPlaybackMs: 50,
-            bufferForPlaybackAfterRebufferMs: 100
+            bufferForPlaybackAfterRebufferMs: 100,
         }
-        : isHLS
+        : isHls
             ? {
                 minBufferMs: 2000,
                 maxBufferMs: 10000,
                 bufferForPlaybackMs: 500,
-                bufferForPlaybackAfterRebufferMs: 1000
+                bufferForPlaybackAfterRebufferMs: 1000,
             }
             : defaultBufferConfig;
 
-    // Local SharedValues for SeekBar
-    const currentTimeSV = useSharedValue(0);
-    const durationSV = useSharedValue(0);
-
-    const videoRef = useRef<VideoRef>(null);
-    const loopCount = useRef(0);
-    const memoryCachedRef = useRef(false);
-    const hasInitialSeekPerformed = useRef(false);
-
-    // Cache-First Strategy: Check cache BEFORE setting source
-    useEffect(() => {
-        let isCancelled = false;
-        const startTime = Date.now();
-
-        const initVideoSource = async () => {
-            if (typeof video.videoUrl !== 'string') {
-                setVideoSource(video.videoUrl);
-                setIsSourceReady(true);
-                return;
-            }
-
-            console.log(`[VideoTransition] 🔍 Source init START for ${video.id} at ${Date.now()}`);
-
-            // STEP 1: Memory cache (synchronous, instant)
-            const memoryCached = VideoCacheService.getMemoryCachedPath(video.videoUrl);
-
-            if (memoryCached && !isCancelled) {
-                const isHLS = video.videoUrl.endsWith('.m3u8');
-                console.log(`[VideoTransition] 🚀 Memory cache HIT: ${video.id} in ${Date.now() - startTime}ms`);
-                memoryCachedRef.current = !isHLS;
-                setVideoSource({ uri: memoryCached });
-                setIsSourceReady(true);
-                return;
-            }
-
-            // STEP 2: Disk cache (async, fast)
-            const diskCached = await VideoCacheService.getCachedVideoPath(video.videoUrl);
-            const checkTime = Date.now() - startTime;
-
-            if (diskCached && !isCancelled) {
-                console.log(`[VideoTransition] ⚡ Disk cache HIT: ${video.id} in ${checkTime}ms`);
-                memoryCachedRef.current = false;
-                setVideoSource({ uri: diskCached });
-                setIsSourceReady(true);
-                return;
-            }
-
-            // STEP 3: Network fallback (slow)
-            if (!isCancelled) {
-                console.log(`[VideoTransition] 🌐 Network MISS: ${video.id} in ${Date.now() - startTime}ms`);
-                memoryCachedRef.current = false;
-                setVideoSource({ uri: video.videoUrl });
-                setIsSourceReady(true);
-            }
-        };
-
-        // Reset states
-        setIsSourceReady(false);
-        setShowPoster(!isCarousel);
-        memoryCachedRef.current = false;
-        hasInitialSeekPerformed.current = false;
-
-        // Initialize source with cache-first strategy
-        initVideoSource();
-
-        return () => { isCancelled = true; };
-    }, [video.id]);
-
-    // Reset finished state if video changes
-    useEffect(() => {
-        setIsFinished(false);
-        setHasError(false);
-        setRetryCount(0);
-        loopCount.current = 0;
-        currentTimeSV.value = 0;
-        durationSV.value = 0;
-        videoRef.current?.seek(0);
-    }, [video.id]);
-
-    // ALWAYS start from beginning when becoming active
-    useEffect(() => {
-        if (isActive) {
-            console.log(`[VideoTransition] ⏱️ Video ${video.id} became ACTIVE at ${Date.now()}`);
-            videoRef.current?.seek(0);
-            currentTimeSV.value = 0;
-            setIsFinished(false);
-
-            // Record view
-            const userId = useAuthStore.getState().user?.id;
-            if (userId && video.id) {
-                videoDataSource.recordVideoView(video.id, userId).catch(err => {
-                    console.error('[VideoLayer] recordVideoView error:', err);
-                });
-            }
-        }
-    }, [isActive, video.id]);
-
-    // Unlock orientation when component unmounts
-    useEffect(() => {
-        return () => {
-            if (ScreenOrientation) {
-                ScreenOrientation.unlockAsync?.().catch((e: any) => {
-                    console.log('[VideoLayer] Orientation unlock skipped:', e.message);
-                });
-            }
-        };
-    }, []);
-
-    // Track if user toggled pause (for replay detection)
-    const wasPausedBefore = useRef(isPausedGlobal);
-
-    // Handle Manual Replay
-    useEffect(() => {
-        const userToggledToUnpause = wasPausedBefore.current === true && isPausedGlobal === false;
-        wasPausedBefore.current = isPausedGlobal;
-
-        if (userToggledToUnpause && isFinished && isActive) {
-            setIsFinished(false);
-            loopCount.current = 0;
-            clearVideoPosition(video.id);
-            videoRef.current?.seek(0);
-        }
-    }, [isPausedGlobal, isFinished, isActive, video.id]);
-
-    const handleLoad = useCallback((data: OnLoadData) => {
-        console.log(`[VideoTransition] 📦 onLoad triggered for ${video.id} at ${Date.now()}`);
-
-        setDuration(data.duration);
-        durationSV.value = data.duration;
-        setHasError(false);
-
-        // Hide poster immediately for cached videos
-        const source = videoSource?.uri?.startsWith('file://')
-            ? 'disk-cache'
-            : isHLS ? 'network' : memoryCachedRef.current ? 'memory-cache' : 'network';
-
-        if (source === 'disk-cache' || source === 'memory-cache') {
-            console.log(`[VideoTransition] 🖼️ Poster HIDDEN (cached) for ${video.id} at ${Date.now()}`);
-            setShowPoster(false);
-        }
-
-        PerformanceLogger.endTransition(video.id, source);
-
-        if (data.naturalSize) {
-            const aspectRatio = data.naturalSize.width / data.naturalSize.height;
-            onResizeModeChange?.(aspectRatio < 0.8 ? 'cover' : 'contain');
-        }
-    }, [onResizeModeChange, video.id, videoSource, isHLS]);
-
-    const handleVideoError = useCallback(async (error: OnVideoErrorData) => {
-        console.error(`[VideoLayer] Error playing video ${video.id}:`, error);
-
-        if (retryCount >= MAX_RETRIES) {
-            console.log(`[VideoLayer] Max retries (${MAX_RETRIES}) reached for ${video.id}. Removing from feed.`);
-            onRemoveVideo?.();
-            return;
-        }
-
-        // Fallback Logic: Cache -> Network
-        if (videoSource?.uri?.startsWith('file://')) {
-            console.warn(`[VideoLayer] Cache file failed for ${video.id}. Deleting corrupt cache and falling back to Network.`);
-            await VideoCacheService.deleteCachedVideo(video.videoUrl);
-            setVideoSource(typeof video.videoUrl === 'string' ? { uri: video.videoUrl } : video.videoUrl);
-            setHasError(false);
-            setKey(prev => prev + 1);
-            return;
-        }
-
-        console.error(`[VideoLayer] Faulty URL:`, video.videoUrl);
-        console.error(`[VideoLayer] Current Source:`, videoSource);
-        setHasError(true);
-    }, [video.id, video.videoUrl, videoSource, retryCount, onRemoveVideo]);
-
-    const handleRetry = useCallback(() => {
-        setRetryCount(prev => prev + 1);
-        setHasError(false);
-        setKey(prev => prev + 1);
-    }, []);
-
-    const handleProgress = useCallback((data: OnProgressData) => {
-        onProgressUpdate?.(data.currentTime, duration);
-        currentTimeSV.value = data.currentTime;
-        if (duration > 0) {
-            durationSV.value = duration;
-        }
-    }, [duration, onProgressUpdate]);
-
-    const handleEnd = useCallback(() => {
-        loopCount.current += 1;
-        console.log(`[Loop] 🔄 Video ${video.id} ended, loop ${loopCount.current}/${MAX_LOOPS}`);
-
-        if (loopCount.current >= maxLoops) {
-            console.log(`[Loop] ✅ Max loops reached, showing replay icon`);
-            setIsFinished(true);
-            clearVideoPosition(video.id);
-            onVideoEnd?.();
-        } else {
-            console.log(`[Loop] ⏪ Looping video from start`);
-            videoRef.current?.seek(0);
-        }
-    }, [onVideoEnd, video.id, maxLoops]);
-
-    const seekTo = useCallback((time: number) => {
-        videoRef.current?.seek(time);
-        if (isFinished) {
-            setIsFinished(false);
-            setPaused(false);
-        }
-    }, [isFinished, setPaused]);
-
-    // Provide seek function to parent when active
-    useEffect(() => {
-        if (isActive && !hasError) {
-            onSeekReady?.(seekTo);
-        }
-    }, [isActive, seekTo, onSeekReady, hasError]);
+    if (!shouldLoad) {
+        return (
+            <View style={styles.container}>
+                {video.thumbnailUrl && (
+                    <Image
+                        source={{ uri: video.thumbnailUrl }}
+                        style={StyleSheet.absoluteFill}
+                        contentFit="cover"
+                        priority="high"
+                        cachePolicy="memory-disk"
+                    />
+                )}
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>
-            {/* Carousel Content */}
             {isCarousel ? (
                 <CarouselLayer
                     mediaUrls={video.mediaUrls ?? []}
-                    isActive={isActive && isAppActive && isScreenFocused && !isPausedGlobal}
+                    isActive={shouldPlay}
                     isMuted={isMuted}
                     isCleanScreen={isCleanScreen}
                     onDoubleTap={onDoubleTap}
@@ -374,10 +158,9 @@ export const VideoLayer = memo(function VideoLayer({
                     onCarouselTouchEnd={onCarouselTouchEnd}
                 />
             ) : (
-                /* Only render Video component when source is ready */
                 isSourceReady && videoSource && (
                     <Video
-                        key={`${video.id}-${key}`}
+                        key={`${video.id}-${playerKey}`}
                         ref={videoRef}
                         source={videoSource}
                         style={[styles.video, { backgroundColor: '#000' }]}
@@ -389,17 +172,15 @@ export const VideoLayer = memo(function VideoLayer({
                         selectedAudioTrack={isMuted ? { type: SelectedTrackType.DISABLED } : undefined}
                         rate={playbackRate}
                         onLoad={handleLoad}
-                        onReadyForDisplay={() => {
-                            console.log(`[VideoTransition] 🎬 onReadyForDisplay for ${video.id} at ${Date.now()}`);
-                            setShowPoster(false);
-                        }}
-                        onError={handleVideoError}
+                        onReadyForDisplay={() => setShowPoster(false)}
+                        onError={handleError}
                         onProgress={handleProgress}
                         onEnd={handleEnd}
+                        bufferConfig={bufferConfig}
                         playInBackground={false}
                         playWhenInactive={false}
                         ignoreSilentSwitch="ignore"
-                        mixWithOthers={isMuted ? "mix" : undefined}
+                        mixWithOthers={isMuted ? 'mix' : undefined}
                         disableFocus={isMuted}
                         progressUpdateInterval={33}
                         automaticallyWaitsToMinimizeStalling={true}
@@ -408,7 +189,6 @@ export const VideoLayer = memo(function VideoLayer({
                 )
             )}
 
-            {/* Manual Poster Overlay */}
             {showPoster && video.thumbnailUrl && (
                 <Image
                     source={{ uri: video.thumbnailUrl }}
@@ -419,10 +199,8 @@ export const VideoLayer = memo(function VideoLayer({
                 />
             )}
 
-            {/* Brightness Overlay (works for video + carousel) */}
             <BrightnessOverlay />
 
-            {/* UI Overlays (for standard videos only) */}
             {video.postType !== 'carousel' && (
                 <VideoOverlays
                     videoId={video.id}
@@ -447,6 +225,7 @@ export const VideoLayer = memo(function VideoLayer({
 }, (prev, next) => {
     return (
         prev.video.id === next.video.id &&
+        prev.shouldLoad === next.shouldLoad &&
         prev.isActive === next.isActive &&
         prev.isMuted === next.isMuted &&
         prev.isCleanScreen === next.isCleanScreen &&

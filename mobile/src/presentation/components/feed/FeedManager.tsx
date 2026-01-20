@@ -91,20 +91,17 @@ export const FeedManager = ({
     showStories = true,
     isCustomFeed = false,
 }: FeedManagerProps) => {
-    const activeVideoStore = useActiveVideoStore();
-    const setActiveVideo = activeVideoStore.setActiveVideo;
-    const activeVideoId = activeVideoStore.activeVideoId;
-    const isAppActive = activeVideoStore.isAppActive;
-    const isSeeking = activeVideoStore.isSeeking;
-    const togglePause = activeVideoStore.togglePause;
-    const setScreenFocused = activeVideoStore.setScreenFocused;
-    const activeIndex = activeVideoStore.activeIndex;
-    const isCleanScreen = activeVideoStore.isCleanScreen;
-    const setCleanScreen = activeVideoStore.setCleanScreen;
-    const playbackRate = activeVideoStore.playbackRate;
-    const viewingMode = activeVideoStore.viewingMode;
-    const setPlaybackRate = activeVideoStore.setPlaybackRate;
-    const setPaused = activeVideoStore.setPaused;
+    const setActiveVideo = useActiveVideoStore((state) => state.setActiveVideo);
+    const activeVideoId = useActiveVideoStore((state) => state.activeVideoId);
+    const isSeeking = useActiveVideoStore((state) => state.isSeeking);
+    const togglePause = useActiveVideoStore((state) => state.togglePause);
+    const setScreenFocused = useActiveVideoStore((state) => state.setScreenFocused);
+    const activeIndex = useActiveVideoStore((state) => state.activeIndex);
+    const isCleanScreen = useActiveVideoStore((state) => state.isCleanScreen);
+    const setCleanScreen = useActiveVideoStore((state) => state.setCleanScreen);
+    const playbackRate = useActiveVideoStore((state) => state.playbackRate);
+    const viewingMode = useActiveVideoStore((state) => state.viewingMode);
+    const setPlaybackRate = useActiveVideoStore((state) => state.setPlaybackRate);
     const [tapIndicator, setTapIndicator] = useState<null | 'play' | 'pause'>(null);
     const tapIndicatorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -665,11 +662,13 @@ export const FeedManager = ({
     const isOwnActiveVideo = !!activeVideo && activeVideo.user?.id === currentUserId;
 
     const renderItem = useCallback(
-        ({ item }: { item: Video }) => {
+        ({ item, index }: { item: Video; index: number }) => {
             const isActive = item.id === activeVideoId;
+            const shouldLoad = Math.abs(index - activeIndex) <= 1;
             return (
                 <FeedItem
                     video={item}
+                    shouldLoad={shouldLoad}
                     isActive={isActive}
                     isMuted={isMuted}
                     isScrolling={isScrollingSV}
@@ -702,7 +701,7 @@ export const FeedManager = ({
         },
         [
             activeVideoId,
-            isAppActive,
+            activeIndex,
             isMuted,
             isSeeking,
             currentUserId,

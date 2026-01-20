@@ -4,6 +4,7 @@ import Animated from 'react-native-reanimated';
 import { SharedValue } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
 
 import { VideoLayer } from './VideoLayer';
 import { ActionButtons, ActionButtonsRef } from './ActionButtons';
@@ -16,6 +17,7 @@ const ITEM_HEIGHT = Dimensions.get('window').height;
 
 interface FeedItemProps {
     video: Video;
+    shouldLoad?: boolean;
     isActive: boolean;
     isMuted: boolean;
     isScrolling: SharedValue<boolean>;
@@ -47,6 +49,7 @@ interface FeedItemProps {
 
 export const FeedItem = memo(function FeedItem({
     video,
+    shouldLoad = true,
     isActive,
     isMuted,
     isScrolling,
@@ -82,6 +85,11 @@ export const FeedItem = memo(function FeedItem({
     const isCarousel = video.postType === 'carousel' && (video.mediaUrls?.length ?? 0) > 0;
     const isSelfProfile = !!currentUserId && video.user.id === currentUserId;
     const profileRoute = isSelfProfile ? '/profile' : `/user/${video.user.id}`;
+    const previewImage =
+        video.thumbnailUrl ||
+        video.mediaUrls?.find((media) => media.thumbnail)?.thumbnail ||
+        video.mediaUrls?.find((media) => media.type === 'image')?.url ||
+        null;
 
     const handleDoubleTap = useCallback(() => {
         // DoubleTapLike already handles the center heart animation
@@ -104,10 +112,23 @@ export const FeedItem = memo(function FeedItem({
 
     return (
         <View style={[styles.itemContainer, { height: ITEM_HEIGHT }]}>
-            {isCarousel ? (
+            {!shouldLoad ? (
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', paddingTop: insets.top }]}>
+                    {previewImage && (
+                        <Image
+                            source={{ uri: previewImage }}
+                            style={StyleSheet.absoluteFill}
+                            contentFit="cover"
+                            cachePolicy="memory-disk"
+                            priority="high"
+                        />
+                    )}
+                </View>
+            ) : isCarousel ? (
                 <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', paddingTop: insets.top }]}>
                     <VideoLayer
                         video={video}
+                        shouldLoad={shouldLoad}
                         isActive={isActive}
                         isMuted={isMuted}
                         isScrolling={isScrolling}
@@ -138,6 +159,7 @@ export const FeedItem = memo(function FeedItem({
                     <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', paddingTop: insets.top }]}>
                         <VideoLayer
                             video={video}
+                            shouldLoad={shouldLoad}
                             isActive={isActive}
                             isMuted={isMuted}
                             isScrolling={isScrolling}
@@ -191,6 +213,7 @@ export const FeedItem = memo(function FeedItem({
 }, (prevProps, nextProps) => {
     return (
         prevProps.video.id === nextProps.video.id &&
+        prevProps.shouldLoad === nextProps.shouldLoad &&
         prevProps.isActive === nextProps.isActive &&
         prevProps.isMuted === nextProps.isMuted &&
         prevProps.video.isLiked === nextProps.video.isLiked &&
