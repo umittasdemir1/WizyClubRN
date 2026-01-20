@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl } 
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft } from 'lucide-react-native';
-import { ActivityGrid } from '../../../src/presentation/components/profile/ActivityGrid';
+import { MediaGrid } from '../../../src/presentation/components/shared/MediaGrid';
 import { UserActivityRepositoryImpl } from '../../../src/data/repositories/UserActivityRepositoryImpl';
 import { Video } from '../../../src/domain/entities/Video';
 import { useThemeStore } from '../../../src/presentation/store/useThemeStore';
@@ -69,7 +69,7 @@ export default function ActivitiesScreen() {
         fetchData();
     };
 
-    const handleVideoPress = (video: Video, index: number) => {
+    const handleVideoPress = (video: { id: string }, index: number) => {
         setCustomFeed(videos);
         setActiveVideo(video.id, index);
         router.push('/custom-feed' as any);
@@ -101,10 +101,18 @@ export default function ActivitiesScreen() {
                         </Text>
                     </View>
                 ) : (
-                    <ActivityGrid
-                        videos={videos}
+                    <MediaGrid
+                        items={videos.map((video) => ({
+                            id: video.id,
+                            thumbnail: video.thumbnailUrl,
+                            views: video.likesCount || 0,
+                            type: 'video' as const,
+                        }))}
                         isDark={isDark}
+                        aspectRatio={0.8}
                         onPress={handleVideoPress}
+                        gap={1}
+                        padding={0}
                     />
                 )}
             </ScrollView>

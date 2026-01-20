@@ -43,6 +43,7 @@ import { COLORS } from '../../../core/constants';
 import React from 'react';
 import { SystemBars } from 'react-native-edge-to-edge';
 import { Bookmark } from 'lucide-react-native';
+import { FeedPrefetchService } from '../../../data/services/FeedPrefetchService';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const SAVE_ICON_ACTIVE = '#FFFFFF';
@@ -367,6 +368,11 @@ export const FeedManager = ({
                     setActiveVideo(newId, newIndex);
                     setActiveTab('foryou');
                     setCleanScreen(false);
+                    FeedPrefetchService.getInstance().queueVideos(videosRef.current, [
+                        newIndex + 1,
+                        newIndex + 2,
+                        newIndex + 3,
+                    ]);
                 }
             }
         },

@@ -13,28 +13,25 @@ export const getBufferConfig = (type: NetInfoStateType | null): BufferConfig => 
         case NetInfoStateType.wifi:
         case NetInfoStateType.ethernet:
             return {
-                // 🔥 WiFi: Ultra aggressive for instant start
-                minBufferMs: 500,
+                minBufferMs: 2000,
                 maxBufferMs: 30000,
-                bufferForPlaybackMs: 50,  // TikTok-style: start ASAP
-                bufferForPlaybackAfterRebufferMs: 250,
+                bufferForPlaybackMs: 250,
+                bufferForPlaybackAfterRebufferMs: 500,
             };
         case NetInfoStateType.cellular:
             return {
-                // Cellular: Slightly conservative but still fast
-                minBufferMs: 750,
+                minBufferMs: 2000,
                 maxBufferMs: 15000,
-                bufferForPlaybackMs: 100,
-                bufferForPlaybackAfterRebufferMs: 300,
+                bufferForPlaybackMs: 250,
+                bufferForPlaybackAfterRebufferMs: 500,
             };
         case NetInfoStateType.none:
         case NetInfoStateType.unknown:
         default:
             return {
-                // Unknown: Balance speed and stability
-                minBufferMs: 1000,
+                minBufferMs: 2000,
                 maxBufferMs: 10000,
-                bufferForPlaybackMs: 100,
+                bufferForPlaybackMs: 250,
                 bufferForPlaybackAfterRebufferMs: 500,
             };
     }

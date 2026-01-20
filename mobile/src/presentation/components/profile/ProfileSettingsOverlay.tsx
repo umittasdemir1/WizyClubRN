@@ -42,7 +42,7 @@ import {
   UserX,
   X,
 } from 'lucide-react-native';
-import { ActivityGrid } from './ActivityGrid';
+import { MediaGrid } from '../shared/MediaGrid';
 import { DeletedContentMenu } from './DeletedContentSheet';
 import type { Theme } from '../../store/useThemeStore';
 
@@ -1538,14 +1538,22 @@ export function ProfileSettingsOverlay({
                   <Text style={{ color: textSecondary }}>Gösterilecek içerik yok</Text>
                 </View>
               ) : (
-                <ActivityGrid
-                  videos={['archived', 'notInterested'].includes(settingsSection) ? [] : activityVideos}
+                <MediaGrid
+                  items={(['archived', 'notInterested'].includes(settingsSection) ? [] : activityVideos).map((video: any) => ({
+                    id: video.id,
+                    thumbnail: video.thumbnailUrl,
+                    views: video.likesCount || 0,
+                    type: 'video' as const,
+                  }))}
                   isDark={isDark}
+                  aspectRatio={0.8}
                   onPress={(video, index) => {
                     setCustomFeed(activityVideos);
                     setActiveVideo(video.id, index);
                     router.push('/custom-feed' as any);
                   }}
+                  gap={1}
+                  padding={0}
                 />
               )}
               {['archived', 'notInterested'].includes(settingsSection) && activityVideos.length === 0 && (

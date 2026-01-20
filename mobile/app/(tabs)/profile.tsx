@@ -27,8 +27,8 @@ import { useDraftStore } from '../../src/presentation/store/useDraftStore';
 import { useInAppBrowserStore } from '../../src/presentation/store/useInAppBrowserStore';
 import { ProfileStats } from '../../src/presentation/components/profile/ProfileStats';
 import { SocialTags } from '../../src/presentation/components/profile/SocialTags';
-import { VideoGrid } from '../../src/presentation/components/profile/VideoGrid';
-import { PostsGrid } from '../../src/presentation/components/profile/PostsGrid';
+import { MediaGrid } from '../../src/presentation/components/shared/MediaGrid';
+import { DraftsFolderCard } from '../../src/presentation/components/profile/DraftsFolderCard';
 import { BioBottomSheet } from '../../src/presentation/components/profile/BioBottomSheet';
 import { EditProfileSheet } from '../../src/presentation/components/profile/EditProfileSheet';
 import { Menu, Store } from 'lucide-react-native';
@@ -751,35 +751,56 @@ export default function ProfileScreen() {
     return () => clearTimeout(timer);
   }, [isShopModalOpen]);
 
+  const draftsHeader = (
+    <DraftsFolderCard
+      drafts={drafts}
+      isDark={isDark}
+      itemWidth={gridItemSize}
+      onPress={handleDraftsFolderPress}
+    />
+  );
+
   const pagerPages = [
     (
       <View key="0">
-        <PostsGrid
-          posts={postsData}
+        <MediaGrid
+          items={postsData}
           isDark={isDark}
+          aspectRatio={0.8}
           onPreview={showPreview}
           onPress={handleVideoPress}
           onPreviewEnd={hidePreview}
-          showDraftsFolder={true}
-          drafts={drafts}
-          onDraftsFolderPress={handleDraftsFolderPress}
+          headerComponent={draftsHeader}
+          gap={2}
+          padding={2}
         />
       </View>
     ),
     (
       <View key="1">
-        <VideoGrid
-          videos={videosData}
+        <MediaGrid
+          items={videosData.map((video) => ({ ...video, type: 'video' as const }))}
           isDark={isDark}
+          aspectRatio={9 / 16}
           onPress={handleVideoPress}
           onPreview={showPreview}
           onPreviewEnd={hidePreview}
+          gap={2}
+          padding={2}
         />
       </View>
     ),
     (
       <View key="2">
-        <PostsGrid posts={tagsData} isDark={isDark} onPreview={showPreview} onPreviewEnd={hidePreview} />
+        <MediaGrid
+          items={tagsData}
+          isDark={isDark}
+          aspectRatio={0.8}
+          onPreview={showPreview}
+          onPreviewEnd={hidePreview}
+          gap={2}
+          padding={2}
+        />
         {tagsData.length === 0 && (
           <View style={{ padding: 40, alignItems: 'center' }}>
             <Text style={{ color: textSecondary }}>Etiketlenmiş gönderi yok</Text>
@@ -789,13 +810,15 @@ export default function ProfileScreen() {
     ),
     (
       <View key="3">
-        <PostsGrid
-          posts={savedData}
+        <MediaGrid
+          items={savedData}
           isDark={isDark}
+          aspectRatio={0.8}
           onPress={handleSavedPress}
           onPreview={showPreview}
           onPreviewEnd={hidePreview}
-          showDraftsFolder={false}
+          gap={2}
+          padding={2}
         />
         {savedData.length === 0 && (
           <View style={{ padding: 40, alignItems: 'center' }}>

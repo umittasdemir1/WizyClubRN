@@ -19,8 +19,7 @@ import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import { ProfileStats } from '../../src/presentation/components/profile/ProfileStats';
 import { Avatar } from '../../src/presentation/components/shared/Avatar';
 import { SocialTags } from '../../src/presentation/components/profile/SocialTags';
-import { VideoGrid } from '../../src/presentation/components/profile/VideoGrid';
-import { PostsGrid } from '../../src/presentation/components/profile/PostsGrid';
+import { MediaGrid } from '../../src/presentation/components/shared/MediaGrid';
 import { BioBottomSheet } from '../../src/presentation/components/profile/BioBottomSheet';
 import { ChevronLeft, MoreVertical, Store } from 'lucide-react-native';
 import BottomSheet from '@gorhom/bottom-sheet';
@@ -233,10 +232,14 @@ export default function UserProfileScreen() {
   const handleTabPress = (index: number) => { setActiveTab(index); pagerRef.current?.setPage(index); };
 
   const pagerPages = [
-    <View key="0"><PostsGrid posts={postsData} isDark={isDark} onPreview={showPreview} onPreviewEnd={hidePreview} /></View>,
-    <View key="1"><VideoGrid videos={videosData} isDark={isDark} onPreview={showPreview} onPreviewEnd={hidePreview} /></View>,
+    <View key="0">
+      <MediaGrid items={postsData} isDark={isDark} aspectRatio={0.8} onPreview={showPreview} onPreviewEnd={hidePreview} gap={2} padding={2} />
+    </View>,
+    <View key="1">
+      <MediaGrid items={videosData.map((video) => ({ ...video, type: 'video' as const }))} isDark={isDark} aspectRatio={9 / 16} onPreview={showPreview} onPreviewEnd={hidePreview} gap={2} padding={2} />
+    </View>,
     <View key="2">
-      <PostsGrid posts={tagsData} isDark={isDark} onPreview={showPreview} onPreviewEnd={hidePreview} />
+      <MediaGrid items={tagsData} isDark={isDark} aspectRatio={0.8} onPreview={showPreview} onPreviewEnd={hidePreview} gap={2} padding={2} />
       {tagsData.length === 0 && (
         <View style={{ padding: 40, alignItems: 'center' }}>
           <Text style={{ color: textSecondary }}>Etiketlenmiş gönderi yok</Text>
