@@ -7,6 +7,7 @@ class FeedPrefetchService {
   private queued = new Set<string>();
   private isProcessing = false;
   private maxQueueSize = 20;
+  private maxParallelDownloads = 3; // ✅ Download 3 videos in parallel
 
   static getInstance(): FeedPrefetchService {
     if (!FeedPrefetchService.instance) {
@@ -34,15 +35,26 @@ class FeedPrefetchService {
     this.isProcessing = true;
 
     while (this.queue.length > 0) {
-      const url = this.queue.shift();
-      if (!url) continue;
-      try {
-        await VideoCacheService.cacheVideo(url);
-      } catch (error) {
-        console.warn('[FeedPrefetch] Failed to cache video:', error);
-      } finally {
-        this.queued.delete(url);
+      // ✅ Take up to maxParallelDownloads from queue
+      const batch: string[] = [];
+      for (let i = 0; i < this.maxParallelDownloads && this.queue.length > 0; i++) {
+        const url = this.queue.shift();
+        if (url) batch.push(url);
       }
+
+      // ✅ Download all in parallel using Promise.allSettled
+      await Promise.allSettled(
+        batch.map(async (url) => {
+          try {
+            await VideoCacheService.cacheVideo(url);
+            console.log('[FeedPrefetch] ✅ Cached:', url.substring(0, 50) + '...');
+          } catch (error) {
+            console.warn('[FeedPrefetch] Failed to cache video:', error);
+          } finally {
+            this.queued.delete(url);
+          }
+        })
+      );
     }
 
     this.isProcessing = false;

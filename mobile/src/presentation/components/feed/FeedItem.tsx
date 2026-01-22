@@ -9,7 +9,7 @@ import { Image } from 'expo-image';
 import { VideoLayer } from './VideoLayer';
 import { ActionButtons, ActionButtonsRef } from './ActionButtons';
 import { MetadataLayer } from './MetadataLayer';
-import { DoubleTapLike, DoubleTapLikeRef } from './DoubleTapLike';
+import { DoubleTapLike } from './DoubleTapLike';
 import { Video } from '../../../domain/entities/Video';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -80,7 +80,6 @@ export const FeedItem = memo(function FeedItem({
 }: FeedItemProps) {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const doubleTapRef = useRef<DoubleTapLikeRef>(null);
     const actionButtonsRef = useRef<ActionButtonsRef>(null);
     const isCarousel = video.postType === 'carousel' && (video.mediaUrls?.length ?? 0) > 0;
     const isSelfProfile = !!currentUserId && video.user.id === currentUserId;
@@ -92,21 +91,19 @@ export const FeedItem = memo(function FeedItem({
         null;
 
     const handleDoubleTap = useCallback(() => {
-        // DoubleTapLike already handles the center heart animation
-        // We just need to trigger the BUTTON animation
+        // Trigger BUTTON animation only
         actionButtonsRef.current?.animateLike();
 
-        // 🔥 DELAY state update (like button press does it immediately, but double-tap needs delay)
+        // Update state with small delay
         setTimeout(() => {
             onDoubleTapLike(video.id);
-        }, 16); // Single frame delay
+        }, 16);
     }, [video.id, onDoubleTapLike]);
 
     const handleLikePress = useCallback(() => {
         if (!video.isLiked) {
-            doubleTapRef.current?.animateLike();
+            actionButtonsRef.current?.animateLike();
         }
-        // 🔥 IMMEDIATE: No delay, no InteractionManager
         onToggleLike(video.id);
     }, [video.isLiked, video.id, onToggleLike]);
 
@@ -149,7 +146,6 @@ export const FeedItem = memo(function FeedItem({
                 </View>
             ) : (
                 <DoubleTapLike
-                    ref={doubleTapRef}
                     onDoubleTap={handleDoubleTap}
                     onSingleTap={onFeedTap}
                     onLongPress={onLongPress}

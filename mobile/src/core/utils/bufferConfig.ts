@@ -13,13 +13,12 @@ export const getBufferConfig = (
     isLocalFile: boolean = false
 ): BufferConfig => {
     // 🚀 LOCAL FILES (Cached): Zero-latency playback
-    // Disk read is instant, no buffering needed
     if (isLocalFile) {
         return {
-            minBufferMs: 250,        // Start playing immediately
-            maxBufferMs: 1500,       // Minimal buffer pool
-            bufferForPlaybackMs: 50, // Almost instant start
-            bufferForPlaybackAfterRebufferMs: 100,
+            minBufferMs: 100,
+            maxBufferMs: 1000,
+            bufferForPlaybackMs: 0,  // INSTANT start
+            bufferForPlaybackAfterRebufferMs: 50,
         };
     }
 
@@ -28,26 +27,26 @@ export const getBufferConfig = (
         case NetInfoStateType.wifi:
         case NetInfoStateType.ethernet:
             return {
-                minBufferMs: 250,    // Reduced from 2000ms → Instant start on WiFi
+                minBufferMs: 500,    // ✅ Optimized for instant start
                 maxBufferMs: 30000,
-                bufferForPlaybackMs: 250,
-                bufferForPlaybackAfterRebufferMs: 500,
+                bufferForPlaybackMs: 150,
+                bufferForPlaybackAfterRebufferMs: 300,
             };
         case NetInfoStateType.cellular:
             return {
-                minBufferMs: 500,    // Slightly safer for cellular
+                minBufferMs: 500,
                 maxBufferMs: 15000,
-                bufferForPlaybackMs: 250,
-                bufferForPlaybackAfterRebufferMs: 500,
+                bufferForPlaybackMs: 200,
+                bufferForPlaybackAfterRebufferMs: 400,
             };
         case NetInfoStateType.none:
         case NetInfoStateType.unknown:
         default:
             return {
-                minBufferMs: 1000,   // Conservative for unknown connection
+                minBufferMs: 500,
                 maxBufferMs: 10000,
-                bufferForPlaybackMs: 250,
-                bufferForPlaybackAfterRebufferMs: 500,
+                bufferForPlaybackMs: 200,
+                bufferForPlaybackAfterRebufferMs: 400,
             };
     }
 };

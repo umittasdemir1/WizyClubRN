@@ -1,6 +1,5 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { SharedValue } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Pause, Repeat1, RefreshCcw, AlertCircle } from 'lucide-react-native';
 import { VideoSeekBar } from './VideoSeekBar';
 import PlayIcon from '../../../../assets/icons/play.svg';
@@ -60,16 +59,6 @@ export function VideoOverlays({
                 <View style={styles.rateBadge} pointerEvents="none">
                     <Text style={styles.rateText}>{rateLabel}</Text>
                 </View>
-            )}
-
-            {/* Gradient Overlay for UI */}
-            {showUiOverlays && (
-                <LinearGradient
-                    colors={['rgba(0,0,0,0.15)', 'transparent', 'transparent', 'rgba(0,0,0,0.5)']}
-                    locations={[0, 0.2, 0.6, 1]}
-                    style={StyleSheet.absoluteFill}
-                    pointerEvents="none"
-                />
             )}
 
             {/* Tap Play/Pause Icon Overlay */}

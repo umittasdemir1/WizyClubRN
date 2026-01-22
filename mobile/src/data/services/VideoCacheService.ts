@@ -1,10 +1,18 @@
 import * as FileSystem from 'expo-file-system/legacy';
+import { LRUCache } from 'lru-cache';
 
 const CACHE_FOLDER = `${FileSystem.cacheDirectory}video-cache/`;
 const MAX_CACHE_SIZE_BYTES = 500 * 1024 * 1024; // 500 MB limit
+const MAX_MEMORY_CACHE_SIZE = 50; // Store max 50 video paths in memory
+const MEMORY_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 
 export class VideoCacheService {
-    private static memoryCache = new Map<string, string>();
+    private static memoryCache = new LRUCache<string, string>({
+        max: MAX_MEMORY_CACHE_SIZE,
+        ttl: MEMORY_CACHE_TTL,
+        updateAgeOnGet: true,
+        updateAgeOnHas: true,
+    });
 
     private static getFilename(url: string): string {
         // Simple hash to avoid collisions for same filenames in different folders (e.g. video.mp4)
@@ -62,6 +70,26 @@ export class VideoCacheService {
             console.error('[VideoCache] Error checking cache:', error);
         }
         return null;
+    }
+
+    // ✅ NEW: Non-blocking cache warmup (doesn't block UI)
+    static warmupCache(url: string | number): void {
+        if (typeof url !== 'string') return;
+
+        // Already in memory cache, no need to warmup
+        if (VideoCacheService.memoryCache.has(url)) return;
+
+        // Schedule disk check without blocking
+        setTimeout(async () => {
+            try {
+                const path = await VideoCacheService.getCachedVideoPath(url);
+                if (path) {
+                    console.log(`[VideoCache] 🔥 Warmed up: ${url.substring(0, 50)}...`);
+                }
+            } catch (error) {
+                // Silently ignore warmup errors
+            }
+        }, 0);
     }
 
     static async cacheVideo(url: string | number): Promise<string | null> {

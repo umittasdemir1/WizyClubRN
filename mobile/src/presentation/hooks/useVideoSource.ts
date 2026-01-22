@@ -22,15 +22,11 @@ export function useVideoSource(video: VideoEntity, shouldLoad: boolean): UseVide
     }, [video.videoUrl]);
 
     useEffect(() => {
-        let isCancelled = false;
-        const startTime = Date.now();
-
-        const initVideoSource = async () => {
+        // ✅ SYNCHRONOUS VIDEO SOURCE INITIALIZATION (Zero-latency)
+        const initVideoSource = () => {
             if (!shouldLoad) {
-                if (!isCancelled) {
-                    setVideoSource(null);
-                    setIsSourceReady(false);
-                }
+                setVideoSource(null);
+                setIsSourceReady(false);
                 return;
             }
 
@@ -40,37 +36,25 @@ export function useVideoSource(video: VideoEntity, shouldLoad: boolean): UseVide
                 return;
             }
 
-            console.log(`[VideoTransition] 🔍 Source init START for ${video.id} at ${Date.now()}`);
-
+            // Memory cache check (synchronous, no blocking)
             const memoryCached = VideoCacheService.getMemoryCachedPath(video.videoUrl);
-            if (memoryCached && !isCancelled) {
-                console.log(`[VideoTransition] 🚀 Memory cache HIT: ${video.id} in ${Date.now() - startTime}ms`);
+            if (memoryCached) {
+                console.log(`[VideoTransition] 🚀 Memory cache HIT: ${video.id}`);
                 setVideoSource({ uri: memoryCached });
                 setIsSourceReady(true);
                 return;
             }
 
-            const diskCached = await VideoCacheService.getCachedVideoPath(video.videoUrl);
-            if (diskCached && !isCancelled) {
-                console.log(`[VideoTransition] ⚡ Disk cache HIT: ${video.id} in ${Date.now() - startTime}ms`);
-                setVideoSource({ uri: diskCached });
-                setIsSourceReady(true);
-                return;
-            }
+            // ✅ Immediate network fallback (NO BLOCKING)
+            console.log(`[VideoTransition] 🌐 Network source: ${video.id}`);
+            setVideoSource({ uri: video.videoUrl });
+            setIsSourceReady(true);
 
-            if (!isCancelled) {
-                console.log(`[VideoTransition] 🌐 Network MISS: ${video.id} in ${Date.now() - startTime}ms`);
-                setVideoSource({ uri: video.videoUrl });
-                setIsSourceReady(true);
-            }
+            // ✅ Background warmup for next access (non-blocking)
+            VideoCacheService.warmupCache(video.videoUrl);
         };
 
-        setIsSourceReady(false);
         initVideoSource();
-
-        return () => {
-            isCancelled = true;
-        };
     }, [video.id, video.videoUrl, shouldLoad]);
 
     return { videoSource, isSourceReady, fallbackToNetwork };
