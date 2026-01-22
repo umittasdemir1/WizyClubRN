@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Video as VideoEntity } from '../../domain/entities/Video';
 import { VideoCacheService } from '../../data/services/VideoCacheService';
+import { isVideoCacheDisabled } from '../../core/utils/videoCacheToggle';
 
 interface UseVideoSourceResult {
     videoSource: any;
@@ -22,13 +23,16 @@ export function useVideoSource(video: VideoEntity, shouldLoad: boolean): UseVide
     }, [video.videoUrl]);
 
     useEffect(() => {
-        // ✅ SYNCHRONOUS VIDEO SOURCE INITIALIZATION (Zero-latency)
-        const initVideoSource = () => {
+        let isCancelled = false;
+
+        const initVideoSource = async () => {
             if (!shouldLoad) {
                 setVideoSource(null);
                 setIsSourceReady(false);
                 return;
             }
+
+            setIsSourceReady(false);
 
             if (typeof video.videoUrl !== 'string') {
                 setVideoSource(video.videoUrl);
@@ -36,7 +40,13 @@ export function useVideoSource(video: VideoEntity, shouldLoad: boolean): UseVide
                 return;
             }
 
-            // Memory cache check (synchronous, no blocking)
+            if (isVideoCacheDisabled()) {
+                setVideoSource({ uri: video.videoUrl });
+                setIsSourceReady(true);
+                return;
+            }
+
+            // Memory cache check (synchronous, instant)
             const memoryCached = VideoCacheService.getMemoryCachedPath(video.videoUrl);
             if (memoryCached) {
                 console.log(`[VideoTransition] 🚀 Memory cache HIT: ${video.id}`);
@@ -45,16 +55,31 @@ export function useVideoSource(video: VideoEntity, shouldLoad: boolean): UseVide
                 return;
             }
 
-            // ✅ Immediate network fallback (NO BLOCKING)
+            // Disk cache check (async, fast) before falling back to network
+            try {
+                const diskCached = await VideoCacheService.getCachedVideoPath(video.videoUrl);
+                if (!isCancelled && diskCached) {
+                    console.log(`[VideoTransition] ⚡ Disk cache HIT: ${video.id}`);
+                    setVideoSource({ uri: diskCached });
+                    setIsSourceReady(true);
+                    return;
+                }
+            } catch {
+                // Ignore cache lookup failures and fall back to network.
+            }
+
+            if (isCancelled) return;
+
             console.log(`[VideoTransition] 🌐 Network source: ${video.id}`);
             setVideoSource({ uri: video.videoUrl });
             setIsSourceReady(true);
 
-            // ✅ Background warmup for next access (non-blocking)
+            // Background warmup for next access (non-blocking)
             VideoCacheService.warmupCache(video.videoUrl);
         };
 
         initVideoSource();
+        return () => { isCancelled = true; };
     }, [video.id, video.videoUrl, shouldLoad]);
 
     return { videoSource, isSourceReady, fallbackToNetwork };

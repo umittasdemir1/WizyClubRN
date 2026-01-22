@@ -1,5 +1,6 @@
 import { Video } from '../../domain/entities/Video';
 import { VideoCacheService } from './VideoCacheService';
+import { isVideoCacheDisabled } from '../../core/utils/videoCacheToggle';
 
 class FeedPrefetchService {
   private static instance: FeedPrefetchService | null = null;
@@ -17,6 +18,7 @@ class FeedPrefetchService {
   }
 
   queueVideos(videos: Video[], indices: number[]) {
+    if (isVideoCacheDisabled()) return;
     indices.forEach((index) => {
       const video = videos[index];
       if (!video || typeof video.videoUrl !== 'string') return;

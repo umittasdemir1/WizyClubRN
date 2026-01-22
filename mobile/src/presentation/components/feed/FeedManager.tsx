@@ -340,6 +340,8 @@ export const FeedManager = ({
     }, [isSeeking]);
 
     const lastInternalIndex = useRef(activeIndex);
+    const lastViewableIndexRef = useRef(0);
+    const lastViewableTsRef = useRef(0);
 
     useEffect(() => {
         if (videos.length > 0 && activeIndex !== lastInternalIndex.current) {
@@ -356,6 +358,29 @@ export const FeedManager = ({
         lastActiveIdRef.current = activeVideoId;
     }, [activeVideoId]);
 
+    const getPrefetchIndices = useCallback((newIndex: number) => {
+        const now = Date.now();
+        const lastIndex = lastViewableIndexRef.current;
+        const lastTs = lastViewableTsRef.current || now;
+        const deltaIndex = Math.abs(newIndex - lastIndex);
+        const deltaMs = Math.max(1, now - lastTs);
+        const fastSwipe = deltaIndex > 1 || deltaMs < 350;
+        const forward = newIndex >= lastIndex;
+        const prefetchCount = fastSwipe ? 5 : 3;
+        const indices = new Set<number>();
+        const maxIndex = videosRef.current.length - 1;
+
+        for (let i = 1; i <= prefetchCount; i++) {
+            const idx = forward ? newIndex + i : newIndex - i;
+            if (idx >= 0 && idx <= maxIndex) indices.add(idx);
+        }
+
+        if (newIndex - 1 >= 0) indices.add(newIndex - 1);
+        if (newIndex + 1 <= maxIndex) indices.add(newIndex + 1);
+
+        return Array.from(indices);
+    }, []);
+
     const onViewableItemsChanged = useCallback(
         ({ viewableItems }: { viewableItems: ViewToken<Video>[] }) => {
             if (viewableItems.length > 0) {
@@ -365,18 +390,19 @@ export const FeedManager = ({
                 if (newId && newId !== lastActiveIdRef.current) {
                     lastInternalIndex.current = newIndex;
                     lastActiveIdRef.current = newId;
+                    lastViewableIndexRef.current = newIndex;
+                    lastViewableTsRef.current = Date.now();
                     setActiveVideo(newId, newIndex);
                     setActiveTab('foryou');
                     setCleanScreen(false);
-                    FeedPrefetchService.getInstance().queueVideos(videosRef.current, [
-                        newIndex + 1,
-                        newIndex + 2,
-                        newIndex + 3,
-                    ]);
+                    FeedPrefetchService.getInstance().queueVideos(
+                        videosRef.current,
+                        getPrefetchIndices(newIndex)
+                    );
                 }
             }
         },
-        [setActiveVideo, setCleanScreen]
+        [setActiveVideo, setCleanScreen, getPrefetchIndices]
     );
 
     const viewabilityConfigCallbackPairs = useRef([

@@ -108,7 +108,6 @@ const purpose = {
   'expo-contacts': 'Rehber erişimi',
   'expo-screen-orientation': 'Orientation lock',
   'expo-blur': 'Blur view',
-  'expo-video': 'Expo video component',
   'expo-dev-client': 'Custom dev client',
   '@react-native-firebase/app': 'Firebase çekirdek',
   '@react-native-firebase/analytics': 'Firebase Analytics',

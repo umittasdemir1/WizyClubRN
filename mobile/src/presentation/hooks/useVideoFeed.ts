@@ -13,6 +13,7 @@ import { useActiveVideoStore } from '../store/useActiveVideoStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useSocialStore } from '../store/useSocialStore';
 import { useStartupStore, initStartupTimer } from '../store/useStartupStore';
+import { isVideoCacheDisabled } from '../../core/utils/videoCacheToggle';
 
 // Interfaces
 interface UseVideoFeedReturn {
@@ -83,7 +84,7 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
     useEffect(() => {
         if (!isStartupComplete) return; // Startup penceresi bitene kadar bekle
 
-        if (videos.length > 0 && !hasInitialPrefetched.current) {
+        if (videos.length > 0 && !hasInitialPrefetched.current && !isVideoCacheDisabled()) {
             hasInitialPrefetched.current = true;
             console.log('[Prefetch] 🚀 Initial prefetch starting...');
 
@@ -119,7 +120,7 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
 
         // Prefetch next 3 videos (if they exist)
         const nextVideos = videos.slice(currentIndex + 1, currentIndex + 4);
-        if (nextVideos.length > 0) {
+        if (nextVideos.length > 0 && !isVideoCacheDisabled()) {
             // Silently prefetch without spam (user doesn't need to see this)
             nextVideos.forEach((v) => {
                 VideoCacheService.cacheVideo(v.videoUrl);
