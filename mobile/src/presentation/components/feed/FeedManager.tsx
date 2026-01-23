@@ -1,3 +1,27 @@
+/**
+ * FeedManager - Dual Layer Architecture
+ *
+ * This component implements a decoupled video/UI architecture for optimal performance:
+ *
+ * Layer 1: VideoPlayerPool (z-index: 1)
+ *   - 3 pre-created video players that recycle
+ *   - Zero player creation during scroll
+ *   - Native thread video decoding
+ *
+ * Layer 2: FlashList (z-index: 5)
+ *   - Transparent scroll detection only
+ *   - Viewability tracking for active video
+ *   - No video players, no heavy UI
+ *
+ * Layer 3: ActiveVideoOverlay (z-index: 50)
+ *   - All UI for active video only
+ *   - Completely decoupled from video layer
+ *   - 0ms sync via SharedValues
+ *
+ * Layer 4: Global Overlays (z-index: 100+)
+ *   - HeaderOverlay, StoryBar, Sheets, Modals
+ */
+
 import { FlashList } from '@shopify/flash-list';
 import type { ViewToken } from 'react-native';
 import {
@@ -11,13 +35,11 @@ import {
     Pressable,
     Share,
     Alert,
-    TouchableOpacity,
     Animated as RNAnimated,
     Easing,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HeaderOverlay } from './HeaderOverlay';
-import { FeedItem } from './FeedItem';
 import { DeleteConfirmationModal } from './DeleteConfirmationModal';
 import { DescriptionSheet } from '../sheets/DescriptionSheet';
 import { MoreOptionsSheet } from '../sheets/MoreOptionsSheet';
@@ -27,8 +49,8 @@ import {
     useMuteControls,
 } from '../../store/useActiveVideoStore';
 import { Video } from '../../../domain/entities/Video';
-import { useState, useRef, useCallback, useEffect } from 'react';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, useAnimatedScrollHandler } from 'react-native-reanimated';
 import BottomSheet from '@gorhom/bottom-sheet';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { FeedSkeleton } from './FeedSkeleton';
@@ -45,13 +67,25 @@ import { SystemBars } from 'react-native-edge-to-edge';
 import { Bookmark } from 'lucide-react-native';
 import { FeedPrefetchService } from '../../../data/services/FeedPrefetchService';
 
+// New architecture imports
+import { VideoPlayerPool } from './VideoPlayerPool';
+import { ActiveVideoOverlay } from './ActiveVideoOverlay';
+import { DoubleTapLike } from './DoubleTapLike';
+
+const AnimatedFlashList = Animated.createAnimatedComponent(FlashList);
+
 const SCREEN_WIDTH = Dimensions.get('window').width;
+const ITEM_HEIGHT = Dimensions.get('window').height;
 const SAVE_ICON_ACTIVE = '#FFFFFF';
 
 const VIEWABILITY_CONFIG = {
     itemVisiblePercentThreshold: 60,
     minimumViewTime: 100,
 };
+
+// ============================================================================
+// Types
+// ============================================================================
 
 interface FeedManagerProps {
     videos: Video[];
@@ -73,6 +107,48 @@ interface FeedManagerProps {
     isCustomFeed?: boolean;
 }
 
+// ============================================================================
+// Scroll Placeholder Component (Minimal, transparent)
+// ============================================================================
+
+const ScrollPlaceholder = React.memo(function ScrollPlaceholder({
+    video,
+    isActive,
+    topInset,
+    onDoubleTap,
+    onSingleTap,
+    onLongPress,
+    onPressIn,
+    onPressOut,
+}: {
+    video: Video;
+    isActive: boolean;
+    topInset: number;
+    onDoubleTap: () => void;
+    onSingleTap: () => void;
+    onLongPress: (event: any) => void;
+    onPressIn: (event: any) => void;
+    onPressOut: () => void;
+}) {
+    const content = <View style={styles.placeholderContainer} />;
+
+    return (
+        <DoubleTapLike
+            onDoubleTap={onDoubleTap}
+            onSingleTap={onSingleTap}
+            onLongPress={onLongPress}
+            onPressIn={onPressIn}
+            onPressOut={onPressOut}
+        >
+            {content}
+        </DoubleTapLike>
+    );
+});
+
+// ============================================================================
+// Main Component
+// ============================================================================
+
 export const FeedManager = ({
     videos,
     isLoading,
@@ -86,38 +162,142 @@ export const FeedManager = ({
     toggleSave,
     toggleFollow,
     toggleShare,
-    toggleShop,
+    toggleShop: _toggleShop,
     deleteVideo,
     prependVideo,
     showStories = true,
     isCustomFeed = false,
 }: FeedManagerProps) => {
+    // ========================================================================
+    // Store subscriptions
+    // ========================================================================
     const setActiveVideo = useActiveVideoStore((state) => state.setActiveVideo);
     const activeVideoId = useActiveVideoStore((state) => state.activeVideoId);
+    const activeIndex = useActiveVideoStore((state) => state.activeIndex);
     const isSeeking = useActiveVideoStore((state) => state.isSeeking);
+    const isPaused = useActiveVideoStore((state) => state.isPaused);
     const togglePause = useActiveVideoStore((state) => state.togglePause);
     const setScreenFocused = useActiveVideoStore((state) => state.setScreenFocused);
-    const activeIndex = useActiveVideoStore((state) => state.activeIndex);
     const isCleanScreen = useActiveVideoStore((state) => state.isCleanScreen);
     const setCleanScreen = useActiveVideoStore((state) => state.setCleanScreen);
     const playbackRate = useActiveVideoStore((state) => state.playbackRate);
     const viewingMode = useActiveVideoStore((state) => state.viewingMode);
     const setPlaybackRate = useActiveVideoStore((state) => state.setPlaybackRate);
+
+    // ========================================================================
+    // SharedValues for video/UI sync (0ms latency)
+    // ========================================================================
+    const currentTimeSV = useSharedValue(0);
+    const durationSV = useSharedValue(0);
+    const isScrollingSV = useSharedValue(false);
+    const scrollY = useSharedValue(0);
+
+    const scrollHandler = useAnimatedScrollHandler({
+        onScroll: (event: any) => {
+            scrollY.value = event.contentOffset.y;
+        },
+        onBeginDrag: () => {
+            isScrollingSV.value = true;
+        },
+        onEndDrag: () => {
+            isScrollingSV.value = false;
+        },
+        onMomentumEnd: () => {
+            isScrollingSV.value = false;
+        },
+    });
+
+    // ========================================================================
+    // Local state
+    // ========================================================================
     const [tapIndicator, setTapIndicator] = useState<null | 'play' | 'pause'>(null);
+    const [activeTab, setActiveTab] = useState<'stories' | 'foryou'>('foryou');
+    const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
+    const [saveToastMessage, setSaveToastMessage] = useState<string | null>(null);
+    const [saveToastActive, setSaveToastActive] = useState(false);
+    const [isCarouselInteracting, _setIsCarouselInteracting] = useState(false);
+
+    // Video playback state (from pool callbacks)
+    const [isVideoLoading, setIsVideoLoading] = useState(false);
+    const [hasVideoError, setHasVideoError] = useState(false);
+    const [isVideoFinished, setIsVideoFinished] = useState(false);
+    const [retryCount, setRetryCount] = useState(0);
+    const [rateLabel, setRateLabel] = useState<string | null>(null);
+
+    // ========================================================================
+    // Refs
+    // ========================================================================
+    const listRef = useRef<any>(null);
+    const descriptionSheetRef = useRef<BottomSheet>(null);
+    const moreOptionsSheetRef = useRef<BottomSheet>(null);
     const tapIndicatorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const videosRef = useRef(videos);
+    const wasPlayingBeforeWebViewRef = useRef(false);
+    const wasPlayingBeforeShareRef = useRef(false);
+    const activeDurationRef = useRef(0);
+    const activeTimeRef = useRef(0);
+    const actionButtonsPressingRef = useRef(false);
+    const doubleTapBlockUntilRef = useRef(0);
+    const lastActiveIdRef = useRef<string | null>(activeVideoId);
+    const lastInternalIndex = useRef(activeIndex);
+    const lastViewableIndexRef = useRef(0);
+    const lastViewableTsRef = useRef(0);
+    const autoAdvanceGuardRef = useRef<string | null>(null);
+    const wasSpeedBoostedRef = useRef(false);
+    const previousPlaybackRateRef = useRef(playbackRate);
+    const lastPressXRef = useRef<number | null>(null);
+    const videoSeekRef = useRef<((time: number) => void) | null>(null);
+    const videoRetryRef = useRef<(() => void) | null>(null);
+    const isScrollingRef = useRef(false);
+    const lastScrollEndRef = useRef(0);
 
+    // Toast animation
+    const saveToastTranslateY = useRef(new RNAnimated.Value(-70)).current;
+    const saveToastOpacity = useRef(new RNAnimated.Value(0)).current;
+    const saveToastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // ========================================================================
+    // Hooks
+    // ========================================================================
+    const insets = useSafeAreaInsets();
+    const router = useRouter();
+    const { isMuted, toggleMute } = useMuteControls();
+    const { user } = useAuthStore();
     const { stories: storyListData } = useStoryViewer();
+    const isInAppBrowserVisible = useInAppBrowserStore((state) => state.isVisible);
+    const openInAppBrowser = useInAppBrowserStore((state) => state.openUrl);
+    const uploadStatus = useUploadStore((state) => state.status);
+    const uploadedVideoId = useUploadStore((state) => state.uploadedVideoId);
+    const resetUpload = useUploadStore((state) => state.reset);
+    const markStartupComplete = useStartupStore((state) => state.markStartupComplete);
 
-    // Group stories by user for StoryBar
-    const storyUsers = React.useMemo(() => {
+    useAppStateSync();
+
+    useEffect(() => {
+        if (__DEV__) {
+            console.log('[FeedManager] isPaused', { isPaused, activeIndex, activeVideoId });
+        }
+    }, [isPaused, activeIndex, activeVideoId]);
+
+    // ========================================================================
+    // Derived state
+    // ========================================================================
+    const currentUserId = user?.id;
+    const activeVideo = useMemo(
+        () => videos.find((v) => v.id === activeVideoId) || null,
+        [videos, activeVideoId]
+    );
+    const isOwnActiveVideo = !!activeVideo && activeVideo.user?.id === currentUserId;
+
+    const storyUsers = useMemo(() => {
         return storyListData.reduce((acc: any[], story) => {
-            const existing = acc.find(u => u.id === story.user.id);
+            const existing = acc.find((u) => u.id === story.user.id);
             if (!existing) {
                 acc.push({
                     id: story.user.id,
                     username: story.user.username,
                     avatarUrl: story.user.avatarUrl,
-                    hasUnseenStory: !story.isViewed
+                    hasUnseenStory: !story.isViewed,
                 });
             } else if (!story.isViewed) {
                 existing.hasUnseenStory = true;
@@ -126,14 +306,20 @@ export const FeedManager = ({
         }, []);
     }, [storyListData]);
 
-    const uploadStatus = useUploadStore(state => state.status);
-    const uploadedVideoId = useUploadStore(state => state.uploadedVideoId);
-    const resetUpload = useUploadStore(state => state.reset);
-    const markStartupComplete = useStartupStore(state => state.markStartupComplete);
-    // Watch for upload success -> Fetch new video and prepend to feed
+    const hasUnseenStories = storyUsers.some((u: any) => u.hasUnseenStory);
+
+    // ========================================================================
+    // Effects
+    // ========================================================================
+
+    // Keep videosRef in sync
+    useEffect(() => {
+        videosRef.current = videos;
+    }, [videos]);
+
+    // Handle upload success
     useEffect(() => {
         if (uploadedVideoId && uploadStatus === 'success' && prependVideo && !isCustomFeed) {
-            // Logic to fetch and prepend - simplified for the component but keeping original intent
             const handleUploadSuccess = async () => {
                 const { supabase } = require('../../../core/supabase');
                 const { data: videoData } = await supabase
@@ -180,45 +366,373 @@ export const FeedManager = ({
             };
             handleUploadSuccess();
         }
-    }, [uploadedVideoId, uploadStatus]);
+    }, [uploadedVideoId, uploadStatus, prependVideo, isCustomFeed, setActiveVideo, resetUpload]);
 
-    // Mute controls
-    const { isMuted, toggleMute } = useMuteControls();
+    // Handle in-app browser pause/resume
+    useEffect(() => {
+        if (isInAppBrowserVisible) {
+            const currentIsPaused = useActiveVideoStore.getState().isPaused;
+            wasPlayingBeforeWebViewRef.current = !currentIsPaused;
+            if (!currentIsPaused) {
+                togglePause();
+            }
+            return;
+        }
 
-    // Tab State
-    const [activeTab, setActiveTab] = useState<'stories' | 'foryou'>('foryou');
+        if (wasPlayingBeforeWebViewRef.current) {
+            const currentIsPaused = useActiveVideoStore.getState().isPaused;
+            if (currentIsPaused) {
+                togglePause();
+            }
+            wasPlayingBeforeWebViewRef.current = false;
+        }
+    }, [isInAppBrowserVisible, togglePause]);
 
-    // Delete modal state
-    const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
-    const isInAppBrowserVisible = useInAppBrowserStore((state) => state.isVisible);
-    const openInAppBrowser = useInAppBrowserStore((state) => state.openUrl);
-    const [saveToastMessage, setSaveToastMessage] = useState<string | null>(null);
-    const [saveToastActive, setSaveToastActive] = useState(false);
-    const [isCarouselInteracting, setIsCarouselInteracting] = useState(false);
+    // Cleanup timeouts
+    useEffect(() => {
+        return () => {
+            if (saveToastTimeoutRef.current) clearTimeout(saveToastTimeoutRef.current);
+            if (tapIndicatorTimeoutRef.current) clearTimeout(tapIndicatorTimeoutRef.current);
+        };
+    }, []);
 
-    // Sheet refs
-    const descriptionSheetRef = useRef<BottomSheet>(null);
-    const moreOptionsSheetRef = useRef<BottomSheet>(null);
+    // Status bar style
+    useFocusEffect(
+        useCallback(() => {
+            SystemBars.setStyle({ statusBar: 'light', navigationBar: 'light' });
+        }, [])
+    );
 
-    // App State Sync
-    useAppStateSync();
+    // Screen focus handling
+    useFocusEffect(
+        useCallback(() => {
+            setScreenFocused(true);
+            setActiveTab('foryou');
 
-    // Video progress
-    const isScrollingSV = useSharedValue(false);
-    const videoSeekRef = useRef<((time: number) => void) | null>(null);
+            if (videosRef.current.length > 0 && !lastActiveIdRef.current) {
+                setActiveVideo(videosRef.current[0].id, 0);
+            }
 
-    const insets = useSafeAreaInsets();
-    const router = useRouter();
-    const listRef = useRef<any>(null);
-    const wasPlayingBeforeWebViewRef = useRef(false);
-    const activeDurationRef = useRef(0);
-    const activeTimeRef = useRef(0);
-    const wasPlayingBeforeShareRef = useRef(false);
-    const saveToastTranslateY = useRef(new RNAnimated.Value(-70)).current;
-    const saveToastOpacity = useRef(new RNAnimated.Value(0)).current;
-    const saveToastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const actionButtonsPressingRef = useRef(false);
-    const doubleTapBlockUntilRef = useRef(0);
+            return () => {
+                setScreenFocused(false);
+            };
+        }, [setScreenFocused, setActiveVideo])
+    );
+
+    // Fast init - set first video as active
+    useEffect(() => {
+        if (videos.length > 0 && !activeVideoId) {
+            setActiveVideo(videos[0].id, 0);
+            lastActiveIdRef.current = videos[0].id;
+        }
+    }, [videos, activeVideoId, setActiveVideo]);
+
+    // Sync internal index with store
+    useEffect(() => {
+        if (videos.length > 0 && activeIndex !== lastInternalIndex.current) {
+            listRef.current?.scrollToIndex({ index: activeIndex, animated: false });
+            lastInternalIndex.current = activeIndex;
+        }
+    }, [activeIndex, videos.length]);
+
+    // Track activeVideoId changes
+    useEffect(() => {
+        lastActiveIdRef.current = activeVideoId;
+        // Reset video state when video changes
+        setIsVideoLoading(true);
+        setHasVideoError(false);
+        setIsVideoFinished(false);
+        setRetryCount(0);
+        currentTimeSV.value = 0;
+        durationSV.value = 0;
+    }, [activeVideoId, currentTimeSV, durationSV]);
+
+    // Playback rate sync
+    useEffect(() => {
+        if (!wasSpeedBoostedRef.current) {
+            previousPlaybackRateRef.current = playbackRate;
+        }
+    }, [playbackRate]);
+
+    // Reset auto-advance guard
+    useEffect(() => {
+        autoAdvanceGuardRef.current = null;
+    }, [activeVideoId, viewingMode]);
+
+    // ========================================================================
+    // Callbacks - VideoPlayerPool
+    // ========================================================================
+
+    const handleVideoLoaded = useCallback((index: number) => {
+        // Video loaded successfully - clear any loading/error states
+        if (index === activeIndex) {
+            setIsVideoLoading(false);
+            setHasVideoError(false);
+        }
+    }, [activeIndex]);
+
+    const handleVideoError = useCallback((index: number, _error: any) => {
+        if (index === activeIndex) {
+            setHasVideoError(true);
+            setIsVideoLoading(false);
+            setRetryCount((prev) => prev + 1);
+        }
+    }, [activeIndex]);
+
+    const handleVideoProgress = useCallback((index: number, currentTime: number, duration: number) => {
+        if (index !== activeIndex) return;
+
+        // Update SharedValues for UI sync
+        currentTimeSV.value = currentTime;
+        durationSV.value = duration;
+        activeTimeRef.current = currentTime;
+
+        if (duration > 0) {
+            activeDurationRef.current = duration;
+        }
+
+        // Fast viewing mode auto-advance
+        if (viewingMode !== 'fast') return;
+        if (!activeVideoId) return;
+        if (duration > 0 && duration <= 10) return;
+        if (currentTime < 10) return;
+        if (autoAdvanceGuardRef.current === activeVideoId) return;
+
+        autoAdvanceGuardRef.current = activeVideoId;
+        const nextIndex = Math.min(activeIndex + 1, videosRef.current.length - 1);
+        if (nextIndex !== activeIndex) {
+            listRef.current?.scrollToOffset({
+                offset: nextIndex * ITEM_HEIGHT,
+                animated: true,
+            });
+        }
+    }, [activeIndex, activeVideoId, viewingMode, currentTimeSV, durationSV]);
+
+    const handleVideoEnd = useCallback((index: number) => {
+        if (index !== activeIndex) return;
+
+        setIsVideoFinished(true);
+        setCleanScreen(false);
+
+        const shouldAdvance =
+            viewingMode === 'full' ||
+            (viewingMode === 'fast' && activeDurationRef.current > 0 && activeDurationRef.current <= 10);
+
+        if (shouldAdvance) {
+            const nextIndex = Math.min(activeIndex + 1, videosRef.current.length - 1);
+            if (nextIndex !== activeIndex) {
+                listRef.current?.scrollToOffset({
+                    offset: nextIndex * ITEM_HEIGHT,
+                    animated: true,
+                });
+            }
+        }
+    }, [activeIndex, viewingMode, setCleanScreen]);
+
+    const handleRemoveVideo = useCallback((index: number) => {
+        const video = videosRef.current[index];
+        if (video) {
+            deleteVideo(video.id);
+        }
+    }, [deleteVideo]);
+
+    // ========================================================================
+    // Callbacks - UI Interactions
+    // ========================================================================
+
+    const showTapIndicator = useCallback((type: 'play' | 'pause') => {
+        if (tapIndicatorTimeoutRef.current) clearTimeout(tapIndicatorTimeoutRef.current);
+        setTapIndicator(type);
+        tapIndicatorTimeoutRef.current = setTimeout(() => setTapIndicator(null), 1000);
+    }, []);
+
+    const handleFeedTap = useCallback(() => {
+        if (isScrollingRef.current || Date.now() - lastScrollEndRef.current < 150) return;
+        if (Date.now() < doubleTapBlockUntilRef.current) return;
+        if (actionButtonsPressingRef.current) return;
+
+        if (activeTab === 'stories') {
+            setActiveTab('foryou');
+            setTimeout(() => {
+                if (useActiveVideoStore.getState().isPaused) togglePause();
+            }, 300);
+        } else {
+            const wasPaused = useActiveVideoStore.getState().isPaused;
+            togglePause();
+            showTapIndicator(wasPaused ? 'play' : 'pause');
+        }
+    }, [activeTab, togglePause, showTapIndicator]);
+
+    const handleDoubleTapLike = useCallback(() => {
+        if (isScrollingRef.current || Date.now() - lastScrollEndRef.current < 150) return;
+        if (!activeVideo) return;
+        doubleTapBlockUntilRef.current = Date.now() + 350;
+        if (!activeVideo.isLiked) {
+            toggleLike(activeVideo.id);
+        }
+    }, [activeVideo, toggleLike]);
+
+    const handlePressIn = useCallback((event: any) => {
+        lastPressXRef.current = event?.nativeEvent?.pageX ?? event?.nativeEvent?.locationX ?? null;
+    }, []);
+
+    const handleLongPress = useCallback((event: any) => {
+        const pressX = lastPressXRef.current ?? event?.nativeEvent?.pageX ?? event?.nativeEvent?.locationX ?? 0;
+        const isRightSide = pressX > SCREEN_WIDTH * 0.8;
+
+        if (isRightSide) {
+            wasSpeedBoostedRef.current = true;
+            previousPlaybackRateRef.current = playbackRate;
+            setPlaybackRate(2.0);
+            setRateLabel('2x');
+            return;
+        }
+
+        if (wasSpeedBoostedRef.current) {
+            wasSpeedBoostedRef.current = false;
+            setPlaybackRate(previousPlaybackRateRef.current);
+            setRateLabel(null);
+        }
+
+        moreOptionsSheetRef.current?.snapToIndex(0);
+        lastPressXRef.current = null;
+    }, [playbackRate, setPlaybackRate]);
+
+    const handlePressOut = useCallback(() => {
+        if (!wasSpeedBoostedRef.current) return;
+        wasSpeedBoostedRef.current = false;
+        setPlaybackRate(previousPlaybackRateRef.current);
+        setRateLabel(null);
+        lastPressXRef.current = null;
+    }, [setPlaybackRate]);
+
+    const handleActionPressIn = useCallback(() => {
+        actionButtonsPressingRef.current = true;
+    }, []);
+
+    const handleActionPressOut = useCallback(() => {
+        actionButtonsPressingRef.current = false;
+    }, []);
+
+    const handleSeek = useCallback((time: number) => {
+        videoSeekRef.current?.(time);
+        currentTimeSV.value = time;
+    }, [currentTimeSV]);
+
+    const handleRetry = useCallback(() => {
+        setHasVideoError(false);
+        setIsVideoLoading(true);
+        setRetryCount(0);
+        videoRetryRef.current?.();
+    }, []);
+
+    // ========================================================================
+    // Callbacks - Actions
+    // ========================================================================
+
+    const handleToggleLike = useCallback(() => {
+        if (activeVideo) toggleLike(activeVideo.id);
+    }, [activeVideo, toggleLike]);
+
+    const handleToggleSave = useCallback(() => {
+        if (!activeVideo) return;
+        const nextSaved = !activeVideo.isSaved;
+        toggleSave(activeVideo.id);
+        setSaveToastActive(nextSaved);
+        showSaveToast(nextSaved ? 'Kaydedilenlere eklendi' : 'Kaydedilenlerden kaldırıldı');
+    }, [activeVideo, toggleSave]);
+
+    const handleToggleShare = useCallback(async () => {
+        if (!activeVideo) return;
+
+        const shareUrl = `wizyclub://video/${activeVideo.id}`;
+        const message = activeVideo.description ? `${activeVideo.description}\n${shareUrl}` : shareUrl;
+
+        const wasPaused = useActiveVideoStore.getState().isPaused;
+        wasPlayingBeforeShareRef.current = !wasPaused;
+
+        try {
+            useActiveVideoStore.getState().setIgnoreAppState(true);
+            if (!wasPaused) useActiveVideoStore.getState().setPaused(true);
+            await Share.share({ message, url: shareUrl });
+            toggleShare(activeVideo.id);
+        } catch (error) {
+            console.error('[Share] Failed:', error);
+        } finally {
+            if (activeVideoId === activeVideo.id) {
+                const resumeTime = activeTimeRef.current;
+                if (resumeTime > 0) videoSeekRef.current?.(resumeTime);
+                if (wasPlayingBeforeShareRef.current) useActiveVideoStore.getState().setPaused(false);
+            }
+            useActiveVideoStore.getState().setIgnoreAppState(false);
+        }
+    }, [activeVideo, activeVideoId, toggleShare]);
+
+    const handleToggleFollow = useCallback(() => {
+        if (activeVideo) toggleFollow(activeVideo.id);
+    }, [activeVideo, toggleFollow]);
+
+    const handleOpenShopping = useCallback(() => {
+        if (!activeVideo?.brandUrl) {
+            Alert.alert('Link bulunamadı', 'Bu video için bir alışveriş linki yok.');
+            return;
+        }
+        const url = activeVideo.brandUrl.match(/^https?:\/\//)
+            ? activeVideo.brandUrl
+            : `https://${activeVideo.brandUrl}`;
+        openInAppBrowser(url);
+    }, [activeVideo, openInAppBrowser]);
+
+    const handleOpenDescription = useCallback(() => {
+        descriptionSheetRef.current?.snapToIndex(0);
+        if (!useActiveVideoStore.getState().isPaused) togglePause();
+    }, [togglePause]);
+
+    const handleCleanScreen = useCallback(() => {
+        setCleanScreen(!isCleanScreen);
+        moreOptionsSheetRef.current?.close();
+        descriptionSheetRef.current?.close();
+    }, [isCleanScreen, setCleanScreen]);
+
+    const handleDeletePress = useCallback(() => {
+        if (!activeVideoId) return;
+        setDeleteModalVisible(true);
+    }, [activeVideoId]);
+
+    const handleSheetDelete = useCallback(() => {
+        moreOptionsSheetRef.current?.close();
+        handleDeletePress();
+    }, [handleDeletePress]);
+
+    // ========================================================================
+    // Callbacks - Story/Tab
+    // ========================================================================
+
+    const handleStoryPress = useCallback(() => {
+        setActiveTab('stories');
+    }, []);
+
+    const handleTabChange = useCallback((tab: 'stories' | 'foryou') => {
+        setActiveTab(tab);
+        if (tab === 'stories' && !useActiveVideoStore.getState().isPaused) {
+            togglePause();
+        }
+    }, [togglePause]);
+
+    const handleCloseStoryBar = useCallback(() => {
+        setActiveTab('foryou');
+        setTimeout(() => {
+            if (useActiveVideoStore.getState().isPaused) togglePause();
+        }, 300);
+    }, [togglePause]);
+
+    const handleStoryAvatarPress = useCallback((userId: string) => {
+        router.push(`/story/${userId}`);
+    }, [router]);
+
+    // ========================================================================
+    // Callbacks - Toast
+    // ========================================================================
 
     const showSaveToast = useCallback((message: string) => {
         setSaveToastMessage(message);
@@ -254,109 +768,13 @@ export const FeedManager = ({
                     duration: 180,
                     useNativeDriver: true,
                 }),
-            ]).start(() => {
-                setSaveToastMessage(null);
-            });
+            ]).start(() => setSaveToastMessage(null));
         }, 2000);
     }, [saveToastOpacity, saveToastTranslateY]);
-    const ITEM_HEIGHT = Dimensions.get('window').height;
 
-
-    const videosRef = useRef(videos);
-    useEffect(() => {
-        videosRef.current = videos;
-    }, [videos]);
-
-    useEffect(() => {
-        if (isInAppBrowserVisible) {
-            const isPaused = useActiveVideoStore.getState().isPaused;
-            wasPlayingBeforeWebViewRef.current = !isPaused;
-            if (!isPaused) {
-                togglePause();
-            }
-            return;
-        }
-
-        if (wasPlayingBeforeWebViewRef.current) {
-            const isPaused = useActiveVideoStore.getState().isPaused;
-            if (isPaused) {
-                togglePause();
-            }
-            wasPlayingBeforeWebViewRef.current = false;
-        }
-    }, [isInAppBrowserVisible, togglePause]);
-
-    useEffect(() => {
-        return () => {
-            if (saveToastTimeoutRef.current) {
-                clearTimeout(saveToastTimeoutRef.current);
-            }
-        };
-    }, []);
-
-    useFocusEffect(
-        useCallback(() => {
-            SystemBars.setStyle({
-                statusBar: 'light',
-                navigationBar: 'light',
-            });
-        }, [])
-    );
-
-    const isScreenFocusedRef = useRef(false);
-
-    useFocusEffect(
-        useCallback(() => {
-            isScreenFocusedRef.current = true;
-            setScreenFocused(true);
-            setActiveTab('foryou');
-
-            if (videosRef.current.length > 0 && !lastActiveIdRef.current) {
-                // 🔧 FIX: İlk video için direkt active yap (deprecated method kullan)
-                setActiveVideo(videosRef.current[0].id, 0);
-            }
-
-            return () => {
-                isScreenFocusedRef.current = false;
-                setScreenFocused(false);
-            };
-        }, [setScreenFocused, setActiveVideo])
-    );
-
-    // Fast init
-    useEffect(() => {
-        if (videos.length > 0 && !activeVideoId) {
-            setActiveVideo(videos[0].id, 0);
-            lastActiveIdRef.current = videos[0].id;
-        }
-    }, [videos, activeVideoId, setActiveVideo]);
-
-    const hasUnseenStories = storyUsers.some((u: any) => u.hasUnseenStory);
-
-    const uiOpacityStyle = useAnimatedStyle(() => {
-        return {
-            opacity: withTiming(isSeeking ? 0 : 1, { duration: 200 })
-        };
-    }, [isSeeking]);
-
-    const lastInternalIndex = useRef(activeIndex);
-    const lastViewableIndexRef = useRef(0);
-    const lastViewableTsRef = useRef(0);
-
-    useEffect(() => {
-        if (videos.length > 0 && activeIndex !== lastInternalIndex.current) {
-            listRef.current?.scrollToIndex({
-                index: activeIndex,
-                animated: false,
-            });
-            lastInternalIndex.current = activeIndex;
-        }
-    }, [activeIndex, videos.length]);
-
-    const lastActiveIdRef = useRef<string | null>(activeVideoId);
-    useEffect(() => {
-        lastActiveIdRef.current = activeVideoId;
-    }, [activeVideoId]);
+    // ========================================================================
+    // Callbacks - Scroll
+    // ========================================================================
 
     const getPrefetchIndices = useCallback((newIndex: number) => {
         const now = Date.now();
@@ -374,7 +792,6 @@ export const FeedManager = ({
             const idx = forward ? newIndex + i : newIndex - i;
             if (idx >= 0 && idx <= maxIndex) indices.add(idx);
         }
-
         if (newIndex - 1 >= 0) indices.add(newIndex - 1);
         if (newIndex + 1 <= maxIndex) indices.add(newIndex + 1);
 
@@ -398,7 +815,7 @@ export const FeedManager = ({
                     FeedPrefetchService.getInstance().queueVideos(
                         videosRef.current,
                         getPrefetchIndices(newIndex),
-                        newIndex // Pass current index for priority calculation
+                        newIndex
                     );
                 }
             }
@@ -407,225 +824,8 @@ export const FeedManager = ({
     );
 
     const viewabilityConfigCallbackPairs = useRef([
-        {
-            viewabilityConfig: VIEWABILITY_CONFIG,
-            onViewableItemsChanged,
-        },
+        { viewabilityConfig: VIEWABILITY_CONFIG, onViewableItemsChanged },
     ]);
-
-    const handleToggleMute = useCallback(() => {
-        toggleMute();
-    }, [toggleMute]);
-
-    const wasSpeedBoostedRef = useRef(false);
-    const previousPlaybackRateRef = useRef(playbackRate);
-    const lastPressXRef = useRef<number | null>(null);
-
-    useEffect(() => {
-        if (!wasSpeedBoostedRef.current) {
-            previousPlaybackRateRef.current = playbackRate;
-        }
-    }, [playbackRate]);
-
-    const handlePressIn = useCallback((event: any) => {
-        lastPressXRef.current = event?.nativeEvent?.pageX ?? event?.nativeEvent?.locationX ?? null;
-    }, []);
-
-    const handleLongPress = useCallback((event: any) => {
-        const pressX = lastPressXRef.current ?? event?.nativeEvent?.pageX ?? event?.nativeEvent?.locationX ?? 0;
-        const screenWidth = Dimensions.get('window').width;
-        const isRightSide = pressX > screenWidth * 0.8;
-
-        if (isRightSide) {
-            wasSpeedBoostedRef.current = true;
-            previousPlaybackRateRef.current = playbackRate;
-            setPlaybackRate(2.0);
-            return;
-        }
-
-        if (wasSpeedBoostedRef.current) {
-            wasSpeedBoostedRef.current = false;
-            setPlaybackRate(previousPlaybackRateRef.current);
-        }
-
-        moreOptionsSheetRef.current?.snapToIndex(0);
-        lastPressXRef.current = null;
-    }, [playbackRate, setPlaybackRate]);
-
-    const handlePressOut = useCallback(() => {
-        if (!wasSpeedBoostedRef.current) return;
-        wasSpeedBoostedRef.current = false;
-        setPlaybackRate(previousPlaybackRateRef.current);
-        lastPressXRef.current = null;
-    }, [setPlaybackRate]);
-
-    const handleCleanScreen = useCallback(() => {
-        const nextCleanScreen = !isCleanScreen;
-        setCleanScreen(nextCleanScreen);
-        moreOptionsSheetRef.current?.close();
-        descriptionSheetRef.current?.close();
-    }, [isCleanScreen, setCleanScreen]);
-
-    const handleStoryPress = useCallback(() => {
-        setActiveTab('stories');
-    }, []);
-
-    const handleTabChange = useCallback((tab: 'stories' | 'foryou') => {
-        setActiveTab(tab);
-        if (tab === 'stories') {
-            if (!useActiveVideoStore.getState().isPaused) {
-                togglePause();
-            }
-        }
-    }, [togglePause]);
-
-    const handleCloseStoryBar = useCallback(() => {
-        setActiveTab('foryou');
-        setTimeout(() => {
-            if (useActiveVideoStore.getState().isPaused) {
-                togglePause();
-            }
-        }, 300);
-    }, [togglePause]);
-
-    const showTapIndicator = useCallback((type: 'play' | 'pause') => {
-        if (tapIndicatorTimeoutRef.current) {
-            clearTimeout(tapIndicatorTimeoutRef.current);
-        }
-        setTapIndicator(type);
-        tapIndicatorTimeoutRef.current = setTimeout(() => {
-            setTapIndicator(null);
-        }, 1000);
-    }, []);
-
-    useEffect(() => {
-        return () => {
-            if (tapIndicatorTimeoutRef.current) {
-                clearTimeout(tapIndicatorTimeoutRef.current);
-            }
-        };
-    }, []);
-
-    const handleFeedTap = useCallback(() => {
-        if (Date.now() < doubleTapBlockUntilRef.current) {
-            return;
-        }
-        if (actionButtonsPressingRef.current) {
-            return;
-        }
-        if (activeTab === 'stories') {
-            handleCloseStoryBar();
-        } else {
-            const wasPaused = useActiveVideoStore.getState().isPaused;
-            togglePause();
-            showTapIndicator(wasPaused ? 'play' : 'pause');
-        }
-    }, [activeTab, handleCloseStoryBar, togglePause, showTapIndicator]);
-
-    const handleActionButtonsPressIn = useCallback(() => {
-        actionButtonsPressingRef.current = true;
-    }, []);
-
-    const handleActionButtonsPressOut = useCallback(() => {
-        actionButtonsPressingRef.current = false;
-    }, []);
-
-    const handleStoryAvatarPress = useCallback((userId: string) => {
-        router.push(`/story/${userId}`);
-    }, [router]);
-
-    const handleOpenDescription = useCallback(() => {
-        descriptionSheetRef.current?.snapToIndex(0);
-        if (!useActiveVideoStore.getState().isPaused) {
-            togglePause();
-        }
-    }, [togglePause]);
-
-    const handleOpenShopping = useCallback(async (videoId: string) => {
-        const video = videosRef.current.find((v) => v.id === videoId);
-        const rawUrl = video?.brandUrl;
-
-        if (!rawUrl) {
-            Alert.alert('Link bulunamadı', 'Bu video için bir alışveriş linki yok.');
-            return;
-        }
-
-        const url = rawUrl.match(/^https?:\/\//) ? rawUrl : `https://${rawUrl}`;
-        openInAppBrowser(url);
-    }, [openInAppBrowser]);
-
-    const handleDeletePress = useCallback(() => {
-        if (!activeVideoId) return;
-        setDeleteModalVisible(true);
-    }, [activeVideoId]);
-
-    const handleSheetDelete = useCallback(() => {
-        moreOptionsSheetRef.current?.close();
-        handleDeletePress();
-    }, [handleDeletePress]);
-
-    const handleDoubleTapLike = useCallback(
-        (videoId: string) => {
-            doubleTapBlockUntilRef.current = Date.now() + 350;
-            const video = videos.find((v) => v.id === videoId);
-            if (video && !video.isLiked) {
-                toggleLike(videoId);
-            }
-        },
-        [videos, toggleLike]
-    );
-
-    const handleVideoEnd = useCallback(() => {
-        setCleanScreen(false);
-        const shouldAdvance =
-            viewingMode === 'full' || (viewingMode === 'fast' && activeDurationRef.current > 0 && activeDurationRef.current <= 10);
-        if (shouldAdvance) {
-            const currentIndex = activeVideoId
-                ? videosRef.current.findIndex((v) => v.id === activeVideoId)
-                : activeIndex;
-            const safeIndex = currentIndex >= 0 ? currentIndex : activeIndex;
-            const nextIndex = Math.min(safeIndex + 1, videosRef.current.length - 1);
-            if (nextIndex !== safeIndex) {
-                listRef.current?.scrollToOffset({
-                    offset: nextIndex * ITEM_HEIGHT,
-                    animated: true,
-                });
-            }
-        }
-    }, [setCleanScreen, viewingMode, activeIndex, activeVideoId]);
-
-    const autoAdvanceGuardRef = useRef<string | null>(null);
-    const handleProgressUpdate = useCallback((currentTime: number, duration: number) => {
-        activeTimeRef.current = currentTime;
-        if (viewingMode !== 'fast') return;
-        if (!activeVideoId) return;
-        if (duration > 0) {
-            activeDurationRef.current = duration;
-        }
-        if (duration > 0 && duration <= 10) return;
-        if (currentTime < 10) return;
-        if (autoAdvanceGuardRef.current === activeVideoId) return;
-        autoAdvanceGuardRef.current = activeVideoId;
-        const currentIndex = activeVideoId
-            ? videosRef.current.findIndex((v) => v.id === activeVideoId)
-            : activeIndex;
-        const safeIndex = currentIndex >= 0 ? currentIndex : activeIndex;
-        const nextIndex = Math.min(safeIndex + 1, videosRef.current.length - 1);
-        if (nextIndex !== safeIndex) {
-            listRef.current?.scrollToOffset({
-                offset: nextIndex * ITEM_HEIGHT,
-                animated: true,
-            });
-        }
-    }, [viewingMode, activeVideoId, activeIndex]);
-
-    useEffect(() => {
-        autoAdvanceGuardRef.current = null;
-    }, [activeVideoId, viewingMode]);
-
-    const handleSeekReady = useCallback((seekFn: (time: number) => void) => {
-        videoSeekRef.current = seekFn;
-    }, []);
 
     const handleScrollEnd = useCallback((event: any) => {
         if (videos.length === 0) return;
@@ -634,144 +834,53 @@ export const FeedManager = ({
         if (offsetY > lastVideoOffset) {
             listRef.current?.scrollToIndex({ index: videos.length - 1, animated: true });
         }
-    }, [videos.length, ITEM_HEIGHT]);
+    }, [videos.length]);
 
-    const handleRemoveVideo = useCallback((videoId: string) => {
-        deleteVideo(videoId);
-    }, [deleteVideo]);
-
-    const handleSharePress = useCallback(async (videoId: string) => {
-        const video = videosRef.current.find((v) => v.id === videoId);
-        if (!video) return;
-
-        const shareUrl = `wizyclub://video/${videoId}`;
-        const message = video.description ? `${video.description}\n${shareUrl}` : shareUrl;
-
-        const wasPaused = useActiveVideoStore.getState().isPaused;
-        wasPlayingBeforeShareRef.current = !wasPaused;
-
-        try {
-            useActiveVideoStore.getState().setIgnoreAppState(true);
-            if (!wasPaused) {
-                useActiveVideoStore.getState().setPaused(true);
-            }
-            await Share.share({ message, url: shareUrl });
-            toggleShare(videoId);
-        } catch (error) {
-            console.error('[Share] Failed to open share sheet:', error);
-        } finally {
-            if (activeVideoId === videoId) {
-                const resumeTime = activeTimeRef.current;
-                if (resumeTime > 0) {
-                    videoSeekRef.current?.(resumeTime);
-                }
-                if (wasPlayingBeforeShareRef.current) {
-                    useActiveVideoStore.getState().setPaused(false);
-                }
-            }
-            useActiveVideoStore.getState().setIgnoreAppState(false);
-        }
-    }, [activeVideoId, toggleShare]);
-
-    const handleToggleSave = useCallback((videoId: string) => {
-        const video = videosRef.current.find((v) => v.id === videoId);
-        const nextSaved = !video?.isSaved;
-        toggleSave(videoId);
-        setSaveToastActive(nextSaved);
-        showSaveToast(nextSaved ? 'Kaydedilenlere eklendi' : 'Kaydedilenlerden kaldırıldı');
-    }, [showSaveToast, toggleSave]);
-
-    const handleCarouselTouchStart = useCallback(() => {
-        setIsCarouselInteracting(true);
-    }, []);
-
-    const handleCarouselTouchEnd = useCallback(() => {
-        setIsCarouselInteracting(false);
-    }, []);
-
-    const { user } = useAuthStore();
-    const currentUserId = user?.id;
-    const activeVideo = videos.find((v) => v.id === activeVideoId) || null;
-    const isOwnActiveVideo = !!activeVideo && activeVideo.user?.id === currentUserId;
+    // ========================================================================
+    // Render helpers
+    // ========================================================================
 
     const renderItem = useCallback(
-        ({ item, index }: { item: Video; index: number }) => {
+        ({ item }: { item: Video }) => {
             const isActive = item.id === activeVideoId;
-
-            // 🚀 PRE-MOUNTING STRATEGY (Zero-Latency Feed)
-            // Mount players for: Previous + Current + Next
-            // Only CURRENT plays, others stay paused but initialized
-            const shouldLoad =
-                index === activeIndex ||      // Current video (playing)
-                index === activeIndex - 1 ||  // Previous video (paused, ready for swipe up)
-                index === activeIndex + 1;    // Next video (paused, ready for swipe down)
-
             return (
-                <FeedItem
+                <ScrollPlaceholder
                     video={item}
-                    shouldLoad={shouldLoad}
                     isActive={isActive}
-                    isMuted={isMuted}
-                    isScrolling={isScrollingSV}
-                    isSeeking={isSeeking}
-                    uiOpacityStyle={uiOpacityStyle}
-                    isCleanScreen={isCleanScreen}
-                    tapIndicator={isActive ? tapIndicator : null}
-                    currentUserId={currentUserId}
-                    onDoubleTapLike={handleDoubleTapLike}
-                    onFeedTap={handleFeedTap}
-                    onSeekReady={isActive ? handleSeekReady : undefined}
-                    onRemoveVideo={handleRemoveVideo}
-                    onToggleLike={toggleLike}
-                    onToggleSave={handleToggleSave}
-                    onToggleShare={handleSharePress}
-                    onToggleFollow={toggleFollow}
-                    onOpenShopping={handleOpenShopping}
-                    onOpenDescription={handleOpenDescription}
+                    topInset={insets.top}
+                    onDoubleTap={handleDoubleTapLike}
+                    onSingleTap={handleFeedTap}
                     onLongPress={handleLongPress}
-                    onPressOut={handlePressOut}
                     onPressIn={handlePressIn}
-                    onActionPressIn={handleActionButtonsPressIn}
-                    onActionPressOut={handleActionButtonsPressOut}
-                    onVideoEnd={handleVideoEnd}
-                    onProgressUpdate={handleProgressUpdate}
-                    onCarouselTouchStart={handleCarouselTouchStart}
-                    onCarouselTouchEnd={handleCarouselTouchEnd}
+                    onPressOut={handlePressOut}
                 />
             );
         },
-        [
-            activeVideoId,
-            activeIndex,
-            isMuted,
-            isSeeking,
-            currentUserId,
-            isCleanScreen,
-            tapIndicator,
-            handlePressIn,
-            handlePressOut,
-            handleActionButtonsPressIn,
-            handleActionButtonsPressOut,
-            handleVideoEnd,
-            handleLongPress,
-            handleProgressUpdate,
-            handleFeedTap,
-            handleOpenDescription,
-            handleOpenShopping,
-            handleRemoveVideo,
-            handleCarouselTouchStart,
-            handleCarouselTouchEnd,
-            handleSeekReady,
-            handleToggleSave,
-            handleSharePress,
-            toggleFollow,
-            toggleLike,
-        ]
+        [activeVideoId, insets.top, handleDoubleTapLike, handleFeedTap, handleLongPress, handlePressIn, handlePressOut]
     );
 
     const keyExtractor = useCallback((item: Video) => item.id, []);
 
-    // Loading State
+    const renderFooter = useCallback(() => {
+        if (!isLoadingMore) return null;
+        return (
+            <View style={styles.footerLoader}>
+                <ActivityIndicator size="small" color="#FFF" />
+            </View>
+        );
+    }, [isLoadingMore]);
+
+    // ========================================================================
+    // UI opacity animation (for seeking)
+    // ========================================================================
+    const uiOpacityStyle = useAnimatedStyle(() => ({
+        opacity: withTiming(isSeeking ? 0 : 1, { duration: 200 }),
+    }), [isSeeking]);
+
+    // ========================================================================
+    // Loading state
+    // ========================================================================
+
     if (isLoading && videos.length === 0) {
         return (
             <View style={styles.loadingContainer}>
@@ -784,7 +893,9 @@ export const FeedManager = ({
         return (
             <View style={styles.errorContainer}>
                 <Text style={styles.errorText}>{error}</Text>
-                <Text style={styles.retryText} onPress={refreshFeed}>Tekrar Dene</Text>
+                <Text style={styles.retryText} onPress={refreshFeed}>
+                    Tekrar Dene
+                </Text>
             </View>
         );
     }
@@ -795,27 +906,20 @@ export const FeedManager = ({
                 <ScrollView
                     contentContainerStyle={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
                     refreshControl={
-                        <RefreshControl
-                            refreshing={isRefreshing}
-                            onRefresh={refreshFeed}
-                            tintColor="#FFFFFF"
-                        />
+                        <RefreshControl refreshing={isRefreshing} onRefresh={refreshFeed} tintColor="#FFFFFF" />
                     }
                 >
                     <View style={styles.emptyContainer}>
                         <Text style={styles.emptyText}>Henüz video yok</Text>
-                        <Text style={[styles.emptySubtext, { marginTop: 10 }]}>İlk videoyu sen yükle! 🚀</Text>
+                        <Text style={[styles.emptySubtext, { marginTop: 10 }]}>İlk videoyu sen yükle!</Text>
                     </View>
                 </ScrollView>
 
                 {!isCleanScreen && (
-                    <Animated.View
-                        style={[StyleSheet.absoluteFill, { zIndex: 50 }]}
-                        pointerEvents="box-none"
-                    >
+                    <Animated.View style={[StyleSheet.absoluteFill, { zIndex: 50 }]} pointerEvents="box-none">
                         <HeaderOverlay
                             isMuted={isMuted}
-                            onToggleMute={handleToggleMute}
+                            onToggleMute={toggleMute}
                             onStoryPress={handleStoryPress}
                             onUploadPress={() => router.push('/upload')}
                             activeTab={activeTab}
@@ -827,19 +931,13 @@ export const FeedManager = ({
                         />
                     </Animated.View>
                 )}
-
             </View>
         );
     }
 
-    const renderFooter = () => {
-        if (!isLoadingMore) return null;
-        return (
-            <View style={styles.footerLoader}>
-                <ActivityIndicator size="small" color="#FFF" />
-            </View>
-        );
-    };
+    // ========================================================================
+    // Main render
+    // ========================================================================
 
     return (
         <SwipeWrapper
@@ -848,6 +946,119 @@ export const FeedManager = ({
             disabled={isCustomFeed}
         >
             <View style={styles.container}>
+                {/* ============================================================
+                    Layer 1: VideoPlayerPool (z-index: 1)
+                    3 pre-created players, zero creation during scroll
+                    ============================================================ */}
+                <VideoPlayerPool
+                    videos={videos}
+                    activeIndex={activeIndex}
+                    isMuted={isMuted}
+                    isPaused={isPaused}
+                    playbackRate={playbackRate}
+                    onVideoLoaded={handleVideoLoaded}
+                    onVideoError={handleVideoError}
+                    onProgress={handleVideoProgress}
+                    onVideoEnd={handleVideoEnd}
+                    onRemoveVideo={handleRemoveVideo}
+                    onSeekReady={(seekFn) => { videoSeekRef.current = seekFn; }}
+                    onRetryReady={(retryFn) => { videoRetryRef.current = retryFn; }}
+                    scrollY={scrollY}
+                />
+
+                {/* ============================================================
+                    Layer 2: FlashList (z-index: 5)
+                    Transparent scroll detection - MUST be above VideoPlayerPool
+                    ============================================================ */}
+                <View style={styles.scrollLayer}>
+                    <AnimatedFlashList
+                        // @ts-ignore
+                        ref={listRef}
+                        data={videos}
+                        renderItem={renderItem}
+                        estimatedItemSize={ITEM_HEIGHT}
+                        keyExtractor={keyExtractor}
+                        pagingEnabled
+                        decelerationRate="fast"
+                        snapToInterval={ITEM_HEIGHT}
+                        snapToAlignment="start"
+                        showsVerticalScrollIndicator={false}
+                        viewabilityConfigCallbackPairs={viewabilityConfigCallbackPairs.current}
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={isRefreshing}
+                                onRefresh={refreshFeed}
+                                tintColor="#FFFFFF"
+                                progressViewOffset={insets.top}
+                            />
+                        }
+                        onEndReached={hasMore ? loadMore : null}
+                        onEndReachedThreshold={0.5}
+                        ListFooterComponent={renderFooter}
+                        removeClippedSubviews={true}
+                        maxToRenderPerBatch={3}
+                        windowSize={5}
+                        initialNumToRender={1}
+                        bounces={false}
+                        overScrollMode="never"
+                        scrollEnabled={!isCarouselInteracting}
+                        nestedScrollEnabled={true}
+                        onScroll={scrollHandler}
+                        onScrollBeginDrag={() => {
+                            isScrollingRef.current = true;
+                        }}
+                        onScrollEndDrag={() => {
+                            isScrollingRef.current = false;
+                            lastScrollEndRef.current = Date.now();
+                        }}
+                        onMomentumScrollEnd={(e) => {
+                            isScrollingSV.value = false;
+                            isScrollingRef.current = false;
+                            lastScrollEndRef.current = Date.now();
+                            handleScrollEnd(e);
+                        }}
+                    />
+                </View>
+
+                {/* ============================================================
+                    Layer 3: ActiveVideoOverlay (z-index: 50)
+                    All UI for active video, decoupled from video layer
+                    ============================================================ */}
+                {activeVideo && !isCleanScreen && (
+                    <ActiveVideoOverlay
+                        video={activeVideo}
+                        currentUserId={currentUserId}
+                        activeIndex={activeIndex}
+                        isFinished={isVideoFinished}
+                        hasError={hasVideoError}
+                        isLoading={isVideoLoading}
+                        retryCount={retryCount}
+                        isCleanScreen={isCleanScreen}
+                        isSeeking={isSeeking}
+                        tapIndicator={tapIndicator}
+                        rateLabel={rateLabel}
+                        currentTimeSV={currentTimeSV}
+                        durationSV={durationSV}
+                        isScrollingSV={isScrollingSV}
+                        scrollY={scrollY}
+                        onToggleLike={handleToggleLike}
+                        onToggleSave={handleToggleSave}
+                        onToggleShare={handleToggleShare}
+                        onToggleFollow={handleToggleFollow}
+                        onOpenShopping={handleOpenShopping}
+                        onOpenDescription={handleOpenDescription}
+                        onSeek={handleSeek}
+                        onRetry={handleRetry}
+                        onActionPressIn={handleActionPressIn}
+                        onActionPressOut={handleActionPressOut}
+                    />
+                )}
+
+                {/* ============================================================
+                    Layer 4: Global Overlays
+                    ============================================================ */}
+
+                {/* Save Toast */}
                 {saveToastMessage && (
                     <RNAnimated.View
                         pointerEvents="none"
@@ -868,68 +1079,22 @@ export const FeedManager = ({
                                 fill={saveToastActive ? SAVE_ICON_ACTIVE : 'none'}
                                 strokeWidth={1.6}
                             />
-                            <Text style={[
-                                styles.saveToastText,
-                                styles.saveToastTextActive,
-                            ]}>
+                            <Text style={[styles.saveToastText, styles.saveToastTextActive]}>
                                 {saveToastMessage}
                             </Text>
                         </View>
                     </RNAnimated.View>
                 )}
-                <FlashList
-                    // @ts-ignore
-                    ref={listRef}
-                    data={videos}
-                    renderItem={renderItem}
-                    estimatedItemSize={ITEM_HEIGHT}
-                    keyExtractor={keyExtractor}
-                    pagingEnabled
-                    decelerationRate="fast"
-                    snapToInterval={ITEM_HEIGHT}
-                    snapToAlignment="start"
-                    showsVerticalScrollIndicator={false}
-                    viewabilityConfigCallbackPairs={viewabilityConfigCallbackPairs.current}
-                    refreshControl={
-                        <RefreshControl
-                            refreshing={isRefreshing}
-                            onRefresh={refreshFeed}
-                            tintColor="#FFFFFF"
-                            progressViewOffset={insets.top}
-                        />
-                    }
-                    onEndReached={hasMore ? loadMore : null}
-                    onEndReachedThreshold={0.5}
-                    ListFooterComponent={renderFooter}
-                    removeClippedSubviews={true}  // Enable clipping for better performance
-                    maxToRenderPerBatch={1}
-                    windowSize={3}  // Only render 3 items: prev + current + next
-                    initialNumToRender={1}  // Only render first video on mount
-                    bounces={false}
-                    overScrollMode="never"
-                    scrollEnabled={!isCarouselInteracting}
-                    nestedScrollEnabled={true}
-                    onScrollBeginDrag={() => {
-                        isScrollingSV.value = true;
-                        setActiveTab('foryou');
-                        setCleanScreen(false);
-                        markStartupComplete();
-                    }}
-                    onScrollEndDrag={() => { isScrollingSV.value = false; }}
-                    onMomentumScrollEnd={(e) => {
-                        isScrollingSV.value = false;
-                        handleScrollEnd(e);
-                    }}
-                />
 
+                {/* Header Overlay */}
                 {!isCleanScreen && (
                     <Animated.View
-                        style={[StyleSheet.absoluteFill, { zIndex: 50 }, uiOpacityStyle]}
+                        style={[StyleSheet.absoluteFill, { zIndex: 100 }, uiOpacityStyle]}
                         pointerEvents={isSeeking ? 'none' : 'box-none'}
                     >
                         <HeaderOverlay
                             isMuted={isMuted}
-                            onToggleMute={handleToggleMute}
+                            onToggleMute={toggleMute}
                             onStoryPress={handleStoryPress}
                             onUploadPress={() => router.push('/upload')}
                             activeTab={activeTab}
@@ -942,6 +1107,7 @@ export const FeedManager = ({
                     </Animated.View>
                 )}
 
+                {/* Story Bar */}
                 {!isCleanScreen && showStories && (
                     <StoryBar
                         isVisible={activeTab === 'stories'}
@@ -951,69 +1117,103 @@ export const FeedManager = ({
                     />
                 )}
 
+                {/* Story touch interceptor */}
                 {!isCleanScreen && activeTab === 'stories' && (
-                    <Pressable
-                        style={styles.touchInterceptor}
-                        onPress={handleCloseStoryBar}
-                    />
+                    <Pressable style={styles.touchInterceptor} onPress={handleCloseStoryBar} />
                 )}
 
-                <MoreOptionsSheet
-                    ref={moreOptionsSheetRef}
-                    onCleanScreenPress={handleCleanScreen}
-                    onDeletePress={isOwnActiveVideo ? handleSheetDelete : undefined}
-                    isCleanScreen={isCleanScreen}
-                />
+                {/* ============================================================
+                    Layer 5: Bottom Sheets & Modals (z-index: 9999)
+                    Must be above all other layers
+                    ============================================================ */}
+                <View style={styles.sheetsContainer} pointerEvents="box-none">
+                    {/* Bottom Sheets */}
+                    <MoreOptionsSheet
+                        ref={moreOptionsSheetRef}
+                        onCleanScreenPress={handleCleanScreen}
+                        onDeletePress={isOwnActiveVideo ? handleSheetDelete : undefined}
+                        isCleanScreen={isCleanScreen}
+                    />
 
-                <DescriptionSheet
-                    ref={descriptionSheetRef}
-                    video={activeVideo}
-                    onFollowPress={() => activeVideoId && toggleFollow(activeVideoId)}
-                    onChange={(index) => {
-                        if (index === -1 && useActiveVideoStore.getState().isPaused) {
-                            togglePause();
-                        }
-                    }}
-                />
+                    <DescriptionSheet
+                        ref={descriptionSheetRef}
+                        video={activeVideo}
+                        onFollowPress={() => activeVideoId && toggleFollow(activeVideoId)}
+                        onChange={(index) => {
+                            if (index === -1 && useActiveVideoStore.getState().isPaused) {
+                                togglePause();
+                            }
+                        }}
+                    />
 
-                <DeleteConfirmationModal
-                    visible={isDeleteModalVisible}
-                    onCancel={() => setDeleteModalVisible(false)}
-                    onConfirm={() => {
-                        if (activeVideoId) {
-                            deleteVideo(activeVideoId);
-                        }
-                        setDeleteModalVisible(false);
-                    }}
-                />
-
+                    {/* Delete Modal */}
+                    <DeleteConfirmationModal
+                        visible={isDeleteModalVisible}
+                        onCancel={() => setDeleteModalVisible(false)}
+                        onConfirm={() => {
+                            if (activeVideoId) deleteVideo(activeVideoId);
+                            setDeleteModalVisible(false);
+                        }}
+                    />
+                </View>
             </View>
         </SwipeWrapper>
     );
 };
+
+// ============================================================================
+// Styles
+// ============================================================================
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: COLORS.background,
     },
-    loadingContainer: { flex: 1, backgroundColor: COLORS.videoBackground },
-    errorContainer: { flex: 1, backgroundColor: COLORS.background, justifyContent: 'center', alignItems: 'center' },
-    errorText: { color: 'red', marginBottom: 16 },
-    retryText: { color: '#FFF', textDecorationLine: 'underline' },
-    emptyContainer: { flex: 1, backgroundColor: COLORS.background, justifyContent: 'center', alignItems: 'center' },
-    emptyText: { color: '#FFF' },
-    emptySubtext: { color: '#aaa' },
+    loadingContainer: {
+        flex: 1,
+        backgroundColor: COLORS.videoBackground,
+    },
+    errorContainer: {
+        flex: 1,
+        backgroundColor: COLORS.background,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    errorText: {
+        color: 'red',
+        marginBottom: 16,
+    },
+    retryText: {
+        color: '#FFF',
+        textDecorationLine: 'underline',
+    },
+    emptyContainer: {
+        flex: 1,
+        backgroundColor: COLORS.background,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    emptyText: {
+        color: '#FFF',
+    },
+    emptySubtext: {
+        color: '#aaa',
+    },
     footerLoader: {
         height: 50,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: 'transparent'
+        backgroundColor: 'transparent',
     },
     touchInterceptor: {
         ...StyleSheet.absoluteFillObject,
         zIndex: 999,
         backgroundColor: 'transparent',
+    },
+    sheetsContainer: {
+        ...StyleSheet.absoluteFillObject,
+        zIndex: 9999,
     },
     saveToast: {
         position: 'absolute',
@@ -1049,5 +1249,14 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
+    },
+    placeholderContainer: {
+        width: SCREEN_WIDTH,
+        height: ITEM_HEIGHT,
+        backgroundColor: 'transparent',
+    },
+    scrollLayer: {
+        ...StyleSheet.absoluteFillObject,
+        zIndex: 5,
     },
 });

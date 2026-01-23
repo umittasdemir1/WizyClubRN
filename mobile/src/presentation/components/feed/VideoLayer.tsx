@@ -3,7 +3,6 @@ import { StyleSheet, View } from 'react-native';
 import Video, { SelectedTrackType } from 'react-native-video';
 import { useNetInfo } from '@react-native-community/netinfo';
 import { SharedValue } from 'react-native-reanimated';
-import { Image } from 'expo-image';
 import { getBufferConfig } from '../../../core/utils/bufferConfig';
 import { Video as VideoEntity } from '../../../domain/entities/Video';
 import { CarouselLayer } from './CarouselLayer';
@@ -117,19 +116,7 @@ export const VideoLayer = memo(function VideoLayer({
     } : null;
 
     if (!shouldLoad) {
-        return (
-            <View style={styles.container}>
-                {video.thumbnailUrl && (
-                    <Image
-                        source={{ uri: video.thumbnailUrl }}
-                        style={StyleSheet.absoluteFill}
-                        contentFit="cover"
-                        priority="high"
-                        cachePolicy="memory-disk"
-                    />
-                )}
-            </View>
-        );
+        return <View style={styles.container} />;
     }
 
     return (
@@ -177,16 +164,6 @@ export const VideoLayer = memo(function VideoLayer({
                         preventsDisplaySleepDuringVideoPlayback={true}
                     />
                 )
-            )}
-
-            {showPoster && video.thumbnailUrl && (
-                <Image
-                    source={{ uri: video.thumbnailUrl }}
-                    style={[StyleSheet.absoluteFill, { zIndex: 1 }]}
-                    contentFit="cover"
-                    priority="high"
-                    cachePolicy="memory-disk"
-                />
             )}
 
             <BrightnessOverlay />

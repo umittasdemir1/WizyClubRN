@@ -10,16 +10,17 @@
  * - previous (slot 2): Cached, ready if user scrolls back
  */
 
-import React, { useRef, useState, useCallback, useEffect, memo } from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
+import React, { useRef, useState, useCallback, useEffect, useMemo, memo, useImperativeHandle, forwardRef } from 'react';
+import { View, StyleSheet, Dimensions, Platform } from 'react-native';
+import Animated, { SharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import Video, { VideoRef, OnLoadData, OnProgressData, OnVideoErrorData, SelectedTrackType } from 'react-native-video';
 import { Video as VideoEntity } from '../../../domain/entities/Video';
 import { VideoCacheService } from '../../../data/services/VideoCacheService';
-import { Image } from 'expo-image';
 import { getBufferConfig } from '../../../core/utils/bufferConfig';
 import { useNetInfo } from '@react-native-community/netinfo';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const SCREEN_HEIGHT = Dimensions.get('window').height;
+const { height: WINDOW_HEIGHT } = Dimensions.get('window');
 const MAX_RETRIES = 3;
 
 interface PlayerSlot {
@@ -28,9 +29,12 @@ interface PlayerSlot {
     source: string;       // Video URL or cached path
     position: number;     // Last playback position
     isLoaded: boolean;    // Whether video is ready to play
+    isReadyForDisplay: boolean; // Whether video is rendered and ready to show
     resizeMode: 'cover' | 'contain';
     retryCount: number;   // Error retry count
     hasError: boolean;    // Whether slot has error
+    isCarousel: boolean;  // Whether this is a carousel post (no video)
+    retryNonce: number;   // Force remount for manual retry
 }
 
 interface VideoPlayerPoolProps {
@@ -38,11 +42,19 @@ interface VideoPlayerPoolProps {
     activeIndex: number;
     isMuted: boolean;
     isPaused: boolean;
+    playbackRate?: number;
     onVideoLoaded: (index: number) => void;
     onVideoError: (index: number, error: any) => void;
     onProgress: (index: number, currentTime: number, duration: number) => void;
     onVideoEnd: (index: number) => void;
     onRemoveVideo?: (index: number) => void;
+    onSeekReady?: (seekFn: (time: number) => void) => void;
+    onRetryReady?: (retryFn: () => void) => void;
+    scrollY: SharedValue<number>;
+}
+
+export interface VideoPlayerPoolRef {
+    seekTo: (time: number) => void;
 }
 
 const createEmptySlot = (index: number = -1): PlayerSlot => ({
@@ -51,29 +63,196 @@ const createEmptySlot = (index: number = -1): PlayerSlot => ({
     source: '',
     position: 0,
     isLoaded: false,
+    isReadyForDisplay: false,
     resizeMode: 'cover',
     retryCount: 0,
     hasError: false,
+    isCarousel: false,
+    retryNonce: 0,
 });
 
-export const VideoPlayerPool = memo(function VideoPlayerPool({
+// ============================================================================
+// PlayerSlotRenderer - Separate component to use hooks
+// ============================================================================
+
+interface PlayerSlotRendererProps {
+    slot: PlayerSlot;
+    slotIndex: number;
+    isActiveSlot: boolean;
+    isNearActive: boolean;
+    activeFeedIndex: number;
+    isActiveReady: boolean;
+    isOnTop: boolean;
+    shouldPlay: boolean;
+    isMuted: boolean;
+    playbackRate: number;
+    playerRef: React.RefObject<VideoRef | null>;
+    scrollY: SharedValue<number>;
+    insets: { top: number; bottom: number };
+    netInfo: any;
+    onLoad: (data: OnLoadData) => void;
+    onError: (error: OnVideoErrorData) => void;
+    onProgress: (data: OnProgressData) => void;
+    onEnd: () => void;
+    onReadyForDisplay: () => void;
+}
+
+const PlayerSlotRenderer = memo(function PlayerSlotRenderer({
+    slot,
+    slotIndex,
+    isActiveSlot,
+    isNearActive,
+    activeFeedIndex,
+    isActiveReady,
+    isOnTop,
+    shouldPlay,
+    isMuted,
+    playbackRate,
+    playerRef,
+    scrollY,
+    insets,
+    netInfo,
+    onLoad,
+    onError,
+    onProgress,
+    onEnd,
+    onReadyForDisplay,
+}: PlayerSlotRendererProps) {
+    // ALL HOOKS MUST BE AT THE TOP - before any conditionals
+    // Transform animation - uses full window height for positioning
+    const animatedStyle = useAnimatedStyle(() => {
+        const targetY = slot.index * WINDOW_HEIGHT;
+        return {
+            transform: [{ translateY: targetY - scrollY.value }]
+        };
+    }, [slot.index, scrollY]);
+
+    // Show only active + adjacent slots; keep previous visible until active is ready
+    const slotReady = slot.index !== activeFeedIndex || slot.isReadyForDisplay || slot.isLoaded;
+    const containerVisible = isNearActive && (slotReady || !isActiveReady) ? 1 : 0;
+
+    // NOW we can do conditional rendering
+    // Skip if carousel or no valid source
+    if (slot.isCarousel) {
+        return null;
+    }
+
+    // Skip rendering if no valid source
+    if (!isValidSource(slot.source)) {
+        return null;
+    }
+
+    const isLocal = slot.source.startsWith('file://');
+    const bufferConfig = getBufferConfig(netInfo.type, isLocal);
+
+    const sourceWithBuffer = {
+        uri: slot.source,
+    };
+
+    return (
+        <Animated.View
+            key={`player-${slotIndex}-${slot.videoId}`}
+            style={[
+                styles.playerContainer,
+                animatedStyle,
+                { opacity: containerVisible, zIndex: isOnTop ? 3 : 1 },
+            ]}
+            pointerEvents="none"
+        >
+            {/* Video Player - Bottom Layer */}
+            <Video
+                key={`video-${slotIndex}-${slot.videoId}-${slot.retryNonce}`}
+                ref={playerRef}
+                source={sourceWithBuffer}
+                bufferConfig={bufferConfig}
+                style={[
+                    styles.video,
+                    {
+                        top: insets.top,
+                        bottom: 0, // Tab navigator handles bottom safe area
+                    }
+                ]}
+                useTextureView={Platform.OS === 'android'}
+                resizeMode={slot.resizeMode}
+                paused={!shouldPlay}
+                muted={isMuted}
+                rate={playbackRate}
+                selectedAudioTrack={isMuted ? { type: SelectedTrackType.DISABLED } : undefined}
+                repeat={false}
+                onLoad={onLoad}
+                onError={onError}
+                onProgress={onProgress}
+                onEnd={onEnd}
+                onReadyForDisplay={onReadyForDisplay}
+                onBuffer={(payload) => {
+                    if (__DEV__) {
+                        console.log('[PlayerPool] onBuffer', {
+                            slotIndex,
+                            videoId: slot.videoId,
+                            isBuffering: payload.isBuffering,
+                        });
+                    }
+                }}
+                playInBackground={false}
+                playWhenInactive={false}
+                ignoreSilentSwitch="ignore"
+                mixWithOthers={isMuted ? "mix" : undefined}
+                disableFocus={isMuted}
+                progressUpdateInterval={33}
+                automaticallyWaitsToMinimizeStalling={true}
+                shutterColor="transparent"
+            />
+
+        </Animated.View>
+    );
+});
+
+// Helper to validate video source
+const isValidSource = (source: string | undefined | null): source is string => {
+    if (!source || typeof source !== 'string') return false;
+    if (source.trim() === '') return false;
+    // Must be a URL or file path
+    return source.startsWith('http://') ||
+           source.startsWith('https://') ||
+           source.startsWith('file://');
+};
+
+// Helper to get video URL from VideoEntity
+const getVideoUrl = (video: VideoEntity): string | null => {
+    // Handle different videoUrl formats
+    if (typeof video.videoUrl === 'string') {
+        return video.videoUrl;
+    }
+    // If videoUrl is an object with uri property
+    if (video.videoUrl && typeof video.videoUrl === 'object' && 'uri' in video.videoUrl) {
+        return (video.videoUrl as { uri: string }).uri;
+    }
+    return null;
+};
+
+export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPoolProps>(function VideoPlayerPool({
     videos,
     activeIndex,
     isMuted,
     isPaused,
+    playbackRate = 1.0,
     onVideoLoaded,
     onVideoError,
     onProgress,
     onVideoEnd,
     onRemoveVideo,
-}: VideoPlayerPoolProps) {
+    onSeekReady,
+    onRetryReady,
+    scrollY,
+}, ref) {
     const netInfo = useNetInfo();
+    const insets = useSafeAreaInsets();
 
     // 3 Player Refs
     const player1Ref = useRef<VideoRef>(null);
     const player2Ref = useRef<VideoRef>(null);
     const player3Ref = useRef<VideoRef>(null);
-    const playerRefs = [player1Ref, player2Ref, player3Ref];
+    const playerRefs = useMemo(() => [player1Ref, player2Ref, player3Ref], []);
 
     // Player slots state
     const [slots, setSlots] = useState<PlayerSlot[]>([
@@ -81,23 +260,83 @@ export const VideoPlayerPool = memo(function VideoPlayerPool({
         createEmptySlot(1),
         createEmptySlot(-1),
     ]);
+    const slotsRef = useRef(slots);
+    const retryTimeoutsRef = useRef<Record<number, ReturnType<typeof setTimeout> | null>>({});
+    const lastActiveSlotIndexRef = useRef(0);
 
     // Track if component is mounted
     const isMountedRef = useRef(true);
 
+    // Track active index to prevent race conditions
+    const activeIndexRef = useRef(activeIndex);
+    const recycleCounterRef = useRef(0);
+
+    // Expose seek function via ref
+    const seekTo = useCallback((time: number) => {
+        const activeSlotIndex = slots.findIndex((slot) => slot.index === activeIndexRef.current);
+        const resolvedIndex = activeSlotIndex >= 0 ? activeSlotIndex : 0;
+        playerRefs[resolvedIndex]?.current?.seek(time);
+    }, [playerRefs, slots]);
+
+    const retryActive = useCallback(() => {
+        const activeSlotIndex = slots.findIndex((slot) => slot.index === activeIndexRef.current);
+        if (activeSlotIndex < 0) return;
+
+        setSlots((prev) => {
+            const next = [...prev];
+            const slot = next[activeSlotIndex];
+            if (!slot) return prev;
+
+            const video = videos[slot.index];
+            const fallbackSource = video ? getVideoUrl(video) : slot.source;
+
+            next[activeSlotIndex] = {
+                ...slot,
+                source: isValidSource(fallbackSource) ? fallbackSource : slot.source,
+                isLoaded: false,
+                isReadyForDisplay: false,
+                hasError: false,
+                retryCount: 0,
+                retryNonce: slot.retryNonce + 1,
+            };
+            return next;
+        });
+    }, [slots, videos]);
+
+    useImperativeHandle(ref, () => ({
+        seekTo,
+    }), [seekTo]);
+
+    // Also expose via callback for FeedManager
+    useEffect(() => {
+        onSeekReady?.(seekTo);
+    }, [seekTo, onSeekReady]);
+
+    useEffect(() => {
+        onRetryReady?.(retryActive);
+    }, [retryActive, onRetryReady]);
+
     // Cleanup on unmount
+    useEffect(() => {
+        slotsRef.current = slots;
+    }, [slots]);
+
+    useEffect(() => {
+        const currentActiveSlotIndex = slots.findIndex((slot) => slot.index === activeIndex);
+        if (currentActiveSlotIndex < 0) return;
+        const currentSlot = slots[currentActiveSlotIndex];
+        if (currentSlot?.isLoaded || currentSlot?.isReadyForDisplay) {
+            lastActiveSlotIndexRef.current = currentActiveSlotIndex;
+        }
+    }, [slots, activeIndex]);
+
     useEffect(() => {
         isMountedRef.current = true;
 
         return () => {
             isMountedRef.current = false;
-            // Pause all players on unmount
-            playerRefs.forEach(ref => {
-                try {
-                    ref.current?.pause();
-                } catch (e) {
-                    // Silently ignore cleanup errors
-                }
+            Object.values(retryTimeoutsRef.current).forEach((timeoutId) => {
+                if (timeoutId) clearTimeout(timeoutId);
             });
         };
     }, []);
@@ -106,8 +345,18 @@ export const VideoPlayerPool = memo(function VideoPlayerPool({
     useEffect(() => {
         if (!isMountedRef.current) return;
 
+        // Increment counter for this recycle operation
+        const currentRecycleId = ++recycleCounterRef.current;
+        activeIndexRef.current = activeIndex;
+
         const recycleSlots = async () => {
-            const newSlots: PlayerSlot[] = [...slots];
+            // Early exit if a newer recycle has started
+            if (currentRecycleId !== recycleCounterRef.current) {
+                console.log(`[PlayerPool] Recycle ${currentRecycleId} cancelled (newer recycle started)`);
+                return;
+            }
+
+            const newSlots: PlayerSlot[] = [...slotsRef.current];
 
             // Calculate which videos should be in each slot
             const currentIdx = activeIndex;
@@ -116,18 +365,26 @@ export const VideoPlayerPool = memo(function VideoPlayerPool({
 
             // Get cached paths for each video
             const getSource = async (video: VideoEntity): Promise<string> => {
-                if (typeof video.videoUrl !== 'string') return '';
+                const videoUrl = getVideoUrl(video);
+                if (!videoUrl) {
+                    console.warn('[PlayerPool] No valid videoUrl for video:', video.id);
+                    return '';
+                }
 
                 // Try memory cache first (synchronous)
-                const memoryCached = VideoCacheService.getMemoryCachedPath(video.videoUrl);
-                if (memoryCached) return memoryCached;
+                const memoryCached = VideoCacheService.getMemoryCachedPath(videoUrl);
+                if (memoryCached && isValidSource(memoryCached)) {
+                    return memoryCached;
+                }
 
                 // Try disk cache (async)
-                const diskCached = await VideoCacheService.getCachedVideoPath(video.videoUrl);
-                if (diskCached) return diskCached;
+                const diskCached = await VideoCacheService.getCachedVideoPath(videoUrl);
+                if (diskCached && isValidSource(diskCached)) {
+                    return diskCached;
+                }
 
                 // Fallback to network
-                return video.videoUrl;
+                return videoUrl;
             };
 
             // Calculate resizeMode
@@ -138,90 +395,151 @@ export const VideoPlayerPool = memo(function VideoPlayerPool({
                 return 'cover';
             };
 
+            // Check if video is carousel (no video, only images)
+            const isCarouselPost = (video: VideoEntity): boolean => {
+                return video.postType === 'carousel' && (!getVideoUrl(video) || (video.mediaUrls?.length ?? 0) > 0);
+            };
+
             // Update slot 0 (current)
             if (videos[currentIdx]) {
-                const source = await getSource(videos[currentIdx]);
-                const isSameVideo = newSlots[0].videoId === videos[currentIdx].id;
+                const video = videos[currentIdx];
+                const isCarousel = isCarouselPost(video);
+                const source = isCarousel ? '' : await getSource(video);
+
+                // Check if cancelled after async getSource
+                if (currentRecycleId !== recycleCounterRef.current) return;
+
+                const isSameVideo = newSlots[0].videoId === video.id;
+
+                if (!isCarousel && !isValidSource(source)) {
+                    console.warn('[PlayerPool] Invalid source for current video:', video.id, source);
+                }
+
                 newSlots[0] = {
                     index: currentIdx,
-                    videoId: videos[currentIdx].id,
-                    source,
+                    videoId: video.id,
+                    source: isValidSource(source) ? source : '',
                     position: isSameVideo ? newSlots[0].position : 0,
                     isLoaded: isSameVideo ? newSlots[0].isLoaded : false,
-                    resizeMode: getResizeMode(videos[currentIdx]),
+                    // ✅ CRITICAL FIX: Reset isReadyForDisplay when switching videos
+                    isReadyForDisplay: false,
+                    resizeMode: getResizeMode(video),
                     retryCount: isSameVideo ? newSlots[0].retryCount : 0,
                     hasError: isSameVideo ? newSlots[0].hasError : false,
+                    isCarousel,
+                    retryNonce: isSameVideo ? newSlots[0].retryNonce : 0,
                 };
+            } else {
+                newSlots[0] = createEmptySlot(-1);
             }
 
             // Update slot 1 (next)
             if (videos[nextIdx] && nextIdx !== currentIdx) {
-                const source = await getSource(videos[nextIdx]);
-                const isSameVideo = newSlots[1].videoId === videos[nextIdx].id;
+                const video = videos[nextIdx];
+                const isCarousel = isCarouselPost(video);
+                const source = isCarousel ? '' : await getSource(video);
+
+                // Check if cancelled after async getSource
+                if (currentRecycleId !== recycleCounterRef.current) return;
+
+                const isSameVideo = newSlots[1].videoId === video.id;
+
                 newSlots[1] = {
                     index: nextIdx,
-                    videoId: videos[nextIdx].id,
-                    source,
+                    videoId: video.id,
+                    source: isValidSource(source) ? source : '',
                     position: 0,
                     isLoaded: isSameVideo ? newSlots[1].isLoaded : false,
-                    resizeMode: getResizeMode(videos[nextIdx]),
+                    // ✅ CRITICAL FIX: Reset isReadyForDisplay when switching videos
+                    isReadyForDisplay: false,
+                    resizeMode: getResizeMode(video),
                     retryCount: isSameVideo ? newSlots[1].retryCount : 0,
                     hasError: isSameVideo ? newSlots[1].hasError : false,
+                    isCarousel,
+                    retryNonce: isSameVideo ? newSlots[1].retryNonce : 0,
                 };
+            } else {
+                newSlots[1] = createEmptySlot(-1);
             }
 
             // Update slot 2 (previous)
             if (videos[prevIdx] && prevIdx !== currentIdx) {
-                const source = await getSource(videos[prevIdx]);
-                const isSameVideo = newSlots[2].videoId === videos[prevIdx].id;
+                const video = videos[prevIdx];
+                const isCarousel = isCarouselPost(video);
+                const source = isCarousel ? '' : await getSource(video);
+
+                // Check if cancelled after async getSource
+                if (currentRecycleId !== recycleCounterRef.current) return;
+
+                const isSameVideo = newSlots[2].videoId === video.id;
+
                 newSlots[2] = {
                     index: prevIdx,
-                    videoId: videos[prevIdx].id,
-                    source,
+                    videoId: video.id,
+                    source: isValidSource(source) ? source : '',
                     position: 0,
                     isLoaded: isSameVideo ? newSlots[2].isLoaded : false,
-                    resizeMode: getResizeMode(videos[prevIdx]),
+                    // ✅ CRITICAL FIX: Reset isReadyForDisplay when switching videos
+                    isReadyForDisplay: false,
+                    resizeMode: getResizeMode(video),
                     retryCount: isSameVideo ? newSlots[2].retryCount : 0,
                     hasError: isSameVideo ? newSlots[2].hasError : false,
+                    isCarousel,
+                    retryNonce: isSameVideo ? newSlots[2].retryNonce : 0,
                 };
+            } else {
+                newSlots[2] = createEmptySlot(-1);
             }
 
-            if (isMountedRef.current) {
-                setSlots(newSlots);
-                console.log(`[PlayerPool] Recycled slots: current=${currentIdx}, next=${nextIdx}, prev=${prevIdx}`);
+            // Final check before setState
+            if (!isMountedRef.current || currentRecycleId !== recycleCounterRef.current) {
+                return;
             }
+
+            setSlots(newSlots);
+            console.log(`[PlayerPool] Recycled slots #${currentRecycleId}: current=${currentIdx}, next=${nextIdx}, prev=${prevIdx}`);
         };
 
         if (videos.length > 0) {
             recycleSlots();
         }
-    }, [activeIndex, videos.length]);
+    }, [activeIndex, videos]);
 
     // Handle video loaded
-    const handleLoad = useCallback((slotIndex: number, _data: OnLoadData) => {
+    const handleLoad = useCallback((slotIndex: number, slotVideoId: string, feedIndex: number, _data: OnLoadData) => {
         if (!isMountedRef.current) return;
 
         setSlots(prev => {
             const newSlots = [...prev];
+            if (newSlots[slotIndex]?.videoId !== slotVideoId) return prev;
             newSlots[slotIndex] = {
                 ...newSlots[slotIndex],
                 isLoaded: true,
                 hasError: false,
+                // ✅ Reset retry count on successful load
+                retryCount: 0,
             };
             return newSlots;
         });
-        onVideoLoaded(slots[slotIndex].index);
-        console.log(`[PlayerPool] Slot ${slotIndex} loaded (video index: ${slots[slotIndex].index})`);
-    }, [slots, onVideoLoaded]);
+        if (__DEV__) {
+            console.log('[PlayerPool] onLoad', { slotIndex, feedIndex, videoId: slotVideoId });
+        }
+        onVideoLoaded(feedIndex);
+    }, [onVideoLoaded]);
 
     // Handle video error with retry logic
-    const handleError = useCallback(async (slotIndex: number, error: OnVideoErrorData) => {
+    const handleError = useCallback(async (slotIndex: number, slotVideoId: string, error: OnVideoErrorData) => {
         if (!isMountedRef.current) return;
 
-        const slot = slots[slotIndex];
+        const slot = slotsRef.current[slotIndex];
+        if (!slot || slot.videoId !== slotVideoId) return;
+        if (__DEV__) {
+            console.log('[PlayerPool] onError', { slotIndex, feedIndex: slot.index, videoId: slotVideoId });
+        }
         console.error(`[PlayerPool] Slot ${slotIndex} error (retry ${slot.retryCount}/${MAX_RETRIES}):`, error);
+        console.log(`[PlayerPool] Failed source: ${slot.source}`);
 
-        // If max retries reached, mark as failed
+        // If max retries reached, report error and stop retrying
         if (slot.retryCount >= MAX_RETRIES) {
             console.log(`[PlayerPool] Max retries reached for slot ${slotIndex}, removing video`);
             onRemoveVideo?.(slot.index);
@@ -232,14 +550,17 @@ export const VideoPlayerPool = memo(function VideoPlayerPool({
         if (slot.source.startsWith('file://')) {
             const video = videos[slot.index];
             if (video) {
+                const videoUrl = getVideoUrl(video);
                 console.warn(`[PlayerPool] Cache failed for slot ${slotIndex}, falling back to network`);
-                await VideoCacheService.deleteCachedVideo(video.videoUrl);
+                if (videoUrl) {
+                    await VideoCacheService.deleteCachedVideo(videoUrl);
+                }
 
                 setSlots(prev => {
                     const newSlots = [...prev];
                     newSlots[slotIndex] = {
                         ...newSlots[slotIndex],
-                        source: typeof video.videoUrl === 'string' ? video.videoUrl : '',
+                        source: videoUrl && isValidSource(videoUrl) ? videoUrl : '',
                         retryCount: newSlots[slotIndex].retryCount + 1,
                         hasError: false,
                     };
@@ -249,117 +570,144 @@ export const VideoPlayerPool = memo(function VideoPlayerPool({
             }
         }
 
-        // Mark as error and increment retry
-        setSlots(prev => {
-            const newSlots = [...prev];
-            newSlots[slotIndex] = {
-                ...newSlots[slotIndex],
-                hasError: true,
-                retryCount: newSlots[slotIndex].retryCount + 1,
-            };
-            return newSlots;
-        });
+        // Auto-retry: keep component mounted, remount player
+        const existingTimeout = retryTimeoutsRef.current[slotIndex];
+        if (existingTimeout) clearTimeout(existingTimeout);
+
+        retryTimeoutsRef.current[slotIndex] = setTimeout(() => {
+            if (!isMountedRef.current) return;
+            setSlots(prev => {
+                const newSlots = [...prev];
+                if (newSlots[slotIndex]?.videoId !== slotVideoId) return prev;
+                newSlots[slotIndex] = {
+                    ...newSlots[slotIndex],
+                    hasError: false,
+                    isLoaded: false,
+                    isReadyForDisplay: false,
+                    retryCount: newSlots[slotIndex].retryCount + 1,
+                    retryNonce: newSlots[slotIndex].retryNonce + 1,
+                };
+                return newSlots;
+            });
+        }, 300);
 
         onVideoError(slot.index, error);
-    }, [slots, videos, onVideoError, onRemoveVideo]);
+    }, [videos, onVideoError, onRemoveVideo]);
 
     // Handle progress
-    const handleProgress = useCallback((slotIndex: number, data: OnProgressData) => {
+    const handleProgress = useCallback((slotIndex: number, slotVideoId: string, data: OnProgressData) => {
         if (!isMountedRef.current) return;
-        if (slotIndex === 0) { // Only track progress for active slot
-            onProgress(slots[slotIndex].index, data.currentTime, data.seekableDuration);
+        const slot = slotsRef.current[slotIndex];
+        if (!slot || slot.videoId !== slotVideoId) return;
+        // ✅ CRITICAL FIX: Track progress for the actual active video, not just slot 0
+        if (slot.index === activeIndex) {
+            onProgress(slot.index, data.currentTime, data.seekableDuration);
         }
-    }, [slots, onProgress]);
+    }, [activeIndex, onProgress]);
 
     // Handle video end
-    const handleEnd = useCallback((slotIndex: number) => {
+    const handleEnd = useCallback((slotIndex: number, slotVideoId: string, feedIndex: number) => {
         if (!isMountedRef.current) return;
-        console.log(`[PlayerPool] Slot ${slotIndex} ended`);
-        onVideoEnd(slots[slotIndex].index);
-    }, [slots, onVideoEnd]);
+        const slot = slotsRef.current[slotIndex];
+        if (!slot || slot.videoId !== slotVideoId) return;
+        if (__DEV__) {
+            console.log('[PlayerPool] onEnd', { slotIndex, feedIndex, videoId: slotVideoId });
+        }
+        onVideoEnd(feedIndex);
+    }, [onVideoEnd]);
+
+    // Handle video ready for display
+    const handleReadyForDisplay = useCallback((slotIndex: number, slotVideoId: string) => {
+        if (!isMountedRef.current) return;
+
+        setSlots(prev => {
+            const newSlots = [...prev];
+            // Only mark as ready if this slot still has the same video
+            if (newSlots[slotIndex]?.videoId === slotVideoId) {
+                newSlots[slotIndex] = {
+                    ...newSlots[slotIndex],
+                    isReadyForDisplay: true,
+                };
+            }
+            return newSlots;
+        });
+        if (__DEV__) {
+            console.log('[PlayerPool] onReadyForDisplay', { slotIndex, videoId: slotVideoId });
+        }
+    }, []);
+
+    const activeSlotIndex = slots.findIndex((slot) => slot.index === activeIndex);
+    const resolvedActiveSlotIndex = activeSlotIndex >= 0 ? activeSlotIndex : 0;
+    const resolvedActiveFeedIndex =
+        activeSlotIndex >= 0
+            ? activeIndex
+            : slots[0]?.index ?? activeIndex;
 
     // Render a single player
-    const renderPlayer = (slotIndex: number, ref: React.RefObject<VideoRef | null>) => {
+    const renderPlayer = (slotIndex: number, playerRef: React.RefObject<VideoRef | null>) => {
         const slot = slots[slotIndex];
-        if (!slot.source || slot.hasError) return null;
 
-        const isActiveSlot = slotIndex === 0;
+        // ✅ CRITICAL FIX: Only ONE slot can be active at a time
+        // Find the FIRST slot that matches activeIndex
+        const isActiveSlot = resolvedActiveSlotIndex === slotIndex;
+        const isNearActive = Math.abs(slot.index - resolvedActiveFeedIndex) <= 1;
+        const activeSlot = slots[resolvedActiveSlotIndex];
+        const activeReady = activeSlot?.isLoaded || activeSlot?.isReadyForDisplay;
         const shouldPlay = isActiveSlot && !isPaused;
-        const isLocal = slot.source.startsWith('file://');
-        const bufferConfig = getBufferConfig(netInfo.type, isLocal);
+        const isOnTop = activeReady
+            ? isActiveSlot
+            : lastActiveSlotIndexRef.current === slotIndex;
 
-        // Buffer config inside source object (new API)
-        const sourceWithBuffer = {
-            uri: slot.source,
-            bufferConfig,
-        };
+        if (__DEV__) {
+            console.log(`[PlayerPool] Slot ${slotIndex}: index=${slot.index}, activeIndex=${activeIndex}, isActive=${isActiveSlot}, shouldPlay=${shouldPlay}, ready=${slot.isReadyForDisplay}`);
+        }
 
         return (
-            <View
-                key={`player-${slotIndex}-${slot.videoId}`}
-                style={[
-                    styles.playerContainer,
-                    {
-                        opacity: isActiveSlot ? 1 : 0,
-                        zIndex: isActiveSlot ? 10 : 1,
-                        top: slot.index * SCREEN_HEIGHT - activeIndex * SCREEN_HEIGHT,
-                    }
-                ]}
-                pointerEvents={isActiveSlot ? 'auto' : 'none'}
-            >
-                {/* Poster/Thumbnail - shown until video is ready */}
-                {!slot.isLoaded && videos[slot.index]?.thumbnailUrl && (
-                    <Image
-                        source={{ uri: videos[slot.index].thumbnailUrl }}
-                        style={StyleSheet.absoluteFill}
-                        contentFit="cover"
-                        priority="high"
-                    />
-                )}
-
-                {/* Video Player */}
-                <Video
-                    ref={ref}
-                    source={sourceWithBuffer}
-                    style={styles.video}
-                    resizeMode={slot.resizeMode}
-                    paused={!shouldPlay}
-                    muted={isMuted}
-                    selectedAudioTrack={isMuted ? { type: SelectedTrackType.DISABLED } : undefined}
-                    repeat={false}
-                    onLoad={(data) => handleLoad(slotIndex, data)}
-                    onError={(error) => handleError(slotIndex, error)}
-                    onProgress={(data) => handleProgress(slotIndex, data)}
-                    onEnd={() => handleEnd(slotIndex)}
-                    playInBackground={false}
-                    playWhenInactive={false}
-                    ignoreSilentSwitch="ignore"
-                    mixWithOthers={isMuted ? "mix" : undefined}
-                    disableFocus={isMuted}
-                    progressUpdateInterval={33}
-                    automaticallyWaitsToMinimizeStalling={true}
-                />
-            </View>
+            <PlayerSlotRenderer
+                key={`slot-${slotIndex}`}
+                slot={slot}
+                slotIndex={slotIndex}
+                isActiveSlot={isActiveSlot}
+                isNearActive={isNearActive}
+                activeFeedIndex={resolvedActiveFeedIndex}
+                isActiveReady={activeReady}
+                isOnTop={isOnTop}
+                shouldPlay={shouldPlay}
+                isMuted={isMuted}
+                playbackRate={playbackRate}
+                playerRef={playerRef}
+                scrollY={scrollY}
+                insets={insets}
+                netInfo={netInfo}
+                onLoad={(data) => handleLoad(slotIndex, slot.videoId, slot.index, data)}
+                onError={(error) => handleError(slotIndex, slot.videoId, error)}
+                onProgress={(data) => handleProgress(slotIndex, slot.videoId, data)}
+                onEnd={() => handleEnd(slotIndex, slot.videoId, slot.index)}
+                onReadyForDisplay={() => handleReadyForDisplay(slotIndex, slot.videoId)}
+            />
         );
     };
 
     return (
-        <View style={styles.container}>
+        <View style={styles.container} pointerEvents="box-none">
             {renderPlayer(0, player1Ref)}
             {renderPlayer(1, player2Ref)}
             {renderPlayer(2, player3Ref)}
         </View>
     );
-});
+}));
 
 const styles = StyleSheet.create({
     container: {
         ...StyleSheet.absoluteFillObject,
+        zIndex: 1, // Below UI layer (z-index: 50)
     },
     playerContainer: {
         position: 'absolute',
         width: '100%',
-        height: SCREEN_HEIGHT,
+        height: WINDOW_HEIGHT,
+        backgroundColor: '#000',
+        zIndex: 1, // Fixed - always below UI
     },
     video: {
         ...StyleSheet.absoluteFillObject,
