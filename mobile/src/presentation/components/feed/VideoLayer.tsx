@@ -106,20 +106,11 @@ export const VideoLayer = memo(function VideoLayer({
 
     const { type: networkType } = useNetInfo();
     const isLocal = videoSource?.uri?.startsWith('file://');
-    const isHls = typeof video.videoUrl === 'string' && video.videoUrl.endsWith('.m3u8');
 
-    // 🚀 Use unified buffer config with local file detection
-    const bufferConfig = isHls
-        ? {
-            // HLS streams need more conservative buffering
-            minBufferMs: 2000,
-            maxBufferMs: 10000,
-            bufferForPlaybackMs: 500,
-            bufferForPlaybackAfterRebufferMs: 1000,
-        }
-        : getBufferConfig(networkType, isLocal);
+    // Buffer config based on network type and cache status
+    const bufferConfig = getBufferConfig(networkType, isLocal);
 
-    // ✅ NEW API: bufferConfig inside source object (not as separate prop)
+    // bufferConfig inside source object (new API)
     const sourceWithBuffer = videoSource ? {
         ...videoSource,
         bufferConfig,

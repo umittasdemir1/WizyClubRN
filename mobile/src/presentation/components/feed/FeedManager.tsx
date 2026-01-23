@@ -397,7 +397,8 @@ export const FeedManager = ({
                     setCleanScreen(false);
                     FeedPrefetchService.getInstance().queueVideos(
                         videosRef.current,
-                        getPrefetchIndices(newIndex)
+                        getPrefetchIndices(newIndex),
+                        newIndex // Pass current index for priority calculation
                     );
                 }
             }

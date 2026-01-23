@@ -95,11 +95,6 @@ export class VideoCacheService {
     static async cacheVideo(url: string | number): Promise<string | null> {
         if (typeof url !== 'string') return null;
 
-        if (url.endsWith('.m3u8')) {
-            VideoCacheService.memoryCache.set(url, url);
-            return url;
-        }
-
         const filename = VideoCacheService.getFilename(url);
         const path = `${CACHE_FOLDER}${filename}`;
 

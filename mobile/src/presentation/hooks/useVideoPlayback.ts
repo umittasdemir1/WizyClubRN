@@ -35,7 +35,7 @@ interface UseVideoPlaybackParams {
 }
 
 interface UseVideoPlaybackResult {
-    videoRef: RefObject<VideoRef>;
+    videoRef: RefObject<VideoRef | null>;
     playerKey: number;
     shouldPlay: boolean;
     rateLabel: string | null;
@@ -136,8 +136,24 @@ export function useVideoPlayback({
         }
     }, [isPausedGlobal, isFinished, isActive, video.id, shouldLoad]);
 
+    // Cleanup on unmount - prevent memory leaks
     useEffect(() => {
         return () => {
+            // Pause video to stop playback and release resources
+            if (videoRef.current) {
+                try {
+                    videoRef.current.pause();
+                    videoRef.current.seek(0);
+                } catch (err) {
+                    // Silently ignore cleanup errors
+                }
+            }
+
+            // Reset shared values
+            currentTimeSV.value = 0;
+            durationSV.value = 0;
+
+            // Unlock orientation if needed
             if (ScreenOrientation) {
                 ScreenOrientation.unlockAsync?.().catch((err: any) => {
                     console.log('[useVideoPlayback] Orientation unlock skipped:', err.message);
