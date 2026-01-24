@@ -82,6 +82,7 @@ interface PlayerSlotRendererProps {
     isNearActive: boolean;
     activeFeedIndex: number;
     isActiveReady: boolean;
+    lastActiveSlotIndex: number;
     isOnTop: boolean;
     shouldPlay: boolean;
     isMuted: boolean;
@@ -104,6 +105,7 @@ const PlayerSlotRenderer = memo(function PlayerSlotRenderer({
     isNearActive,
     activeFeedIndex,
     isActiveReady,
+    lastActiveSlotIndex,
     isOnTop,
     shouldPlay,
     isMuted,
@@ -127,9 +129,19 @@ const PlayerSlotRenderer = memo(function PlayerSlotRenderer({
         };
     }, [slot.index, scrollY]);
 
-    // Show only active + adjacent slots; keep previous visible until active is ready
-    const slotReady = slot.index !== activeFeedIndex || slot.isReadyForDisplay || slot.isLoaded;
-    const containerVisible = isNearActive && (slotReady || !isActiveReady) ? 1 : 0;
+    // Check if this slot is ready to display
+    const slotReady = slot.isReadyForDisplay || slot.isLoaded;
+
+    // Show slot if:
+    // 1. It's the active slot AND it's ready
+    // 2. It's the last active slot AND current active is not ready (seamless transition)
+    // 3. It's an adjacent slot AND it's ready (for preload visibility)
+    const shouldShowSlot =
+        (isActiveSlot && slotReady) ||
+        (!isActiveSlot && !isActiveReady && lastActiveSlotIndex === slotIndex) ||
+        (!isActiveSlot && isNearActive && slotReady);
+
+    const containerVisible = shouldShowSlot ? 1 : 0;
 
     // NOW we can do conditional rendering
     // Skip if carousel or no valid source
@@ -161,7 +173,7 @@ const PlayerSlotRenderer = memo(function PlayerSlotRenderer({
         >
             {/* Video Player - Bottom Layer */}
             <Video
-                key={`video-${slotIndex}-${slot.videoId}-${slot.retryNonce}`}
+                key={`video-${slot.videoId}-${slot.retryNonce}`}
                 ref={playerRef}
                 source={sourceWithBuffer}
                 bufferConfig={bufferConfig}
@@ -356,7 +368,9 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
                 return;
             }
 
-            const newSlots: PlayerSlot[] = [...slotsRef.current];
+            const priorSlots = slotsRef.current;
+            const newSlots: PlayerSlot[] = [...priorSlots];
+            let slotsChanged = false;
 
             // Calculate which videos should be in each slot
             const currentIdx = activeIndex;
@@ -400,95 +414,102 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
                 return video.postType === 'carousel' && (!getVideoUrl(video) || (video.mediaUrls?.length ?? 0) > 0);
             };
 
-            // Update slot 0 (current)
-            if (videos[currentIdx]) {
-                const video = videos[currentIdx];
-                const isCarousel = isCarouselPost(video);
-                const source = isCarousel ? '' : await getSource(video);
+            const getPreservedSlot = (videoId: string) => priorSlots.find((slot) => slot.videoId === videoId);
+            const slotsEqual = (a: PlayerSlot, b: PlayerSlot) =>
+                a.index === b.index &&
+                a.videoId === b.videoId &&
+                a.source === b.source &&
+                a.position === b.position &&
+                a.isLoaded === b.isLoaded &&
+                a.isReadyForDisplay === b.isReadyForDisplay &&
+                a.resizeMode === b.resizeMode &&
+                a.retryCount === b.retryCount &&
+                a.hasError === b.hasError &&
+                a.isCarousel === b.isCarousel &&
+                a.retryNonce === b.retryNonce;
 
-                // Check if cancelled after async getSource
-                if (currentRecycleId !== recycleCounterRef.current) return;
+            const setSlotIfChanged = (slotIndex: number, nextSlot: PlayerSlot) => {
+                const prevSlot = priorSlots[slotIndex];
+                if (!prevSlot || !slotsEqual(prevSlot, nextSlot)) {
+                    newSlots[slotIndex] = nextSlot;
+                    slotsChanged = true;
+                } else {
+                    newSlots[slotIndex] = prevSlot;
+                }
+            };
 
-                const isSameVideo = newSlots[0].videoId === video.id;
+            const activeSlotIndex = priorSlots.findIndex((slot) => slot.index === currentIdx);
+            const targetIndices: Array<number | null> = [null, null, null];
+            const usedIndices = new Set<number>();
 
-                if (!isCarousel && !isValidSource(source)) {
-                    console.warn('[PlayerPool] Invalid source for current video:', video.id, source);
+            if (activeSlotIndex >= 0) {
+                targetIndices[activeSlotIndex] = currentIdx;
+                usedIndices.add(currentIdx);
+            }
+
+            const remainingTargets = [nextIdx, prevIdx].filter((idx, pos, arr) =>
+                idx !== currentIdx && arr.indexOf(idx) === pos
+            );
+
+            for (let slotIndex = 0; slotIndex < 3; slotIndex++) {
+                if (slotIndex === activeSlotIndex) continue;
+                const existingIdx = priorSlots[slotIndex]?.index;
+                if (existingIdx != null && remainingTargets.includes(existingIdx) && !usedIndices.has(existingIdx)) {
+                    targetIndices[slotIndex] = existingIdx;
+                    usedIndices.add(existingIdx);
+                }
+            }
+
+            for (let slotIndex = 0; slotIndex < 3; slotIndex++) {
+                if (targetIndices[slotIndex] != null) continue;
+                const nextTarget = remainingTargets.find((idx) => !usedIndices.has(idx));
+                if (nextTarget != null) {
+                    targetIndices[slotIndex] = nextTarget;
+                    usedIndices.add(nextTarget);
+                }
+            }
+
+            const updateSlotForIndex = async (slotIndex: number, targetIdx: number | null) => {
+                if (targetIdx == null || !videos[targetIdx]) {
+                    setSlotIfChanged(slotIndex, createEmptySlot(-1));
+                    return;
                 }
 
-                newSlots[0] = {
-                    index: currentIdx,
-                    videoId: video.id,
-                    source: isValidSource(source) ? source : '',
-                    position: isSameVideo ? newSlots[0].position : 0,
-                    isLoaded: isSameVideo ? newSlots[0].isLoaded : false,
-                    // ✅ CRITICAL FIX: Reset isReadyForDisplay when switching videos
-                    isReadyForDisplay: false,
-                    resizeMode: getResizeMode(video),
-                    retryCount: isSameVideo ? newSlots[0].retryCount : 0,
-                    hasError: isSameVideo ? newSlots[0].hasError : false,
-                    isCarousel,
-                    retryNonce: isSameVideo ? newSlots[0].retryNonce : 0,
-                };
-            } else {
-                newSlots[0] = createEmptySlot(-1);
-            }
-
-            // Update slot 1 (next)
-            if (videos[nextIdx] && nextIdx !== currentIdx) {
-                const video = videos[nextIdx];
+                const video = videos[targetIdx];
                 const isCarousel = isCarouselPost(video);
                 const source = isCarousel ? '' : await getSource(video);
 
-                // Check if cancelled after async getSource
                 if (currentRecycleId !== recycleCounterRef.current) return;
 
-                const isSameVideo = newSlots[1].videoId === video.id;
+                const preserved = getPreservedSlot(video.id);
+                const isSameVideo = Boolean(preserved);
+                const wasReady = preserved?.isLoaded || preserved?.isReadyForDisplay;
+                const preservedSource = wasReady && preserved && isValidSource(preserved.source)
+                    ? preserved.source
+                    : null;
 
-                newSlots[1] = {
-                    index: nextIdx,
+                if (!isCarousel && !isValidSource(source)) {
+                    console.warn('[PlayerPool] Invalid source for video:', video.id, source);
+                }
+
+                const nextSlot: PlayerSlot = {
+                    index: targetIdx,
                     videoId: video.id,
-                    source: isValidSource(source) ? source : '',
-                    position: 0,
-                    isLoaded: isSameVideo ? newSlots[1].isLoaded : false,
-                    // ✅ CRITICAL FIX: Reset isReadyForDisplay when switching videos
-                    isReadyForDisplay: false,
+                    source: preservedSource ?? (isValidSource(source) ? source : ''),
+                    position: isSameVideo ? preserved!.position : 0,
+                    isLoaded: isSameVideo ? preserved!.isLoaded : false,
+                    isReadyForDisplay: isSameVideo ? preserved!.isReadyForDisplay : false,
                     resizeMode: getResizeMode(video),
-                    retryCount: isSameVideo ? newSlots[1].retryCount : 0,
-                    hasError: isSameVideo ? newSlots[1].hasError : false,
+                    retryCount: isSameVideo ? preserved!.retryCount : 0,
+                    hasError: isSameVideo ? preserved!.hasError : false,
                     isCarousel,
-                    retryNonce: isSameVideo ? newSlots[1].retryNonce : 0,
+                    retryNonce: isSameVideo ? preserved!.retryNonce : 0,
                 };
-            } else {
-                newSlots[1] = createEmptySlot(-1);
-            }
+                setSlotIfChanged(slotIndex, nextSlot);
+            };
 
-            // Update slot 2 (previous)
-            if (videos[prevIdx] && prevIdx !== currentIdx) {
-                const video = videos[prevIdx];
-                const isCarousel = isCarouselPost(video);
-                const source = isCarousel ? '' : await getSource(video);
-
-                // Check if cancelled after async getSource
-                if (currentRecycleId !== recycleCounterRef.current) return;
-
-                const isSameVideo = newSlots[2].videoId === video.id;
-
-                newSlots[2] = {
-                    index: prevIdx,
-                    videoId: video.id,
-                    source: isValidSource(source) ? source : '',
-                    position: 0,
-                    isLoaded: isSameVideo ? newSlots[2].isLoaded : false,
-                    // ✅ CRITICAL FIX: Reset isReadyForDisplay when switching videos
-                    isReadyForDisplay: false,
-                    resizeMode: getResizeMode(video),
-                    retryCount: isSameVideo ? newSlots[2].retryCount : 0,
-                    hasError: isSameVideo ? newSlots[2].hasError : false,
-                    isCarousel,
-                    retryNonce: isSameVideo ? newSlots[2].retryNonce : 0,
-                };
-            } else {
-                newSlots[2] = createEmptySlot(-1);
+            for (let slotIndex = 0; slotIndex < 3; slotIndex++) {
+                await updateSlotForIndex(slotIndex, targetIndices[slotIndex]);
             }
 
             // Final check before setState
@@ -496,8 +517,12 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
                 return;
             }
 
-            setSlots(newSlots);
-            console.log(`[PlayerPool] Recycled slots #${currentRecycleId}: current=${currentIdx}, next=${nextIdx}, prev=${prevIdx}`);
+            if (slotsChanged) {
+                setSlots(newSlots);
+                console.log(`[PlayerPool] Recycled slots #${currentRecycleId}: current=${currentIdx}, next=${nextIdx}, prev=${prevIdx}`);
+            } else {
+                console.log(`[PlayerPool] Skip recycle #${currentRecycleId}: no slot changes`);
+            }
         };
 
         if (videos.length > 0) {
@@ -671,6 +696,7 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
                 isNearActive={isNearActive}
                 activeFeedIndex={resolvedActiveFeedIndex}
                 isActiveReady={activeReady}
+                lastActiveSlotIndex={lastActiveSlotIndexRef.current}
                 isOnTop={isOnTop}
                 shouldPlay={shouldPlay}
                 isMuted={isMuted}

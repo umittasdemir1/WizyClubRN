@@ -1,6 +1,7 @@
 import { Video } from '../../domain/entities/Video';
 import { VideoCacheService } from './VideoCacheService';
 import { isVideoCacheDisabled } from '../../core/utils/videoCacheToggle';
+import { NetInfoStateType } from '@react-native-community/netinfo';
 
 interface PrefetchItem {
   url: string;
@@ -13,13 +14,22 @@ class FeedPrefetchService {
   private queued = new Set<string>();
   private isProcessing = false;
   private maxQueueSize = 20;
-  private maxParallelDownloads = 3;
+  private maxParallelDownloads = 2;
+  private networkType: NetInfoStateType | null = null;
 
   static getInstance(): FeedPrefetchService {
     if (!FeedPrefetchService.instance) {
       FeedPrefetchService.instance = new FeedPrefetchService();
     }
     return FeedPrefetchService.instance;
+  }
+
+  setNetworkType(type: NetInfoStateType | null) {
+    this.networkType = type;
+    const isFast =
+      type === NetInfoStateType.wifi || type === NetInfoStateType.ethernet;
+    this.maxParallelDownloads = isFast ? 2 : 1;
+    this.maxQueueSize = isFast ? 20 : 12;
   }
 
   /**
@@ -108,6 +118,14 @@ class FeedPrefetchService {
       await Promise.allSettled(
         batch.map(async ({ url, priority }) => {
           try {
+            const memoryCached = VideoCacheService.getMemoryCachedPath(url);
+            if (memoryCached) {
+              return;
+            }
+            const diskCached = await VideoCacheService.getCachedVideoPath(url);
+            if (diskCached) {
+              return;
+            }
             await VideoCacheService.cacheVideo(url);
             const priorityLabel = priority === 0 ? '🔥' : priority === 1 ? '⚡' : '✅';
             console.log(`[FeedPrefetch] ${priorityLabel} Cached (p${priority}):`, url.substring(0, 50) + '...');

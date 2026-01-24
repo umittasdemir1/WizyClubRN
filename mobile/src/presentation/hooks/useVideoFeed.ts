@@ -8,6 +8,7 @@ import { ToggleFollowUseCase } from '../../domain/usecases/ToggleFollowUseCase';
 import { VideoRepositoryImpl } from '../../data/repositories/VideoRepositoryImpl';
 import { InteractionRepositoryImpl } from '../../data/repositories/InteractionRepositoryImpl';
 import { VideoCacheService } from '../../data/services/VideoCacheService';
+import { FeedPrefetchService } from '../../data/services/FeedPrefetchService';
 import { Image } from 'expo-image';
 import { useActiveVideoStore } from '../store/useActiveVideoStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -88,48 +89,14 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
             hasInitialPrefetched.current = true;
             console.log('[Prefetch] 🚀 Initial prefetch starting...');
 
-            videos.slice(0, 3).forEach((v, i) => {
-                // Video prefetch (background download)
-                VideoCacheService.cacheVideo(v.videoUrl).then(path => {
-                    if (path) console.log(`[Prefetch] ✅ Video ${i + 1} cached`);
-                });
-                // Thumbnail prefetch (for instant display)
+            FeedPrefetchService.getInstance().queueVideos(videos, [0, 1, 2], 0);
+            videos.slice(0, 3).forEach((v) => {
                 if (v.thumbnailUrl) {
                     Image.prefetch(v.thumbnailUrl);
                 }
             });
         }
     }, [videos.length, isStartupComplete]);
-
-    // 2. Scroll Prefetch: When user scrolls to new video, prefetch next 3 videos
-    const lastPrefetchedIndex = useRef(-1);
-    useEffect(() => {
-        if (!activeVideoId || videos.length === 0) return;
-
-        const currentIndex = videos.findIndex(v => v.id === activeVideoId);
-        if (currentIndex === -1 || currentIndex === lastPrefetchedIndex.current) return;
-
-        // Skip prefetch if we're still on initial videos (index 0-2) to avoid overlap
-        // Initial prefetch already handled first 3 videos
-        if (currentIndex < 2) {
-            lastPrefetchedIndex.current = currentIndex;
-            return;
-        }
-
-        lastPrefetchedIndex.current = currentIndex;
-
-        // Prefetch next 3 videos (if they exist)
-        const nextVideos = videos.slice(currentIndex + 1, currentIndex + 4);
-        if (nextVideos.length > 0 && !isVideoCacheDisabled()) {
-            // Silently prefetch without spam (user doesn't need to see this)
-            nextVideos.forEach((v) => {
-                VideoCacheService.cacheVideo(v.videoUrl);
-                if (v.thumbnailUrl) {
-                    Image.prefetch(v.thumbnailUrl);
-                }
-            });
-        }
-    }, [activeVideoId, videos]);
 
     // ============================================
 

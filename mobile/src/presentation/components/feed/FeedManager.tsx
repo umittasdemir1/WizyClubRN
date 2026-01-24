@@ -39,6 +39,7 @@ import {
     Easing,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNetInfo } from '@react-native-community/netinfo';
 import { HeaderOverlay } from './HeaderOverlay';
 import { DeleteConfirmationModal } from './DeleteConfirmationModal';
 import { DescriptionSheet } from '../sheets/DescriptionSheet';
@@ -250,6 +251,11 @@ export const FeedManager = ({
     const videoRetryRef = useRef<(() => void) | null>(null);
     const isScrollingRef = useRef(false);
     const lastScrollEndRef = useRef(0);
+    const videoLoadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const activeLoadTokenRef = useRef(0);
+    const activeLoadedRef = useRef(false);
+    const loopCountRef = useRef(0);
+    const lastLoopTimeRef = useRef(Date.now());
 
     // Toast animation
     const saveToastTranslateY = useRef(new RNAnimated.Value(-70)).current;
@@ -260,6 +266,7 @@ export const FeedManager = ({
     // Hooks
     // ========================================================================
     const insets = useSafeAreaInsets();
+    const netInfo = useNetInfo();
     const router = useRouter();
     const { isMuted, toggleMute } = useMuteControls();
     const { user } = useAuthStore();
@@ -272,6 +279,18 @@ export const FeedManager = ({
     const markStartupComplete = useStartupStore((state) => state.markStartupComplete);
 
     useAppStateSync();
+
+    useEffect(() => {
+        FeedPrefetchService.getInstance().setNetworkType(netInfo.type);
+    }, [netInfo.type]);
+
+    useEffect(() => {
+        return () => {
+            if (videoLoadingTimeoutRef.current) {
+                clearTimeout(videoLoadingTimeoutRef.current);
+            }
+        };
+    }, []);
 
     useEffect(() => {
         if (__DEV__) {
@@ -439,12 +458,26 @@ export const FeedManager = ({
     useEffect(() => {
         lastActiveIdRef.current = activeVideoId;
         // Reset video state when video changes
-        setIsVideoLoading(true);
+        activeLoadedRef.current = false;
+        setIsVideoLoading(false);
         setHasVideoError(false);
         setIsVideoFinished(false);
         setRetryCount(0);
         currentTimeSV.value = 0;
         durationSV.value = 0;
+        loopCountRef.current = 0;
+        lastLoopTimeRef.current = Date.now();
+
+        if (videoLoadingTimeoutRef.current) {
+            clearTimeout(videoLoadingTimeoutRef.current);
+        }
+        const loadToken = ++activeLoadTokenRef.current;
+        videoLoadingTimeoutRef.current = setTimeout(() => {
+            if (activeLoadTokenRef.current !== loadToken) return;
+            if (!activeLoadedRef.current) {
+                setIsVideoLoading(true);
+            }
+        }, 250);
     }, [activeVideoId, currentTimeSV, durationSV]);
 
     // Playback rate sync
@@ -466,6 +499,10 @@ export const FeedManager = ({
     const handleVideoLoaded = useCallback((index: number) => {
         // Video loaded successfully - clear any loading/error states
         if (index === activeIndex) {
+            activeLoadedRef.current = true;
+            if (videoLoadingTimeoutRef.current) {
+                clearTimeout(videoLoadingTimeoutRef.current);
+            }
             setIsVideoLoading(false);
             setHasVideoError(false);
         }
@@ -473,6 +510,9 @@ export const FeedManager = ({
 
     const handleVideoError = useCallback((index: number, _error: any) => {
         if (index === activeIndex) {
+            if (videoLoadingTimeoutRef.current) {
+                clearTimeout(videoLoadingTimeoutRef.current);
+            }
             setHasVideoError(true);
             setIsVideoLoading(false);
             setRetryCount((prev) => prev + 1);
@@ -511,6 +551,40 @@ export const FeedManager = ({
     const handleVideoEnd = useCallback((index: number) => {
         if (index !== activeIndex) return;
 
+        // Debounce: prevent double-counting (e.g., from seek or rapid callbacks)
+        const now = Date.now();
+        if (now - lastLoopTimeRef.current < 1000) {
+            if (__DEV__) {
+                console.log('[FeedManager] Video end ignored (debounce)');
+            }
+            return;
+        }
+        lastLoopTimeRef.current = now;
+
+        // Increment loop count
+        loopCountRef.current += 1;
+
+        if (__DEV__) {
+            console.log(`[FeedManager] Loop completed (${loopCountRef.current})`);
+        }
+
+        // If we haven't looped enough times yet, replay the video
+        if (loopCountRef.current < 2) {
+            if (__DEV__) {
+                console.log(`[FeedManager] Loop ${loopCountRef.current}/2: Replaying video ${activeVideoId}`);
+            }
+            if (videoSeekRef.current) {
+                videoSeekRef.current(0);
+            }
+            // Ensure video is playing after seek
+            const isPausedNow = useActiveVideoStore.getState().isPaused;
+            if (isPausedNow) {
+                togglePause();
+            }
+            return;
+        }
+
+        // After 2 loops, finish the video
         setIsVideoFinished(true);
         setCleanScreen(false);
 
@@ -527,7 +601,7 @@ export const FeedManager = ({
                 });
             }
         }
-    }, [activeIndex, viewingMode, setCleanScreen]);
+    }, [activeIndex, activeVideoId, viewingMode, setCleanScreen, togglePause]);
 
     const handleRemoveVideo = useCallback((index: number) => {
         const video = videosRef.current[index];
@@ -551,6 +625,24 @@ export const FeedManager = ({
         if (Date.now() < doubleTapBlockUntilRef.current) return;
         if (actionButtonsPressingRef.current) return;
 
+        // Handle restart when video is finished
+        if (isVideoFinished) {
+            if (__DEV__) {
+                console.log('[FeedManager] Manual restart triggered');
+            }
+            setIsVideoFinished(false);
+            loopCountRef.current = 0;
+            lastLoopTimeRef.current = Date.now();
+            if (videoSeekRef.current) {
+                videoSeekRef.current(0);
+            }
+            const isPausedNow = useActiveVideoStore.getState().isPaused;
+            if (isPausedNow) {
+                togglePause();
+            }
+            return;
+        }
+
         if (activeTab === 'stories') {
             setActiveTab('foryou');
             setTimeout(() => {
@@ -561,7 +653,7 @@ export const FeedManager = ({
             togglePause();
             showTapIndicator(wasPaused ? 'play' : 'pause');
         }
-    }, [activeTab, togglePause, showTapIndicator]);
+    }, [activeTab, isVideoFinished, togglePause, showTapIndicator]);
 
     const handleDoubleTapLike = useCallback(() => {
         if (isScrollingRef.current || Date.now() - lastScrollEndRef.current < 150) return;
@@ -784,7 +876,7 @@ export const FeedManager = ({
         const deltaMs = Math.max(1, now - lastTs);
         const fastSwipe = deltaIndex > 1 || deltaMs < 350;
         const forward = newIndex >= lastIndex;
-        const prefetchCount = fastSwipe ? 5 : 3;
+        const prefetchCount = fastSwipe ? 3 : 2;
         const indices = new Set<number>();
         const maxIndex = videosRef.current.length - 1;
 
