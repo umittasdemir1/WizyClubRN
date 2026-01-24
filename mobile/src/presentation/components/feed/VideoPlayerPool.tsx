@@ -11,7 +11,7 @@
  */
 
 import React, { useRef, useState, useCallback, useEffect, useMemo, memo, useImperativeHandle, forwardRef } from 'react';
-import { View, StyleSheet, Dimensions, Platform } from 'react-native';
+import { View, StyleSheet, Dimensions, Platform, Image } from 'react-native';
 import Animated, { SharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import Video, { VideoRef, OnLoadData, OnProgressData, OnVideoErrorData, SelectedTrackType } from 'react-native-video';
 import { Video as VideoEntity } from '../../../domain/entities/Video';
@@ -181,9 +181,6 @@ const PlayerSlotRenderer = memo(function PlayerSlotRenderer({
                 key={`video-retry-${slot.retryNonce}`}
                 ref={playerRef}
                 source={sourceWithBuffer}
-                // ✅ Poster support for instant visual feedback
-                poster={slot.thumbnailUrl}
-                posterResizeMode={slot.resizeMode}
                 // @ts-ignore - bufferConfig deprecated but still works
                 bufferConfig={bufferConfig}
                 style={[
@@ -220,6 +217,23 @@ const PlayerSlotRenderer = memo(function PlayerSlotRenderer({
                 // ✅ Force iOS to buffer ahead (5s) even when paused
                 preferredForwardBufferDuration={5}
             />
+
+            {/* ✅ Poster Image Overlay - Shows until video is ready for display */}
+            {/* Prevents black screen flashes during fast scroll */}
+            {!slot.isReadyForDisplay && slot.thumbnailUrl && (
+                <Image
+                    source={{ uri: slot.thumbnailUrl }}
+                    style={[
+                        StyleSheet.absoluteFill,
+                        {
+                            zIndex: 2, // Above video
+                            backgroundColor: '#000', // Fallback color
+                        }
+                    ]}
+                    contentFit={slot.resizeMode === 'contain' ? 'contain' : 'cover'}
+                    transition={0} // Instant appearance
+                />
+            )}
 
         </Animated.View>
     );

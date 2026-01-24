@@ -132,9 +132,9 @@ export const ActiveVideoOverlay = memo(function ActiveVideoOverlay({
         // Immediate hide
         uiVisibleSV.value = 0;
         
-        // Native delay: Wait 100ms, then fade in over 200ms
-        // This runs on UI thread, guaranteed smooth even if JS is busy
-        uiVisibleSV.value = withDelay(100, withTiming(1, { duration: 200 }));
+        // Native delay: Wait 50ms, then fade in over 50ms
+        // Ultra-snappier transition
+        uiVisibleSV.value = withDelay(50, withTiming(1, { duration: 50 }));
     }, [video.id]);
 
     // ========================================================================

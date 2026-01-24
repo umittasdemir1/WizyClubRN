@@ -1784,19 +1784,38 @@ app.delete('/drafts/:id', async (req, res) => {
     }
 });
 
+const DRAFT_CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+async function cleanupExpiredDraftsInternal() {
+    const { data, error } = await supabase
+        .from('drafts')
+        .delete()
+        .lt('expires_at', new Date().toISOString())
+        .select('id');
+
+    if (error) throw error;
+
+    const count = data?.length || 0;
+    console.log(`🧹 [DRAFTS] Cleaned up ${count} expired drafts`);
+    return count;
+}
+
+function startDraftCleanupScheduler() {
+    // Avoid relying on the client; run periodic cleanup in the backend.
+    cleanupExpiredDraftsInternal().catch((error) => {
+        console.error('[DRAFTS] Scheduled cleanup failed:', error);
+    });
+    setInterval(() => {
+        cleanupExpiredDraftsInternal().catch((error) => {
+            console.error('[DRAFTS] Scheduled cleanup failed:', error);
+        });
+    }, DRAFT_CLEANUP_INTERVAL_MS);
+}
+
 // Cleanup expired drafts (cron job endpoint)
 app.post('/drafts/cleanup', async (req, res) => {
     try {
-        const { data, error } = await supabase
-            .from('drafts')
-            .delete()
-            .lt('expires_at', new Date().toISOString())
-            .select('id');
-
-        if (error) throw error;
-
-        const count = data?.length || 0;
-        console.log(`🧹 [DRAFTS] Cleaned up ${count} expired drafts`);
+        const count = await cleanupExpiredDraftsInternal();
         res.json({ success: true, deletedCount: count });
     } catch (error) {
         console.error('[DRAFTS] Error cleaning up drafts:', error);
@@ -1821,4 +1840,5 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log(`🌐 Network Access: http://192.168.0.138:${PORT}`);
     console.log(`📦 Target Bucket: "${process.env.R2_BUCKET_NAME}"`);
     console.log(`📡 Ready to accept uploads`);
+    startDraftCleanupScheduler();
 });

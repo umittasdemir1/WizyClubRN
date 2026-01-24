@@ -9,7 +9,6 @@ import * as SplashScreen from 'expo-splash-screen';
 import { SystemBars } from 'react-native-edge-to-edge';
 import { useThemeStore } from '../src/presentation/store/useThemeStore';
 import { useAuthStore } from '../src/presentation/store/useAuthStore';
-import { useDraftCleanup } from '../src/presentation/hooks/useDraftCleanup';
 import { SessionLogService } from '../src/core/services/SessionLogService';
 import { COLORS, LIGHT_COLORS } from '../src/core/constants';
 import { useEffect, useRef } from 'react';
@@ -42,9 +41,6 @@ function RootNavigator() {
 
     // Keep the screen awake during video playback/app usage
     useKeepAwake();
-
-    // Cleanup expired drafts periodically
-    useDraftCleanup();
 
     useEffect(() => {
         // Initialize auth state on app start
