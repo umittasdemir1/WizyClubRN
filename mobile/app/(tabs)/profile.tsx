@@ -14,7 +14,7 @@ import {
   Animated as RNAnimated,
   Easing,
 } from 'react-native';
-import PagerView from 'react-native-pager-view';
+import PagerView from '../../src/presentation/components/shared/PagerView';
 import Video from 'react-native-video';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
@@ -661,7 +661,7 @@ export default function ProfileScreen() {
   const btnEditText = textPrimary;
 
   // PagerView States
-  const pagerRef = useRef<PagerView>(null);
+  const pagerRef = useRef<React.ElementRef<typeof PagerView>>(null);
   const [activeTab, setActiveTab] = useState(0);
 
   // Current User as Domain Entity

@@ -10,7 +10,7 @@ import { StoryHeader } from './StoryHeader';
 import { StoryActions } from './StoryActions';
 import { FlyingEmoji } from './FlyingEmoji';
 import { useRouter } from 'expo-router';
-import PagerView from 'react-native-pager-view';
+import PagerView from '../shared/PagerView';
 import { COLORS } from '../../../core/constants';
 import { useStoryStore } from '../../store/useStoryStore';
 import { StoryRepositoryImpl } from '../../../data/repositories/StoryRepositoryImpl';
@@ -38,7 +38,7 @@ interface StoryViewerProps {
 export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: StoryViewerProps) {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const pagerRef = useRef<PagerView>(null);
+    const pagerRef = useRef<React.ElementRef<typeof PagerView>>(null);
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
     const [isPaused, setIsPaused] = useState(false);
     const [isLiked, setIsLiked] = useState(stories[initialIndex]?.isLiked || false);

@@ -10,7 +10,7 @@ import {
   Dimensions,
   ActivityIndicator,
 } from 'react-native';
-import PagerView from 'react-native-pager-view';
+import PagerView from '../../src/presentation/components/shared/PagerView';
 import Video from 'react-native-video';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { SystemBars } from 'react-native-edge-to-edge';
@@ -218,7 +218,7 @@ export default function UserProfileScreen() {
   const videosData = safeVideos.map(v => ({ id: v.id, thumbnail: v.thumbnailUrl, views: v.likesCount?.toString() || '0', videoUrl: v.videoUrl }));
   const tagsData: any[] = [];
 
-  const pagerRef = useRef<PagerView>(null);
+  const pagerRef = useRef<React.ElementRef<typeof PagerView>>(null);
   const [activeTab, setActiveTab] = useState(0);
   const gridItemSize = Math.floor((SCREEN_WIDTH - 8) / 3);
   const gridItemHeight = gridItemSize * 1.25; // 4:5 ratio

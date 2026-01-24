@@ -25,7 +25,6 @@ import {
     Text,
     StyleSheet,
     Pressable,
-    ActivityIndicator,
     Dimensions,
 } from 'react-native';
 import Animated, {
@@ -133,7 +132,6 @@ export const ActiveVideoOverlay = memo(function ActiveVideoOverlay({
     const showTapIndicator = !!tapIndicator && !hasError;
     const showReplayIcon = isFinished && !hasError && !showTapIndicator;
     const showPlayPauseIcon = showTapIndicator || showReplayIcon;
-    const showLoading = isLoading && !hasError;
 
     // ========================================================================
     // Animated styles
@@ -209,12 +207,7 @@ export const ActiveVideoOverlay = memo(function ActiveVideoOverlay({
                     </View>
                 )}
 
-                {/* Loading Indicator */}
-                {showLoading && (
-                    <View style={styles.iconContainer} pointerEvents="none">
-                        <ActivityIndicator size="large" color="#FFFFFF" />
-                    </View>
-                )}
+                {/* Loading Indicator - Removed */}
 
                 {/* Error Overlay */}
                 {hasError && (
