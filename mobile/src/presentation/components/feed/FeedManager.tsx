@@ -70,6 +70,7 @@ import { FeedPrefetchService } from '../../../data/services/FeedPrefetchService'
 
 // New architecture imports
 import { VideoPlayerPool } from './VideoPlayerPool';
+import { BrightnessOverlay } from './BrightnessOverlay';
 import { ActiveVideoOverlay } from './ActiveVideoOverlay';
 import { DoubleTapLike } from './DoubleTapLike';
 
@@ -125,7 +126,7 @@ const ScrollPlaceholder = React.memo(function ScrollPlaceholder({
     video: Video;
     isActive: boolean;
     topInset: number;
-    onDoubleTap: () => void;
+    onDoubleTap: (videoId: string) => void;
     onSingleTap: () => void;
     onLongPress: (event: any) => void;
     onPressIn: (event: any) => void;
@@ -135,7 +136,7 @@ const ScrollPlaceholder = React.memo(function ScrollPlaceholder({
 
     return (
         <DoubleTapLike
-            onDoubleTap={onDoubleTap}
+            onDoubleTap={() => onDoubleTap(video.id)}
             onSingleTap={onSingleTap}
             onLongPress={onLongPress}
             onPressIn={onPressIn}
@@ -659,14 +660,15 @@ export const FeedManager = ({
         }
     }, [activeTab, isVideoFinished, togglePause, showTapIndicator]);
 
-    const handleDoubleTapLike = useCallback(() => {
+    const handleDoubleTapLike = useCallback((videoId: string) => {
         if (isScrollingRef.current || Date.now() - lastScrollEndRef.current < 150) return;
-        if (!activeVideo) return;
+        const targetVideo = videosRef.current.find((video) => video.id === videoId);
+        if (!targetVideo) return;
         doubleTapBlockUntilRef.current = Date.now() + 350;
-        if (!activeVideo.isLiked) {
-            toggleLike(activeVideo.id);
+        if (!targetVideo.isLiked) {
+            toggleLike(videoId);
         }
-    }, [activeVideo, toggleLike]);
+    }, [toggleLike]);
 
     const handlePressIn = useCallback((event: any) => {
         lastPressXRef.current = event?.nativeEvent?.pageX ?? event?.nativeEvent?.locationX ?? null;
@@ -1065,6 +1067,7 @@ export const FeedManager = ({
                     onRetryReady={(retryFn) => { videoRetryRef.current = retryFn; }}
                     scrollY={scrollY}
                 />
+                <BrightnessOverlay />
 
                 {/* ============================================================ 
                     Layer 2: FlashList (z-index: 5)

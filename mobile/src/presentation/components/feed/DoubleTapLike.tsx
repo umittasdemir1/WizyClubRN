@@ -42,10 +42,23 @@ const DoubleTapLikeComponent = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
         const containerSizeRef = useRef({ width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
         const lastTapTimeRef = useRef(0);
 
-        // ❌ ANIMATION DISABLED - Only gesture detection
         const performAnimation = useCallback((x?: number, y?: number) => {
-            // Animation disabled for performance
-        }, []);
+            const randomAngle = Math.random() * 30 - 15;
+            rotation.value = randomAngle;
+            if (typeof x === 'number' && typeof y === 'number') {
+                heartX.value = x;
+                heartY.value = y;
+            }
+            opacity.value = 1;
+            scale.value = 0;
+
+            scale.value = withSpring(1.2, { mass: 0.8, damping: 12, stiffness: 300 }, (finished) => {
+                if (finished) {
+                    scale.value = withTiming(0, { duration: 150 });
+                    opacity.value = withTiming(0, { duration: 150 });
+                }
+            });
+        }, [scale, opacity, rotation, heartX, heartY]);
 
         useImperativeHandle(ref, () => ({
             animateLike: performAnimation,
@@ -131,7 +144,11 @@ const DoubleTapLikeComponent = forwardRef<DoubleTapLikeRef, DoubleTapLikeProps>(
                     <View style={styles.tapLayer} />
                 </TouchableWithoutFeedback>
 
-                {/* ❌ HEART ANIMATION DISABLED */}
+                <View style={styles.iconContainer} pointerEvents="none">
+                    <Animated.View style={[styles.heartWrapper, animatedStyle]}>
+                        <AnimatedLikeIcon width={HEART_SIZE} height={HEART_SIZE} color={HEART_COLOR} />
+                    </Animated.View>
+                </View>
             </View>
         );
     }
