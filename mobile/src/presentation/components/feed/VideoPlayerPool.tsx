@@ -163,19 +163,23 @@ const PlayerSlotRenderer = memo(function PlayerSlotRenderer({
 
     return (
         <Animated.View
-            key={`player-${slotIndex}-${slot.videoId}`}
+            // ✅ NO KEY - allows FlashList recycling to work properly
             style={[
                 styles.playerContainer,
                 animatedStyle,
                 { opacity: containerVisible, zIndex: isOnTop ? 3 : 1 },
             ]}
             pointerEvents="none"
+            shouldRasterizeIOS
+            renderToHardwareTextureAndroid
         >
             {/* Video Player - Bottom Layer */}
             <Video
-                key={`video-${slot.videoId}-${slot.retryNonce}`}
+                // ✅ Key only for retry (retryNonce), not for videoId changes
+                key={`video-retry-${slot.retryNonce}`}
                 ref={playerRef}
                 source={sourceWithBuffer}
+                // @ts-ignore - bufferConfig deprecated but still works
                 bufferConfig={bufferConfig}
                 style={[
                     styles.video,
@@ -184,6 +188,7 @@ const PlayerSlotRenderer = memo(function PlayerSlotRenderer({
                         bottom: 0, // Tab navigator handles bottom safe area
                     }
                 ]}
+                // @ts-ignore - useTextureView deprecated, now default on Android
                 useTextureView={Platform.OS === 'android'}
                 resizeMode={slot.resizeMode}
                 paused={!shouldPlay}
@@ -196,15 +201,7 @@ const PlayerSlotRenderer = memo(function PlayerSlotRenderer({
                 onProgress={onProgress}
                 onEnd={onEnd}
                 onReadyForDisplay={onReadyForDisplay}
-                onBuffer={(payload) => {
-                    if (__DEV__) {
-                        console.log('[PlayerPool] onBuffer', {
-                            slotIndex,
-                            videoId: slot.videoId,
-                            isBuffering: payload.isBuffering,
-                        });
-                    }
-                }}
+                // ✅ onBuffer removed for performance
                 playInBackground={false}
                 playWhenInactive={false}
                 ignoreSilentSwitch="ignore"
@@ -364,7 +361,7 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
         const recycleSlots = async () => {
             // Early exit if a newer recycle has started
             if (currentRecycleId !== recycleCounterRef.current) {
-                console.log(`[PlayerPool] Recycle ${currentRecycleId} cancelled (newer recycle started)`);
+                // ✅ Logging disabled for performance
                 return;
             }
 
@@ -508,9 +505,10 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
                 setSlotIfChanged(slotIndex, nextSlot);
             };
 
-            for (let slotIndex = 0; slotIndex < 3; slotIndex++) {
-                await updateSlotForIndex(slotIndex, targetIndices[slotIndex]);
-            }
+            // ✅ FIX: Parallelize slot updates to avoid sequential disk I/O
+            await Promise.all(
+                [0, 1, 2].map(slotIndex => updateSlotForIndex(slotIndex, targetIndices[slotIndex]))
+            );
 
             // Final check before setState
             if (!isMountedRef.current || currentRecycleId !== recycleCounterRef.current) {
@@ -519,9 +517,7 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
 
             if (slotsChanged) {
                 setSlots(newSlots);
-                console.log(`[PlayerPool] Recycled slots #${currentRecycleId}: current=${currentIdx}, next=${nextIdx}, prev=${prevIdx}`);
-            } else {
-                console.log(`[PlayerPool] Skip recycle #${currentRecycleId}: no slot changes`);
+                // ✅ Logging disabled for performance
             }
         };
 
@@ -546,9 +542,7 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
             };
             return newSlots;
         });
-        if (__DEV__) {
-            console.log('[PlayerPool] onLoad', { slotIndex, feedIndex, videoId: slotVideoId });
-        }
+        // ✅ Logging disabled for performance
         onVideoLoaded(feedIndex);
     }, [onVideoLoaded]);
 
@@ -558,15 +552,12 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
 
         const slot = slotsRef.current[slotIndex];
         if (!slot || slot.videoId !== slotVideoId) return;
-        if (__DEV__) {
-            console.log('[PlayerPool] onError', { slotIndex, feedIndex: slot.index, videoId: slotVideoId });
-        }
+
+        // ✅ Keep only critical error logs
         console.error(`[PlayerPool] Slot ${slotIndex} error (retry ${slot.retryCount}/${MAX_RETRIES}):`, error);
-        console.log(`[PlayerPool] Failed source: ${slot.source}`);
 
         // If max retries reached, report error and stop retrying
         if (slot.retryCount >= MAX_RETRIES) {
-            console.log(`[PlayerPool] Max retries reached for slot ${slotIndex}, removing video`);
             onRemoveVideo?.(slot.index);
             return;
         }
@@ -635,9 +626,7 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
         if (!isMountedRef.current) return;
         const slot = slotsRef.current[slotIndex];
         if (!slot || slot.videoId !== slotVideoId) return;
-        if (__DEV__) {
-            console.log('[PlayerPool] onEnd', { slotIndex, feedIndex, videoId: slotVideoId });
-        }
+        // ✅ Logging disabled for performance
         onVideoEnd(feedIndex);
     }, [onVideoEnd]);
 
@@ -656,9 +645,7 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
             }
             return newSlots;
         });
-        if (__DEV__) {
-            console.log('[PlayerPool] onReadyForDisplay', { slotIndex, videoId: slotVideoId });
-        }
+        // ✅ Logging disabled for performance
     }, []);
 
     const activeSlotIndex = slots.findIndex((slot) => slot.index === activeIndex);
@@ -683,9 +670,7 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
             ? isActiveSlot
             : lastActiveSlotIndexRef.current === slotIndex;
 
-        if (__DEV__) {
-            console.log(`[PlayerPool] Slot ${slotIndex}: index=${slot.index}, activeIndex=${activeIndex}, isActive=${isActiveSlot}, shouldPlay=${shouldPlay}, ready=${slot.isReadyForDisplay}`);
-        }
+        // ✅ Remove console.log for performance (blocks JS thread)
 
         return (
             <PlayerSlotRenderer

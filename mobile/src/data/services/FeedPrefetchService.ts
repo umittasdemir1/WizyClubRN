@@ -127,8 +127,7 @@ class FeedPrefetchService {
               return;
             }
             await VideoCacheService.cacheVideo(url);
-            const priorityLabel = priority === 0 ? '🔥' : priority === 1 ? '⚡' : '✅';
-            console.log(`[FeedPrefetch] ${priorityLabel} Cached (p${priority}):`, url.substring(0, 50) + '...');
+            // ✅ Logging disabled for performance
           } catch (error) {
             console.warn('[FeedPrefetch] Failed to cache video:', error);
           } finally {

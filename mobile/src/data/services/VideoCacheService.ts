@@ -2,8 +2,8 @@ import { Directory, File, Paths } from 'expo-file-system/next';
 
 const CACHE_DIRECTORY = new Directory(Paths.cache, 'video-cache');
 const MAX_CACHE_SIZE_BYTES = 500 * 1024 * 1024; // 500 MB limit
-const MAX_MEMORY_CACHE_SIZE = 50; // Store max 50 video paths in memory
-const MEMORY_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+const MAX_MEMORY_CACHE_SIZE = 100; // ✅ Increased from 50 for better hit rate
+const MEMORY_CACHE_TTL = 60 * 60 * 1000; // ✅ Increased to 60 minutes from 30
 
 export class VideoCacheService {
     private static memoryCache = new Map<string, { path: string; expiresAt: number }>();

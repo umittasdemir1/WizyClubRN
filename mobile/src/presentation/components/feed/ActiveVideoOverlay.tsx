@@ -19,7 +19,7 @@
  * - Error/Loading overlays
  */
 
-import React, { memo, useRef, useCallback } from 'react';
+import React, { memo, useRef, useCallback, useEffect } from 'react';
 import {
     View,
     Text,
@@ -31,6 +31,8 @@ import Animated, {
     useAnimatedStyle,
     withTiming,
     SharedValue,
+    useSharedValue,
+    withDelay,
 } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -121,6 +123,20 @@ export const ActiveVideoOverlay = memo(function ActiveVideoOverlay({
     const insets = useSafeAreaInsets();
     const actionButtonsRef = useRef<ActionButtonsRef>(null);
 
+    // Native Thread Delay Logic
+    // 0 = Hidden, 1 = Visible
+    // Controlled purely by Reanimated to avoid JS thread jitter
+    const uiVisibleSV = useSharedValue(0);
+
+    useEffect(() => {
+        // Immediate hide
+        uiVisibleSV.value = 0;
+        
+        // Native delay: Wait 100ms, then fade in over 200ms
+        // This runs on UI thread, guaranteed smooth even if JS is busy
+        uiVisibleSV.value = withDelay(100, withTiming(1, { duration: 200 }));
+    }, [video.id]);
+
     // ========================================================================
     // Derived state
     // ========================================================================
@@ -148,6 +164,19 @@ export const ActiveVideoOverlay = memo(function ActiveVideoOverlay({
     const uiOpacityStyle = useAnimatedStyle(() => ({
         opacity: withTiming(isSeeking ? 0 : 1, { duration: 200 }),
     }), [isSeeking]);
+
+    // Optimize scroll performance & entry animation
+    // 1. Hides instantly when scrolling
+    // 2. Fades in smoothly after delay when video changes
+    const contentOpacityStyle = useAnimatedStyle(() => {
+        const isScrolling = isScrollingSV.value;
+        const visibility = uiVisibleSV.value;
+        
+        // If scrolling, force hide (0). Otherwise use the visibility animation value.
+        return {
+            opacity: isScrolling ? 0 : visibility
+        };
+    }, []);
 
     // ========================================================================
     // Handlers
@@ -244,35 +273,38 @@ export const ActiveVideoOverlay = memo(function ActiveVideoOverlay({
                     ]}
                     pointerEvents={isSeeking ? 'none' : 'box-none'}
                 >
-                    {/* Action Buttons (Right side) */}
-                    <ActionButtons
-                        ref={actionButtonsRef}
-                        videoId={video.id}
-                        isLiked={video.isLiked}
-                        likesCount={video.likesCount}
-                        isSaved={video.isSaved}
-                        savesCount={video.savesCount || 0}
-                        sharesCount={video.sharesCount}
-                        shopsCount={video.shopsCount || 0}
-                        onLike={handleLikePress}
-                        onSave={onToggleSave}
-                        onShare={onToggleShare}
-                        onShop={onOpenShopping}
-                        showShop={!!video.brandUrl}
-                        onProfilePress={handleProfilePress}
-                        onPressIn={onActionPressIn}
-                        onPressOut={onActionPressOut}
-                    />
+                    {/* UI Content - Fades out during scroll for performance */}
+                    <Animated.View style={[StyleSheet.absoluteFill, contentOpacityStyle]} pointerEvents="box-none">
+                        {/* Action Buttons (Right side) */}
+                        <ActionButtons
+                            ref={actionButtonsRef}
+                            videoId={video.id}
+                            isLiked={video.isLiked}
+                            likesCount={video.likesCount}
+                            isSaved={video.isSaved}
+                            savesCount={video.savesCount || 0}
+                            sharesCount={video.sharesCount}
+                            shopsCount={video.shopsCount || 0}
+                            onLike={handleLikePress}
+                            onSave={onToggleSave}
+                            onShare={onToggleShare}
+                            onShop={onOpenShopping}
+                            showShop={!!video.brandUrl}
+                            onProfilePress={handleProfilePress}
+                            onPressIn={onActionPressIn}
+                            onPressOut={onActionPressOut}
+                        />
 
-                    {/* Metadata Layer (Bottom left) */}
-                    <MetadataLayer
-                        video={video}
-                        currentUserId={currentUserId}
-                        onAvatarPress={handleProfilePress}
-                        onFollowPress={onToggleFollow}
-                        onReadMorePress={onOpenDescription}
-                        onCommercialTagPress={() => {}}
-                    />
+                        {/* Metadata Layer (Bottom left) */}
+                        <MetadataLayer
+                            video={video}
+                            currentUserId={currentUserId}
+                            onAvatarPress={handleProfilePress}
+                            onFollowPress={onToggleFollow}
+                            onReadMorePress={onOpenDescription}
+                            onCommercialTagPress={() => {}}
+                        />
+                    </Animated.View>
 
                     {/* Video SeekBar (Bottom) */}
                     <VideoSeekBar

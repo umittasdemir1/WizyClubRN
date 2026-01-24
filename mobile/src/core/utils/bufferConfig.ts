@@ -27,17 +27,17 @@ export const getBufferConfig = (
         case NetInfoStateType.wifi:
         case NetInfoStateType.ethernet:
             return {
-                minBufferMs: 1000,
+                minBufferMs: 800,
                 maxBufferMs: 30000,
-                bufferForPlaybackMs: 500,
-                bufferForPlaybackAfterRebufferMs: 1000,
+                bufferForPlaybackMs: 200,  // ✅ Reduced from 500ms for instant start
+                bufferForPlaybackAfterRebufferMs: 800,
             };
         case NetInfoStateType.cellular:
             return {
-                minBufferMs: 1500,
+                minBufferMs: 1000,
                 maxBufferMs: 30000,
-                bufferForPlaybackMs: 800,
-                bufferForPlaybackAfterRebufferMs: 1500,
+                bufferForPlaybackMs: 300,  // ✅ Reduced from 800ms for faster start
+                bufferForPlaybackAfterRebufferMs: 1000,
             };
         case NetInfoStateType.none:
         case NetInfoStateType.unknown:

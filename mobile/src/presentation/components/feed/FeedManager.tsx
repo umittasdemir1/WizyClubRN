@@ -80,13 +80,13 @@ const ITEM_HEIGHT = Dimensions.get('window').height;
 const SAVE_ICON_ACTIVE = '#FFFFFF';
 
 const VIEWABILITY_CONFIG = {
-    itemVisiblePercentThreshold: 60,
-    minimumViewTime: 100,
+    itemVisiblePercentThreshold: 50,  // ✅ Reduced from 60 for faster transitions
+    minimumViewTime: 50,  // ✅ Reduced from 100ms for snappier feel
 };
 
-// ============================================================================
+// ============================================================================ 
 // Types
-// ============================================================================
+// ============================================================================ 
 
 interface FeedManagerProps {
     videos: Video[];
@@ -108,9 +108,9 @@ interface FeedManagerProps {
     isCustomFeed?: boolean;
 }
 
-// ============================================================================
+// ============================================================================ 
 // Scroll Placeholder Component (Minimal, transparent)
-// ============================================================================
+// ============================================================================ 
 
 const ScrollPlaceholder = React.memo(function ScrollPlaceholder({
     video,
@@ -144,11 +144,15 @@ const ScrollPlaceholder = React.memo(function ScrollPlaceholder({
             {content}
         </DoubleTapLike>
     );
+}, (prevProps, nextProps) => {
+    // ✅ Custom comparison: Only re-render if video ID changes
+    // isActive changes don't trigger re-render (videos don't need to know if they're active)
+    return prevProps.video.id === nextProps.video.id;
 });
 
-// ============================================================================
+// ============================================================================ 
 // Main Component
-// ============================================================================
+// ============================================================================ 
 
 export const FeedManager = ({
     videos,
@@ -169,9 +173,9 @@ export const FeedManager = ({
     showStories = true,
     isCustomFeed = false,
 }: FeedManagerProps) => {
-    // ========================================================================
+    // ======================================================================== 
     // Store subscriptions
-    // ========================================================================
+    // ======================================================================== 
     const setActiveVideo = useActiveVideoStore((state) => state.setActiveVideo);
     const activeVideoId = useActiveVideoStore((state) => state.activeVideoId);
     const activeIndex = useActiveVideoStore((state) => state.activeIndex);
@@ -185,9 +189,9 @@ export const FeedManager = ({
     const viewingMode = useActiveVideoStore((state) => state.viewingMode);
     const setPlaybackRate = useActiveVideoStore((state) => state.setPlaybackRate);
 
-    // ========================================================================
+    // ======================================================================== 
     // SharedValues for video/UI sync (0ms latency)
-    // ========================================================================
+    // ======================================================================== 
     const currentTimeSV = useSharedValue(0);
     const durationSV = useSharedValue(0);
     const isScrollingSV = useSharedValue(false);
@@ -195,22 +199,22 @@ export const FeedManager = ({
 
     const scrollHandler = useAnimatedScrollHandler({
         onScroll: (event: any) => {
+            // ✅ FIX #4: Only update scrollY (critical for video positioning)
+            // All other state updates moved to JS callbacks to reduce worklet load
             scrollY.value = event.contentOffset.y;
         },
         onBeginDrag: () => {
             isScrollingSV.value = true;
         },
-        onEndDrag: () => {
-            isScrollingSV.value = false;
-        },
         onMomentumEnd: () => {
+            // ✅ Simplified: Only momentum end matters for scroll state
             isScrollingSV.value = false;
         },
-    });
+    }, []);
 
-    // ========================================================================
+    // ======================================================================== 
     // Local state
-    // ========================================================================
+    // ======================================================================== 
     const [tapIndicator, setTapIndicator] = useState<null | 'play' | 'pause'>(null);
     const [activeTab, setActiveTab] = useState<'stories' | 'foryou'>('foryou');
     const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
@@ -225,9 +229,9 @@ export const FeedManager = ({
     const [retryCount, setRetryCount] = useState(0);
     const [rateLabel, setRateLabel] = useState<string | null>(null);
 
-    // ========================================================================
+    // ======================================================================== 
     // Refs
-    // ========================================================================
+    // ======================================================================== 
     const listRef = useRef<any>(null);
     const descriptionSheetRef = useRef<BottomSheet>(null);
     const moreOptionsSheetRef = useRef<BottomSheet>(null);
@@ -262,9 +266,9 @@ export const FeedManager = ({
     const saveToastOpacity = useRef(new RNAnimated.Value(0)).current;
     const saveToastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // ========================================================================
+    // ======================================================================== 
     // Hooks
-    // ========================================================================
+    // ======================================================================== 
     const insets = useSafeAreaInsets();
     const netInfo = useNetInfo();
     const router = useRouter();
@@ -298,9 +302,9 @@ export const FeedManager = ({
         }
     }, [isPaused, activeIndex, activeVideoId]);
 
-    // ========================================================================
+    // ======================================================================== 
     // Derived state
-    // ========================================================================
+    // ======================================================================== 
     const currentUserId = user?.id;
     const activeVideo = useMemo(
         () => videos.find((v) => v.id === activeVideoId) || null,
@@ -327,9 +331,9 @@ export const FeedManager = ({
 
     const hasUnseenStories = storyUsers.some((u: any) => u.hasUnseenStory);
 
-    // ========================================================================
+    // ======================================================================== 
     // Effects
-    // ========================================================================
+    // ======================================================================== 
 
     // Keep videosRef in sync
     useEffect(() => {
@@ -492,9 +496,9 @@ export const FeedManager = ({
         autoAdvanceGuardRef.current = null;
     }, [activeVideoId, viewingMode]);
 
-    // ========================================================================
+    // ======================================================================== 
     // Callbacks - VideoPlayerPool
-    // ========================================================================
+    // ======================================================================== 
 
     const handleVideoLoaded = useCallback((index: number) => {
         // Video loaded successfully - clear any loading/error states
@@ -610,9 +614,9 @@ export const FeedManager = ({
         }
     }, [deleteVideo]);
 
-    // ========================================================================
+    // ======================================================================== 
     // Callbacks - UI Interactions
-    // ========================================================================
+    // ======================================================================== 
 
     const showTapIndicator = useCallback((type: 'play' | 'pause') => {
         if (tapIndicatorTimeoutRef.current) clearTimeout(tapIndicatorTimeoutRef.current);
@@ -718,9 +722,9 @@ export const FeedManager = ({
         videoRetryRef.current?.();
     }, []);
 
-    // ========================================================================
+    // ======================================================================== 
     // Callbacks - Actions
-    // ========================================================================
+    // ======================================================================== 
 
     const handleToggleLike = useCallback(() => {
         if (activeVideo) toggleLike(activeVideo.id);
@@ -769,7 +773,7 @@ export const FeedManager = ({
             Alert.alert('Link bulunamadı', 'Bu video için bir alışveriş linki yok.');
             return;
         }
-        const url = activeVideo.brandUrl.match(/^https?:\/\//)
+        const url = activeVideo.brandUrl.match(/^https?:\/\/./)
             ? activeVideo.brandUrl
             : `https://${activeVideo.brandUrl}`;
         openInAppBrowser(url);
@@ -796,9 +800,9 @@ export const FeedManager = ({
         handleDeletePress();
     }, [handleDeletePress]);
 
-    // ========================================================================
+    // ======================================================================== 
     // Callbacks - Story/Tab
-    // ========================================================================
+    // ======================================================================== 
 
     const handleStoryPress = useCallback(() => {
         setActiveTab('stories');
@@ -822,9 +826,9 @@ export const FeedManager = ({
         router.push(`/story/${userId}`);
     }, [router]);
 
-    // ========================================================================
+    // ======================================================================== 
     // Callbacks - Toast
-    // ========================================================================
+    // ======================================================================== 
 
     const showSaveToast = useCallback((message: string) => {
         setSaveToastMessage(message);
@@ -864,9 +868,9 @@ export const FeedManager = ({
         }, 2000);
     }, [saveToastOpacity, saveToastTranslateY]);
 
-    // ========================================================================
+    // ======================================================================== 
     // Callbacks - Scroll
-    // ========================================================================
+    // ======================================================================== 
 
     const getPrefetchIndices = useCallback((newIndex: number) => {
         const now = Date.now();
@@ -904,11 +908,15 @@ export const FeedManager = ({
                     setActiveVideo(newId, newIndex);
                     setActiveTab('foryou');
                     setCleanScreen(false);
-                    FeedPrefetchService.getInstance().queueVideos(
-                        videosRef.current,
-                        getPrefetchIndices(newIndex),
-                        newIndex
-                    );
+
+                    // ✅ Defer prefetch to avoid blocking scroll
+                    setTimeout(() => {
+                        FeedPrefetchService.getInstance().queueVideos(
+                            videosRef.current,
+                            getPrefetchIndices(newIndex),
+                            newIndex
+                        );
+                    }, 0);
                 }
             }
         },
@@ -928,9 +936,9 @@ export const FeedManager = ({
         }
     }, [videos.length]);
 
-    // ========================================================================
+    // ======================================================================== 
     // Render helpers
-    // ========================================================================
+    // ======================================================================== 
 
     const renderItem = useCallback(
         ({ item }: { item: Video }) => {
@@ -962,16 +970,16 @@ export const FeedManager = ({
         );
     }, [isLoadingMore]);
 
-    // ========================================================================
+    // ======================================================================== 
     // UI opacity animation (for seeking)
-    // ========================================================================
+    // ======================================================================== 
     const uiOpacityStyle = useAnimatedStyle(() => ({
         opacity: withTiming(isSeeking ? 0 : 1, { duration: 200 }),
     }), [isSeeking]);
 
-    // ========================================================================
+    // ======================================================================== 
     // Loading state
-    // ========================================================================
+    // ======================================================================== 
 
     if (isLoading && videos.length === 0) {
         return (
@@ -1027,9 +1035,9 @@ export const FeedManager = ({
         );
     }
 
-    // ========================================================================
+    // ======================================================================== 
     // Main render
-    // ========================================================================
+    // ======================================================================== 
 
     return (
         <SwipeWrapper
@@ -1038,7 +1046,7 @@ export const FeedManager = ({
             disabled={isCustomFeed}
         >
             <View style={styles.container}>
-                {/* ============================================================
+                {/* ============================================================ 
                     Layer 1: VideoPlayerPool (z-index: 1)
                     3 pre-created players, zero creation during scroll
                     ============================================================ */}
@@ -1058,7 +1066,7 @@ export const FeedManager = ({
                     scrollY={scrollY}
                 />
 
-                {/* ============================================================
+                {/* ============================================================ 
                     Layer 2: FlashList (z-index: 5)
                     Transparent scroll detection - MUST be above VideoPlayerPool
                     ============================================================ */}
@@ -1069,11 +1077,19 @@ export const FeedManager = ({
                         data={videos}
                         renderItem={renderItem}
                         estimatedItemSize={ITEM_HEIGHT}
+                        // ✅ FIX #1: Pre-calculate all item layouts (eliminates layout thrashing)
+                        overrideItemLayout={(layout, _item, _index) => {
+                            layout.size = ITEM_HEIGHT;
+                        }}
                         keyExtractor={keyExtractor}
-                        pagingEnabled
-                        decelerationRate="fast"
+                        // ✅ FIX #5: Faster cell recycling for smoother scroll
+                        updateCellsBatchingPeriod={16}  // 1 frame at 60fps
+                        // ✅ FIX #6: TikTok-style snap - only 1 video per swipe
+                        pagingEnabled={false}  // Disable native paging
                         snapToInterval={ITEM_HEIGHT}
                         snapToAlignment="start"
+                        decelerationRate="fast"
+                        disableIntervalMomentum={true}  // 🔥 Key fix: prevents multi-video skip
                         showsVerticalScrollIndicator={false}
                         viewabilityConfigCallbackPairs={viewabilityConfigCallbackPairs.current}
                         refreshControl={
@@ -1088,21 +1104,15 @@ export const FeedManager = ({
                         onEndReachedThreshold={0.5}
                         ListFooterComponent={renderFooter}
                         removeClippedSubviews={true}
-                        maxToRenderPerBatch={3}
-                        windowSize={5}
+                        maxToRenderPerBatch={1}  // ✅ Reduced from 3 for smoother scroll
+                        windowSize={3}  // ✅ Reduced from 5, matches 3-slot player pool
+                        drawDistance={ITEM_HEIGHT * 1.5}  // ✅ Only render 1.5 screens ahead/behind
                         initialNumToRender={1}
                         bounces={false}
                         overScrollMode="never"
                         scrollEnabled={!isCarouselInteracting}
                         nestedScrollEnabled={true}
                         onScroll={scrollHandler}
-                        onScrollBeginDrag={() => {
-                            isScrollingRef.current = true;
-                        }}
-                        onScrollEndDrag={() => {
-                            isScrollingRef.current = false;
-                            lastScrollEndRef.current = Date.now();
-                        }}
                         onMomentumScrollEnd={(e) => {
                             isScrollingSV.value = false;
                             isScrollingRef.current = false;
@@ -1112,7 +1122,7 @@ export const FeedManager = ({
                     />
                 </View>
 
-                {/* ============================================================
+                {/* ============================================================ 
                     Layer 3: ActiveVideoOverlay (z-index: 50)
                     All UI for active video, decoupled from video layer
                     ============================================================ */}
@@ -1146,7 +1156,7 @@ export const FeedManager = ({
                     />
                 )}
 
-                {/* ============================================================
+                {/* ============================================================ 
                     Layer 4: Global Overlays
                     ============================================================ */}
 
@@ -1214,7 +1224,7 @@ export const FeedManager = ({
                     <Pressable style={styles.touchInterceptor} onPress={handleCloseStoryBar} />
                 )}
 
-                {/* ============================================================
+                {/* ============================================================ 
                     Layer 5: Bottom Sheets & Modals (z-index: 9999)
                     Must be above all other layers
                     ============================================================ */}
@@ -1253,9 +1263,9 @@ export const FeedManager = ({
     );
 };
 
-// ============================================================================
+// ============================================================================ 
 // Styles
-// ============================================================================
+// ============================================================================ 
 
 const styles = StyleSheet.create({
     container: {
