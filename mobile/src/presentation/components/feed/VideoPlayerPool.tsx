@@ -27,6 +27,7 @@ interface PlayerSlot {
     index: number;        // Video index in the feed
     videoId: string;      // Video ID
     source: string;       // Video URL or cached path
+    thumbnailUrl?: string; // ✅ Added thumbnail URL for poster
     position: number;     // Last playback position
     isLoaded: boolean;    // Whether video is ready to play
     isReadyForDisplay: boolean; // Whether video is rendered and ready to show
@@ -61,6 +62,7 @@ const createEmptySlot = (index: number = -1): PlayerSlot => ({
     index,
     videoId: '',
     source: '',
+    thumbnailUrl: undefined,
     position: 0,
     isLoaded: false,
     isReadyForDisplay: false,
@@ -179,6 +181,9 @@ const PlayerSlotRenderer = memo(function PlayerSlotRenderer({
                 key={`video-retry-${slot.retryNonce}`}
                 ref={playerRef}
                 source={sourceWithBuffer}
+                // ✅ Poster support for instant visual feedback
+                poster={slot.thumbnailUrl}
+                posterResizeMode={slot.resizeMode}
                 // @ts-ignore - bufferConfig deprecated but still works
                 bufferConfig={bufferConfig}
                 style={[
@@ -210,6 +215,10 @@ const PlayerSlotRenderer = memo(function PlayerSlotRenderer({
                 progressUpdateInterval={33}
                 automaticallyWaitsToMinimizeStalling={true}
                 shutterColor="transparent"
+                // ✅ Allow background buffering optimization
+                preventsDisplaySleepDuringVideoPlayback={false}
+                // ✅ Force iOS to buffer ahead (5s) even when paused
+                preferredForwardBufferDuration={5}
             />
 
         </Animated.View>
@@ -302,6 +311,7 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
             next[activeSlotIndex] = {
                 ...slot,
                 source: isValidSource(fallbackSource) ? fallbackSource : slot.source,
+                thumbnailUrl: video?.thumbnailUrl,
                 isLoaded: false,
                 isReadyForDisplay: false,
                 hasError: false,
@@ -416,6 +426,7 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
                 a.index === b.index &&
                 a.videoId === b.videoId &&
                 a.source === b.source &&
+                a.thumbnailUrl === b.thumbnailUrl &&
                 a.position === b.position &&
                 a.isLoaded === b.isLoaded &&
                 a.isReadyForDisplay === b.isReadyForDisplay &&
@@ -493,6 +504,7 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
                     index: targetIdx,
                     videoId: video.id,
                     source: preservedSource ?? (isValidSource(source) ? source : ''),
+                    thumbnailUrl: video.thumbnailUrl, // ✅ Preserve thumbnail
                     position: isSameVideo ? preserved!.position : 0,
                     isLoaded: isSameVideo ? preserved!.isLoaded : false,
                     isReadyForDisplay: isSameVideo ? preserved!.isReadyForDisplay : false,
@@ -577,6 +589,7 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
                     newSlots[slotIndex] = {
                         ...newSlots[slotIndex],
                         source: videoUrl && isValidSource(videoUrl) ? videoUrl : '',
+                        thumbnailUrl: newSlots[slotIndex].thumbnailUrl,
                         retryCount: newSlots[slotIndex].retryCount + 1,
                         hasError: false,
                     };
@@ -598,7 +611,6 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
                 newSlots[slotIndex] = {
                     ...newSlots[slotIndex],
                     hasError: false,
-                    isLoaded: false,
                     isReadyForDisplay: false,
                     retryCount: newSlots[slotIndex].retryCount + 1,
                     retryNonce: newSlots[slotIndex].retryNonce + 1,

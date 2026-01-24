@@ -28,8 +28,9 @@ class FeedPrefetchService {
     this.networkType = type;
     const isFast =
       type === NetInfoStateType.wifi || type === NetInfoStateType.ethernet;
-    this.maxParallelDownloads = isFast ? 2 : 1;
-    this.maxQueueSize = isFast ? 20 : 12;
+    // 🚀 Aggressive prefetching for instant playback
+    this.maxParallelDownloads = isFast ? 3 : 2; // Increased from 2/1
+    this.maxQueueSize = isFast ? 30 : 15;       // Increased from 20/12
   }
 
   /**
