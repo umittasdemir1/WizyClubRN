@@ -5,6 +5,7 @@ import { StoryRepositoryImpl } from '../../data/repositories/StoryRepositoryImpl
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useStoryStore } from '../store/useStoryStore';
 import { useAuthStore } from '../store/useAuthStore';
+import { logStory, LogCode } from '@/core/services/Logger';
 
 export function useStoryViewer(userId?: string) {
     const [stories, setStories] = useState<Story[]>([]);
@@ -79,7 +80,7 @@ export function useStoryViewer(userId?: string) {
 
                 // Set stories for current user
                 const userStories = usersMap.get(userId)?.stories || [];
-                console.log(`[StoryViewer] Loaded ${userStories.length} stories for user: ${userId}`);
+                logStory(LogCode.STORY_LOADED, 'Stories loaded for user', { userId, count: userStories.length });
                 setStories(userStories);
 
                 // Handle initial index (e.g. starting from last story when swiping back)

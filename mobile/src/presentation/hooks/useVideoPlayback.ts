@@ -7,6 +7,7 @@ import { SupabaseVideoDataSource } from '../../data/datasources/SupabaseVideoDat
 import { useAuthStore } from '../store/useAuthStore';
 import { PerformanceLogger } from '../../core/services/PerformanceLogger';
 import { VideoCacheService } from '../../data/services/VideoCacheService';
+import { LogCode, logVideo, logError, logSystem } from '@/core/services/Logger';
 
 const videoDataSource = new SupabaseVideoDataSource();
 
@@ -14,7 +15,7 @@ let ScreenOrientation: any = null;
 try {
     ScreenOrientation = require('expo-screen-orientation');
 } catch (e) {
-    console.log('[useVideoPlayback] expo-screen-orientation not available (native build required)');
+    logSystem(LogCode.WARNING_IGNORED, 'expo-screen-orientation not available (native build required)');
 }
 
 const MAX_LOOPS = 2;
@@ -109,7 +110,7 @@ export function useVideoPlayback({
     useEffect(() => {
         if (!shouldLoad) return;
         if (isActive) {
-            console.log(`[VideoTransition] ⏱️ Video ${video.id} became ACTIVE at ${Date.now()}`);
+            logVideo(LogCode.VIDEO_PLAYBACK_START, 'Video became active', { videoId: video.id, timestamp: Date.now() });
             videoRef.current?.seek(0);
             currentTimeSV.value = 0;
             setIsFinished(false);
@@ -117,7 +118,7 @@ export function useVideoPlayback({
             const userId = useAuthStore.getState().user?.id;
             if (userId && video.id) {
                 videoDataSource.recordVideoView(video.id, userId).catch((err) => {
-                    console.error('[VideoLayer] recordVideoView error:', err);
+                    logError(LogCode.ERROR_CAUGHT, 'Failed to record video view', err);
                 });
             }
         }
@@ -156,7 +157,7 @@ export function useVideoPlayback({
             // Unlock orientation if needed
             if (ScreenOrientation) {
                 ScreenOrientation.unlockAsync?.().catch((err: any) => {
-                    console.log('[useVideoPlayback] Orientation unlock skipped:', err.message);
+                    logSystem(LogCode.WARNING_IGNORED, 'Orientation unlock skipped', { error: err.message });
                 });
             }
         };
@@ -181,16 +182,16 @@ export function useVideoPlayback({
     }, [durationSV, onCachedSourceLoaded, onResizeModeChange, video.id, videoSource]);
 
     const handleError = useCallback(async (error: OnVideoErrorData) => {
-        console.error(`[VideoLayer] Error playing video ${video.id}:`, error);
+        logError(LogCode.VIDEO_PLAYBACK_ERROR, 'Error playing video', { videoId: video.id, error });
 
         if (retryCount >= MAX_RETRIES) {
-            console.log(`[VideoLayer] Max retries (${MAX_RETRIES}) reached for ${video.id}. Removing from feed.`);
+            logVideo(LogCode.VIDEO_LOAD_ERROR, 'Max retries reached, removing from feed', { videoId: video.id, maxRetries: MAX_RETRIES });
             onRemoveVideo?.();
             return;
         }
 
         if (videoSource?.uri?.startsWith('file://')) {
-            console.warn(`[VideoLayer] Cache file failed for ${video.id}. Deleting corrupt cache and falling back to Network.`);
+            logError(LogCode.CACHE_ERROR, 'Cache file failed, falling back to network', { videoId: video.id });
             await VideoCacheService.deleteCachedVideo(video.videoUrl);
             onUseNetworkSource?.();
             setHasError(false);
@@ -198,8 +199,7 @@ export function useVideoPlayback({
             return;
         }
 
-        console.error(`[VideoLayer] Faulty URL:`, video.videoUrl);
-        console.error(`[VideoLayer] Current Source:`, videoSource);
+        logError(LogCode.VIDEO_LOAD_ERROR, 'Faulty video source', { videoUrl: video.videoUrl, source: videoSource });
         setHasError(true);
     }, [video.id, video.videoUrl, videoSource, retryCount, onRemoveVideo, onUseNetworkSource]);
 
@@ -219,15 +219,15 @@ export function useVideoPlayback({
 
     const handleEnd = useCallback(() => {
         loopCount.current += 1;
-        console.log(`[Loop] 🔄 Video ${video.id} ended, loop ${loopCount.current}/${MAX_LOOPS}`);
+        logVideo(LogCode.VIDEO_PLAYBACK_PAUSE, 'Video ended', { videoId: video.id, loop: loopCount.current, maxLoops: MAX_LOOPS });
 
         if (loopCount.current >= maxLoops) {
-            console.log(`[Loop] ✅ Max loops reached, showing replay icon`);
+            logVideo(LogCode.VIDEO_PLAYBACK_PAUSE, 'Max loops reached, showing replay icon', { videoId: video.id });
             setIsFinished(true);
             clearVideoPosition(video.id);
             onVideoEnd?.();
         } else {
-            console.log(`[Loop] ⏪ Looping video from start`);
+            logVideo(LogCode.VIDEO_PLAYBACK_START, 'Looping video from start', { videoId: video.id });
             videoRef.current?.seek(0);
         }
     }, [onVideoEnd, video.id, maxLoops]);

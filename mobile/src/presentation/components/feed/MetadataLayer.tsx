@@ -3,6 +3,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Video } from '../../../domain/entities/Video';
 import { Avatar } from '../shared/Avatar';
 import { VerifiedBadge } from '../shared/VerifiedBadge';
+import { textShadowStyle } from '@/core/utils/shadow';
 
 interface MetadataLayerProps {
     video: Video;
@@ -137,16 +138,12 @@ const styles = StyleSheet.create({
         color: 'white',
         fontWeight: '700',
         fontSize: 15,
-        textShadowColor: 'rgba(0, 0, 0, 0.5)',
-        textShadowOffset: { width: 1, height: 1 },
-        textShadowRadius: 2,
+        ...textShadowStyle('rgba(0, 0, 0, 0.5)', { width: 1, height: 1 }, 2),
     },
     handleText: {
         color: 'rgba(255, 255, 255, 0.7)',
         fontSize: 12,
-        textShadowColor: 'rgba(0, 0, 0, 0.5)',
-        textShadowOffset: { width: 1, height: 1 },
-        textShadowRadius: 2,
+        ...textShadowStyle('rgba(0, 0, 0, 0.5)', { width: 1, height: 1 }, 2),
         marginTop: -2,
     },
     verifiedBadge: {
@@ -177,9 +174,7 @@ const styles = StyleSheet.create({
         color: 'white',
         fontSize: 14,
         lineHeight: 20,
-        textShadowColor: 'rgba(0, 0, 0, 0.5)',
-        textShadowOffset: { width: 1, height: 1 },
-        textShadowRadius: 2,
+        ...textShadowStyle('rgba(0, 0, 0, 0.5)', { width: 1, height: 1 }, 2),
     },
     readMoreInline: {
         color: 'rgba(255,255,255,0.8)',

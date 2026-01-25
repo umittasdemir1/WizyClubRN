@@ -1,6 +1,7 @@
 import React from 'react';
 import { ScrollView, Text, TouchableOpacity, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { shadowStyle } from '@/core/utils/shadow';
 
 interface FilterBarProps {
     categories: string[];
@@ -116,11 +117,7 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         borderRadius: 22,
         // Glow effect
-        shadowColor: '#FF3B30',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.45,
-        shadowRadius: 12,
-        elevation: 8,
+        ...shadowStyle({ color: '#FF3B30', offset: { width: 0, height: 6 }, opacity: 0.45, radius: 12, elevation: 8 }),
     },
     activeText: {
         color: '#FFFFFF',
@@ -144,11 +141,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255, 255, 255, 0.7)',
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.9)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-        elevation: 3,
+        ...shadowStyle({ color: '#000', offset: { width: 0, height: 2 }, opacity: 0.08, radius: 8, elevation: 3 }),
     },
 
     // Text Styles

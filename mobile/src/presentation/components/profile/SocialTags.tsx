@@ -3,6 +3,8 @@ import { View, StyleSheet, TouchableOpacity, Linking } from 'react-native';
 import { FontAwesome6 } from '@expo/vector-icons';
 
 import { User } from '../../../domain/entities/User';
+import { logError, LogCode } from '@/core/services/Logger';
+import { shadowStyle } from '@/core/utils/shadow';
 
 interface SocialTagsProps {
     isDark: boolean;
@@ -39,12 +41,10 @@ export const SocialTags: React.FC<SocialTagsProps> = ({ isDark, user }) => {
     ].filter(link => link.url && link.url.trim() !== '');
 
     const openLink = async (url: string | undefined) => {
-        if (!url) return;
+        let targetUrl = url?.trim() || '';
+        if (!targetUrl) return;
 
         try {
-            // Trim whitespace
-            let targetUrl = url.trim();
-
             // If no protocol is present, basic check for common patterns or just prepend https://
             if (!targetUrl.match(/^[a-zA-Z]+:\/\//)) {
                 targetUrl = `https://${targetUrl}`;
@@ -54,10 +54,10 @@ export const SocialTags: React.FC<SocialTagsProps> = ({ isDark, user }) => {
             if (supported) {
                 await Linking.openURL(targetUrl);
             } else {
-                console.error("Don't know how to open URI: " + targetUrl);
+                logError(LogCode.ERROR_NAVIGATION, 'Cannot open URL - unsupported protocol', { url: targetUrl });
             }
         } catch (error) {
-            console.error('Error opening URL:', error);
+            logError(LogCode.ERROR_NAVIGATION, 'Error opening URL', { error, url: targetUrl });
         }
     };
 
@@ -101,10 +101,6 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff', // Solid white for the 3D effect
         borderWidth: 1,
         // 3D Glass Effect (Same as brand logos)
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 3,
-        elevation: 4,
+        ...shadowStyle({ color: '#000', offset: { width: 0, height: 2 }, opacity: 0.2, radius: 3, elevation: 4 }),
     },
 });

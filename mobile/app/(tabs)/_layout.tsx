@@ -62,7 +62,6 @@ export default function TabLayout() {
             screenOptions={{
                 headerShown: false,
                 lazy: true,
-                detachInactiveScreens: true,
                 tabBarStyle: {
                     backgroundColor: tabBarBackground,
                     borderTopWidth: 0,

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Avatar } from '../shared/Avatar';
 import { AdvancedStoryRing } from '../shared/AdvancedStoryRing';
 import { useStoryStore } from '../../store/useStoryStore';
+import { shadowStyle } from '@/core/utils/shadow';
 
 interface ProfileStatsProps {
   userId?: string;
@@ -119,10 +120,6 @@ const styles = StyleSheet.create({
     height: 90,
     borderRadius: 45,
     overflow: 'hidden',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    ...shadowStyle({ color: '#000', offset: { width: 0, height: 2 }, opacity: 0.1, radius: 4, elevation: 5 }),
   },
 });

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Draft } from '../../domain/entities/Draft';
 import { DraftRepositoryImpl } from '../../data/repositories/DraftRepositoryImpl';
+import { LogCode, logData, logError } from '@/core/services/Logger';
 
 interface DraftState {
   drafts: Draft[];
@@ -34,7 +35,7 @@ export const useDraftStore = create<DraftState>((set, get) => ({
       const drafts = await repository.getDrafts(userId);
       set({ drafts, isLoading: false });
     } catch (error: any) {
-      console.error('[DraftStore] Error fetching drafts:', error);
+      logError(LogCode.REPO_ERROR, 'Error fetching drafts', error);
       set({ error: error.message, isLoading: false });
     }
   },
@@ -50,7 +51,7 @@ export const useDraftStore = create<DraftState>((set, get) => ({
       }));
       return newDraft;
     } catch (error: any) {
-      console.error('[DraftStore] Error creating draft:', error);
+      logError(LogCode.DRAFT_SAVE, 'Error creating draft', error);
       set({ error: error.message, isLoading: false });
       throw error;
     }
@@ -63,7 +64,7 @@ export const useDraftStore = create<DraftState>((set, get) => ({
         drafts: state.drafts.map((d) => (d.id === draftId ? updatedDraft : d)),
       }));
     } catch (error: any) {
-      console.error('[DraftStore] Error updating draft:', error);
+      logError(LogCode.REPO_ERROR, 'Error updating draft', error);
       set({ error: error.message });
       throw error;
     }
@@ -78,7 +79,7 @@ export const useDraftStore = create<DraftState>((set, get) => ({
         }));
       }
     } catch (error: any) {
-      console.error('[DraftStore] Error deleting draft:', error);
+      logError(LogCode.DRAFT_DELETE, 'Error deleting draft', error);
       set({ error: error.message });
       throw error;
     }

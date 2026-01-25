@@ -1,6 +1,7 @@
 import { supabase } from '../../core/supabase';
 import { User } from '../../domain/entities';
 import { CONFIG } from '../../core/config';
+import { LogCode, logData, logError } from '@/core/services/Logger';
 
 export class SupabaseProfileDataSource {
     async getProfile(userId: string, viewerId?: string): Promise<any> {
@@ -11,7 +12,7 @@ export class SupabaseProfileDataSource {
             .maybeSingle(); // Use maybeSingle instead of single to handle missing profiles gracefully
 
         if (error) {
-            console.error('[SupabaseDataSource] ❌ Profile fetch error:', error);
+            logError(LogCode.DB_QUERY_ERROR, 'Profile fetch error', { userId, error });
             throw error;
         }
 
@@ -67,7 +68,7 @@ export class SupabaseProfileDataSource {
         data.has_stories = hasStories;
         data.has_unseen_story = hasUnseenStory;
 
-        console.log('[SupabaseDataSource] ✅ Profile fetched:', { username: data?.username, hasStories, hasUnseenStory });
+        logData(LogCode.DB_QUERY_SUCCESS, 'Profile fetched successfully', { username: data?.username, hasStories, hasUnseenStory });
         return data;
     }
 
@@ -83,10 +84,10 @@ export class SupabaseProfileDataSource {
             });
 
             if (authError) {
-                console.warn('[SupabaseDataSource] ⚠️ Auth metadata update warning:', authError);
+                logError(LogCode.DB_UPDATE, 'Auth metadata update warning', authError);
                 // Don't throw - profiles table update is more critical
             } else {
-                console.log('[SupabaseDataSource] ✅ Auth metadata updated:', authMetadata);
+                logData(LogCode.DB_UPDATE, 'Auth metadata updated successfully', authMetadata);
             }
         }
 
@@ -110,7 +111,7 @@ export class SupabaseProfileDataSource {
             .maybeSingle();
 
         if (error) {
-            console.error('[SupabaseDataSource] ❌ Username check error:', error);
+            logError(LogCode.DB_QUERY_ERROR, 'Username check error', { username, error });
             throw error;
         }
 
@@ -119,7 +120,7 @@ export class SupabaseProfileDataSource {
     }
 
     async uploadAvatar(userId: string, fileUri: string): Promise<string> {
-        console.log(`🚀 [UPLOAD] Starting avatar upload for: ${userId}`);
+        logData(LogCode.API_REQUEST_START, 'Starting avatar upload', { userId });
 
         const formData = new FormData();
         formData.append('userId', userId);
@@ -138,17 +139,17 @@ export class SupabaseProfileDataSource {
 
         if (!uploadResponse.ok) {
             const errorText = await uploadResponse.text();
-            console.error(`❌ [UPLOAD] Server error: ${errorText}`);
+            logError(LogCode.API_REQUEST_ERROR, 'Avatar upload server error', { status: uploadResponse.status, errorText });
             throw new Error(`Avatar upload failed: ${errorText}`);
         }
 
         const result = await uploadResponse.json();
         if (!result.success) {
-            console.error(`❌ [UPLOAD] Response failed: ${result.error}`);
+            logError(LogCode.API_REQUEST_ERROR, 'Avatar upload response failed', { error: result.error });
             throw new Error(result.error || 'Avatar upload failed');
         }
 
-        console.log(`✅ [UPLOAD] Success. URL: ${result.avatarUrl}`);
+        logData(LogCode.API_REQUEST_SUCCESS, 'Avatar upload successful', { avatarUrl: result.avatarUrl });
         return result.avatarUrl;
     }
 

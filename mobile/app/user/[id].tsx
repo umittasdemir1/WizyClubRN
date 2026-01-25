@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import PagerView from '../../src/presentation/components/shared/PagerView';
+import type { PagerViewOnPageSelectedEvent } from 'react-native-pager-view';
 import Video from 'react-native-video';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { SystemBars } from 'react-native-edge-to-edge';
@@ -42,6 +43,8 @@ import { InteractionRepositoryImpl } from '../../src/data/repositories/Interacti
 import { ToggleFollowUseCase } from '../../src/domain/usecases/ToggleFollowUseCase';
 import { useSocialStore } from '../../src/presentation/store/useSocialStore';
 import { VerifiedBadge } from '../../src/presentation/components/shared/VerifiedBadge';
+import { logSocial, logError, logUI, LogCode } from '@/core/services/Logger';
+import { shadowStyle } from '@/core/utils/shadow';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -199,7 +202,7 @@ export default function UserProfileScreen() {
     try {
       await globalToggleFollow(userId, currentUserId);
     } catch (err) {
-      console.error('Follow toggle failed', err);
+      logError(LogCode.SOCIAL_FOLLOW_ERROR, 'Follow toggle failed', { error: err, targetUserId: userId, currentUserId });
     }
   };
 
@@ -230,6 +233,9 @@ export default function UserProfileScreen() {
   const showShopTab = profileUser?.isVerified === true && profileUser?.shopEnabled === true;
 
   const handleTabPress = (index: number) => { setActiveTab(index); pagerRef.current?.setPage(index); };
+
+  const showPreview = (item: any) => setPreviewItem(item);
+  const hidePreview = () => setPreviewItem(null);
 
   const pagerPages = [
     <View key="0">
@@ -264,8 +270,6 @@ export default function UserProfileScreen() {
       pagerRef.current?.setPage(2);
     }
   }, [activeTab, showShopTab]);
-  const showPreview = (item: any) => setPreviewItem(item);
-  const hidePreview = () => setPreviewItem(null);
   const bioLimit = 110;
   const truncatedBio = user.bio.length > bioLimit ? user.bio.substring(0, bioLimit) + '...' : user.bio;
   const [showHeaderAvatar, setShowHeaderAvatar] = useState(false);
@@ -382,7 +386,7 @@ export default function UserProfileScreen() {
               <View style={styles.btnIconOnly}>
                 <AnimatedIconButton
                   icon={ShareIcon}
-                  onPress={() => console.log('Share')}
+                  onPress={() => logUI(LogCode.UI_INTERACTION, 'Share profile button pressed', { userId })}
                   inactiveColor={iconColor}
                   size={28}
                   outlined={true}
@@ -413,7 +417,7 @@ export default function UserProfileScreen() {
           ref={pagerRef}
           style={{ width: '100%', height: activeTab === 0 ? gridHeight : activeTab === 1 ? videosHeight : activeTab === 2 ? tagsHeight : shopHeight }}
           initialPage={0}
-          onPageSelected={(e) => setActiveTab(e.nativeEvent.position)}
+          onPageSelected={(e: PagerViewOnPageSelectedEvent) => setActiveTab(e.nativeEvent.position)}
         >
           {pagerPages}
         </PagerView>
@@ -423,7 +427,7 @@ export default function UserProfileScreen() {
       {/* Overlays & Modals */}
       {previewItem && <PreviewModal item={previewItem} onClose={hidePreview} />}
       <BioBottomSheet ref={bioSheetRef} bio={user.bio} isDark={isDark} />
-      <UserOptionsModal visible={isUserOptionsVisible} username={user.username} onClose={() => setIsUserOptionsVisible(false)} onAction={(type) => console.log('User action:', type)} />
+      <UserOptionsModal visible={isUserOptionsVisible} username={user.username} onClose={() => setIsUserOptionsVisible(false)} onAction={(type) => logUI(LogCode.MODAL_ACTION, 'User options action triggered', { actionType: type, userId })} />
     </View>
   );
 }
@@ -449,6 +453,6 @@ const styles = StyleSheet.create({
   socialClubsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15, marginVertical: 10, width: '100%' },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   previewOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', zIndex: 999 },
-  previewCard: { width: '80%', height: 480, borderRadius: 30, overflow: 'hidden', backgroundColor: '#000', elevation: 20, shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 15, shadowOffset: { width: 0, height: 10 } },
+  previewCard: { width: '80%', height: 480, borderRadius: 30, overflow: 'hidden', backgroundColor: '#000', ...shadowStyle({ color: '#000', offset: { width: 0, height: 10 }, opacity: 0.5, radius: 15, elevation: 20 }) },
   previewVideo: { width: '100%', height: '100%' },
 });

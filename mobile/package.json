@@ -8,7 +8,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "deps:check": "node scripts/deps-check.js",
-    "postinstall": "node scripts/patch-react-native-video.js"
+    "postinstall": "node scripts/patch-react-native-video.js && node scripts/patch-tslib.js"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

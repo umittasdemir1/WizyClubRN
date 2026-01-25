@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
+import { shadowStyle } from '@/core/utils/shadow';
 
 interface RectangularStoryRingProps {
   width: number;
@@ -62,11 +63,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   ringGlow: {
-    shadowColor: '#00C6FF',
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 4,
+    ...shadowStyle({ color: '#00C6FF', offset: { width: 0, height: 0 }, opacity: 0.4, radius: 6, elevation: 4 }),
   },
   inner: {
     flex: 1,

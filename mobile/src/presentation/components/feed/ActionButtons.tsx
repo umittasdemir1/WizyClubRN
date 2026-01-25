@@ -1,5 +1,6 @@
 import React, { memo, useState, useEffect, forwardRef, useImperativeHandle, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { textShadowStyle } from '@/core/utils/shadow';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -361,18 +362,14 @@ const styles = StyleSheet.create({
         color: 'white',
         fontSize: 14,
         fontWeight: '600',
-        textShadowColor: 'rgba(0,0,0,0.8)',
-        textShadowOffset: { width: 1, height: 1 },
-        textShadowRadius: 3,
+        ...textShadowStyle('rgba(0,0,0,0.8)', { width: 1, height: 1 }, 3),
         textAlign: 'center',
     },
     zeroText: {
         color: 'white',
         fontSize: 11,
         fontWeight: '400',
-        textShadowColor: 'rgba(0,0,0,0.8)',
-        textShadowOffset: { width: 1, height: 1 },
-        textShadowRadius: 3,
+        ...textShadowStyle('rgba(0,0,0,0.8)', { width: 1, height: 1 }, 3),
         textAlign: 'center',
     },
 });

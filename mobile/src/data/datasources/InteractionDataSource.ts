@@ -1,4 +1,5 @@
 import { supabase } from '../../core/supabase';
+import { LogCode, logData, logError } from '@/core/services/Logger';
 
 export class InteractionDataSource {
     async toggleLike(userId: string, targetId: string, targetType: 'video' | 'story'): Promise<boolean> {
@@ -13,7 +14,7 @@ export class InteractionDataSource {
             .maybeSingle();
 
         if (error) {
-            console.error('[InteractionDataSource] toggleLike check error:', error);
+            logError(LogCode.DB_QUERY_ERROR, 'toggleLike check error', { userId, targetId, targetType, error });
             throw error;
         }
 
@@ -52,7 +53,7 @@ export class InteractionDataSource {
             .maybeSingle();
 
         if (error) {
-            console.error('[InteractionDataSource] toggleSave check error:', error);
+            logError(LogCode.DB_QUERY_ERROR, 'toggleSave check error', { userId, videoId, error });
             throw error;
         }
 
@@ -65,7 +66,7 @@ export class InteractionDataSource {
                 .eq('video_id', videoId);
 
             if (deleteError) {
-                console.error('[InteractionDataSource] toggleSave delete error:', deleteError);
+                logError(LogCode.DB_DELETE, 'toggleSave delete error', { userId, videoId, deleteError });
                 throw deleteError;
             }
             return false;
@@ -82,7 +83,7 @@ export class InteractionDataSource {
                 // If it already exists (race condition), just return false (as if it was already there)
                 if (insertError.code === '23505') return true;
 
-                console.error('[InteractionDataSource] toggleSave insert error:', insertError);
+                logError(LogCode.DB_INSERT, 'toggleSave insert error', { userId, videoId, insertError });
                 throw insertError;
             }
             return true;

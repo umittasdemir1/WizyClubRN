@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, TextInput, Text } from 'react-native';
 import { Image } from 'expo-image';
+import { shadowStyle, textShadowStyle } from '@/core/utils/shadow';
 import Animated, {
     useAnimatedStyle,
     useAnimatedProps,
@@ -169,11 +170,7 @@ const styles = StyleSheet.create({
         borderColor: '#FFFFFF',      // The requested white color
 
         // 3. SHADOW (Outer Glow)
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.5,
-        shadowRadius: 5,
-        elevation: 10,
+        ...shadowStyle({ color: '#000', offset: { width: 0, height: 4 }, opacity: 0.5, radius: 5, elevation: 10 }),
 
         // 4. LAYOUT
         justifyContent: 'flex-start', // Align to top-left to match image anchor
@@ -194,9 +191,7 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: 'bold',
         fontVariant: ['tabular-nums'],
-        textShadowColor: 'rgba(0, 0, 0, 0.75)', // Small text shadow for readability against video
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 2,
+        ...textShadowStyle('rgba(0, 0, 0, 0.75)', { width: 0, height: 1 }, 2),
         // Hack to make TextInput look like Text
         padding: 0,
         margin: 0,

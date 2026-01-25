@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '../../core/supabase';
 import type { User as SupabaseUser, Session } from '@supabase/supabase-js';
+import { LogCode, logAuth, logError } from '@/core/services/Logger';
 
 interface AuthState {
   user: SupabaseUser | null;
@@ -30,11 +31,12 @@ export const useAuthStore = create<AuthState>((set) => ({
       const { data: { session }, error } = await supabase.auth.getSession();
 
       if (error) {
-        console.error('[AuthStore] Session error:', error);
+        logError(LogCode.AUTH_SESSION_CHECK, 'Session check failed', error);
         set({ user: null, session: null, isLoading: false, isInitialized: true });
         return;
       }
 
+      logAuth(LogCode.AUTH_SESSION_CHECK, 'Session initialized', { userId: session?.user?.id });
       set({
         user: session?.user ?? null,
         session: session ?? null,
@@ -44,11 +46,11 @@ export const useAuthStore = create<AuthState>((set) => ({
 
       // Listen for auth changes
       supabase.auth.onAuthStateChange((_event, session) => {
-        console.log('[AuthStore] Auth state changed:', _event);
+        logAuth(LogCode.AUTH_TOKEN_REFRESH, `Auth state changed: ${_event}`, { userId: session?.user?.id });
         set({ user: session?.user ?? null, session: session ?? null });
       });
     } catch (err) {
-      console.error('[AuthStore] Initialize error:', err);
+      logError(LogCode.SUPABASE_ERROR, 'Auth initialize failed', err);
       set({ user: null, session: null, isLoading: false, isInitialized: true });
     }
   },
@@ -63,7 +65,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       });
 
       if (error) {
-        console.error('[AuthStore] Sign in error:', error);
+        logError(LogCode.AUTH_LOGIN_FAILED, 'Sign in failed', { email, error: error.message });
         let errorMessage = 'Giriş yapılırken bir hata oluştu.';
 
         if (error.message.includes('Invalid login credentials')) {
@@ -76,10 +78,11 @@ export const useAuthStore = create<AuthState>((set) => ({
         return { success: false, error: errorMessage };
       }
 
+      logAuth(LogCode.AUTH_LOGIN_SUCCESS, 'User signed in', { userId: data.user?.id, email });
       set({ user: data.user, session: data.session, isLoading: false, error: null });
       return { success: true };
     } catch (err: any) {
-      console.error('[AuthStore] Sign in error:', err);
+      logError(LogCode.AUTH_LOGIN_FAILED, 'Sign in exception', err);
       const errorMessage = 'Beklenmeyen bir hata oluştu.';
       set({ isLoading: false, error: errorMessage });
       return { success: false, error: errorMessage };
@@ -102,7 +105,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       });
 
       if (error) {
-        console.error('[AuthStore] Sign up error:', error);
+        logError(LogCode.AUTH_LOGIN_FAILED, 'Sign up failed', { email, error: error.message });
         let errorMessage = 'Kayıt olurken bir hata oluştu.';
 
         if (error.message.includes('User already registered')) {
@@ -132,14 +135,16 @@ export const useAuthStore = create<AuthState>((set) => ({
           });
 
         if (profileError) {
-          console.warn('[AuthStore] Profile creation warning:', profileError);
+          logError(LogCode.DB_INSERT, 'Profile creation failed', profileError);
+        } else {
+          logAuth(LogCode.AUTH_LOGIN_SUCCESS, 'User profile created', { userId: data.user.id, username });
         }
       }
 
       set({ isLoading: false, error: null });
       return { success: true };
     } catch (err: any) {
-      console.error('[AuthStore] Sign up error:', err);
+      logError(LogCode.AUTH_LOGIN_FAILED, 'Sign up exception', err);
       const errorMessage = 'Beklenmeyen bir hata oluştu.';
       set({ isLoading: false, error: errorMessage });
       return { success: false, error: errorMessage };
@@ -149,9 +154,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   signOut: async () => {
     try {
       await supabase.auth.signOut();
+      logAuth(LogCode.AUTH_LOGOUT, 'User signed out');
       set({ user: null, error: null });
     } catch (err) {
-      console.error('[AuthStore] Sign out error:', err);
+      logError(LogCode.AUTH_LOGOUT, 'Sign out failed', err);
     }
   },
 

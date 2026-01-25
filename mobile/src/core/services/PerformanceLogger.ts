@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Logger, LogCode, logPerf, logError, logSystem } from './Logger';
 
 interface TransitionMetric {
     videoId: string;
@@ -63,10 +64,11 @@ class PerformanceLoggerService {
 
         // Only log slow transitions (>1000ms) to reduce spam
         if (duration > 1000) {
-            const emoji = this.getPerformanceEmoji(duration, source);
-            console.log(
-                `[Perf] ${emoji} SLOW transition: ${videoId} | ${duration}ms | ${source.toUpperCase()}`
-            );
+            logPerf(LogCode.PERF_SLOW_RENDER, 'Slow video transition detected', {
+                videoId,
+                duration,
+                source,
+            });
         }
 
         // Save to AsyncStorage periodically
@@ -86,7 +88,7 @@ class PerformanceLoggerService {
             metric.duration = metric.endTime - metric.startTime;
             this.completedMetrics.push(metric);
             this.metrics.delete(videoId);
-            console.error(`[Perf] ❌ FAIL transition: ${videoId} | ${error}`);
+            logError(LogCode.VIDEO_LOAD_ERROR, 'Video transition failed', { videoId, error });
         }
     }
 
@@ -145,22 +147,11 @@ class PerformanceLoggerService {
     printStats() {
         const stats = this.getStats();
         if (!stats) {
-            console.log('[Perf] 📊 No metrics collected yet');
+            logPerf(LogCode.PERF_MEASURE_END, 'No performance metrics collected yet');
             return;
         }
 
-        console.log('═══════════════════════════════════════');
-        console.log('[Perf] 📊 PERFORMANCE STATISTICS');
-        console.log('═══════════════════════════════════════');
-        console.log(`Total Transitions: ${stats.total}`);
-        console.log(`Cache Hit Rate:    ${stats.cacheHitRate}`);
-        console.log(`Average Duration:  ${stats.avg}ms`);
-        console.log(`P50 (Median):      ${stats.p50}ms`);
-        console.log(`P95:               ${stats.p95}ms`);
-        console.log(`P99:               ${stats.p99}ms`);
-        console.log(`Min:               ${stats.min}ms`);
-        console.log(`Max:               ${stats.max}ms`);
-        console.log('═══════════════════════════════════════');
+        logPerf(LogCode.PERF_MEASURE_END, 'Performance statistics', stats);
     }
 
     /**
@@ -171,7 +162,7 @@ class PerformanceLoggerService {
             const metricsToSave = this.completedMetrics.slice(-MAX_METRICS);
             await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(metricsToSave));
         } catch (error) {
-            console.error('[Perf] Failed to save metrics:', error);
+            logError(LogCode.ASYNC_STORAGE_ERROR, 'Failed to save performance metrics', error);
         }
     }
 
@@ -183,10 +174,12 @@ class PerformanceLoggerService {
             const saved = await AsyncStorage.getItem(STORAGE_KEY);
             if (saved) {
                 this.completedMetrics = JSON.parse(saved);
-                console.log(`[Perf] Loaded ${this.completedMetrics.length} metrics from storage`);
+                logPerf(LogCode.ASYNC_STORAGE_GET, 'Performance metrics loaded', {
+                    count: this.completedMetrics.length,
+                });
             }
         } catch (error) {
-            console.error('[Perf] Failed to load metrics:', error);
+            logError(LogCode.ASYNC_STORAGE_ERROR, 'Failed to load performance metrics', error);
         }
     }
 
@@ -197,7 +190,7 @@ class PerformanceLoggerService {
         this.metrics.clear();
         this.completedMetrics = [];
         await AsyncStorage.removeItem(STORAGE_KEY);
-        console.log('[Perf] 🧹 All metrics cleared');
+        logSystem(LogCode.STORE_UPDATE, 'All performance metrics cleared');
     }
 
     /**

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Video as VideoEntity } from '../../domain/entities/Video';
 import { VideoCacheService } from '../../data/services/VideoCacheService';
 import { isVideoCacheDisabled } from '../../core/utils/videoCacheToggle';
+import { logCache, LogCode } from '@/core/services/Logger';
 
 interface UseVideoSourceResult {
     videoSource: any;
@@ -49,7 +50,7 @@ export function useVideoSource(video: VideoEntity, shouldLoad: boolean): UseVide
             // Memory cache check (synchronous, instant)
             const memoryCached = VideoCacheService.getMemoryCachedPath(video.videoUrl);
             if (memoryCached) {
-                console.log(`[VideoTransition] 🚀 Memory cache HIT: ${video.id}`);
+                logCache(LogCode.CACHE_HIT, 'Memory cache HIT for video transition', { videoId: video.id });
                 setVideoSource({ uri: memoryCached });
                 setIsSourceReady(true);
                 return;
@@ -59,7 +60,7 @@ export function useVideoSource(video: VideoEntity, shouldLoad: boolean): UseVide
             try {
                 const diskCached = await VideoCacheService.getCachedVideoPath(video.videoUrl);
                 if (!isCancelled && diskCached) {
-                    console.log(`[VideoTransition] ⚡ Disk cache HIT: ${video.id}`);
+                    logCache(LogCode.CACHE_HIT, 'Disk cache HIT for video transition', { videoId: video.id });
                     setVideoSource({ uri: diskCached });
                     setIsSourceReady(true);
                     return;
@@ -70,7 +71,7 @@ export function useVideoSource(video: VideoEntity, shouldLoad: boolean): UseVide
 
             if (isCancelled) return;
 
-            console.log(`[VideoTransition] 🌐 Network source: ${video.id}`);
+            logCache(LogCode.CACHE_MISS, 'Network source for video transition', { videoId: video.id });
             setVideoSource({ uri: video.videoUrl });
             setIsSourceReady(true);
 

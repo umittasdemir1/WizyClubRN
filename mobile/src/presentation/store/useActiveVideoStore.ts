@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { AppState, AppStateStatus } from 'react-native';
 import { useEffect, useRef } from 'react';
+import { logVideo, LogCode } from '@/core/services/Logger';
 // ===================================
 // 🎬 GLOBAL ACTIVE VIDEO STORE
 // ===================================
@@ -120,7 +121,7 @@ export function saveVideoPosition(videoId: string, position: number) {
     // Only save if position is meaningful (> 0.5 sec and not near end)
     if (position > 0.5) {
         videoPositions.set(videoId, position);
-        console.log(`[Position] 💾 Saved: ${videoId} at ${position.toFixed(1)}s`);
+        logVideo(LogCode.VIDEO_POSITION_SAVED, 'Video position saved', { videoId, position: position.toFixed(1) });
     }
 }
 
@@ -221,7 +222,7 @@ export function useVideoPreloader(
 
         // Debug log (development only)
         if (__DEV__) {
-            console.log(`📹 Preload indices: [${indicesToPreload.join(', ')}]`);
+            logVideo(LogCode.VIDEO_PRELOAD_INDICES, 'Video preload indices calculated', { indices: indicesToPreload });
         }
     }, [videos, currentIndex, preloadCount, setPreloadIndices]);
 

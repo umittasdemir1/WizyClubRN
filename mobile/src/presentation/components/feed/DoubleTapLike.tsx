@@ -7,6 +7,7 @@ import Animated, {
     withTiming,
 } from 'react-native-reanimated';
 import LikeIcon from '../../../../assets/icons/doubletablike.svg';
+import { shadowStyle } from '@/core/utils/shadow';
 
 const AnimatedLikeIcon = Animated.createAnimatedComponent(LikeIcon);
 
@@ -174,10 +175,6 @@ const styles = StyleSheet.create({
         zIndex: 999,
     },
     heartWrapper: {
-        shadowColor: '#000000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.5,
-        shadowRadius: 15,
-        elevation: 20,
+        ...shadowStyle({ color: '#000000', offset: { width: 0, height: 8 }, opacity: 0.5, radius: 15, elevation: 20 }),
     },
 });

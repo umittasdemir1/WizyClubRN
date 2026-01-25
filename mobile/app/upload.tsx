@@ -18,6 +18,8 @@ import { X, Zap, ZapOff, Cog, RefreshCcw } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { UploadModal } from '../src/presentation/components/feed/UploadModal';
+import { LogCode, logError, logUI } from '@/core/services/Logger';
+import { textShadowStyle } from '@/core/utils/shadow';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -59,7 +61,7 @@ export default function CameraScreen() {
                         setLastPhoto(albums.assets[0].uri);
                     }
                 } catch (error) {
-                    console.error('Error fetching last photo:', error);
+                    logError(LogCode.MEDIA_PICKER_ERROR, 'Failed to fetch last photo', error);
                 }
             }
         })();
@@ -145,7 +147,7 @@ export default function CameraScreen() {
         if (cameraRef.current) {
             try {
                 const photo = await cameraRef.current.takePictureAsync();
-                console.log('Photo taken:', photo.uri);
+                logUI(LogCode.CAMERA_CAPTURE, 'Photo captured', { width: photo.width, height: photo.height });
                 // Convert photo to ImagePicker.ImagePickerAsset format
                 const photoAsset: ImagePicker.ImagePickerAsset = {
                     uri: photo.uri,
@@ -163,7 +165,7 @@ export default function CameraScreen() {
                 setSelectedAssetsForUpload([photoAsset]);
                 setShowUploadModal(true);
             } catch (error) {
-                console.error('Error taking picture:', error);
+                logError(LogCode.CAMERA_ERROR, 'Failed to take picture', error);
             }
         }
     };
@@ -177,14 +179,14 @@ export default function CameraScreen() {
                 cameraRef.current.stopRecording();
                 setIsRecording(false);
             } catch (error) {
-                console.error('Error stopping recording:', error);
+                logError(LogCode.CAMERA_ERROR, 'Failed to stop recording', error);
             }
         } else {
             // Start recording
             try {
                 setIsRecording(true);
                 const video = await cameraRef.current.recordAsync();
-                console.log('Video recorded:', video.uri);
+                logUI(LogCode.CAMERA_CAPTURE, 'Video recorded', { uri: video.uri });
                 // Convert video to ImagePicker.ImagePickerAsset format
                 const videoAsset: ImagePicker.ImagePickerAsset = {
                     uri: video.uri,
@@ -203,7 +205,7 @@ export default function CameraScreen() {
                 setShowUploadModal(true);
                 setIsRecording(false);
             } catch (error) {
-                console.error('Error recording video:', error);
+                logError(LogCode.CAMERA_ERROR, 'Failed to record video', error);
                 setIsRecording(false);
             }
         }
@@ -228,34 +230,34 @@ export default function CameraScreen() {
                         style={styles.camera}
                         facing={facing}
                         flash={flash}
-                    >
-                        {/* Top Header - Overlay on Camera */}
-                        <View style={[styles.topBar, { paddingTop: 12 }]}>
-                            <Pressable onPress={() => router.back()} style={[styles.iconButton, styles.topIconShiftLeft, styles.topBarLeft]}>
-                                <X color="#FFFFFF" size={32} strokeWidth={1.8} />
-                            </Pressable>
+                    />
 
-                            <View style={styles.topBarCenter}>
-                                {isRecording && (
-                                    <View style={styles.recordingIndicator}>
-                                        <View style={styles.recordingDot} />
-                                        <Text style={styles.recordingText}>Kaydediliyor</Text>
-                                    </View>
+                    {/* Top Header - Overlay on Camera with absolute positioning */}
+                    <View style={[styles.topBar, { paddingTop: 12 }]}>
+                        <Pressable onPress={() => router.back()} style={[styles.iconButton, styles.topIconShiftLeft, styles.topBarLeft]}>
+                            <X color="#FFFFFF" size={32} strokeWidth={1.8} />
+                        </Pressable>
+
+                        <View style={styles.topBarCenter}>
+                            {isRecording && (
+                                <View style={styles.recordingIndicator}>
+                                    <View style={styles.recordingDot} />
+                                    <Text style={styles.recordingText}>Kaydediliyor</Text>
+                                </View>
+                            )}
+                            <Pressable onPress={toggleFlash} style={[styles.iconButton, styles.topIconShift]}>
+                                {flash === 'off' ? (
+                                    <ZapOff color="#FFFFFF" size={30} strokeWidth={2} fill="#FFFFFF" />
+                                ) : (
+                                    <Zap color="#FFD60A" size={30} strokeWidth={2} fill="#FFD60A" />
                                 )}
-                                <Pressable onPress={toggleFlash} style={[styles.iconButton, styles.topIconShift]}>
-                                    {flash === 'off' ? (
-                                        <ZapOff color="#FFFFFF" size={30} strokeWidth={2} fill="#FFFFFF" />
-                                    ) : (
-                                        <Zap color="#FFD60A" size={30} strokeWidth={2} fill="#FFD60A" />
-                                    )}
-                                </Pressable>
-                            </View>
-
-                            <Pressable onPress={() => console.log('Settings')} style={[styles.iconButton, styles.topIconShiftRight, styles.topBarRight]}>
-                                <Cog color="#FFFFFF" size={30} strokeWidth={1.4} fill="none" />
                             </Pressable>
                         </View>
-                    </CameraView>
+
+                        <Pressable onPress={() => logUI(LogCode.UI_INTERACTION, 'Camera settings button pressed')} style={[styles.iconButton, styles.topIconShiftRight, styles.topBarRight]}>
+                            <Cog color="#FFFFFF" size={30} strokeWidth={1.4} fill="none" />
+                        </Pressable>
+                    </View>
                 </View>
             </View>
 
@@ -499,9 +501,7 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 18,
         fontWeight: '700',
-        textShadowColor: 'rgba(0, 0, 0, 0.5)',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 2,
+        ...textShadowStyle('rgba(0, 0, 0, 0.5)', { width: 0, height: 1 }, 2),
     },
     modeScrollContent: {
         alignItems: 'center',

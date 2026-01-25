@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { Archive } from 'lucide-react-native';
 import { Draft } from '../../../domain/entities/Draft';
+import { textShadowStyle } from '@/core/utils/shadow';
 
 interface DraftsFolderCardProps {
   drafts: Draft[];
@@ -75,9 +76,7 @@ const styles = StyleSheet.create({
     left: 8,
     fontSize: 12,
     fontWeight: '600',
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    ...textShadowStyle('rgba(0, 0, 0, 0.5)', { width: 0, height: 1 }, 3),
   },
   iconContainer: {
     position: 'absolute',

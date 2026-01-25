@@ -2,6 +2,7 @@ import { Video } from '../../domain/entities/Video';
 import { Story } from '../../domain/entities/Story';
 import { User } from '../../domain/entities/User';
 import { supabase } from '../../core/supabase';
+import { LogCode, logData, logError } from '@/core/services/Logger';
 
 // User mapping - converts user_id to display info
 const USER_MAP: Record<string, { displayName: string; avatar: string }> = {
@@ -69,6 +70,7 @@ interface SupabaseVideo {
         age: number;
         bio: string;
         is_verified: boolean;
+        shop_enabled?: boolean;
         followers_count: number;
         following_count: number;
         posts_count: number;
@@ -83,7 +85,7 @@ interface SupabaseVideo {
 export class SupabaseVideoDataSource {
     async getVideos(page: number, limit: number, userId?: string, authorId?: string): Promise<Video[]> {
         const offset = (page - 1) * limit;
-        console.log(`[DataSource] Fetching videos: page=${page}, offset=${offset}, limit=${limit}, userId=${userId}, authorId=${authorId}`);
+        logData(LogCode.DB_QUERY_START, 'Fetching videos', { page, offset, limit, userId, authorId });
 
         let query = supabase
             .from('videos')
@@ -99,7 +101,7 @@ export class SupabaseVideoDataSource {
         const { data, error } = await query;
 
         if (error) {
-            console.error('[DataSource] Supabase error:', error);
+            logError(LogCode.DB_QUERY_ERROR, 'Supabase videos fetch error', error);
             return [];
         }
 
@@ -146,7 +148,7 @@ export class SupabaseVideoDataSource {
         const { data, error } = await query;
 
         if (error) {
-            console.error('Supabase stories error:', error);
+            logError(LogCode.DB_QUERY_ERROR, 'Supabase stories fetch error', error);
             return [];
         }
 
@@ -162,7 +164,7 @@ export class SupabaseVideoDataSource {
             }
         }
 
-        console.log('[Stories] Fetched', data?.length || 0, 'active stories');
+        logData(LogCode.DB_QUERY_SUCCESS, 'Stories fetched successfully', { count: data?.length || 0 });
         return (data as any[]).map(dto => this.mapToStory(dto, viewedStoryIds.has(dto.id)));
     }
 
@@ -179,7 +181,7 @@ export class SupabaseVideoDataSource {
         if (error) {
             // Ignore unique violation (code 23505)
             if (error.code !== '23505') {
-                console.error('Error marking story as viewed:', error);
+                logError(LogCode.DB_INSERT, 'Error marking story as viewed', { storyId, userId, error });
             }
         }
     }
@@ -199,7 +201,7 @@ export class SupabaseVideoDataSource {
             // But for video_views, we might want multiple entries or just one.
             // Based on the migration, we didn't add a UNIQUE constraint, so multiple views will be recorded.
             if (error.code !== '23505') {
-                console.error('Error recording video view:', error);
+                logError(LogCode.DB_INSERT, 'Error recording video view', { videoId, userId, error });
             }
         }
     }
@@ -228,7 +230,7 @@ export class SupabaseVideoDataSource {
             .is('deleted_at', null);
 
         if (error || !data) {
-            console.error('[DataSource] getVideosByIds error:', error);
+            logError(LogCode.DB_QUERY_ERROR, 'getVideosByIds error', { videoIds, error });
             return [];
         }
 

@@ -67,6 +67,7 @@ import React from 'react';
 import { SystemBars } from 'react-native-edge-to-edge';
 import { Bookmark } from 'lucide-react-native';
 import { FeedPrefetchService } from '../../../data/services/FeedPrefetchService';
+import { LogCode, logUI, logError } from '@/core/services/Logger';
 
 // New architecture imports
 import { VideoPlayerPool } from './VideoPlayerPool';
@@ -299,7 +300,7 @@ export const FeedManager = ({
 
     useEffect(() => {
         if (__DEV__) {
-            console.log('[FeedManager] isPaused', { isPaused, activeIndex, activeVideoId });
+            logUI(LogCode.DEBUG_INFO, 'FeedManager isPaused state', { isPaused, activeIndex, activeVideoId });
         }
     }, [isPaused, activeIndex, activeVideoId]);
 
@@ -560,7 +561,7 @@ export const FeedManager = ({
         const now = Date.now();
         if (now - lastLoopTimeRef.current < 1000) {
             if (__DEV__) {
-                console.log('[FeedManager] Video end ignored (debounce)');
+                logUI(LogCode.DEBUG_INFO, 'Video end ignored (debounce)');
             }
             return;
         }
@@ -570,13 +571,13 @@ export const FeedManager = ({
         loopCountRef.current += 1;
 
         if (__DEV__) {
-            console.log(`[FeedManager] Loop completed (${loopCountRef.current})`);
+            logUI(LogCode.DEBUG_INFO, 'Loop completed', { loopCount: loopCountRef.current });
         }
 
         // If we haven't looped enough times yet, replay the video
         if (loopCountRef.current < 2) {
             if (__DEV__) {
-                console.log(`[FeedManager] Loop ${loopCountRef.current}/2: Replaying video ${activeVideoId}`);
+                logUI(LogCode.DEBUG_INFO, 'Replaying video', { loopCount: loopCountRef.current, maxLoops: 2, videoId: activeVideoId });
             }
             if (videoSeekRef.current) {
                 videoSeekRef.current(0);
@@ -633,7 +634,7 @@ export const FeedManager = ({
         // Handle restart when video is finished
         if (isVideoFinished) {
             if (__DEV__) {
-                console.log('[FeedManager] Manual restart triggered');
+                logUI(LogCode.INTERACTION_TAP, 'Manual restart triggered');
             }
             setIsVideoFinished(false);
             loopCountRef.current = 0;
@@ -755,7 +756,7 @@ export const FeedManager = ({
             await Share.share({ message, url: shareUrl });
             toggleShare(activeVideo.id);
         } catch (error) {
-            console.error('[Share] Failed:', error);
+            logError(LogCode.ERROR_CAUGHT, 'Share failed', error);
         } finally {
             if (activeVideoId === activeVideo.id) {
                 const resumeTime = activeTimeRef.current;
@@ -1330,11 +1331,6 @@ const styles = StyleSheet.create({
         borderRadius: 14,
         alignItems: 'center',
         overflow: 'hidden',
-        shadowColor: '#000',
-        shadowOpacity: 0,
-        shadowRadius: 0,
-        shadowOffset: { width: 0, height: 0 },
-        elevation: 0,
     },
     saveToastActive: {
         backgroundColor: '#2c2c2e',

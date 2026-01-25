@@ -11,6 +11,7 @@ import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { StoryAvatar } from './StoryAvatar';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useProfile } from '../../hooks/useProfile';
+import { logStory, LogCode } from '@/core/services/Logger';
 
 const BAR_HEIGHT = 110;
 const DEFAULT_AVATAR = 'https://ui-avatars.com/api/?name=Me&background=random&color=fff';
@@ -44,15 +45,35 @@ export const StoryBar = memo(function StoryBar({
     const { user: authUser } = useAuthStore();
     const { user: profileUser } = useProfile(authUser?.id || '');
 
-    // Resolve the current user to display
-    const currentUser = profileUser || authUser;
+    const currentUserDisplay = useMemo(() => {
+        if (profileUser) {
+            return {
+                id: profileUser.id,
+                username: profileUser.username,
+                avatarUrl: profileUser.avatarUrl,
+            };
+        }
+        if (authUser) {
+            const username = authUser.email?.split('@')[0] || 'me';
+            return {
+                id: authUser.id,
+                username,
+                avatarUrl: DEFAULT_AVATAR,
+            };
+        }
+        return null;
+    }, [profileUser, authUser]);
 
     // Debug user data
     useEffect(() => {
-        if (isVisible && currentUser) {
-            console.log('[StoryBar] Current User:', { id: currentUser.id, username: currentUser.username, avatarUrl: currentUser.avatarUrl });
+        if (isVisible && currentUserDisplay) {
+            logStory(LogCode.STORY_BAR_VISIBLE, 'Story bar visible with current user', {
+                userId: currentUserDisplay.id,
+                username: currentUserDisplay.username,
+                hasAvatar: !!currentUserDisplay.avatarUrl
+            });
         }
-    }, [isVisible, currentUser]);
+    }, [isVisible, currentUserDisplay]);
 
     // Slide down/up animasyonu
     useEffect(() => {
@@ -103,8 +124,8 @@ export const StoryBar = memo(function StoryBar({
         let users = [...storyUsers];
 
         // Filter out current user from the list if present (to avoid duplication when adding to front)
-        if (currentUser) {
-            users = users.filter(u => u.id !== currentUser.id);
+        if (currentUserDisplay) {
+            users = users.filter(u => u.id !== currentUserDisplay.id);
         }
 
         users.sort((a, b) => {
@@ -114,15 +135,15 @@ export const StoryBar = memo(function StoryBar({
         });
 
         // Add current user to the front
-        if (currentUser) {
-            const selfInList = storyUsers.find(u => u.id === currentUser.id);
+        if (currentUserDisplay) {
+            const selfInList = storyUsers.find(u => u.id === currentUserDisplay.id);
             // Use avatarUrl if available, otherwise use default
-            const displayAvatar = currentUser.avatarUrl && currentUser.avatarUrl.trim() !== '' 
-                ? currentUser.avatarUrl 
+            const displayAvatar = currentUserDisplay.avatarUrl && currentUserDisplay.avatarUrl.trim() !== '' 
+                ? currentUserDisplay.avatarUrl 
                 : DEFAULT_AVATAR;
 
             users.unshift({
-                id: currentUser.id,
+                id: currentUserDisplay.id,
                 username: 'Hikayen',
                 avatarUrl: displayAvatar,
                 hasUnseenStory: selfInList ? selfInList.hasUnseenStory : false,
@@ -130,7 +151,7 @@ export const StoryBar = memo(function StoryBar({
         }
 
         return users;
-    }, [storyUsers, currentUser]);
+    }, [storyUsers, currentUserDisplay]);
 
     if (!shouldRender) return null;
 
@@ -191,4 +212,3 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
 });
-

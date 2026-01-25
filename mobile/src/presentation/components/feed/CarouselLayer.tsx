@@ -5,6 +5,7 @@ import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming } from 'react-native-reanimated';
 import LikeIcon from '../../../../assets/icons/doubletablike.svg';
+import { shadowStyle } from '@/core/utils/shadow';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -358,11 +359,7 @@ const styles = StyleSheet.create({
         zIndex: 999,
     },
     heartWrapper: {
-        shadowColor: '#000000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.5,
-        shadowRadius: 15,
-        elevation: 20,
+        ...shadowStyle({ color: '#000000', offset: { width: 0, height: 8 }, opacity: 0.5, radius: 15, elevation: 20 }),
     },
     dot: {
         height: 6,

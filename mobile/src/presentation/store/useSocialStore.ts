@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { ToggleFollowUseCase } from '../../domain/usecases/ToggleFollowUseCase';
 import { InteractionRepositoryImpl } from '../../data/repositories/InteractionRepositoryImpl';
+import { logSocial, logError, LogCode } from '@/core/services/Logger';
 
 interface SocialState {
     followingMap: Record<string, boolean>;
@@ -39,7 +40,7 @@ export const useSocialStore = create<SocialState>((set, get) => ({
         // PROTECTION: If we had a local optimistic update recently, ignore server sync
         // This prevents "jumpy" UI where server returns old data before backend fully propagates
         if (now - lastLocalUpdate < SYNC_PROTECTION_MS) {
-            console.log(`[SocialStore] 🛡️ Ignoring sync for ${userId} (recent local update)`);
+            logSocial(LogCode.SOCIAL_SYNC_IGNORED, 'Ignoring sync due to recent local update', { userId });
             return;
         }
 
@@ -79,7 +80,7 @@ export const useSocialStore = create<SocialState>((set, get) => ({
         try {
             await toggleFollowUseCase.execute(targetUserId, currentUserId);
         } catch (error) {
-            console.error('[SocialStore] Toggle follow failed, rolling back:', error);
+            logError(LogCode.SOCIAL_FOLLOW_ERROR, 'Toggle follow failed, rolling back', { error, targetUserId, currentUserId });
             set((state) => ({
                 followingMap: { ...state.followingMap, [targetUserId]: isCurrentlyFollowing },
                 followerCounts: { ...state.followerCounts, [targetUserId]: targetFollowerCount },

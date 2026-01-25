@@ -8,6 +8,7 @@ import { ToggleFollowUseCase } from '../../domain/usecases/ToggleFollowUseCase';
 import { VideoRepositoryImpl } from '../../data/repositories/VideoRepositoryImpl';
 import { InteractionRepositoryImpl } from '../../data/repositories/InteractionRepositoryImpl';
 import { VideoCacheService } from '../../data/services/VideoCacheService';
+import { LogCode, logPerf, logError, logData, logSystem, logAuth } from '@/core/services/Logger';
 import { FeedPrefetchService } from '../../data/services/FeedPrefetchService';
 import { Image } from 'expo-image';
 import { useActiveVideoStore } from '../store/useActiveVideoStore';
@@ -87,7 +88,7 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
 
         if (videos.length > 0 && !hasInitialPrefetched.current && !isVideoCacheDisabled()) {
             hasInitialPrefetched.current = true;
-            console.log('[Prefetch] 🚀 Initial prefetch starting...');
+            logPerf(LogCode.PREFETCH_START, 'Initial video prefetch starting');
 
             FeedPrefetchService.getInstance().queueVideos(videos, [0, 1, 2], 0);
             videos.slice(0, 3).forEach((v) => {
@@ -134,7 +135,7 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
         } catch (err) {
             if (isMounted.current) {
                 setError('Video yüklenirken hata oluştu. Lütfen tekrar deneyin.');
-                console.error('Feed fetch error:', err);
+                logError(LogCode.FETCH_ERROR, 'Feed fetch error', err);
             }
         } finally {
             if (isMounted.current) {
@@ -175,7 +176,7 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
         } catch (err) {
             if (isMounted.current) {
                 setError('Yenileme başarısız oldu.');
-                console.error('Refresh error:', err);
+                logError(LogCode.FETCH_ERROR, 'Feed refresh error', err);
             }
         } finally {
             if (isMounted.current) {
@@ -214,7 +215,7 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
                 }
             }
         } catch (err) {
-            console.error('Load more error:', err);
+            logError(LogCode.FETCH_ERROR, 'Load more error', err);
         } finally {
             if (isMounted.current) {
                 setIsLoadingMore(false);
@@ -250,7 +251,7 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
             await toggleLikeUseCase.execute(videoId, freshUserId);
         } catch (err) {
             // Rollback on error
-            console.error('Toggle like failed, reverting:', err);
+            logError(LogCode.DB_UPDATE, 'Toggle like failed, reverting', err);
             setVideos((prevVideos) =>
                 prevVideos.map((video) => {
                     if (video.id === videoId) {
@@ -294,7 +295,7 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
             const freshUserId = useAuthStore.getState().user?.id || 'anon';
             await toggleSaveUseCase.execute(videoId, freshUserId);
         } catch (err) {
-            console.error('Toggle save failed, reverting:', err);
+            logError(LogCode.DB_UPDATE, 'Toggle save failed, reverting', err);
             // Rollback
             setVideos((prevVideos) =>
                 prevVideos.map((video) => {
@@ -394,7 +395,7 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
         // 3. Switch to next video IMMEDIATELY (before network call for instant UX)
         const { setActiveVideo } = useActiveVideoStore.getState();
         if (nextActiveId) {
-            console.log(`[Delete] 🎯 Switching to next video: ${nextActiveId} (index ${nextActiveIndex})`);
+            logData(LogCode.DB_DELETE, 'Switching to next video after delete', { nextActiveId, nextActiveIndex });
             setActiveVideo(nextActiveId, nextActiveIndex);
         }
 
@@ -406,11 +407,10 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
             const { CONFIG } = require('../../core/config');
             const authState = useAuthStore.getState();
             const token = authState.session?.access_token;
-            console.log(`[Delete] 🔑 Auth State Debug:`, {
+            logAuth(LogCode.AUTH_SESSION_CHECK, 'Delete video auth state check', {
                 hasSession: !!authState.session,
                 hasUser: !!authState.user,
                 hasToken: !!token,
-                tokenPreview: token ? token.substring(0, 30) + '...' : 'NULL'
             });
 
             // Soft delete (default)
@@ -426,9 +426,9 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
                 const errText = await response.text();
                 throw new Error(errText || 'Sunucu hatası');
             }
-            console.log('[useVideoFeed] Delete success:', videoId);
+            logData(LogCode.DB_DELETE, 'Video deleted successfully', { videoId });
         } catch (error: any) {
-            console.error('[useVideoFeed] Delete failed, rolling back:', error);
+            logError(LogCode.DB_DELETE, 'Video delete failed, rolling back', error);
             // Rollback on failure
             setVideos(currentVideos);
             Alert.alert("Silme Başarısız", error.message || "Bilinmeyen hata");
@@ -440,10 +440,10 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
         setVideos(current => {
             // Prevent duplicates
             if (current.some(v => v.id === newVideo.id)) {
-                console.log('[useVideoFeed] Video already exists, skipping prepend:', newVideo.id);
+                logData(LogCode.REPO_SAVE, 'Video already exists, skipping prepend', { videoId: newVideo.id });
                 return current;
             }
-            console.log('[useVideoFeed] Prepending new video:', newVideo.id);
+            logData(LogCode.REPO_SAVE, 'Prepending new video to feed', { videoId: newVideo.id });
             return [newVideo, ...current];
         });
     }, []);
@@ -453,19 +453,19 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
     useEffect(() => {
         // Guard: Wait for auth to be initialized
         if (!isInitialized) {
-            console.log('[useVideoFeed] ⏸️  Waiting for auth initialization...');
+            logAuth(LogCode.AUTH_SESSION_CHECK, 'Waiting for auth initialization');
             return;
         }
 
         // Guard: Prevent duplicate initial fetch
         if (hasInitialFetch.current) {
-            console.log('[useVideoFeed] ✋ Initial fetch already done, skipping');
+            logSystem(LogCode.DEBUG_INFO, 'Initial fetch already done, skipping');
             return;
         }
 
         // Mark as fetched BEFORE making the call (prevents race condition)
         hasInitialFetch.current = true;
-        console.log('[useVideoFeed] 🚀 Starting initial fetch with userId:', currentUserId);
+        logData(LogCode.FETCH_START, 'Starting initial feed fetch', { userId: currentUserId });
         fetchFeed();
     }, [isInitialized]); // Only depend on isInitialized, NOT on fetchFeed or currentUserId
 

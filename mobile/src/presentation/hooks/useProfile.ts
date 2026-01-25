@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { User } from '../../domain/entities';
 import { ProfileRepositoryImpl } from '../../data/repositories/ProfileRepositoryImpl';
 import { useSocialStore } from '../store/useSocialStore';
+import { logRepo, logError, LogCode } from '@/core/services/Logger';
 
 const profileRepo = new ProfileRepositoryImpl();
 
@@ -43,7 +44,7 @@ export const useProfile = (userId: string, viewerId?: string) => {
             }
         } catch (err) {
             setError('Profil yüklenirken bir hata oluştu.');
-            console.error('[useProfile] Load error:', err);
+            logError(LogCode.REPO_ERROR, 'Profile load error', { error: err, userId });
         } finally {
             if (!silentRefresh) {
                 setIsLoading(false);
@@ -74,7 +75,7 @@ export const useProfile = (userId: string, viewerId?: string) => {
 
             return updatedUser;
         } catch (err) {
-            console.error('[useProfile] Update error:', err);
+            logError(LogCode.REPO_ERROR, 'Profile update error', { error: err, userId });
             setError('Profil güncellenirken bir hata oluştu.');
             throw err;
         }

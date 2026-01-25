@@ -16,6 +16,7 @@ import { useStoryStore } from '../../store/useStoryStore';
 import { StoryRepositoryImpl } from '../../../data/repositories/StoryRepositoryImpl';
 import { useInAppBrowserStore } from '../../store/useInAppBrowserStore';
 import { useActiveVideoStore } from '../../store/useActiveVideoStore';
+import { logStory, logError, LogCode } from '@/core/services/Logger';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('screen');
 const DEFAULT_STORY_DURATION = 10000; // 10 seconds for images
@@ -90,7 +91,9 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
         if (initialStory?.user?.id) {
             markUserAsViewed(initialStory.user.id);
             // Also mark as viewed in backend
-            new StoryRepositoryImpl().markAsViewed(initialStory.originalId).catch(err => console.error('Failed to mark view', err));
+            new StoryRepositoryImpl().markAsViewed(initialStory.originalId).catch(err =>
+                logError(LogCode.STORY_VIEW_ERROR, 'Failed to mark story as viewed', { error: err, storyId: initialStory.originalId })
+            );
         }
 
         const cachedDuration = videoDurationsRef.current[initialStory?.id];
@@ -199,7 +202,9 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
         // Mark user as viewed when sliding to next story
         if (newStory?.user?.id) {
             markUserAsViewed(newStory.user.id);
-            new StoryRepositoryImpl().markAsViewed(newStory.originalId).catch(console.error);
+            new StoryRepositoryImpl().markAsViewed(newStory.originalId).catch(err =>
+                logError(LogCode.STORY_VIEW_ERROR, 'Failed to mark story as viewed on swipe', { error: err, storyId: newStory.originalId })
+            );
         }
 
         // 🔥 Reset previous video to start (prevents memory buildup)
@@ -265,7 +270,7 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
         try {
             await Share.share({ message: shareUrl, url: shareUrl });
         } catch (error) {
-            console.error('Share story failed:', error);
+            logError(LogCode.SHARE_ERROR, 'Story share failed', { error, storyId: activeStory?.id });
         } finally {
             setIsPaused(wasPaused);
         }

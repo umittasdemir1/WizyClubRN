@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import Svg, { Circle, Line } from 'react-native-svg';
+import { shadowStyle } from '@/core/utils/shadow';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -130,11 +131,7 @@ const styles = StyleSheet.create({
         height: 176,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-        elevation: 4,
+        ...shadowStyle({ color: '#000', offset: { width: 0, height: 4 }, opacity: 0.15, radius: 8, elevation: 4 }),
     },
     leftCard: {
         left: 20,
@@ -150,11 +147,7 @@ const styles = StyleSheet.create({
         width: 160,
         height: 192,
         zIndex: 10,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.25,
-        shadowRadius: 12,
-        elevation: 10,
+        ...shadowStyle({ color: '#000', offset: { width: 0, height: 8 }, opacity: 0.25, radius: 12, elevation: 10 }),
     },
     sideCardText: {
         fontSize: 10,
@@ -225,11 +218,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 24,
         paddingVertical: 8,
         borderRadius: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 4,
-        elevation: 3,
+        ...shadowStyle({ color: '#000', offset: { width: 0, height: 2 }, opacity: 0.15, radius: 4, elevation: 3 }),
     },
     redeemButtonText: {
         fontSize: 10,

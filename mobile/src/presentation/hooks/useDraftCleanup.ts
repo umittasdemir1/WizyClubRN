@@ -3,6 +3,7 @@ import { AppState, AppStateStatus } from 'react-native';
 import { useDraftStore } from '../store/useDraftStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { CONFIG } from '../../core/config';
+import { logApi, logError, LogCode } from '@/core/services/Logger';
 
 const CLEANUP_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -47,19 +48,22 @@ export function useDraftCleanup() {
       if (!response.ok) {
         const text = await response.text();
         // Log truncated text to avoid flooding logs with HTML
-        console.warn(`[Cleanup] Server returned ${response.status}. Response: ${text.substring(0, 100)}...`);
+        logApi(LogCode.API_ERROR, 'Draft cleanup server error', {
+          status: response.status,
+          response: text.substring(0, 100)
+        });
         return;
       }
 
       const result = await response.json();
 
       if (result.success && result.deletedCount > 0) {
-        console.log(`🧹 [Cleanup] Removed ${result.deletedCount} expired drafts`);
+        logApi(LogCode.DRAFT_CLEANUP_SUCCESS, 'Removed expired drafts', { deletedCount: result.deletedCount });
         // Refresh drafts list
         fetchDrafts(user.id);
       }
     } catch (error) {
-      console.error('[Cleanup] Error cleaning up expired drafts:', error);
+      logError(LogCode.DRAFT_CLEANUP_ERROR, 'Error cleaning up expired drafts', { error });
     }
   };
 }

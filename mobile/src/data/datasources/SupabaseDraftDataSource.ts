@@ -1,5 +1,6 @@
 import { supabase } from '../../core/supabase';
 import { Draft } from '../../domain/entities/Draft';
+import { LogCode, logData, logError } from '@/core/services/Logger';
 
 interface SupabaseDraft {
   id: string;
@@ -31,7 +32,7 @@ export class SupabaseDraftDataSource {
       .range(offset, offset + limit - 1);
 
     if (error) {
-      console.error('[DraftDataSource] Error fetching drafts:', error);
+      logError(LogCode.DB_QUERY_ERROR, 'Error fetching drafts', { userId, error });
       return [];
     }
 
@@ -46,7 +47,7 @@ export class SupabaseDraftDataSource {
       .single();
 
     if (error || !data) {
-      console.error('[DraftDataSource] Error fetching draft:', error);
+      logError(LogCode.DB_QUERY_ERROR, 'Error fetching draft', { draftId, error });
       return null;
     }
 
@@ -110,7 +111,7 @@ export class SupabaseDraftDataSource {
     const { error } = await supabase.from('drafts').delete().eq('id', draftId);
 
     if (error) {
-      console.error('[DraftDataSource] Error deleting draft:', error);
+      logError(LogCode.DRAFT_DELETE, 'Error deleting draft', { draftId, error });
       return false;
     }
 
@@ -121,7 +122,7 @@ export class SupabaseDraftDataSource {
     const { error } = await supabase.from('drafts').delete().in('id', draftIds);
 
     if (error) {
-      console.error('[DraftDataSource] Error batch deleting drafts:', error);
+      logError(LogCode.DRAFT_DELETE, 'Error batch deleting drafts', { draftIds, error });
       return false;
     }
 
@@ -136,7 +137,7 @@ export class SupabaseDraftDataSource {
       .select('id');
 
     if (error) {
-      console.error('[DraftDataSource] Error cleaning up expired drafts:', error);
+      logError(LogCode.DRAFT_CLEANUP, 'Error cleaning up expired drafts', error);
       return 0;
     }
 

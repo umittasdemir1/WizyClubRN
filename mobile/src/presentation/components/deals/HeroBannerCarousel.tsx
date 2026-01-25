@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Dimensions, TouchableOpacity, Platform } from 'react-native';
+import { View, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
 import Animated, {
   useSharedValue,
@@ -9,6 +9,7 @@ import Animated, {
   runOnJS,
   Extrapolation,
 } from 'react-native-reanimated';
+import { shadowStyle } from '@/core/utils/shadow';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -156,17 +157,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     backgroundColor: '#111',
     overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 6,
-      },
-    }),
+    ...shadowStyle({ color: '#000', offset: { width: 0, height: 4 }, opacity: 0.3, radius: 8, elevation: 6 }),
   },
   image: {
     width: '100%',

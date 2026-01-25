@@ -10,6 +10,7 @@ import { useThemeStore } from '../../../src/presentation/store/useThemeStore';
 import { useAuthStore } from '../../../src/presentation/store/useAuthStore';
 import { useActiveVideoStore } from '../../../src/presentation/store/useActiveVideoStore';
 import { LIGHT_COLORS, DARK_COLORS } from '../../../src/core/constants';
+import { logRepo, logError, LogCode } from '@/core/services/Logger';
 
 const repository = new UserActivityRepositoryImpl();
 
@@ -53,7 +54,7 @@ export default function ActivitiesScreen() {
             }
             setVideos(data);
         } catch (error) {
-            console.error('[Activities] Fetch error:', error);
+            logError(LogCode.REPO_ERROR, 'Activities fetch error', { error, type, userId: user?.id });
         } finally {
             setLoading(false);
             setRefreshing(false);

@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { logError, LogCode } from './Logger';
 
 export interface SessionData {
     userId: string;
@@ -27,7 +28,7 @@ export class SessionLogService {
             });
 
         if (error) {
-            console.error('[SessionLogService] Error logging event:', error);
+            logError(LogCode.DB_ERROR, 'Session log service error logging event', { error, eventType: data.eventType, userId: data.userId });
         }
     }
 }

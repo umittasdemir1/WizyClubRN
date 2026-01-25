@@ -28,6 +28,7 @@ import { CONFIG } from '../../../core/config';
 import { router } from 'expo-router';
 import { useStoryStore } from '../../store/useStoryStore';
 import { SystemBars } from 'react-native-edge-to-edge';
+import { LogCode, logUI, logError, logData } from '@/core/services/Logger';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PREVIEW_ITEM_WIDTH = SCREEN_WIDTH * 0.7;
@@ -140,19 +141,19 @@ export function UploadModal({ isVisible, onClose, initialAssets, uploadMode = 'v
 
             onClose();
         } catch (error) {
-            console.error('[UploadModal] Error saving draft:', error);
+            logError(LogCode.DRAFT_SAVE, 'Error saving draft', error);
             Alert.alert('Hata', 'Taslak kaydedilirken bir hata oluştu.');
         }
     };
 
     const handleCoverEdit = () => {
         // TODO: Thumbnail seçim/düzenleme modal'ı aç
-        console.log('Cover edit tapped');
+        logUI(LogCode.INTERACTION_TAP, 'Cover edit tapped');
     };
 
     const handleClubsSelect = () => {
         // TODO: CLUB seçim modal'ı aç
-        console.log('Clubs select tapped');
+        logUI(LogCode.INTERACTION_TAP, 'Clubs select tapped');
     };
 
     const handleCommercialTypeSelect = () => {
@@ -243,7 +244,7 @@ export function UploadModal({ isVisible, onClose, initialAssets, uploadMode = 'v
             // 🔥 CONDITIONAL: Story goes to /upload-story, Video goes to /upload-hls
             const endpoint = uploadMode === 'story' ? '/upload-story' : '/upload-hls';
             const uploadUrl = `${CONFIG.API_URL}${endpoint}`;
-            console.log('🚀 [UPLOAD] Target URL:', uploadUrl);
+            logData(LogCode.VIDEO_UPLOAD_START, 'Starting upload', { uploadUrl, uploadMode });
             xhr.open('POST', uploadUrl);
 
             // 🔥 SIMPLE: Linear progress from 0 to 95, then 100 on success
@@ -265,7 +266,7 @@ export function UploadModal({ isVisible, onClose, initialAssets, uploadMode = 'v
 
                 if (xhr.status === 200) {
                     const response = JSON.parse(xhr.responseText);
-                    console.log('Upload success:', response);
+                    logData(LogCode.VIDEO_UPLOAD_SUCCESS, 'Upload completed successfully', { response });
 
                     // 🔥 Quick animation to 100% before closing
                     let finalProgress = currentProgress;
@@ -299,7 +300,7 @@ export function UploadModal({ isVisible, onClose, initialAssets, uploadMode = 'v
                     }, 30);
 
                 } else {
-                    console.error('Upload failed:', xhr.responseText);
+                    logError(LogCode.VIDEO_UPLOAD_ERROR, 'Upload failed', { status: xhr.status, response: xhr.responseText });
                     setError('Yükleme başarısız oldu.');
                     setStatus('error');
                 }
@@ -307,8 +308,7 @@ export function UploadModal({ isVisible, onClose, initialAssets, uploadMode = 'v
 
             xhr.onerror = (e) => {
                 clearInterval(progressInterval);
-                console.error('❌ [UPLOAD] Network Error Details:', e);
-                console.error('❌ [UPLOAD] XHR Status:', xhr.status);
+                logError(LogCode.ERROR_NETWORK, 'Upload network error', { event: e, status: xhr.status });
                 setError('Ağ hatası oluştu. Sunucuya ulaşılamıyor.');
                 setStatus('error');
             };
@@ -316,7 +316,7 @@ export function UploadModal({ isVisible, onClose, initialAssets, uploadMode = 'v
             xhr.send(formData);
 
         } catch (error) {
-            console.error('Upload exception:', error);
+            logError(LogCode.EXCEPTION_UNCAUGHT, 'Upload exception caught', error);
             setError('Beklenmedik bir hata oluştu.');
             setStatus('error');
         }

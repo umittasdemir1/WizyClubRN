@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { logCache, LogCode } from '@/core/services/Logger';
 
 interface StartupState {
   isStartupComplete: boolean;
@@ -9,7 +10,7 @@ export const useStartupStore = create<StartupState>((set, get) => ({
   isStartupComplete: false,
   markStartupComplete: () => {
     if (!get().isStartupComplete) {
-      console.log('[Startup] ✅ Prefetch allowed');
+      logCache(LogCode.CACHE_STARTUP_COMPLETE, 'Startup complete - prefetch allowed');
       set({ isStartupComplete: true });
     }
   },

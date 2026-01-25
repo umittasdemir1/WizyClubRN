@@ -15,6 +15,7 @@ import {
   Easing,
 } from 'react-native';
 import PagerView from '../../src/presentation/components/shared/PagerView';
+import type { PagerViewOnPageSelectedEvent } from 'react-native-pager-view';
 import Video from 'react-native-video';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
@@ -51,6 +52,8 @@ import { VerifiedBadge } from '../../src/presentation/components/shared/Verified
 import { ProfileSettingsOverlay } from '../../src/presentation/components/profile/ProfileSettingsOverlay';
 import { UserActivityRepositoryImpl } from '../../src/data/repositories/UserActivityRepositoryImpl';
 import { Video as VideoEntity } from '../../src/domain/entities/Video';
+import { logApi, logError, logUI, LogCode } from '@/core/services/Logger';
+import { shadowStyle } from '@/core/utils/shadow';
 
 const activityRepository = new UserActivityRepositoryImpl();
 
@@ -388,7 +391,7 @@ export default function ProfileScreen() {
       const segmentText = getString('profile.settings.segment.textColor');
       setSettingsSegmentTextColorOverride(segmentText || null);
     } catch (error) {
-      console.warn('[Profile] Admin config load failed:', error);
+      logApi(LogCode.API_ERROR, 'Profile admin config load failed', { error });
     }
   }, []);
 
@@ -751,6 +754,24 @@ export default function ProfileScreen() {
     return () => clearTimeout(timer);
   }, [isShopModalOpen]);
 
+  const showPreview = (item: any) => setPreviewItem(item);
+  const hidePreview = () => setPreviewItem(null);
+  const handleDraftsFolderPress = () => {
+    router.push('/drafts' as any);
+  };
+
+  const handleVideoPress = (video: any, index: number) => {
+    setCustomFeed(safeVideos);
+    setActiveVideo(video.id, index);
+    router.push('/custom-feed');
+  };
+
+  const handleSavedPress = (video: any, index: number) => {
+    setCustomFeed(savedVideosData);
+    setActiveVideo(video.id, index);
+    router.push('/custom-feed');
+  };
+
   const draftsHeader = (
     <DraftsFolderCard
       drafts={drafts}
@@ -839,23 +860,6 @@ export default function ProfileScreen() {
     );
   }
 
-  const showPreview = (item: any) => setPreviewItem(item);
-  const hidePreview = () => setPreviewItem(null);
-  const handleDraftsFolderPress = () => {
-    router.push('/drafts' as any);
-  };
-
-  const handleVideoPress = (video: any, index: number) => {
-    setCustomFeed(safeVideos);
-    setActiveVideo(video.id, index);
-    router.push('/custom-feed');
-  };
-
-  const handleSavedPress = (video: any, index: number) => {
-    setCustomFeed(savedVideosData);
-    setActiveVideo(video.id, index);
-    router.push('/custom-feed');
-  };
   const bioLimit = 110;
   const truncatedBio = user.bio.length > bioLimit ? user.bio.substring(0, bioLimit) + '...' : user.bio;
   const themeOptions = [
@@ -975,7 +979,7 @@ export default function ProfileScreen() {
       else if (type === 'history') data = await activityRepository.getWatchHistory(currentUserId);
       setActivityVideos(data);
     } catch (err) {
-      console.error('[Profile] Activity fetch error:', err);
+      logError(LogCode.REPO_ERROR, 'Profile activity fetch error', { error: err, type, userId: currentUserId });
     } finally {
       setIsActivityLoading(false);
     }
@@ -1129,7 +1133,7 @@ export default function ProfileScreen() {
 
                 <Pressable
                   style={[styles.btnAction, { backgroundColor: btnEditBg }]}
-                  onPress={() => console.log('Share Profile')}
+                  onPress={() => logUI(LogCode.UI_INTERACTION, 'Share profile button pressed')}
                 >
                   <Text style={[styles.btnActionText, { color: btnEditText }]}>Profili Paylaş</Text>
                 </Pressable>
@@ -1196,7 +1200,7 @@ export default function ProfileScreen() {
                       : shopHeight,
             }}
             initialPage={0}
-            onPageSelected={(e) => setActiveTab(e.nativeEvent.position)}
+            onPageSelected={(e: PagerViewOnPageSelectedEvent) => setActiveTab(e.nativeEvent.position)}
           >
             {pagerPages}
           </PagerView>
@@ -1439,7 +1443,7 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   activeTab: { borderBottomWidth: 2 },
   previewOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', zIndex: 999 },
-  previewCard: { width: '80%', height: 480, borderRadius: 30, overflow: 'hidden', backgroundColor: '#000', elevation: 20, shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 15, shadowOffset: { width: 0, height: 10 } },
+  previewCard: { width: '80%', height: 480, borderRadius: 30, overflow: 'hidden', backgroundColor: '#000', ...shadowStyle({ color: '#000', offset: { width: 0, height: 10 }, opacity: 0.5, radius: 15, elevation: 20 }) },
   previewVideo: { width: '100%', height: '100%' },
   shopModalOverlay: {
     flex: 1,
@@ -1465,11 +1469,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
-    shadowColor: '#000000',
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
+    ...shadowStyle({ color: '#000000', offset: { width: 0, height: 6 }, opacity: 0.18, radius: 12, elevation: 8 }),
   },
   shopModalContent: {
     paddingTop: 26,

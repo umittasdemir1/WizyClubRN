@@ -1,6 +1,7 @@
 import { IUserRepository } from '../../domain/repositories/IUserRepository';
 import { User } from '../../domain/entities/User';
 import { supabase } from '../../core/supabase';
+import { logRepo, logError, LogCode } from '@/core/services/Logger';
 
 export class UserRepositoryImpl implements IUserRepository {
     async getUserByUsername(username: string): Promise<User | null> {
@@ -11,7 +12,7 @@ export class UserRepositoryImpl implements IUserRepository {
             .single();
 
         if (error || !data) {
-            console.error('[UserRepository] Error fetching user by username:', error);
+            logError(LogCode.REPO_ERROR, 'Error fetching user by username', { error, username });
             return null;
         }
 
@@ -26,7 +27,7 @@ export class UserRepositoryImpl implements IUserRepository {
             .single();
 
         if (error || !data) {
-            console.error('[UserRepository] Error fetching user by id:', error);
+            logError(LogCode.REPO_ERROR, 'Error fetching user by id', { error, userId: id });
             return null;
         }
 

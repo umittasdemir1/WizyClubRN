@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { RotateCcw, Trash2 } from 'lucide-react-native';
 import { supabase } from '../../../core/supabase';
 import { CONFIG } from '../../../core/config';
+import { logVideo, logError, LogCode } from '@/core/services/Logger';
 
 interface DeletedContentMenuProps {
     isDark: boolean;
@@ -74,7 +75,10 @@ export const DeletedContentMenu = ({ isDark, isActive }: DeletedContentMenuProps
                             // 🔥 Get auth token for authenticated delete
                             const { useAuthStore } = require('../../store/useAuthStore');
                             const token = useAuthStore.getState().session?.access_token;
-                            console.log(`[HardDelete] 🔑 Token: ${token ? 'Present' : 'MISSING'}`);
+                            logVideo(LogCode.VIDEO_DELETE_PERMANENT, 'Permanent delete initiated', {
+                                videoId: id,
+                                hasToken: !!token
+                            });
 
                             // Call Backend DELETE with ?force=true + Auth header
                             const response = await fetch(`${CONFIG.API_URL}/videos/${id}?force=true`, {
@@ -89,7 +93,7 @@ export const DeletedContentMenu = ({ isDark, isActive }: DeletedContentMenuProps
                                 fetchDeletedVideos();
                             }
                         } catch (e) {
-                            console.error(e);
+                            logError(LogCode.VIDEO_DELETE_ERROR, 'Permanent delete failed', { error: e, videoId: id });
                         }
                     }
                 }

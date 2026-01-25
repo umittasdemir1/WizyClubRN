@@ -2,6 +2,7 @@ import { Video } from '../../domain/entities/Video';
 import { VideoCacheService } from './VideoCacheService';
 import { isVideoCacheDisabled } from '../../core/utils/videoCacheToggle';
 import { NetInfoStateType } from '@react-native-community/netinfo';
+import { logCache, LogCode } from '@/core/services/Logger';
 
 interface PrefetchItem {
   url: string;
@@ -130,7 +131,7 @@ class FeedPrefetchService {
             await VideoCacheService.cacheVideo(url);
             // ✅ Logging disabled for performance
           } catch (error) {
-            console.warn('[FeedPrefetch] Failed to cache video:', error);
+            logCache(LogCode.CACHE_ERROR, 'Feed prefetch failed to cache video', { error, url });
           } finally {
             this.queued.delete(url);
           }

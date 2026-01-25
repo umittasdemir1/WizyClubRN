@@ -20,7 +20,7 @@
       "edgeToEdgeEnabled": true
     },
     "androidStatusBar": {
-      "backgroundColor": "#00000000",
+      "backgroundColor": "#000000",
       "barStyle": "light-content",
       "translucent": true
     },

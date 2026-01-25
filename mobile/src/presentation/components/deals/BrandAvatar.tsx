@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
+import { shadowStyle } from '@/core/utils/shadow';
 
 interface BrandAvatarProps {
     brandName: string;
@@ -53,11 +54,7 @@ const styles = StyleSheet.create({
         borderRadius: 30,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 1,
+        ...shadowStyle({ color: '#000', offset: { width: 0, height: 1 }, opacity: 0.05, radius: 2, elevation: 1 }),
     },
     icon: {
         width: 48,

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
+import { shadowStyle } from '@/core/utils/shadow';
 
 interface ClubsCollaborationProps {
     clubsCount: number;
@@ -78,11 +79,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         padding: 1, // Reduced from 5 to enlarge logos a bit more
         // 3D Glass Effect
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 3,
-        elevation: 4,
+        ...shadowStyle({ color: '#000', offset: { width: 0, height: 2 }, opacity: 0.15, radius: 3, elevation: 4 }),
     },
     logo: {
         width: '100%',

@@ -11,6 +11,7 @@ import { ActionButtons, ActionButtonsRef } from './ActionButtons';
 import { MetadataLayer } from './MetadataLayer';
 import { DoubleTapLike } from './DoubleTapLike';
 import { Video } from '../../../domain/entities/Video';
+import { logUI, LogCode } from '@/core/services/Logger';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const ITEM_HEIGHT = Dimensions.get('window').height;
@@ -200,7 +201,7 @@ export const FeedItem = memo(function FeedItem({
                         onAvatarPress={() => router.push(profileRoute as any)}
                         onFollowPress={() => onToggleFollow(video.id)}
                         onReadMorePress={onOpenDescription}
-                        onCommercialTagPress={() => console.log('Open Commercial Info')}
+                        onCommercialTagPress={() => logUI(LogCode.UI_INTERACTION, 'Commercial tag pressed', { videoId: video.id })}
                     />
                 </Animated.View>
             )}

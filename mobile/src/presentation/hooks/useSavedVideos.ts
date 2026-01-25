@@ -3,6 +3,7 @@ import { Video } from '../../domain/entities/Video';
 import { GetSavedVideosUseCase } from '../../domain/usecases/GetSavedVideosUseCase';
 import { InteractionRepositoryImpl } from '../../data/repositories/InteractionRepositoryImpl';
 import { VideoRepositoryImpl } from '../../data/repositories/VideoRepositoryImpl';
+import { logRepo, logError, LogCode } from '@/core/services/Logger';
 
 const interactionRepo = new InteractionRepositoryImpl();
 const videoRepo = new VideoRepositoryImpl();
@@ -22,7 +23,7 @@ export const useSavedVideos = (userId: string) => {
             setVideos(data);
             setError(null);
         } catch (err) {
-            console.error('[useSavedVideos] Error:', err);
+            logError(LogCode.REPO_ERROR, 'Error loading saved videos', { error: err, userId });
             setError('Kaydedilen videolar yüklenirken bir hata oluştu');
         } finally {
             if (!silent) setIsLoading(false);

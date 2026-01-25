@@ -20,6 +20,7 @@ import { FlyingEmoji } from './FlyingEmoji';
 import { COLORS } from '../../../core/constants';
 import { useInAppBrowserStore } from '../../store/useInAppBrowserStore';
 import { useActiveVideoStore } from '../../store/useActiveVideoStore';
+import { logStory, logError, LogCode } from '@/core/services/Logger';
 
 const STORY_DURATION = 5000; // 5 seconds
 const HOLD_PAUSE_DELAY = 200; // 200ms like Instagram
@@ -179,7 +180,7 @@ export function StoryPage({
         try {
             await Share.share({ message: shareUrl, url: shareUrl });
         } catch (error) {
-            console.error('Share story failed:', error);
+            logError(LogCode.SHARE_ERROR, 'Story share failed', { error, storyId: story.id });
         } finally {
             onPauseToggle(wasPaused);
         }
@@ -211,8 +212,12 @@ export function StoryPage({
     }, []);
 
     const handleCommercialPress = useCallback(() => {
-        console.log('Commercial disclosure:', story.commercialType, story.brandName);
-    }, [story.commercialType, story.brandName]);
+        logStory(LogCode.STORY_COMMERCIAL_PRESSED, 'Commercial disclosure pressed', {
+            storyId: story.id,
+            commercialType: story.commercialType,
+            brandName: story.brandName
+        });
+    }, [story.id, story.commercialType, story.brandName]);
 
     // Vertical swipe to close
     const panGesture = Gesture.Pan()

@@ -13,6 +13,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useBrightnessStore } from '../../store/useBrightnessStore';
 import SunIcon from '../../../../assets/icons/sun.svg';
+import { shadowStyle } from '@/core/utils/shadow';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SLIDER_HEIGHT = 200;
@@ -173,11 +174,7 @@ const styles = StyleSheet.create({
         // Glass effect
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.15)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.4,
-        shadowRadius: 16,
-        elevation: 10,
+        ...shadowStyle({ color: '#000', offset: { width: 0, height: 8 }, opacity: 0.4, radius: 16, elevation: 10 }),
     },
     iconContainer: {
         marginBottom: 12,
@@ -208,11 +205,7 @@ const styles = StyleSheet.create({
         height: THUMB_SIZE,
         borderRadius: THUMB_SIZE / 2,
         backgroundColor: '#FFFFFF',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 4,
-        elevation: 5,
+        ...shadowStyle({ color: '#000', offset: { width: 0, height: 2 }, opacity: 0.3, radius: 4, elevation: 5 }),
         left: (SLIDER_WIDTH - THUMB_SIZE) / 2,
         top: 0,
     },

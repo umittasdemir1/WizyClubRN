@@ -9,6 +9,8 @@ import { useThemeStore } from '../../store/useThemeStore';
 import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
 import { User } from '../../../domain/entities/User';
 import { ProfileRepositoryImpl } from '../../../data/repositories/ProfileRepositoryImpl';
+import { logRepo, logError, LogCode } from '@/core/services/Logger';
+import { shadowStyle } from '@/core/utils/shadow';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -103,7 +105,7 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
         setActiveSubView(null);
         setUsernameError(null);
       } catch (error) {
-        console.error('Error checking username:', error);
+        logError(LogCode.REPO_ERROR, 'Error checking username availability', { error, username: tempUsername });
         setUsernameError('Kullanıcı adı kontrol edilirken bir hata oluştu');
       } finally {
         setIsSaving(false);
@@ -144,7 +146,7 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
         onUpdateCompleted?.();
         handleClose();
       } catch (error) {
-        console.error('Error saving profile:', error);
+        logError(LogCode.REPO_ERROR, 'Error saving profile updates', { error, userId: user.id });
       } finally {
         setIsSaving(false);
       }
@@ -163,7 +165,7 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
         onUpdateCompleted?.();
         setActiveSubView(null);
       } catch (error) {
-        console.error('Error saving social links:', error);
+        logError(LogCode.REPO_ERROR, 'Error saving social links', { error, userId: user.id });
       } finally {
         setIsSaving(false);
       }
@@ -551,7 +553,7 @@ const styles = StyleSheet.create({
   pickerItem: { paddingVertical: 16, alignItems: 'center', borderTopWidth: 0.5 },
   pickerCancel: { paddingVertical: 16, alignItems: 'center', marginTop: 8 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.92)', justifyContent: 'center', alignItems: 'center' },
-  zoomedAvatarContainer: { shadowColor: "#000", shadowOpacity: 0.8, shadowRadius: 20, elevation: 20 },
+  zoomedAvatarContainer: { ...shadowStyle({ color: '#000', offset: { width: 0, height: 0 }, opacity: 0.8, radius: 20, elevation: 20 }) },
   zoomedAvatar: { width: SCREEN_WIDTH * 0.75, height: SCREEN_WIDTH * 0.75, borderRadius: (SCREEN_WIDTH * 0.75) / 2, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   closeZoomText: { marginTop: 40, fontSize: 14, color: 'rgba(255,255,255,0.6)', fontWeight: '500' },
   modalPressable: { flex: 1, width: '100%', justifyContent: 'center', alignItems: 'center' },

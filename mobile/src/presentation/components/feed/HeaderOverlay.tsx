@@ -13,6 +13,7 @@ import Animated, {
 import { Plus, Volume2, VolumeX, ChevronLeft } from 'lucide-react-native';
 import { useBrightnessStore } from '../../store/useBrightnessStore';
 import { useUploadStore } from '../../store/useUploadStore';
+import { textShadowStyle } from '@/core/utils/shadow';
 
 // Import SVGs
 import SunIcon from '../../../../assets/icons/sun.svg';
@@ -105,9 +106,7 @@ const thumbnailStyles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 13,
         fontWeight: '700',
-        textShadowColor: 'rgba(0, 0, 0, 0.75)',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 3,
+        ...textShadowStyle('rgba(0, 0, 0, 0.75)', { width: 0, height: 1 }, 3),
     },
 });
 

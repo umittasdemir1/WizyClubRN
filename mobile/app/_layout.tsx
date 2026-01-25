@@ -19,6 +19,7 @@ import { InAppBrowserOverlay } from '../src/presentation/components/shared/InApp
 import Purchases from 'react-native-purchases';
 import { CONFIG } from '../src/core/config';
 import * as Notifications from 'expo-notifications';
+import { LogCode, logAuth, logError } from '@/core/services/Logger';
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -26,6 +27,8 @@ SplashScreen.preventAutoHideAsync();
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
         shouldShowAlert: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
         shouldPlaySound: true,
         shouldSetBadge: false,
         sound: 'default',
@@ -60,9 +63,9 @@ function RootNavigator() {
                 try {
                     await SessionLogService.logEvent({ userId: user.id, eventType: 'app_open' });
                     await SessionLogService.logEvent({ userId: user.id, eventType: 'login' });
-                    console.log('[RootNavigator] Session logged successfully');
+                    logAuth(LogCode.AUTH_LOGIN_SUCCESS, 'Session logged successfully', { userId: user.id });
                 } catch (err) {
-                    console.error('[RootNavigator] Session logging failed:', err);
+                    logError(LogCode.ERROR_CAUGHT, 'Session logging failed', err);
                 }
             };
             logSession();
@@ -84,11 +87,11 @@ function RootNavigator() {
         }
         if (user?.id) {
             Purchases.logIn(user.id).catch((err) => {
-                console.warn('[Purchases] logIn failed:', err);
+                logError(LogCode.ERROR_CAUGHT, 'Purchases logIn failed', err);
             });
         } else {
             Purchases.logOut().catch((err) => {
-                console.warn('[Purchases] logOut failed:', err);
+                logError(LogCode.ERROR_CAUGHT, 'Purchases logOut failed', err);
             });
         }
     }, [user?.id]);

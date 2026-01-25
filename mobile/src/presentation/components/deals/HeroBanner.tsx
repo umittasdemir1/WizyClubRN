@@ -9,7 +9,7 @@ interface HeroBannerProps {
     title: string;
     subtitle: string;
     imageUrl: string;
-    gradientColors?: string[];
+    gradientColors?: [string, string, ...string[]];
     onShopPress?: () => void;
 }
 
@@ -17,7 +17,7 @@ export function HeroBanner({
     title,
     subtitle,
     imageUrl,
-    gradientColors = ['#e8d5f0', '#d4c4e8', '#c9e0eb'],
+    gradientColors = ['#e8d5f0', '#d4c4e8', '#c9e0eb'] as [string, string, ...string[]],
     onShopPress,
 }: HeroBannerProps) {
     return (

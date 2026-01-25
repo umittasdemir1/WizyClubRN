@@ -11,7 +11,8 @@
  */
 
 import React, { useRef, useState, useCallback, useEffect, useMemo, memo, useImperativeHandle, forwardRef } from 'react';
-import { View, StyleSheet, Dimensions, Platform, Image } from 'react-native';
+import { View, StyleSheet, Dimensions, Platform } from 'react-native';
+import { Image as ExpoImage, type ImageProps } from 'expo-image';
 import Animated, { SharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import Video, { VideoRef, OnLoadData, OnProgressData, OnVideoErrorData, SelectedTrackType } from 'react-native-video';
 import { Video as VideoEntity } from '../../../domain/entities/Video';
@@ -19,9 +20,11 @@ import { VideoCacheService } from '../../../data/services/VideoCacheService';
 import { getBufferConfig } from '../../../core/utils/bufferConfig';
 import { useNetInfo } from '@react-native-community/netinfo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LogCode, logError, logCache } from '@/core/services/Logger';
 
 const { height: WINDOW_HEIGHT } = Dimensions.get('window');
 const MAX_RETRIES = 3;
+const PosterImage = ExpoImage as unknown as React.ComponentType<ImageProps>;
 
 interface PlayerSlot {
     index: number;        // Video index in the feed
@@ -221,7 +224,7 @@ const PlayerSlotRenderer = memo(function PlayerSlotRenderer({
             {/* ✅ Poster Image Overlay - Shows until video is ready for display */}
             {/* Prevents black screen flashes during fast scroll */}
             {!slot.isReadyForDisplay && slot.thumbnailUrl && (
-                <Image
+                <PosterImage
                     source={{ uri: slot.thumbnailUrl }}
                     style={[
                         StyleSheet.absoluteFill,
@@ -402,7 +405,7 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
             const getSource = async (video: VideoEntity): Promise<string> => {
                 const videoUrl = getVideoUrl(video);
                 if (!videoUrl) {
-                    console.warn('[PlayerPool] No valid videoUrl for video:', video.id);
+                    logError(LogCode.ERROR_VALIDATION, 'No valid videoUrl for video', { videoId: video.id });
                     return '';
                 }
 
@@ -511,7 +514,7 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
                     : null;
 
                 if (!isCarousel && !isValidSource(source)) {
-                    console.warn('[PlayerPool] Invalid source for video:', video.id, source);
+                    logError(LogCode.ERROR_VALIDATION, 'Invalid source for video', { videoId: video.id, source });
                 }
 
                 const nextSlot: PlayerSlot = {
@@ -580,7 +583,7 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
         if (!slot || slot.videoId !== slotVideoId) return;
 
         // ✅ Keep only critical error logs
-        console.error(`[PlayerPool] Slot ${slotIndex} error (retry ${slot.retryCount}/${MAX_RETRIES}):`, error);
+        logError(LogCode.VIDEO_PLAYBACK_ERROR, 'Video player error', { slotIndex, retryCount: slot.retryCount, maxRetries: MAX_RETRIES, error });
 
         // If max retries reached, report error and stop retrying
         if (slot.retryCount >= MAX_RETRIES) {
@@ -593,7 +596,7 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
             const video = videos[slot.index];
             if (video) {
                 const videoUrl = getVideoUrl(video);
-                console.warn(`[PlayerPool] Cache failed for slot ${slotIndex}, falling back to network`);
+                logCache(LogCode.CACHE_ERROR, 'Cache failed, falling back to network', { slotIndex, videoId: video.id });
                 if (videoUrl) {
                     await VideoCacheService.deleteCachedVideo(videoUrl);
                 }

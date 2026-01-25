@@ -2,6 +2,7 @@ import { FeedManager } from '../../src/presentation/components/feed/FeedManager'
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import { useActiveVideoStore } from '../../src/presentation/store/useActiveVideoStore';
 import { useEffect } from 'react';
+import { logVideo, LogCode } from '@/core/services/Logger';
 
 export default function FeedScreen() {
     const {
@@ -30,7 +31,7 @@ export default function FeedScreen() {
     // Debug logging - only log when feed is initially loaded or significantly changes
     useEffect(() => {
         if (videos.length > 0) {
-            console.log(`[FeedScreen] Discovery feed ready with ${videos.length} videos`);
+            logVideo(LogCode.VIDEO_FEED_READY, 'Discovery feed ready', { videoCount: videos.length });
         }
     }, [videos.length]); // Changed from [videos] to [videos.length] to reduce re-renders
 

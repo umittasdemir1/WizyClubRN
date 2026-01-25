@@ -7,6 +7,7 @@ import { Avatar } from '../shared/Avatar';
 import { Video } from '../../../domain/entities/Video';
 import { useThemeStore } from '../../store/useThemeStore';
 import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
+import { logSheet, LogCode } from '@/core/services/Logger';
 
 interface DescriptionSheetProps {
   video: Video | null;
@@ -31,7 +32,7 @@ export const DescriptionSheet = forwardRef<BottomSheet, DescriptionSheetProps>(
     const snapPoints = useMemo(() => [SCREEN_HEIGHT - topOffset], [insets.top]);
 
     const handleInternalMore = () => {
-      console.log('Internal More Menu Pressed');
+      logSheet(LogCode.SHEET_ACTION, 'Description sheet more menu pressed', { videoId: video?.id });
     };
 
     const handleClose = () => {

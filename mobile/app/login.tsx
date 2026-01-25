@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Mail, Lock, Eye, EyeOff, CheckCircle } from 'lucide-react-native';
 import { useAuthStore } from '../src/presentation/store/useAuthStore';
+import { shadowStyle, textShadowStyle } from '@/core/utils/shadow';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -235,9 +236,7 @@ const styles = StyleSheet.create({
         color: '#FFF',
         textAlign: 'center',
         marginBottom: 12,
-        textShadowColor: 'rgba(0,0,0,0.5)',
-        textShadowOffset: { width: 0, height: 2 },
-        textShadowRadius: 4,
+        ...textShadowStyle('rgba(0,0,0,0.5)', { width: 0, height: 2 }, 4),
     },
     subtitleText: {
         fontSize: 16,
@@ -333,11 +332,7 @@ const styles = StyleSheet.create({
         borderRadius: 50,
         overflow: 'hidden',
         marginBottom: 24,
-        shadowColor: '#8B5CF6',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 6,
+        ...shadowStyle({ color: '#8B5CF6', offset: { width: 0, height: 4 }, opacity: 0.3, radius: 8, elevation: 6 }),
     },
     buttonDisabled: {
         opacity: 0.7,
@@ -382,11 +377,7 @@ const styles = StyleSheet.create({
         borderColor: '#E5E7EB',
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
+        ...shadowStyle({ color: '#000', offset: { width: 0, height: 2 }, opacity: 0.05, radius: 4, elevation: 2 }),
     },
     appleIcon: {
         fontSize: 24,

@@ -1,6 +1,7 @@
 import { IProfileRepository } from '../../domain/repositories/IProfileRepository';
 import { User } from '../../domain/entities';
 import { SupabaseProfileDataSource } from '../datasources/SupabaseProfileDataSource';
+import { logRepo, logError, LogCode } from '@/core/services/Logger';
 
 export class ProfileRepositoryImpl implements IProfileRepository {
     private dataSource: SupabaseProfileDataSource;
@@ -20,7 +21,7 @@ export class ProfileRepositoryImpl implements IProfileRepository {
 
             return this.mapDtoToUser(data);
         } catch (error: any) {
-            console.error('[ProfileRepository] ❌ getProfile error:', error);
+            logError(LogCode.REPO_ERROR, 'Profile repository getProfile error', { error, userId, viewerId });
             return null;
         }
     }

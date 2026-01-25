@@ -20,6 +20,7 @@ import { VideoSeekBar } from './VideoSeekBar';
 import { RefreshCcw, AlertCircle } from 'lucide-react-native';
 import PlayIcon from '../../../../assets/icons/play.svg';
 import ReplayIcon from '../../../../assets/icons/replay.svg';
+import { logUI, LogCode } from '@/core/services/Logger';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const ITEM_HEIGHT = Dimensions.get('window').height;
@@ -172,16 +173,16 @@ export const FeedItemOverlay = memo(function FeedItemOverlay({
                     onShare={() => onToggleShare(video.id)}
                     onShop={onOpenShopping}
                     showShop={!!video.brandUrl}
-                    onProfilePress={() => router.push(profileRoute)}
+                    onProfilePress={() => router.push(profileRoute as any)}
                 />
 
                 <MetadataLayer
                     video={video}
                     currentUserId={currentUserId}
-                    onAvatarPress={() => router.push(profileRoute)}
+                    onAvatarPress={() => router.push(profileRoute as any)}
                     onFollowPress={() => onToggleFollow(video.id)}
                     onReadMorePress={onOpenDescription}
-                    onCommercialTagPress={() => console.log('Open Commercial Info')}
+                    onCommercialTagPress={() => logUI(LogCode.UI_INTERACTION, 'Commercial tag pressed', { videoId: video.id })}
                 />
 
                 {isActive && (
