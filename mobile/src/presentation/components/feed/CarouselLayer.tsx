@@ -3,6 +3,7 @@ import { View, StyleSheet, Dimensions, FlatList, ViewToken, Pressable, GestureRe
 import Video, { SelectedTrackType } from 'react-native-video';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { shadowStyle } from '@/core/utils/shadow';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 

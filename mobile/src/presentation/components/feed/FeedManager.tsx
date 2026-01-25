@@ -70,12 +70,14 @@ import { FeedPrefetchService } from '../../../data/services/FeedPrefetchService'
 import { VideoCacheService } from '../../../data/services/VideoCacheService';
 import { LogCode, logUI, logError } from '@/core/services/Logger';
 import { Image } from 'expo-image';
+import { getVideoUrl } from '../../../core/utils/videoUrl';
 
 // New architecture imports
 import { VideoPlayerPool } from './VideoPlayerPool';
 import { BrightnessOverlay } from './BrightnessOverlay';
 import { ActiveVideoOverlay } from './ActiveVideoOverlay';
 import { DoubleTapLike } from './DoubleTapLike';
+import { CarouselLayer } from './CarouselLayer';
 
 const AnimatedFlashList = Animated.createAnimatedComponent(FlashList);
 
@@ -90,16 +92,6 @@ const DISABLE_NON_ACTIVE_UI = DISABLE_FEED_UI_FOR_TEST;
 const VIEWABILITY_CONFIG = {
     itemVisiblePercentThreshold: 50,  // ✅ Reduced from 60 for faster transitions
     minimumViewTime: 50,  // ✅ Reduced from 100ms for snappier feel
-};
-
-const getVideoUrl = (video: Video): string | null => {
-    if (typeof video.videoUrl === 'string') {
-        return video.videoUrl;
-    }
-    if (video.videoUrl && typeof video.videoUrl === 'object' && 'uri' in video.videoUrl) {
-        return (video.videoUrl as { uri: string }).uri;
-    }
-    return null;
 };
 
 // ============================================================================ 
@@ -134,21 +126,51 @@ const ScrollPlaceholder = React.memo(function ScrollPlaceholder({
     video,
     isActive,
     topInset,
+    isMuted,
+    isCleanScreen,
     onDoubleTap,
     onSingleTap,
     onLongPress,
     onPressIn,
     onPressOut,
+    onCarouselTouchStart,
+    onCarouselTouchEnd,
 }: {
     video: Video;
     isActive: boolean;
     topInset: number;
+    isMuted: boolean;
+    isCleanScreen: boolean;
     onDoubleTap: (videoId: string) => void;
     onSingleTap: () => void;
     onLongPress: (event: any) => void;
     onPressIn: (event: any) => void;
     onPressOut: () => void;
+    onCarouselTouchStart?: () => void;
+    onCarouselTouchEnd?: () => void;
 }) {
+    const isCarousel = video.postType === 'carousel' && (video.mediaUrls?.length ?? 0) > 0;
+
+    if (isActive && isCarousel) {
+        return (
+            <View style={styles.placeholderContainer}>
+                <CarouselLayer
+                    mediaUrls={video.mediaUrls ?? []}
+                    isActive={isActive}
+                    isMuted={isMuted}
+                    isCleanScreen={isCleanScreen}
+                    onDoubleTap={() => onDoubleTap(video.id)}
+                    onSingleTap={onSingleTap}
+                    onLongPress={onLongPress}
+                    onPressIn={onPressIn}
+                    onPressOut={onPressOut}
+                    onCarouselTouchStart={onCarouselTouchStart}
+                    onCarouselTouchEnd={onCarouselTouchEnd}
+                />
+            </View>
+        );
+    }
+
     const content = <View style={styles.placeholderContainer} />;
 
     return (
@@ -163,8 +185,19 @@ const ScrollPlaceholder = React.memo(function ScrollPlaceholder({
         </DoubleTapLike>
     );
 }, (prevProps, nextProps) => {
-    // ✅ Custom comparison: Only re-render if video ID changes
-    // isActive changes don't trigger re-render (videos don't need to know if they're active)
+    // ✅ Custom comparison: Only re-render if needed
+    const isCarousel = (video: Video) => video.postType === 'carousel' && (video.mediaUrls?.length ?? 0) > 0;
+
+    if (isCarousel(prevProps.video) || isCarousel(nextProps.video)) {
+        return (
+            prevProps.video.id === nextProps.video.id &&
+            prevProps.isActive === nextProps.isActive &&
+            prevProps.isMuted === nextProps.isMuted &&
+            prevProps.isCleanScreen === nextProps.isCleanScreen
+        );
+    }
+
+    // Non-carousel: Only re-render if video ID changes
     return prevProps.video.id === nextProps.video.id;
 });
 
@@ -459,14 +492,10 @@ export const FeedManager = ({
             setScreenFocused(true);
             setActiveTab('foryou');
 
-            if (videosRef.current.length > 0 && !lastActiveIdRef.current) {
-                setActiveVideo(videosRef.current[0].id, 0);
-            }
-
             return () => {
                 setScreenFocused(false);
             };
-        }, [setScreenFocused, setActiveVideo])
+        }, [setScreenFocused])
     );
 
     // Fast init - set first video as active
@@ -735,6 +764,16 @@ export const FeedManager = ({
         lastPressXRef.current = null;
     }, [setPlaybackRate]);
 
+    const handleCarouselTouchStart = useCallback(() => {
+        if (DISABLE_NON_ACTIVE_UI) return;
+        _setIsCarouselInteracting(true);
+    }, []);
+
+    const handleCarouselTouchEnd = useCallback(() => {
+        if (DISABLE_NON_ACTIVE_UI) return;
+        _setIsCarouselInteracting(false);
+    }, []);
+
     const handleActionPressIn = useCallback(() => {
         actionButtonsPressingRef.current = true;
     }, []);
@@ -940,6 +979,7 @@ export const FeedManager = ({
         setActiveVideo(newId, newIndex);
         setActiveTab('foryou');
         setCleanScreen(false);
+        _setIsCarouselInteracting(false);
 
         const nextVideo = videosRef.current[newIndex + 1];
         const nextUrl = nextVideo ? getVideoUrl(nextVideo) : null;
@@ -1000,15 +1040,31 @@ export const FeedManager = ({
                     video={item}
                     isActive={isActive}
                     topInset={insets.top}
+                    isMuted={isMuted}
+                    isCleanScreen={isCleanScreen}
                     onDoubleTap={handleDoubleTapLike}
                     onSingleTap={handleFeedTap}
                     onLongPress={handleLongPress}
                     onPressIn={handlePressIn}
                     onPressOut={handlePressOut}
+                    onCarouselTouchStart={handleCarouselTouchStart}
+                    onCarouselTouchEnd={handleCarouselTouchEnd}
                 />
             );
         },
-        [activeVideoId, insets.top, handleDoubleTapLike, handleFeedTap, handleLongPress, handlePressIn, handlePressOut]
+        [
+            activeVideoId,
+            insets.top,
+            isMuted,
+            isCleanScreen,
+            handleDoubleTapLike,
+            handleFeedTap,
+            handleLongPress,
+            handlePressIn,
+            handlePressOut,
+            handleCarouselTouchStart,
+            handleCarouselTouchEnd,
+        ]
     );
 
     const keyExtractor = useCallback((item: Video) => item.id, []);

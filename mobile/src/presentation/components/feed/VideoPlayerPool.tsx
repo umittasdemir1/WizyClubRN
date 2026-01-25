@@ -18,6 +18,7 @@ import Video, { VideoRef, OnLoadData, OnProgressData, OnVideoErrorData, Selected
 import { Video as VideoEntity } from '../../../domain/entities/Video';
 import { VideoCacheService } from '../../../data/services/VideoCacheService';
 import { getBufferConfig } from '../../../core/utils/bufferConfig';
+import { getVideoUrl } from '../../../core/utils/videoUrl';
 import { useNetInfo } from '@react-native-community/netinfo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LogCode, logError, logCache } from '@/core/services/Logger';
@@ -148,7 +149,6 @@ const PlayerSlotRenderer = memo(function PlayerSlotRenderer({
 
     const containerVisible = shouldShowSlot ? 1 : 0;
 
-    // NOW we can do conditional rendering
     // Skip if carousel or no valid source
     if (slot.isCarousel) {
         return null;
@@ -239,7 +239,6 @@ const PlayerSlotRenderer = memo(function PlayerSlotRenderer({
                     priority="high"
                 />
             )}
-
         </Animated.View>
     );
 });
@@ -252,19 +251,6 @@ const isValidSource = (source: string | undefined | null): source is string => {
     return source.startsWith('http://') ||
            source.startsWith('https://') ||
            source.startsWith('file://');
-};
-
-// Helper to get video URL from VideoEntity
-const getVideoUrl = (video: VideoEntity): string | null => {
-    // Handle different videoUrl formats
-    if (typeof video.videoUrl === 'string') {
-        return video.videoUrl;
-    }
-    // If videoUrl is an object with uri property
-    if (video.videoUrl && typeof video.videoUrl === 'object' && 'uri' in video.videoUrl) {
-        return (video.videoUrl as { uri: string }).uri;
-    }
-    return null;
 };
 
 export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPoolProps>(function VideoPlayerPool({
@@ -486,25 +472,17 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
                 }
             }
 
-            const updateSlotForIndex = async (slotIndex: number, targetIdx: number | null) => {
-                if (currentRecycleId !== recycleCounterRef.current) return;
+            const buildSlotForIndex = async (_slotIndex: number, targetIdx: number | null): Promise<PlayerSlot | null> => {
+                if (currentRecycleId !== recycleCounterRef.current) return null;
                 if (targetIdx == null || !videos[targetIdx]) {
-                    setSlots((prev) => {
-                        const prevSlot = prev[slotIndex];
-                        const nextSlot = createEmptySlot(-1);
-                        if (prevSlot && slotsEqual(prevSlot, nextSlot)) return prev;
-                        const next = [...prev];
-                        next[slotIndex] = nextSlot;
-                        return next;
-                    });
-                    return;
+                    return createEmptySlot(-1);
                 }
 
                 const video = videos[targetIdx];
                 const isCarousel = isCarouselPost(video);
                 const source = isCarousel ? '' : await getSource(video, targetIdx === currentIdx);
 
-                if (currentRecycleId !== recycleCounterRef.current) return;
+                if (currentRecycleId !== recycleCounterRef.current) return null;
 
                 const preserved = getPreservedSlot(video.id);
                 const isSameVideo = Boolean(preserved);
@@ -517,7 +495,7 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
                     logError(LogCode.ERROR_VALIDATION, 'Invalid source for video', { videoId: video.id, source });
                 }
 
-                const nextSlot: PlayerSlot = {
+                return {
                     index: targetIdx,
                     videoId: video.id,
                     source: preservedSource ?? (isValidSource(source) ? source : ''),
@@ -531,6 +509,9 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
                     isCarousel,
                     retryNonce: isSameVideo ? preserved!.retryNonce : 0,
                 };
+            };
+
+            const applySlotUpdate = (slotIndex: number, nextSlot: PlayerSlot) => {
                 setSlots((prev) => {
                     const prevSlot = prev[slotIndex];
                     if (prevSlot && slotsEqual(prevSlot, nextSlot)) return prev;
@@ -541,16 +522,64 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
             };
 
             const activeSlotIndexForUpdate = targetIndices.findIndex((idx) => idx === currentIdx);
+            const activeVideo = videos[currentIdx];
+            const activeVideoUrl = activeVideo ? getVideoUrl(activeVideo) : null;
+
             if (activeSlotIndexForUpdate >= 0) {
-                await updateSlotForIndex(activeSlotIndexForUpdate, currentIdx);
+                const nextSlot = await buildSlotForIndex(activeSlotIndexForUpdate, currentIdx);
+                if (nextSlot) {
+                    applySlotUpdate(activeSlotIndexForUpdate, nextSlot);
+
+                    if (
+                        activeVideoUrl &&
+                        nextSlot.videoId === activeVideo?.id &&
+                        nextSlot.source === activeVideoUrl &&
+                        activeVideoUrl.startsWith('http')
+                    ) {
+                        VideoCacheService.getCachedVideoPath(activeVideoUrl)
+                            .then((diskCached) => {
+                                if (!diskCached || !isValidSource(diskCached)) return;
+                                if (!isMountedRef.current) return;
+                                if (currentRecycleId !== recycleCounterRef.current) return;
+                                setSlots((prev) => {
+                                    const prevSlot = prev[activeSlotIndexForUpdate];
+                                    if (!prevSlot || prevSlot.videoId !== activeVideo.id) return prev;
+                                    if (prevSlot.isLoaded || prevSlot.isReadyForDisplay) return prev;
+                                    if (prevSlot.source === diskCached) return prev;
+                                    const next = [...prev];
+                                    next[activeSlotIndexForUpdate] = {
+                                        ...prevSlot,
+                                        source: diskCached,
+                                    };
+                                    return next;
+                                });
+                            })
+                            .catch(() => {});
+                    }
+                }
             }
 
             // ✅ Update other slots in background without blocking active slot render
+            const otherSlotIndices = [0, 1, 2].filter((slotIndex) => slotIndex !== activeSlotIndexForUpdate);
             Promise.all(
-                [0, 1, 2]
-                    .filter((slotIndex) => slotIndex !== activeSlotIndexForUpdate)
-                    .map((slotIndex) => updateSlotForIndex(slotIndex, targetIndices[slotIndex]))
-            );
+                otherSlotIndices.map(async (slotIndex) => ({
+                    slotIndex,
+                    nextSlot: await buildSlotForIndex(slotIndex, targetIndices[slotIndex]),
+                }))
+            ).then((results) => {
+                if (!isMountedRef.current || currentRecycleId !== recycleCounterRef.current) return;
+                setSlots((prev) => {
+                    let next = prev;
+                    results.forEach(({ slotIndex, nextSlot }) => {
+                        if (!nextSlot) return;
+                        const prevSlot = next[slotIndex];
+                        if (prevSlot && slotsEqual(prevSlot, nextSlot)) return;
+                        if (next === prev) next = [...prev];
+                        next[slotIndex] = nextSlot;
+                    });
+                    return next;
+                });
+            });
         };
 
         if (videos.length > 0) {
