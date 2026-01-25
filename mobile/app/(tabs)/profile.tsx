@@ -742,9 +742,9 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     if (!isShopModalOpen) return;
-    NavigationBar.setBackgroundColorAsync(tabBarBackground);
+    // setBackgroundColorAsync is not supported with edge-to-edge enabled on Android.
     NavigationBar.setButtonStyleAsync(isDark ? 'light' : 'dark');
-  }, [isShopModalOpen, tabBarBackground, isDark]);
+  }, [isShopModalOpen, isDark]);
 
   useEffect(() => {
     if (!isShopModalOpen) return;
