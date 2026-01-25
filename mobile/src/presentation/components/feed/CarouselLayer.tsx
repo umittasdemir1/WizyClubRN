@@ -17,6 +17,7 @@ interface CarouselLayerProps {
     mediaUrls: CarouselItem[];
     isActive: boolean;
     isMuted: boolean;
+    isPaused?: boolean;
     isCleanScreen?: boolean;
     onDoubleTap?: () => void;
     onSingleTap?: () => void;
@@ -33,6 +34,7 @@ export function CarouselLayer({
     mediaUrls,
     isActive,
     isMuted,
+    isPaused = false,
     isCleanScreen = false,
     onDoubleTap,
     onSingleTap,
@@ -110,6 +112,7 @@ export function CarouselLayer({
                         item={item}
                         isActive={isActive && activeIndex === index}
                         isMuted={isMuted}
+                        isPaused={isPaused}
                         onPress={handlePress}
                         onLongPress={onLongPress ? handleLongPress : undefined}
                         onPressOut={onPressOut}
@@ -186,6 +189,7 @@ interface CarouselItemProps {
     item: CarouselItem;
     isActive: boolean;
     isMuted: boolean;
+    isPaused: boolean;
     onPress: (event: GestureResponderEvent) => void;
     onLongPress?: (event: GestureResponderEvent) => void;
     onPressOut?: () => void;
@@ -196,6 +200,7 @@ function CarouselMediaItem({
     item,
     isActive,
     isMuted,
+    isPaused,
     onPress,
     onLongPress,
     onPressOut,
@@ -216,7 +221,7 @@ function CarouselMediaItem({
                     style={styles.video}
                     resizeMode="cover"
                     repeat={true}
-                    paused={!isActive}
+                    paused={!isActive || isPaused}
                     muted={isMuted}
                     selectedAudioTrack={isMuted ? { type: SelectedTrackType.DISABLED } : undefined}
                     playInBackground={false}

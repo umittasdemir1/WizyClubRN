@@ -125,6 +125,7 @@ interface FeedManagerProps {
 const ScrollPlaceholder = React.memo(function ScrollPlaceholder({
     video,
     isActive,
+    isPaused,
     topInset,
     isMuted,
     isCleanScreen,
@@ -138,6 +139,7 @@ const ScrollPlaceholder = React.memo(function ScrollPlaceholder({
 }: {
     video: Video;
     isActive: boolean;
+    isPaused: boolean;
     topInset: number;
     isMuted: boolean;
     isCleanScreen: boolean;
@@ -158,6 +160,7 @@ const ScrollPlaceholder = React.memo(function ScrollPlaceholder({
                     mediaUrls={video.mediaUrls ?? []}
                     isActive={isActive}
                     isMuted={isMuted}
+                    isPaused={isPaused}
                     isCleanScreen={isCleanScreen}
                     onDoubleTap={() => onDoubleTap(video.id)}
                     onSingleTap={onSingleTap}
@@ -192,6 +195,7 @@ const ScrollPlaceholder = React.memo(function ScrollPlaceholder({
         return (
             prevProps.video.id === nextProps.video.id &&
             prevProps.isActive === nextProps.isActive &&
+            prevProps.isPaused === nextProps.isPaused &&
             prevProps.isMuted === nextProps.isMuted &&
             prevProps.isCleanScreen === nextProps.isCleanScreen
         );
@@ -1039,6 +1043,7 @@ export const FeedManager = ({
                 <ScrollPlaceholder
                     video={item}
                     isActive={isActive}
+                    isPaused={isPaused}
                     topInset={insets.top}
                     isMuted={isMuted}
                     isCleanScreen={isCleanScreen}
@@ -1054,6 +1059,7 @@ export const FeedManager = ({
         },
         [
             activeVideoId,
+            isPaused,
             insets.top,
             isMuted,
             isCleanScreen,
