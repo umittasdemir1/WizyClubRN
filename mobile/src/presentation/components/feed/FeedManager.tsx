@@ -529,6 +529,8 @@ export const FeedManager = ({
         setRetryCount(0);
         currentTimeSV.value = 0;
         durationSV.value = 0;
+        activeTimeRef.current = 0;
+        activeDurationRef.current = 0;
         loopCountRef.current = 0;
         lastLoopTimeRef.current = Date.now();
 

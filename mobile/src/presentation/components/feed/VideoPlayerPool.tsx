@@ -286,6 +286,7 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
     const slotsRef = useRef(slots);
     const retryTimeoutsRef = useRef<Record<number, ReturnType<typeof setTimeout> | null>>({});
     const lastActiveSlotIndexRef = useRef(0);
+    const lastResetVideoIdRef = useRef<string | null>(null);
 
     // Track if component is mounted
     const isMountedRef = useRef(true);
@@ -364,6 +365,19 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
             });
         };
     }, []);
+
+    // Always restart from the beginning when a video becomes active.
+    useEffect(() => {
+        const activeVideoId = videos[activeIndex]?.id ?? null;
+        if (!activeVideoId) return;
+        if (lastResetVideoIdRef.current === activeVideoId) return;
+
+        const activeSlotIndex = slots.findIndex((slot) => slot.videoId === activeVideoId);
+        if (activeSlotIndex < 0) return;
+
+        playerRefs[activeSlotIndex]?.current?.seek(0);
+        lastResetVideoIdRef.current = activeVideoId;
+    }, [activeIndex, slots, videos, playerRefs]);
 
     // Initialize/recycle players when activeIndex changes
     useEffect(() => {
