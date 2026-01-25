@@ -138,11 +138,11 @@ const PlayerSlotRenderer = memo(function PlayerSlotRenderer({
     const slotReady = slot.isReadyForDisplay || slot.isLoaded;
 
     // Show slot if:
-    // 1. It's the active slot AND it's ready
+    // 1. It's the active slot (even if not ready, so poster can render)
     // 2. It's the last active slot AND current active is not ready (seamless transition)
     // 3. It's an adjacent slot AND it's ready (for preload visibility)
     const shouldShowSlot =
-        (isActiveSlot && slotReady) ||
+        (isActiveSlot && isValidSource(slot.source)) ||
         (!isActiveSlot && !isActiveReady && lastActiveSlotIndex === slotIndex) ||
         (!isActiveSlot && isNearActive && slotReady);
 
@@ -213,7 +213,7 @@ const PlayerSlotRenderer = memo(function PlayerSlotRenderer({
                 mixWithOthers={isMuted ? "mix" : undefined}
                 disableFocus={isMuted}
                 progressUpdateInterval={33}
-                automaticallyWaitsToMinimizeStalling={true}
+                automaticallyWaitsToMinimizeStalling={false}
                 shutterColor="transparent"
                 // ✅ Allow background buffering optimization
                 preventsDisplaySleepDuringVideoPlayback={false}
@@ -235,6 +235,8 @@ const PlayerSlotRenderer = memo(function PlayerSlotRenderer({
                     ]}
                     contentFit={slot.resizeMode === 'contain' ? 'contain' : 'cover'}
                     transition={0} // Instant appearance
+                    cachePolicy="memory-disk"
+                    priority="high"
                 />
             )}
 
@@ -393,8 +395,6 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
             }
 
             const priorSlots = slotsRef.current;
-            const newSlots: PlayerSlot[] = [...priorSlots];
-            let slotsChanged = false;
 
             // Calculate which videos should be in each slot
             const currentIdx = activeIndex;
@@ -402,7 +402,7 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
             const prevIdx = Math.max(activeIndex - 1, 0);
 
             // Get cached paths for each video
-            const getSource = async (video: VideoEntity): Promise<string> => {
+            const getSource = async (video: VideoEntity, preferFast: boolean): Promise<string> => {
                 const videoUrl = getVideoUrl(video);
                 if (!videoUrl) {
                     logError(LogCode.ERROR_VALIDATION, 'No valid videoUrl for video', { videoId: video.id });
@@ -415,10 +415,12 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
                     return memoryCached;
                 }
 
-                // Try disk cache (async)
-                const diskCached = await VideoCacheService.getCachedVideoPath(videoUrl);
-                if (diskCached && isValidSource(diskCached)) {
-                    return diskCached;
+                if (!preferFast) {
+                    // Try disk cache (async)
+                    const diskCached = await VideoCacheService.getCachedVideoPath(videoUrl);
+                    if (diskCached && isValidSource(diskCached)) {
+                        return diskCached;
+                    }
                 }
 
                 // Fallback to network
@@ -453,16 +455,6 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
                 a.isCarousel === b.isCarousel &&
                 a.retryNonce === b.retryNonce;
 
-            const setSlotIfChanged = (slotIndex: number, nextSlot: PlayerSlot) => {
-                const prevSlot = priorSlots[slotIndex];
-                if (!prevSlot || !slotsEqual(prevSlot, nextSlot)) {
-                    newSlots[slotIndex] = nextSlot;
-                    slotsChanged = true;
-                } else {
-                    newSlots[slotIndex] = prevSlot;
-                }
-            };
-
             const activeSlotIndex = priorSlots.findIndex((slot) => slot.index === currentIdx);
             const targetIndices: Array<number | null> = [null, null, null];
             const usedIndices = new Set<number>();
@@ -495,14 +487,22 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
             }
 
             const updateSlotForIndex = async (slotIndex: number, targetIdx: number | null) => {
+                if (currentRecycleId !== recycleCounterRef.current) return;
                 if (targetIdx == null || !videos[targetIdx]) {
-                    setSlotIfChanged(slotIndex, createEmptySlot(-1));
+                    setSlots((prev) => {
+                        const prevSlot = prev[slotIndex];
+                        const nextSlot = createEmptySlot(-1);
+                        if (prevSlot && slotsEqual(prevSlot, nextSlot)) return prev;
+                        const next = [...prev];
+                        next[slotIndex] = nextSlot;
+                        return next;
+                    });
                     return;
                 }
 
                 const video = videos[targetIdx];
                 const isCarousel = isCarouselPost(video);
-                const source = isCarousel ? '' : await getSource(video);
+                const source = isCarousel ? '' : await getSource(video, targetIdx === currentIdx);
 
                 if (currentRecycleId !== recycleCounterRef.current) return;
 
@@ -531,23 +531,26 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
                     isCarousel,
                     retryNonce: isSameVideo ? preserved!.retryNonce : 0,
                 };
-                setSlotIfChanged(slotIndex, nextSlot);
+                setSlots((prev) => {
+                    const prevSlot = prev[slotIndex];
+                    if (prevSlot && slotsEqual(prevSlot, nextSlot)) return prev;
+                    const next = [...prev];
+                    next[slotIndex] = nextSlot;
+                    return next;
+                });
             };
 
-            // ✅ FIX: Parallelize slot updates to avoid sequential disk I/O
-            await Promise.all(
-                [0, 1, 2].map(slotIndex => updateSlotForIndex(slotIndex, targetIndices[slotIndex]))
+            const activeSlotIndexForUpdate = targetIndices.findIndex((idx) => idx === currentIdx);
+            if (activeSlotIndexForUpdate >= 0) {
+                await updateSlotForIndex(activeSlotIndexForUpdate, currentIdx);
+            }
+
+            // ✅ Update other slots in background without blocking active slot render
+            Promise.all(
+                [0, 1, 2]
+                    .filter((slotIndex) => slotIndex !== activeSlotIndexForUpdate)
+                    .map((slotIndex) => updateSlotForIndex(slotIndex, targetIndices[slotIndex]))
             );
-
-            // Final check before setState
-            if (!isMountedRef.current || currentRecycleId !== recycleCounterRef.current) {
-                return;
-            }
-
-            if (slotsChanged) {
-                setSlots(newSlots);
-                // ✅ Logging disabled for performance
-            }
         };
 
         if (videos.length > 0) {

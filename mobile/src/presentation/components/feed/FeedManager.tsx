@@ -67,7 +67,9 @@ import React from 'react';
 import { SystemBars } from 'react-native-edge-to-edge';
 import { Bookmark } from 'lucide-react-native';
 import { FeedPrefetchService } from '../../../data/services/FeedPrefetchService';
+import { VideoCacheService } from '../../../data/services/VideoCacheService';
 import { LogCode, logUI, logError } from '@/core/services/Logger';
+import { Image } from 'expo-image';
 
 // New architecture imports
 import { VideoPlayerPool } from './VideoPlayerPool';
@@ -80,10 +82,24 @@ const AnimatedFlashList = Animated.createAnimatedComponent(FlashList);
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const ITEM_HEIGHT = Dimensions.get('window').height;
 const SAVE_ICON_ACTIVE = '#FFFFFF';
+const DISABLE_FEED_UI_FOR_TEST = true;
+const DISABLE_ACTIVE_VIDEO_OVERLAY = DISABLE_FEED_UI_FOR_TEST;
+const DISABLE_GLOBAL_OVERLAYS = DISABLE_FEED_UI_FOR_TEST;
+const DISABLE_NON_ACTIVE_UI = DISABLE_FEED_UI_FOR_TEST;
 
 const VIEWABILITY_CONFIG = {
     itemVisiblePercentThreshold: 50,  // ✅ Reduced from 60 for faster transitions
     minimumViewTime: 50,  // ✅ Reduced from 100ms for snappier feel
+};
+
+const getVideoUrl = (video: Video): string | null => {
+    if (typeof video.videoUrl === 'string') {
+        return video.videoUrl;
+    }
+    if (video.videoUrl && typeof video.videoUrl === 'object' && 'uri' in video.videoUrl) {
+        return (video.videoUrl as { uri: string }).uri;
+    }
+    return null;
 };
 
 // ============================================================================ 
@@ -636,6 +652,7 @@ export const FeedManager = ({
     }, []);
 
     const handleFeedTap = useCallback(() => {
+        if (DISABLE_NON_ACTIVE_UI) return;
         if (isScrollingRef.current || Date.now() - lastScrollEndRef.current < 150) return;
         if (Date.now() < doubleTapBlockUntilRef.current) return;
         if (actionButtonsPressingRef.current) return;
@@ -671,6 +688,7 @@ export const FeedManager = ({
     }, [activeTab, isVideoFinished, togglePause, showTapIndicator]);
 
     const handleDoubleTapLike = useCallback((videoId: string) => {
+        if (DISABLE_NON_ACTIVE_UI) return;
         if (isScrollingRef.current || Date.now() - lastScrollEndRef.current < 150) return;
         const targetVideo = videosRef.current.find((video) => video.id === videoId);
         if (!targetVideo) return;
@@ -681,10 +699,12 @@ export const FeedManager = ({
     }, [toggleLike]);
 
     const handlePressIn = useCallback((event: any) => {
+        if (DISABLE_NON_ACTIVE_UI) return;
         lastPressXRef.current = event?.nativeEvent?.pageX ?? event?.nativeEvent?.locationX ?? null;
     }, []);
 
     const handleLongPress = useCallback((event: any) => {
+        if (DISABLE_NON_ACTIVE_UI || DISABLE_GLOBAL_OVERLAYS) return;
         const pressX = lastPressXRef.current ?? event?.nativeEvent?.pageX ?? event?.nativeEvent?.locationX ?? 0;
         const isRightSide = pressX > SCREEN_WIDTH * 0.8;
 
@@ -707,6 +727,7 @@ export const FeedManager = ({
     }, [playbackRate, setPlaybackRate]);
 
     const handlePressOut = useCallback(() => {
+        if (DISABLE_NON_ACTIVE_UI) return;
         if (!wasSpeedBoostedRef.current) return;
         wasSpeedBoostedRef.current = false;
         setPlaybackRate(previousPlaybackRateRef.current);
@@ -906,33 +927,52 @@ export const FeedManager = ({
         return Array.from(indices);
     }, []);
 
+    const setActiveFromIndex = useCallback((newIndex: number) => {
+        if (newIndex < 0 || newIndex >= videosRef.current.length) return;
+        const newVideo = videosRef.current[newIndex];
+        const newId = newVideo?.id ?? null;
+        if (!newId || newId === lastActiveIdRef.current) return;
+
+        lastInternalIndex.current = newIndex;
+        lastActiveIdRef.current = newId;
+        lastViewableIndexRef.current = newIndex;
+        lastViewableTsRef.current = Date.now();
+        setActiveVideo(newId, newIndex);
+        setActiveTab('foryou');
+        setCleanScreen(false);
+
+        const nextVideo = videosRef.current[newIndex + 1];
+        const nextUrl = nextVideo ? getVideoUrl(nextVideo) : null;
+        if (nextUrl) {
+            VideoCacheService.cacheVideo(nextUrl).catch(() => {});
+        }
+
+        // Prefetch next thumbnails for faster poster display
+        [newIndex + 1, newIndex + 2].forEach((idx) => {
+            const video = videosRef.current[idx];
+            if (video?.thumbnailUrl) {
+                Image.prefetch(video.thumbnailUrl);
+            }
+        });
+
+        // ✅ Defer prefetch to avoid blocking scroll
+        setTimeout(() => {
+            FeedPrefetchService.getInstance().queueVideos(
+                videosRef.current,
+                getPrefetchIndices(newIndex),
+                newIndex
+            );
+        }, 0);
+    }, [setActiveVideo, setCleanScreen, getPrefetchIndices]);
+
     const onViewableItemsChanged = useCallback(
         ({ viewableItems }: { viewableItems: ViewToken<Video>[] }) => {
             if (viewableItems.length > 0) {
                 const newIndex = viewableItems[0].index ?? 0;
-                const newId = viewableItems[0].item?.id ?? null;
-
-                if (newId && newId !== lastActiveIdRef.current) {
-                    lastInternalIndex.current = newIndex;
-                    lastActiveIdRef.current = newId;
-                    lastViewableIndexRef.current = newIndex;
-                    lastViewableTsRef.current = Date.now();
-                    setActiveVideo(newId, newIndex);
-                    setActiveTab('foryou');
-                    setCleanScreen(false);
-
-                    // ✅ Defer prefetch to avoid blocking scroll
-                    setTimeout(() => {
-                        FeedPrefetchService.getInstance().queueVideos(
-                            videosRef.current,
-                            getPrefetchIndices(newIndex),
-                            newIndex
-                        );
-                    }, 0);
-                }
+                setActiveFromIndex(newIndex);
             }
         },
-        [setActiveVideo, setCleanScreen, getPrefetchIndices]
+        [setActiveFromIndex]
     );
 
     const viewabilityConfigCallbackPairs = useRef([
@@ -1053,9 +1093,9 @@ export const FeedManager = ({
 
     return (
         <SwipeWrapper
-            onSwipeLeft={handleSwipeLeft}
-            onSwipeRight={() => !isCustomFeed && router.push('/upload')}
-            disabled={isCustomFeed}
+            onSwipeLeft={DISABLE_NON_ACTIVE_UI ? undefined : handleSwipeLeft}
+            onSwipeRight={DISABLE_NON_ACTIVE_UI ? undefined : () => !isCustomFeed && router.push('/upload')}
+            disabled={isCustomFeed || DISABLE_NON_ACTIVE_UI}
         >
             <View style={styles.container}>
                 {/* ============================================================ 
@@ -1126,10 +1166,21 @@ export const FeedManager = ({
                         scrollEnabled={!isCarouselInteracting}
                         nestedScrollEnabled={true}
                         onScroll={scrollHandler}
+                        onScrollEndDrag={(e) => {
+                            const velocityY = e.nativeEvent.velocity?.y ?? 0;
+                            if (Math.abs(velocityY) < 0.25) {
+                                const offsetY = e.nativeEvent.contentOffset.y;
+                                const newIndex = Math.round(offsetY / ITEM_HEIGHT);
+                                setActiveFromIndex(newIndex);
+                            }
+                        }}
                         onMomentumScrollEnd={(e) => {
                             isScrollingSV.value = false;
                             isScrollingRef.current = false;
                             lastScrollEndRef.current = Date.now();
+                            const offsetY = e.nativeEvent.contentOffset.y;
+                            const newIndex = Math.round(offsetY / ITEM_HEIGHT);
+                            setActiveFromIndex(newIndex);
                             handleScrollEnd(e);
                         }}
                     />
@@ -1139,7 +1190,7 @@ export const FeedManager = ({
                     Layer 3: ActiveVideoOverlay (z-index: 50)
                     All UI for active video, decoupled from video layer
                     ============================================================ */}
-                {activeVideo && !isCleanScreen && (
+                {!DISABLE_ACTIVE_VIDEO_OVERLAY && activeVideo && !isCleanScreen && (
                     <ActiveVideoOverlay
                         video={activeVideo}
                         currentUserId={currentUserId}
@@ -1172,105 +1223,108 @@ export const FeedManager = ({
                 {/* ============================================================ 
                     Layer 4: Global Overlays
                     ============================================================ */}
+                {!DISABLE_GLOBAL_OVERLAYS && (
+                    <>
+                        {/* Save Toast */}
+                        {saveToastMessage && (
+                            <RNAnimated.View
+                                pointerEvents="none"
+                                style={[
+                                    styles.saveToast,
+                                    saveToastActive ? styles.saveToastActive : styles.saveToastInactive,
+                                    {
+                                        top: insets.top + 60,
+                                        opacity: saveToastOpacity,
+                                        transform: [{ translateY: saveToastTranslateY }],
+                                    },
+                                ]}
+                            >
+                                <View style={styles.saveToastContent}>
+                                    <Bookmark
+                                        size={18}
+                                        color={SAVE_ICON_ACTIVE}
+                                        fill={saveToastActive ? SAVE_ICON_ACTIVE : 'none'}
+                                        strokeWidth={1.6}
+                                    />
+                                    <Text style={[styles.saveToastText, styles.saveToastTextActive]}>
+                                        {saveToastMessage}
+                                    </Text>
+                                </View>
+                            </RNAnimated.View>
+                        )}
 
-                {/* Save Toast */}
-                {saveToastMessage && (
-                    <RNAnimated.View
-                        pointerEvents="none"
-                        style={[
-                            styles.saveToast,
-                            saveToastActive ? styles.saveToastActive : styles.saveToastInactive,
-                            {
-                                top: insets.top + 60,
-                                opacity: saveToastOpacity,
-                                transform: [{ translateY: saveToastTranslateY }],
-                            },
-                        ]}
-                    >
-                        <View style={styles.saveToastContent}>
-                            <Bookmark
-                                size={18}
-                                color={SAVE_ICON_ACTIVE}
-                                fill={saveToastActive ? SAVE_ICON_ACTIVE : 'none'}
-                                strokeWidth={1.6}
+                        {/* Header Overlay */}
+                        {!isCleanScreen && (
+                            <Animated.View
+                                style={[StyleSheet.absoluteFill, { zIndex: 100 }, uiOpacityStyle]}
+                                pointerEvents={isSeeking ? 'none' : 'box-none'}
+                            >
+                                <HeaderOverlay
+                                    isMuted={isMuted}
+                                    onToggleMute={toggleMute}
+                                    onStoryPress={handleStoryPress}
+                                    onUploadPress={() => router.push('/upload')}
+                                    activeTab={activeTab}
+                                    onTabChange={handleTabChange}
+                                    showBrightnessButton={false}
+                                    hasUnseenStories={hasUnseenStories}
+                                    showBack={isCustomFeed}
+                                    onBack={() => router.back()}
+                                />
+                            </Animated.View>
+                        )}
+
+                        {/* Story Bar */}
+                        {!isCleanScreen && showStories && (
+                            <StoryBar
+                                isVisible={activeTab === 'stories'}
+                                storyUsers={storyUsers}
+                                onAvatarPress={handleStoryAvatarPress}
+                                onClose={handleCloseStoryBar}
                             />
-                            <Text style={[styles.saveToastText, styles.saveToastTextActive]}>
-                                {saveToastMessage}
-                            </Text>
+                        )}
+
+                        {/* Story touch interceptor */}
+                        {!isCleanScreen && activeTab === 'stories' && (
+                            <Pressable style={styles.touchInterceptor} onPress={handleCloseStoryBar} />
+                        )}
+
+                        {/* ============================================================ 
+                            Layer 5: Bottom Sheets & Modals (z-index: 9999)
+                            Must be above all other layers
+                            ============================================================ */}
+                        <View style={styles.sheetsContainer} pointerEvents="box-none">
+                            {/* Bottom Sheets */}
+                            <MoreOptionsSheet
+                                ref={moreOptionsSheetRef}
+                                onCleanScreenPress={handleCleanScreen}
+                                onDeletePress={isOwnActiveVideo ? handleSheetDelete : undefined}
+                                isCleanScreen={isCleanScreen}
+                            />
+
+                            <DescriptionSheet
+                                ref={descriptionSheetRef}
+                                video={activeVideo}
+                                onFollowPress={() => activeVideoId && toggleFollow(activeVideoId)}
+                                onChange={(index) => {
+                                    if (index === -1 && useActiveVideoStore.getState().isPaused) {
+                                        togglePause();
+                                    }
+                                }}
+                            />
+
+                            {/* Delete Modal */}
+                            <DeleteConfirmationModal
+                                visible={isDeleteModalVisible}
+                                onCancel={() => setDeleteModalVisible(false)}
+                                onConfirm={() => {
+                                    if (activeVideoId) deleteVideo(activeVideoId);
+                                    setDeleteModalVisible(false);
+                                }}
+                            />
                         </View>
-                    </RNAnimated.View>
+                    </>
                 )}
-
-                {/* Header Overlay */}
-                {!isCleanScreen && (
-                    <Animated.View
-                        style={[StyleSheet.absoluteFill, { zIndex: 100 }, uiOpacityStyle]}
-                        pointerEvents={isSeeking ? 'none' : 'box-none'}
-                    >
-                        <HeaderOverlay
-                            isMuted={isMuted}
-                            onToggleMute={toggleMute}
-                            onStoryPress={handleStoryPress}
-                            onUploadPress={() => router.push('/upload')}
-                            activeTab={activeTab}
-                            onTabChange={handleTabChange}
-                            showBrightnessButton={false}
-                            hasUnseenStories={hasUnseenStories}
-                            showBack={isCustomFeed}
-                            onBack={() => router.back()}
-                        />
-                    </Animated.View>
-                )}
-
-                {/* Story Bar */}
-                {!isCleanScreen && showStories && (
-                    <StoryBar
-                        isVisible={activeTab === 'stories'}
-                        storyUsers={storyUsers}
-                        onAvatarPress={handleStoryAvatarPress}
-                        onClose={handleCloseStoryBar}
-                    />
-                )}
-
-                {/* Story touch interceptor */}
-                {!isCleanScreen && activeTab === 'stories' && (
-                    <Pressable style={styles.touchInterceptor} onPress={handleCloseStoryBar} />
-                )}
-
-                {/* ============================================================ 
-                    Layer 5: Bottom Sheets & Modals (z-index: 9999)
-                    Must be above all other layers
-                    ============================================================ */}
-                <View style={styles.sheetsContainer} pointerEvents="box-none">
-                    {/* Bottom Sheets */}
-                    <MoreOptionsSheet
-                        ref={moreOptionsSheetRef}
-                        onCleanScreenPress={handleCleanScreen}
-                        onDeletePress={isOwnActiveVideo ? handleSheetDelete : undefined}
-                        isCleanScreen={isCleanScreen}
-                    />
-
-                    <DescriptionSheet
-                        ref={descriptionSheetRef}
-                        video={activeVideo}
-                        onFollowPress={() => activeVideoId && toggleFollow(activeVideoId)}
-                        onChange={(index) => {
-                            if (index === -1 && useActiveVideoStore.getState().isPaused) {
-                                togglePause();
-                            }
-                        }}
-                    />
-
-                    {/* Delete Modal */}
-                    <DeleteConfirmationModal
-                        visible={isDeleteModalVisible}
-                        onCancel={() => setDeleteModalVisible(false)}
-                        onConfirm={() => {
-                            if (activeVideoId) deleteVideo(activeVideoId);
-                            setDeleteModalVisible(false);
-                        }}
-                    />
-                </View>
             </View>
         </SwipeWrapper>
     );
