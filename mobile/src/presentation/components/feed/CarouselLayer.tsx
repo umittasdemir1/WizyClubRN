@@ -3,12 +3,8 @@ import { View, StyleSheet, Dimensions, FlatList, ViewToken, Pressable, GestureRe
 import Video, { SelectedTrackType } from 'react-native-video';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming } from 'react-native-reanimated';
-import LikeIcon from '../../../../assets/icons/doubletablike.svg';
-import { shadowStyle } from '@/core/utils/shadow';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface CarouselItem {
     url: string;
@@ -31,11 +27,6 @@ interface CarouselLayerProps {
 }
 
 const DOUBLE_TAP_DELAY = 250;
-const HEART_COLOR = '#FF2146';
-const HEART_SIZE = 100;
-const TAP_Y_OFFSET = HEART_SIZE * 0.6;
-
-const AnimatedLikeIcon = Animated.createAnimatedComponent(LikeIcon);
 
 export function CarouselLayer({
     mediaUrls,
@@ -55,12 +46,6 @@ export function CarouselLayer({
     const tapCount = useRef(0);
     const tapTimer = useRef<NodeJS.Timeout | null>(null);
     const insets = useSafeAreaInsets();
-    const containerSizeRef = useRef({ width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
-    const scale = useSharedValue(0);
-    const opacity = useSharedValue(0);
-    const rotation = useSharedValue(0);
-    const heartX = useSharedValue(SCREEN_WIDTH / 2);
-    const heartY = useSharedValue(SCREEN_HEIGHT / 2);
 
     const lastActiveIndexRef = useRef(0);
     const handleScroll = useCallback((event: any) => {
@@ -80,25 +65,7 @@ export function CarouselLayer({
         };
     }, []);
 
-    const performAnimation = useCallback((x?: number, y?: number) => {
-        const randomAngle = Math.random() * 30 - 15;
-        rotation.value = randomAngle;
-        if (typeof x === 'number' && typeof y === 'number') {
-            heartX.value = x;
-            heartY.value = y;
-        }
-        opacity.value = 1;
-        scale.value = 0;
-
-        scale.value = withSpring(1.2, { mass: 0.8, damping: 12, stiffness: 300 }, (finished) => {
-            if (finished) {
-                scale.value = withTiming(0, { duration: 150 });
-                opacity.value = withTiming(0, { duration: 150 });
-            }
-        });
-    }, [scale, opacity, rotation, heartX, heartY]);
-
-    const handlePress = useCallback((event: GestureResponderEvent) => {
+    const handlePress = useCallback((_event: GestureResponderEvent) => {
         tapCount.current += 1;
         if (tapCount.current === 1) {
             tapTimer.current = setTimeout(() => {
@@ -113,15 +80,9 @@ export function CarouselLayer({
                 tapTimer.current = null;
             }
             tapCount.current = 0;
-            const rawX = event.nativeEvent.locationX;
-            const rawY = event.nativeEvent.locationY - TAP_Y_OFFSET;
-            const { width, height } = containerSizeRef.current;
-            const tapX = Math.max(HEART_SIZE / 2, Math.min(width - HEART_SIZE / 2, rawX));
-            const tapY = Math.max(HEART_SIZE / 2, Math.min(height - HEART_SIZE / 2, rawY));
-            performAnimation(tapX, tapY);
             onDoubleTap?.();
         }
-    }, [onSingleTap, onDoubleTap, performAnimation]);
+    }, [onSingleTap, onDoubleTap]);
 
     const handleLongPress = useCallback((event: GestureResponderEvent) => {
         if (!onLongPress) return;
@@ -133,32 +94,13 @@ export function CarouselLayer({
         onLongPress(event);
     }, [onLongPress]);
 
-    const heartAnimatedStyle = useAnimatedStyle(() => ({
-        position: 'absolute',
-        transform: [
-            { translateX: heartX.value - HEART_SIZE / 2 },
-            { translateY: heartY.value - HEART_SIZE / 2 },
-            { scale: Math.max(scale.value, 0) },
-            { rotate: `${rotation.value}deg` },
-        ],
-        opacity: opacity.value,
-    }));
-
     const imageItems = useMemo(() => mediaUrls.filter((item) => item.type === 'image'), [mediaUrls]);
     const activeItem = mediaUrls[activeIndex];
     const isActiveImage = activeItem?.type === 'image';
     const activeImageIndex = isActiveImage ? imageItems.indexOf(activeItem) : -1;
 
     return (
-        <View
-            style={styles.container}
-            onLayout={(event) => {
-                containerSizeRef.current = {
-                    width: event.nativeEvent.layout.width,
-                    height: event.nativeEvent.layout.height,
-                };
-            }}
-        >
+        <View style={styles.container}>
             <FlatList
                 ref={flatListRef}
                 data={mediaUrls}
@@ -235,12 +177,6 @@ export function CarouselLayer({
                 </View>
             )}
 
-            {/* Double-tap heart */}
-            <View style={styles.iconContainer} pointerEvents="none">
-                <Animated.View style={[styles.heartWrapper, heartAnimatedStyle]}>
-                    <AnimatedLikeIcon width={HEART_SIZE} height={HEART_SIZE} color={HEART_COLOR} />
-                </Animated.View>
-            </View>
         </View>
     );
 }

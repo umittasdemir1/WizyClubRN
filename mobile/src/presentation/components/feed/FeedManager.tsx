@@ -199,6 +199,16 @@ export const FeedManager = ({
     const isScrollingSV = useSharedValue(false);
     const scrollY = useSharedValue(0);
 
+    // ======================================================================== 
+    // Local state
+    // ======================================================================== 
+    const [tapIndicator, setTapIndicator] = useState<null | 'play' | 'pause'>(null);
+    const [activeTab, setActiveTab] = useState<'stories' | 'foryou'>('foryou');
+    const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
+    const [saveToastMessage, setSaveToastMessage] = useState<string | null>(null);
+    const [saveToastActive, setSaveToastActive] = useState(false);
+    const [isCarouselInteracting, _setIsCarouselInteracting] = useState(false);
+
     const scrollHandler = useAnimatedScrollHandler({
         onScroll: (event: any) => {
             // ✅ FIX #4: Only update scrollY (critical for video positioning)
@@ -213,16 +223,6 @@ export const FeedManager = ({
             isScrollingSV.value = false;
         },
     }, []);
-
-    // ======================================================================== 
-    // Local state
-    // ======================================================================== 
-    const [tapIndicator, setTapIndicator] = useState<null | 'play' | 'pause'>(null);
-    const [activeTab, setActiveTab] = useState<'stories' | 'foryou'>('foryou');
-    const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
-    const [saveToastMessage, setSaveToastMessage] = useState<string | null>(null);
-    const [saveToastActive, setSaveToastActive] = useState(false);
-    const [isCarouselInteracting, _setIsCarouselInteracting] = useState(false);
 
     // Video playback state (from pool callbacks)
     const [isVideoLoading, setIsVideoLoading] = useState(false);
@@ -313,6 +313,10 @@ export const FeedManager = ({
         [videos, activeVideoId]
     );
     const isOwnActiveVideo = !!activeVideo && activeVideo.user?.id === currentUserId;
+    const activeProfileRoute = useMemo(() => {
+        if (!activeVideo?.user?.id) return null;
+        return isOwnActiveVideo ? '/profile' : `/user/${activeVideo.user.id}`;
+    }, [activeVideo?.user?.id, isOwnActiveVideo]);
 
     const storyUsers = useMemo(() => {
         return storyListData.reduce((acc: any[], story) => {
@@ -332,6 +336,11 @@ export const FeedManager = ({
     }, [storyListData]);
 
     const hasUnseenStories = storyUsers.some((u: any) => u.hasUnseenStory);
+
+    const handleSwipeLeft = useCallback(() => {
+        if (isCustomFeed || !activeProfileRoute) return;
+        router.push(activeProfileRoute as any);
+    }, [activeProfileRoute, isCustomFeed, router]);
 
     // ======================================================================== 
     // Effects
@@ -1044,7 +1053,7 @@ export const FeedManager = ({
 
     return (
         <SwipeWrapper
-            onSwipeLeft={() => !isCustomFeed && router.push('/explore')}
+            onSwipeLeft={handleSwipeLeft}
             onSwipeRight={() => !isCustomFeed && router.push('/upload')}
             disabled={isCustomFeed}
         >

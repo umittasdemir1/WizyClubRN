@@ -174,7 +174,7 @@ export const ActiveVideoOverlay = memo(function ActiveVideoOverlay({
         
         // If scrolling, force hide (0). Otherwise use the visibility animation value.
         return {
-            opacity: isScrolling ? 0 : visibility
+            opacity: isScrolling ? 0.3 : visibility
         };
     }, []);
 
