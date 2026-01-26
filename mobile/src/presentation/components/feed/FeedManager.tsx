@@ -125,9 +125,7 @@ interface FeedManagerProps {
 const ScrollPlaceholder = React.memo(function ScrollPlaceholder({
     video,
     isActive,
-    isPaused,
     topInset,
-    isMuted,
     isCleanScreen,
     onDoubleTap,
     onSingleTap,
@@ -139,9 +137,7 @@ const ScrollPlaceholder = React.memo(function ScrollPlaceholder({
 }: {
     video: Video;
     isActive: boolean;
-    isPaused: boolean;
     topInset: number;
-    isMuted: boolean;
     isCleanScreen: boolean;
     onDoubleTap: (videoId: string) => void;
     onSingleTap: () => void;
@@ -159,8 +155,6 @@ const ScrollPlaceholder = React.memo(function ScrollPlaceholder({
                 <CarouselLayer
                     mediaUrls={video.mediaUrls ?? []}
                     isActive={isActive}
-                    isMuted={isMuted}
-                    isPaused={isPaused}
                     isCleanScreen={isCleanScreen}
                     onDoubleTap={() => onDoubleTap(video.id)}
                     onSingleTap={onSingleTap}
@@ -195,8 +189,6 @@ const ScrollPlaceholder = React.memo(function ScrollPlaceholder({
         return (
             prevProps.video.id === nextProps.video.id &&
             prevProps.isActive === nextProps.isActive &&
-            prevProps.isPaused === nextProps.isPaused &&
-            prevProps.isMuted === nextProps.isMuted &&
             prevProps.isCleanScreen === nextProps.isCleanScreen
         );
     }
@@ -1013,12 +1005,21 @@ export const FeedManager = ({
 
     const onViewableItemsChanged = useCallback(
         ({ viewableItems }: { viewableItems: ViewToken<Video>[] }) => {
-            if (viewableItems.length > 0) {
-                const newIndex = viewableItems[0].index ?? 0;
-                setActiveFromIndex(newIndex);
-            }
+            if (viewableItems.length === 0) return;
+            const targetIndex = Math.round(scrollY.value / ITEM_HEIGHT);
+            let nextIndex = viewableItems[0].index ?? 0;
+            let bestDistance = Math.abs(nextIndex - targetIndex);
+            viewableItems.forEach((item) => {
+                if (item.index == null) return;
+                const distance = Math.abs(item.index - targetIndex);
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    nextIndex = item.index;
+                }
+            });
+            setActiveFromIndex(nextIndex);
         },
-        [setActiveFromIndex]
+        [setActiveFromIndex, scrollY]
     );
 
     const viewabilityConfigCallbackPairs = useRef([
@@ -1045,9 +1046,7 @@ export const FeedManager = ({
                 <ScrollPlaceholder
                     video={item}
                     isActive={isActive}
-                    isPaused={isPaused}
                     topInset={insets.top}
-                    isMuted={isMuted}
                     isCleanScreen={isCleanScreen}
                     onDoubleTap={handleDoubleTapLike}
                     onSingleTap={handleFeedTap}
@@ -1061,9 +1060,7 @@ export const FeedManager = ({
         },
         [
             activeVideoId,
-            isPaused,
             insets.top,
-            isMuted,
             isCleanScreen,
             handleDoubleTapLike,
             handleFeedTap,

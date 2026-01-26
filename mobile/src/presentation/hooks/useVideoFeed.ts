@@ -83,21 +83,46 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
 
     // 1. Initial Prefetch: When feed loads, prefetch first 3 videos
     const hasInitialPrefetched = useRef(false);
+    const initialPrefetchFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const runInitialPrefetch = useCallback((reason: 'startup' | 'fallback') => {
+        if (hasInitialPrefetched.current || isVideoCacheDisabled()) return;
+        if (videos.length === 0) return;
+
+        hasInitialPrefetched.current = true;
+        logPerf(LogCode.PREFETCH_START, 'Initial video prefetch starting', { reason });
+
+        FeedPrefetchService.getInstance().queueVideos(videos, [0, 1, 2], 0);
+        videos.slice(0, 3).forEach((v) => {
+            if (v.thumbnailUrl) {
+                Image.prefetch(v.thumbnailUrl);
+            }
+        });
+    }, [videos]);
     useEffect(() => {
-        if (!isStartupComplete) return; // Startup penceresi bitene kadar bekle
-
-        if (videos.length > 0 && !hasInitialPrefetched.current && !isVideoCacheDisabled()) {
-            hasInitialPrefetched.current = true;
-            logPerf(LogCode.PREFETCH_START, 'Initial video prefetch starting');
-
-            FeedPrefetchService.getInstance().queueVideos(videos, [0, 1, 2], 0);
-            videos.slice(0, 3).forEach((v) => {
-                if (v.thumbnailUrl) {
-                    Image.prefetch(v.thumbnailUrl);
-                }
-            });
+        if (initialPrefetchFallbackRef.current) {
+            clearTimeout(initialPrefetchFallbackRef.current);
+            initialPrefetchFallbackRef.current = null;
         }
-    }, [videos.length, isStartupComplete]);
+
+        if (hasInitialPrefetched.current || videos.length === 0 || isVideoCacheDisabled()) return;
+
+        if (isStartupComplete) {
+            runInitialPrefetch('startup');
+            return;
+        }
+
+        // Fallback: run initial prefetch even if startup flag never flips.
+        initialPrefetchFallbackRef.current = setTimeout(() => {
+            runInitialPrefetch('fallback');
+        }, 4000);
+
+        return () => {
+            if (initialPrefetchFallbackRef.current) {
+                clearTimeout(initialPrefetchFallbackRef.current);
+                initialPrefetchFallbackRef.current = null;
+            }
+        };
+    }, [videos.length, isStartupComplete, runInitialPrefetch]);
 
     // ============================================
 

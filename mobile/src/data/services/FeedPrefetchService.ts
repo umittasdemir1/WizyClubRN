@@ -17,6 +17,8 @@ class FeedPrefetchService {
   private maxQueueSize = 20;
   private maxParallelDownloads = 2;
   private networkType: NetInfoStateType | null = null;
+  private activeIndex: number | null = null;
+  private generation = 0;
 
   static getInstance(): FeedPrefetchService {
     if (!FeedPrefetchService.instance) {
@@ -42,6 +44,13 @@ class FeedPrefetchService {
    */
   queueVideos(videos: Video[], indices: number[], currentIndex?: number) {
     if (isVideoCacheDisabled()) return;
+
+    if (typeof currentIndex === 'number' && currentIndex !== this.activeIndex) {
+      this.activeIndex = currentIndex;
+      this.generation += 1;
+      this.queue = [];
+      this.queued.clear();
+    }
 
     indices.forEach((index) => {
       const video = videos[index];
@@ -107,8 +116,10 @@ class FeedPrefetchService {
   private async processQueue() {
     if (this.isProcessing) return;
     this.isProcessing = true;
+    const startGeneration = this.generation;
 
     while (this.queue.length > 0) {
+      if (startGeneration !== this.generation) break;
       // Take highest priority items first
       const batch: PrefetchItem[] = [];
       for (let i = 0; i < this.maxParallelDownloads && this.queue.length > 0; i++) {
@@ -124,10 +135,7 @@ class FeedPrefetchService {
             if (memoryCached) {
               return;
             }
-            const diskCached = await VideoCacheService.getCachedVideoPath(url);
-            if (diskCached) {
-              return;
-            }
+            // Avoid extra disk checks here; cacheVideo already verifies disk.
             await VideoCacheService.cacheVideo(url);
             // ✅ Logging disabled for performance
           } catch (error) {
@@ -140,6 +148,9 @@ class FeedPrefetchService {
     }
 
     this.isProcessing = false;
+    if (this.queue.length > 0) {
+      this.processQueue();
+    }
   }
 
   /**
@@ -148,6 +159,7 @@ class FeedPrefetchService {
   clearQueue() {
     this.queue = [];
     this.queued.clear();
+    this.generation += 1;
   }
 
   /**

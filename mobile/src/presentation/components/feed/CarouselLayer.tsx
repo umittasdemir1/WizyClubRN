@@ -1,11 +1,16 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { View, StyleSheet, Dimensions, FlatList, ViewToken, Pressable, GestureResponderEvent, Text } from 'react-native';
-import Video, { SelectedTrackType } from 'react-native-video';
+import { View, StyleSheet, Dimensions, FlatList, Pressable, GestureResponderEvent, Text, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { shadowStyle } from '@/core/utils/shadow';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.heic', '.heif', '.avif'];
+
+const isImageUrl = (url: string): boolean => {
+    const normalized = url.split('?')[0].toLowerCase();
+    return IMAGE_EXTENSIONS.some((ext) => normalized.endsWith(ext));
+};
 
 interface CarouselItem {
     url: string;
@@ -16,8 +21,6 @@ interface CarouselItem {
 interface CarouselLayerProps {
     mediaUrls: CarouselItem[];
     isActive: boolean;
-    isMuted: boolean;
-    isPaused?: boolean;
     isCleanScreen?: boolean;
     onDoubleTap?: () => void;
     onSingleTap?: () => void;
@@ -33,8 +36,6 @@ const DOUBLE_TAP_DELAY = 250;
 export function CarouselLayer({
     mediaUrls,
     isActive,
-    isMuted,
-    isPaused = false,
     isCleanScreen = false,
     onDoubleTap,
     onSingleTap,
@@ -49,16 +50,28 @@ export function CarouselLayer({
     const tapCount = useRef(0);
     const tapTimer = useRef<NodeJS.Timeout | null>(null);
     const insets = useSafeAreaInsets();
+    const loadedIndicesRef = useRef<Set<number>>(new Set());
+    const [activeImageLoaded, setActiveImageLoaded] = useState(false);
 
     const lastActiveIndexRef = useRef(0);
+    const normalizedItems = useMemo(
+        () =>
+            mediaUrls
+                .filter((item) => item.type === 'image' || isImageUrl(item.url))
+                .map((item) => ({ ...item, type: 'image' as const })),
+        [mediaUrls]
+    );
+
     const handleScroll = useCallback((event: any) => {
+        if (normalizedItems.length === 0) return;
         const offsetX = event.nativeEvent.contentOffset.x;
         const nextIndex = Math.round(offsetX / SCREEN_WIDTH);
-        if (nextIndex !== lastActiveIndexRef.current) {
-            lastActiveIndexRef.current = nextIndex;
-            setActiveIndex(nextIndex);
+        const clampedIndex = Math.max(0, Math.min(nextIndex, normalizedItems.length - 1));
+        if (clampedIndex !== lastActiveIndexRef.current) {
+            lastActiveIndexRef.current = clampedIndex;
+            setActiveIndex(clampedIndex);
         }
-    }, []);
+    }, [normalizedItems.length]);
 
     useEffect(() => {
         return () => {
@@ -97,26 +110,61 @@ export function CarouselLayer({
         onLongPress(event);
     }, [onLongPress]);
 
-    const imageItems = useMemo(() => mediaUrls.filter((item) => item.type === 'image'), [mediaUrls]);
-    const activeItem = mediaUrls[activeIndex];
-    const isActiveImage = activeItem?.type === 'image';
-    const activeImageIndex = isActiveImage ? imageItems.indexOf(activeItem) : -1;
+    useEffect(() => {
+        if (normalizedItems.length === 0) {
+            lastActiveIndexRef.current = 0;
+            if (activeIndex !== 0) setActiveIndex(0);
+            setActiveImageLoaded(false);
+            return;
+        }
+        if (activeIndex >= normalizedItems.length) {
+            lastActiveIndexRef.current = 0;
+            setActiveIndex(0);
+            setActiveImageLoaded(false);
+        }
+        setActiveImageLoaded(loadedIndicesRef.current.has(activeIndex));
+    }, [activeIndex, normalizedItems.length]);
+
+    useEffect(() => {
+        if (!isActive || normalizedItems.length === 0) return;
+        const targets = new Set<number>();
+        [activeIndex - 1, activeIndex, activeIndex + 1, activeIndex + 2].forEach((idx) => {
+            if (idx >= 0 && idx < normalizedItems.length) targets.add(idx);
+        });
+        targets.forEach((idx) => {
+            const url = normalizedItems[idx]?.url;
+            if (url) {
+                Image.prefetch(url);
+            }
+        });
+    }, [activeIndex, isActive, normalizedItems]);
+
+    const handleImageDone = useCallback((index: number) => {
+        loadedIndicesRef.current.add(index);
+        if (index === activeIndex) {
+            setActiveImageLoaded(true);
+        }
+    }, [activeIndex]);
+
+    const imageItems = normalizedItems;
+    const activeItem = normalizedItems[activeIndex];
+    const isActiveImage = Boolean(activeItem);
+    const activeImageIndex = isActiveImage ? activeIndex : -1;
 
     return (
         <View style={styles.container}>
             <FlatList
                 ref={flatListRef}
-                data={mediaUrls}
+                data={normalizedItems}
                 renderItem={({ item, index }) => (
                     <CarouselMediaItem
                         item={item}
-                        isActive={isActive && activeIndex === index}
-                        isMuted={isMuted}
-                        isPaused={isPaused}
+                        index={index}
                         onPress={handlePress}
                         onLongPress={onLongPress ? handleLongPress : undefined}
                         onPressOut={onPressOut}
                         onPressIn={onPressIn}
+                        onImageDone={handleImageDone}
                     />
                 )}
                 keyExtractor={(item, index) => `${item.url}-${index}`}
@@ -147,10 +195,10 @@ export function CarouselLayer({
             />
 
             {/* Dots Indicator */}
-            {!isCleanScreen && mediaUrls.length > 1 && (
+            {!isCleanScreen && normalizedItems.length > 1 && (
                 <View style={styles.indicatorContainer}>
                     <View style={styles.indicatorPill}>
-                        {mediaUrls.map((_, index) => (
+                        {normalizedItems.map((_, index) => (
                             <View
                                 key={index}
                                 style={[
@@ -181,60 +229,36 @@ export function CarouselLayer({
                 </View>
             )}
 
+            {isActive && !activeImageLoaded && (
+                <View style={styles.loadingOverlay} pointerEvents="none">
+                    <ActivityIndicator color="#FFFFFF" />
+                </View>
+            )}
+
         </View>
     );
 }
 
 interface CarouselItemProps {
     item: CarouselItem;
-    isActive: boolean;
-    isMuted: boolean;
-    isPaused: boolean;
+    index: number;
     onPress: (event: GestureResponderEvent) => void;
     onLongPress?: (event: GestureResponderEvent) => void;
     onPressOut?: () => void;
     onPressIn?: (event: GestureResponderEvent) => void;
+    onImageDone: (index: number) => void;
 }
 
 function CarouselMediaItem({
     item,
-    isActive,
-    isMuted,
-    isPaused,
+    index,
     onPress,
     onLongPress,
     onPressOut,
     onPressIn,
+    onImageDone,
 }: CarouselItemProps) {
-    if (item.type === 'video') {
-        return (
-            <Pressable
-                style={styles.mediaContainer}
-                onPress={onPress}
-                onLongPress={onLongPress}
-                onPressOut={onPressOut}
-                onPressIn={onPressIn}
-                delayLongPress={300}
-            >
-                <Video
-                    source={{ uri: item.url }}
-                    style={styles.video}
-                    resizeMode="cover"
-                    repeat={true}
-                    paused={!isActive || isPaused}
-                    muted={isMuted}
-                    selectedAudioTrack={isMuted ? { type: SelectedTrackType.DISABLED } : undefined}
-                    playInBackground={false}
-                    playWhenInactive={false}
-                    ignoreSilentSwitch="ignore"
-                    mixWithOthers={isMuted ? "mix" : undefined}
-                    disableFocus={isMuted}
-                />
-            </Pressable>
-        );
-    }
-
-    // Image - Match video behavior (full-screen cover)
+    // Image-only carousel
     return (
         <Pressable
             style={styles.mediaContainer}
@@ -250,6 +274,9 @@ function CarouselMediaItem({
                 contentFit="contain"
                 cachePolicy="memory-disk"
                 priority="high"
+                placeholder={item.thumbnail ? { uri: item.thumbnail } : undefined}
+                onLoad={() => onImageDone(index)}
+                onError={() => onImageDone(index)}
             />
         </Pressable>
     );
@@ -320,5 +347,12 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 13,
         fontWeight: '700',
+    },
+    loadingOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#000',
+        zIndex: 200,
     },
 });

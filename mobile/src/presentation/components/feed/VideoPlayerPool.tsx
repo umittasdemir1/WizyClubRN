@@ -294,6 +294,7 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
     // Track active index to prevent race conditions
     const activeIndexRef = useRef(activeIndex);
     const recycleCounterRef = useRef(0);
+    const recycleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Expose seek function via ref
     const seekTo = useCallback((time: number) => {
@@ -363,6 +364,10 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
             Object.values(retryTimeoutsRef.current).forEach((timeoutId) => {
                 if (timeoutId) clearTimeout(timeoutId);
             });
+            if (recycleTimeoutRef.current) {
+                clearTimeout(recycleTimeoutRef.current);
+                recycleTimeoutRef.current = null;
+            }
         };
     }, []);
 
@@ -526,9 +531,13 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
             };
 
             const applySlotUpdate = (slotIndex: number, nextSlot: PlayerSlot) => {
+                const prevSlot = slotsRef.current[slotIndex];
+                if (prevSlot && prevSlot.videoId && prevSlot.videoId !== nextSlot.videoId) {
+                    playerRefs[slotIndex]?.current?.pause();
+                }
                 setSlots((prev) => {
-                    const prevSlot = prev[slotIndex];
-                    if (prevSlot && slotsEqual(prevSlot, nextSlot)) return prev;
+                    const prevSlotState = prev[slotIndex];
+                    if (prevSlotState && slotsEqual(prevSlotState, nextSlot)) return prev;
                     const next = [...prev];
                     next[slotIndex] = nextSlot;
                     return next;
@@ -596,9 +605,23 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
             });
         };
 
-        if (videos.length > 0) {
-            recycleSlots();
+        if (recycleTimeoutRef.current) {
+            clearTimeout(recycleTimeoutRef.current);
+            recycleTimeoutRef.current = null;
         }
+
+        if (videos.length > 0) {
+            recycleTimeoutRef.current = setTimeout(() => {
+                recycleSlots();
+            }, 100);
+        }
+
+        return () => {
+            if (recycleTimeoutRef.current) {
+                clearTimeout(recycleTimeoutRef.current);
+                recycleTimeoutRef.current = null;
+            }
+        };
     }, [activeIndex, videos]);
 
     // Handle video loaded
