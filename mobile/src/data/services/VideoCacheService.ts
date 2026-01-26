@@ -35,6 +35,24 @@ export class VideoCacheService {
             VideoCacheService.memoryCache.delete(url);
             return null;
         }
+        if (Platform.OS === 'web' || !CACHE_DIRECTORY) {
+            return entry.path;
+        }
+        if (!entry.path.startsWith('file://')) {
+            return entry.path;
+        }
+        try {
+            const filename = VideoCacheService.getFilename(url);
+            const file = new File(CACHE_DIRECTORY, filename);
+            const fileInfo = file.info();
+            if (!fileInfo.exists || (fileInfo.size ?? 0) <= 0) {
+                VideoCacheService.memoryCache.delete(url);
+                return null;
+            }
+        } catch {
+            VideoCacheService.memoryCache.delete(url);
+            return null;
+        }
         return entry.path;
     }
 

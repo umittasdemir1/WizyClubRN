@@ -140,7 +140,8 @@ async function processVideo(inputPath, videoName) {
 }
 
 async function main() {
-    const assetsDir = path.join(__dirname, '..', 'assets', 'videos');
+    const repoRoot = path.resolve(__dirname, '..', '..');
+    const assetsDir = path.join(repoRoot, 'assets', 'videos');
     const videos = fs.readdirSync(assetsDir).filter(f => f.endsWith('.mp4'));
 
     console.log('🚀 Starting batch video migration');

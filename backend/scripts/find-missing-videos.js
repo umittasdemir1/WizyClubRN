@@ -63,11 +63,14 @@ async function findMissingVideos() {
         });
 
         const fs = require('fs');
+        const path = require('path');
         const idList = missingVideos.map(v => `'${v.id}'`).join(', ');
         const sql = `DELETE FROM videos WHERE id IN (${idList});`;
         console.log(sql);
-        fs.writeFileSync('delete_missing.sql', sql, 'utf8');
-        console.log('\n✅ SQL command saved to delete_missing.sql');
+        const backendRoot = path.resolve(__dirname, '..');
+        const sqlPath = path.join(backendRoot, 'migrations', 'delete_missing.sql');
+        fs.writeFileSync(sqlPath, sql, 'utf8');
+        console.log(`\n✅ SQL command saved to ${sqlPath}`);
     }
 }
 

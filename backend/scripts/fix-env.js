@@ -1,7 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const envPath = path.join(__dirname, '.env');
+const backendRoot = path.resolve(__dirname, '..');
+const envPath = path.join(backendRoot, '.env');
 let envContent = fs.readFileSync(envPath, 'utf8');
 
 // Replace R2_BUCKET_NAME

@@ -13,10 +13,10 @@
 - Doğrulama yolu ve geri dönüş planı olmadan hiçbir şeyi kaldırma.
 
 ## Envanter: Mevcutlar (Üst Düzey Harita)
-- Root: `backend/`, `mobile/`, `maintenance_scripts/`, `r2-mcp/`, `Lütfen Kontrol Et/` altında büyük doküman arşivi, tool binary’leri (`ngrok`, `ngrok-v3-stable-linux-amd64.tgz.1`) ve çok sayıda feed denetim/refactor dokümanı.
+- Root: `backend/`, `mobile/`, `r2-mcp/`, `docs/archive/` altında arşiv dokümanları, tool binary’leri (`ngrok`, `ngrok-v3-stable-linux-amd64.tgz.1`) ve çok sayıda feed denetim/refactor dokümanı.
 - Backend: `server.js` monoliti, `services/HlsService.js`, `docs/openapi.yaml`, repo kökünde çok sayıda tek seferlik script ve SQL dosyası, ayrıca `backend/temp_uploads/` altında izlenen runtime artefaktları.
 - Mobile app: `mobile/app/` altında route ekranları, mimari `core/`, `data/`, `domain/`, `presentation/` olarak ayrılmış ve büyük bir feed/video alt sistemi var.
-- Tools: `r2-mcp/` paketi, DB/R2 kontrolleri için `maintenance_scripts/`, `.idx/` tool config klasörü.
+- Tools: `r2-mcp/` paketi, DB/R2 kontrolleri için `backend/scripts/` CLI, `.idx/` tool config klasörü.
 - Assets: `mobile/assets/` altında lokal ikon/görseller ve repo-hosted asset’lere bazı remote referanslar.
 
 ## Silme Listesi (Güvenli Kaldırmalar)
@@ -39,13 +39,13 @@
 - `mobile/src/presentation/components/discovery/*` (klasör dışında import bulunmuyor; dinamik ya da geleceğe dönük kullanım doğrulanmalı).
 - Deals domain yığını: `mobile/src/domain/usecases/GetDealsUseCase.ts`, `mobile/src/domain/repositories/IDealRepository.ts`, `mobile/src/data/repositories/DealRepositoryImpl.ts`, `mobile/src/data/datasources/MockDealDataSource.ts`.
 - User profile domain yığını: `mobile/src/domain/usecases/GetUserProfileUseCase.ts`, `mobile/src/domain/repositories/IUserRepository.ts`, `mobile/src/data/repositories/UserRepositoryImpl.ts`.
-- Tooling ve arşivler: `r2-mcp/`, `maintenance_scripts/`, `.idx/` ve tüm `Lütfen Kontrol Et/` doküman arşivi.
+- Tooling ve arşivler: `r2-mcp/`, `backend/scripts/`, `.idx/` ve tüm `docs/archive/` doküman arşivi.
 
 ## Konsolidasyon Planı (Birleştirilecek Kopyalar)
 - Tema sahipliği: `mobile/src/presentation/contexts/ThemeContext.tsx` vs `mobile/src/presentation/store/useThemeStore.ts` (tekini seç ve tüketimi birleştir).
 - Feed overlay’leri ve UI state’i: `ActiveVideoOverlay`, `MetadataLayer` ve ilişkili bileşenler arasındaki çakışan overlay mantığını azalt.
 - Cache/prefetch sahipliği: `FeedPrefetchService` ile `TrendingCarousel` içindeki ad-hoc cache kullanımını hizala.
-- Script dağınıklığı: backend root scriptleri ve `maintenance_scripts/` içeriklerini tek bir `backend/scripts/` CLI altında topla; giriş/çıkışları standardize et.
+- Script dağınıklığı: backend root scriptleri ve bakım görevlerini tek bir `backend/scripts/` CLI altında topla; giriş/çıkışları standardize et.
 - Doküman dağınıklığı: `LOGGING_GUIDE.md` ve `LOGLAMA_KILAVUZU.md` birleştir; eski notları `docs/archive/` altına ve bir index ile taşı.
 
 ## Props ve Public API Yüzeyi Azaltma
@@ -140,8 +140,8 @@
 - [REFACTOR] `mobile/src/presentation/components/feed/ActiveVideoOverlay.tsx`, `MetadataLayer.tsx`, `ActionButtons.tsx`: Prop yüzeyini aksiyon/state’i tek hook veya context altında gruplandırarak azalt. Neden: aşırı prop coupling ve regresyon riskini artırır. Risk: medium. Doğrulama: overlay aksiyonları çalışır ve UI doğru güncellenir. Bağımlılıklar: Faz 1 tamamlandı.
 - [REFACTOR] `mobile/src/presentation/components/explore/TrendingCarousel.tsx`, `mobile/src/data/services/FeedPrefetchService.ts`: Cache/prefetch sahipliğini tek serviste konsolide et. Neden: duplikasyon tutarsız UX üretir. Risk: medium. Doğrulama: prefetch davranışı feed ile aynı ve cache hit’ler korunur. Bağımlılıklar: Faz 1 tamamlandı.
 - [DOC] `LOGGING_GUIDE.md`, `LOGLAMA_KILAVUZU.md`: Tek bir kanonik logging dokümanı yap ve çevirileri tek yerde tut. Neden: yinelenen dokümanlar zamanla drift olur. Risk: low. Doğrulama: yeni doküman README veya root index’ten referanslanır. Bağımlılıklar: Faz 1 tamamlandı.
-- [DOC] `Lütfen Kontrol Et/`: Arşiv dokümanlarını `docs/archive/` altına taşı ve index dosyası ekle. Neden: büyük doküman arşivi repo root’unu kirletir. Risk: low. Doğrulama: dokümanlar index üzerinden erişilebilir. Bağımlılıklar: Faz 1 tamamlandı.
-- [SIMPLIFY] `backend/` root scriptleri ve `maintenance_scripts/`: `backend/scripts/` altında tek bir CLI girişiyle konsolide et. Neden: scriptler dağınık ve keşfi zor. Risk: medium. Doğrulama: kritik bakım işleri çalışır. Bağımlılıklar: Faz 1 tamamlandı.
+- [DOC] `docs/archive/`: Arşiv dokümanlarını `docs/archive/` altına taşı ve index dosyası ekle. Neden: büyük doküman arşivi repo root’unu kirletir. Risk: low. Doğrulama: dokümanlar index üzerinden erişilebilir. Bağımlılıklar: Faz 1 tamamlandı.
+- [SIMPLIFY] `backend/` root scriptleri ve bakım görevleri (eski `maintenance_scripts/`): `backend/scripts/` altında tek bir CLI girişiyle konsolide et. Neden: scriptler dağınık ve keşfi zor. Risk: medium. Doğrulama: kritik bakım işleri çalışır. Bağımlılıklar: Faz 1 tamamlandı.
 - [SIMPLIFY] `backend/*.sql`: Migration’ları `backend/migrations/` altına tutarlı isimlendirme ve README ile taşı. Neden: root seviyesinde SQL dağınıklığı yönetimi zorlaştırır. Risk: medium. Doğrulama: migration talimatları güncel ve yollar doğru. Bağımlılıklar: Faz 1 tamamlandı.
 
 ### Faz 3 — Yapısal Refactorlar (Sahiplik Sınırları)

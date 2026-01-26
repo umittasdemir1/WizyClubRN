@@ -14,22 +14,28 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Heart, Bookmark, Send, PictureInPicture } from 'lucide-react-native';
 
-interface ActionButtonsProps {
+interface ActionButtonsState {
     isLiked: boolean;
     likesCount: number;
     isSaved: boolean;
     savesCount: number;
     sharesCount: number;
     shopsCount: number;
-    videoId: string;
+    showShop?: boolean;
+}
+
+interface ActionButtonsHandlers {
     onLike: () => void;
     onSave: () => void;
     onShare: () => void;
     onShop: () => void;
-    onProfilePress: () => void;
-    showShop?: boolean;
     onPressIn?: () => void;
     onPressOut?: () => void;
+}
+
+interface ActionButtonsProps {
+    state: ActionButtonsState;
+    handlers: ActionButtonsHandlers;
 }
 
 export interface ActionButtonsRef {
@@ -61,7 +67,6 @@ interface ActionButtonProps {
     IconComponent: typeof Heart;
     count: string;
     zeroText: string;
-    videoId: string;
     isActive: boolean;
     activeColor: string;
     canToggle?: boolean; // If false, no color change on press
@@ -93,7 +98,7 @@ function BurstParticle({ angle, color, burst }: { angle: number; color: string; 
 }
 
 const ActionButton = forwardRef<ActionButtonRef, ActionButtonProps>(
-    ({ onPress, onLongPress, onPressIn, onPressOut, IconComponent, count, zeroText, videoId, isActive, activeColor, canToggle = true, enableBurst = false, burstColors = LIKE_PARTICLE_COLORS }, ref) => {
+    ({ onPress, onLongPress, onPressIn, onPressOut, IconComponent, count, zeroText, isActive, activeColor, canToggle = true, enableBurst = false, burstColors = LIKE_PARTICLE_COLORS }, ref) => {
         const [localActive, setLocalActive] = useState(isActive);
         const scale = useSharedValue(1);
         const isZero = count === '0';
@@ -196,21 +201,26 @@ const ActionButton = forwardRef<ActionButtonRef, ActionButtonProps>(
 );
 
 export const ActionButtons = memo(forwardRef<ActionButtonsRef, ActionButtonsProps>(function ActionButtons({
-    isLiked,
-    likesCount,
-    isSaved,
-    savesCount,
-    sharesCount,
-    shopsCount,
-    videoId,
-    onLike,
-    onSave,
-    onShare,
-    onShop,
-    showShop = true,
-    onPressIn,
-    onPressOut,
+    state,
+    handlers,
 }, ref) {
+    const {
+        isLiked,
+        likesCount,
+        isSaved,
+        savesCount,
+        sharesCount,
+        shopsCount,
+        showShop = true,
+    } = state;
+    const {
+        onLike,
+        onSave,
+        onShare,
+        onShop,
+        onPressIn,
+        onPressOut,
+    } = handlers;
     const likeButtonRef = useRef<ActionButtonRef>(null);
     const shake = useSharedValue(0);
 
@@ -245,7 +255,6 @@ export const ActionButtons = memo(forwardRef<ActionButtonsRef, ActionButtonsProp
                     IconComponent={Heart}
                     count={formatCount(likesCount)}
                     zeroText="Beğen"
-                    videoId={videoId}
                     onPress={onLike}
                     onLongPress={triggerShake}
                     onPressIn={onPressIn}
@@ -260,7 +269,6 @@ export const ActionButtons = memo(forwardRef<ActionButtonsRef, ActionButtonsProp
                     IconComponent={Bookmark}
                     count={formatCount(savesCount || 0)}
                     zeroText="Kaydet"
-                    videoId={videoId}
                     onPress={onSave}
                     onLongPress={triggerShake}
                     onPressIn={onPressIn}
@@ -275,7 +283,6 @@ export const ActionButtons = memo(forwardRef<ActionButtonsRef, ActionButtonsProp
                     IconComponent={Send}
                     count={formatCount(sharesCount)}
                     zeroText="Gönder"
-                    videoId={videoId}
                     onPress={onShare}
                     onLongPress={triggerShake}
                     onPressIn={onPressIn}
@@ -290,7 +297,6 @@ export const ActionButtons = memo(forwardRef<ActionButtonsRef, ActionButtonsProp
                         IconComponent={PictureInPicture}
                         count={formatCount(shopsCount || 0)}
                         zeroText="Göz At"
-                        videoId={videoId}
                         onPress={onShop}
                         onLongPress={triggerShake}
                         onPressIn={onPressIn}

@@ -268,7 +268,6 @@ export const FeedManager = ({
     }, []);
 
     // Video playback state (from pool callbacks)
-    const [isVideoLoading, setIsVideoLoading] = useState(false);
     const [hasVideoError, setHasVideoError] = useState(false);
     const [isVideoFinished, setIsVideoFinished] = useState(false);
     const [retryCount, setRetryCount] = useState(0);
@@ -300,9 +299,7 @@ export const FeedManager = ({
     const videoRetryRef = useRef<(() => void) | null>(null);
     const isScrollingRef = useRef(false);
     const lastScrollEndRef = useRef(0);
-    const videoLoadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const activeLoadTokenRef = useRef(0);
-    const activeLoadedRef = useRef(false);
     const loopCountRef = useRef(0);
     const lastLoopTimeRef = useRef(Date.now());
 
@@ -332,14 +329,6 @@ export const FeedManager = ({
     useEffect(() => {
         FeedPrefetchService.getInstance().setNetworkType(netInfo.type);
     }, [netInfo.type]);
-
-    useEffect(() => {
-        return () => {
-            if (videoLoadingTimeoutRef.current) {
-                clearTimeout(videoLoadingTimeoutRef.current);
-            }
-        };
-    }, []);
 
     useEffect(() => {
         if (__DEV__) {
@@ -512,8 +501,6 @@ export const FeedManager = ({
     useEffect(() => {
         lastActiveIdRef.current = activeVideoId;
         // Reset video state when video changes
-        activeLoadedRef.current = false;
-        setIsVideoLoading(false);
         setHasVideoError(false);
         setIsVideoFinished(false);
         setRetryCount(0);
@@ -523,17 +510,7 @@ export const FeedManager = ({
         activeDurationRef.current = 0;
         loopCountRef.current = 0;
         lastLoopTimeRef.current = Date.now();
-
-        if (videoLoadingTimeoutRef.current) {
-            clearTimeout(videoLoadingTimeoutRef.current);
-        }
-        const loadToken = ++activeLoadTokenRef.current;
-        videoLoadingTimeoutRef.current = setTimeout(() => {
-            if (activeLoadTokenRef.current !== loadToken) return;
-            if (!activeLoadedRef.current) {
-                setIsVideoLoading(true);
-            }
-        }, 250);
+        activeLoadTokenRef.current += 1;
     }, [activeVideoId, currentTimeSV, durationSV]);
 
     // Playback rate sync
@@ -555,22 +532,13 @@ export const FeedManager = ({
     const handleVideoLoaded = useCallback((index: number) => {
         // Video loaded successfully - clear any loading/error states
         if (index === activeIndex) {
-            activeLoadedRef.current = true;
-            if (videoLoadingTimeoutRef.current) {
-                clearTimeout(videoLoadingTimeoutRef.current);
-            }
-            setIsVideoLoading(false);
             setHasVideoError(false);
         }
     }, [activeIndex]);
 
     const handleVideoError = useCallback((index: number, _error: any) => {
         if (index === activeIndex) {
-            if (videoLoadingTimeoutRef.current) {
-                clearTimeout(videoLoadingTimeoutRef.current);
-            }
             setHasVideoError(true);
-            setIsVideoLoading(false);
             setRetryCount((prev) => prev + 1);
         }
     }, [activeIndex]);
@@ -785,7 +753,6 @@ export const FeedManager = ({
 
     const handleRetry = useCallback(() => {
         setHasVideoError(false);
-        setIsVideoLoading(true);
         setRetryCount(0);
         videoRetryRef.current?.();
     }, []);
@@ -1249,31 +1216,38 @@ export const FeedManager = ({
                     ============================================================ */}
                 {!DISABLE_ACTIVE_VIDEO_OVERLAY && activeVideo && !isCleanScreen && (
                     <ActiveVideoOverlay
-                        video={activeVideo}
-                        currentUserId={currentUserId}
-                        activeIndex={activeIndex}
-                        isFinished={isVideoFinished}
-                        hasError={hasVideoError}
-                        isLoading={isVideoLoading}
-                        retryCount={retryCount}
-                        isCleanScreen={isCleanScreen}
-                        isSeeking={isSeeking}
-                        tapIndicator={tapIndicator}
-                        rateLabel={rateLabel}
-                        currentTimeSV={currentTimeSV}
-                        durationSV={durationSV}
-                        isScrollingSV={isScrollingSV}
-                        scrollY={scrollY}
-                        onToggleLike={handleToggleLike}
-                        onToggleSave={handleToggleSave}
-                        onToggleShare={handleToggleShare}
-                        onToggleFollow={handleToggleFollow}
-                        onOpenShopping={handleOpenShopping}
-                        onOpenDescription={handleOpenDescription}
-                        onSeek={handleSeek}
-                        onRetry={handleRetry}
-                        onActionPressIn={handleActionPressIn}
-                        onActionPressOut={handleActionPressOut}
+                        data={{
+                            video: activeVideo,
+                            currentUserId,
+                            activeIndex,
+                        }}
+                        playback={{
+                            isFinished: isVideoFinished,
+                            hasError: hasVideoError,
+                            retryCount,
+                            isCleanScreen,
+                            isSeeking,
+                            tapIndicator,
+                            rateLabel,
+                        }}
+                        timeline={{
+                            currentTimeSV,
+                            durationSV,
+                            isScrollingSV,
+                            scrollY,
+                        }}
+                        actions={{
+                            onToggleLike: handleToggleLike,
+                            onToggleSave: handleToggleSave,
+                            onToggleShare: handleToggleShare,
+                            onToggleFollow: handleToggleFollow,
+                            onOpenShopping: handleOpenShopping,
+                            onOpenDescription: handleOpenDescription,
+                            onSeek: handleSeek,
+                            onRetry: handleRetry,
+                            onActionPressIn: handleActionPressIn,
+                            onActionPressOut: handleActionPressOut,
+                        }}
                     />
                 )}
 

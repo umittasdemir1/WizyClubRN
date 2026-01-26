@@ -84,6 +84,20 @@ class FeedPrefetchService {
     this.processQueue();
   }
 
+  async getCachedPath(url: string): Promise<string | null> {
+    if (isVideoCacheDisabled()) return null;
+    if (typeof url !== 'string') return null;
+    const memoryCached = VideoCacheService.getMemoryCachedPath(url);
+    if (memoryCached) return memoryCached;
+    return VideoCacheService.getCachedVideoPath(url);
+  }
+
+  async cacheVideoNow(url: string): Promise<string | null> {
+    if (isVideoCacheDisabled()) return null;
+    if (typeof url !== 'string') return null;
+    return VideoCacheService.cacheVideo(url);
+  }
+
   /**
    * Queue a single video with specific priority
    */

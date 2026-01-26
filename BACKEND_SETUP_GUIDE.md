@@ -30,6 +30,9 @@ nano .env
 # Kaydet: CTRL+X, Y, Enter
 
 npx expo start --dev-client --tunnel
+
+# Baseline loglarını otomatik yakalamak için:
+npm run start:devclient:baseline -- --tunnel --clear
 ```
 
 ---
@@ -53,6 +56,9 @@ nano .env
 
 npx expo start --dev-client
 # Tunnel yok!
+
+# Baseline loglarını otomatik yakalamak için:
+npm run start:devclient:baseline -- --clear
 ```
 
 ---

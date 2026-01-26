@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { Appearance } from 'react-native';
+import { useEffect } from 'react';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -53,9 +54,20 @@ export const useThemeStore = create<ThemeState>()(
     )
 );
 
-Appearance.addChangeListener(({ colorScheme }) => {
-    const { theme } = useThemeStore.getState();
-    if (theme === 'system') {
-        useThemeStore.setState({ isDark: colorScheme === 'dark' });
-    }
-});
+export function useThemeAppearanceSync() {
+    const theme = useThemeStore((state) => state.theme);
+
+    useEffect(() => {
+        if (theme !== 'system') {
+            return;
+        }
+
+        const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+            useThemeStore.setState({ isDark: colorScheme === 'dark' });
+        });
+
+        return () => {
+            subscription.remove();
+        };
+    }, [theme]);
+}

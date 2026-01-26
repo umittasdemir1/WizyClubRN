@@ -22,6 +22,7 @@ import { getVideoUrl } from '../../../core/utils/videoUrl';
 import { useNetInfo } from '@react-native-community/netinfo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LogCode, logError, logCache } from '@/core/services/Logger';
+import { PerformanceLogger } from '@/core/services/PerformanceLogger';
 
 const { height: WINDOW_HEIGHT } = Dimensions.get('window');
 const MAX_RETRIES = 3;
@@ -743,6 +744,13 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
             }
             return newSlots;
         });
+        const slot = slotsRef.current[slotIndex];
+        if (slot && slot.videoId === slotVideoId && slot.index === activeIndexRef.current) {
+            PerformanceLogger.markFirstVideoReady(slotVideoId, {
+                feedIndex: slot.index,
+                slotIndex,
+            });
+        }
         // ✅ Logging disabled for performance
     }, []);
 

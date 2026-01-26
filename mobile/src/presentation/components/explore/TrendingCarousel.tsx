@@ -12,7 +12,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Video, { SelectedTrackType } from 'react-native-video';
 import MoreIcon from '../../../../assets/icons/more.svg';
-import { VideoCacheService } from '../../../../src/data/services/VideoCacheService';
+import { FeedPrefetchService } from '../../../../src/data/services/FeedPrefetchService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ITEM_WIDTH = SCREEN_WIDTH * 0.38;
@@ -76,22 +76,20 @@ const TrendingCard = memo(({ item, index, scrollX, onPress, onPreview, onPreview
 
     useEffect(() => {
         let isMounted = true;
+        const prefetchService = FeedPrefetchService.getInstance();
         const loadVideo = async () => {
-            if (shouldLoad) {
-                const cachedPath = await VideoCacheService.getCachedVideoPath(item.videoUrl);
-                if (isMounted) {
-                    if (cachedPath) {
-                        setVideoSource({ uri: cachedPath });
-                    } else {
-                        // If not cached, start caching but keep playing from URL
-                        VideoCacheService.cacheVideo(item.videoUrl).then(path => {
-                            if (isMounted && path) {
-                                setVideoSource({ uri: path });
-                            }
-                        });
-                    }
-                }
+            if (!shouldLoad) return;
+            const cachedPath = await prefetchService.getCachedPath(item.videoUrl);
+            if (!isMounted) return;
+            if (cachedPath) {
+                setVideoSource({ uri: cachedPath });
+                return;
             }
+            prefetchService.cacheVideoNow(item.videoUrl).then((path) => {
+                if (isMounted && path) {
+                    setVideoSource({ uri: path });
+                }
+            });
         };
         loadVideo();
         return () => { isMounted = false; };

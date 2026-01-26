@@ -1,7 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const envPath = path.join(__dirname, 'wizy-backend', '.env');
+const backendRoot = path.resolve(__dirname, '..');
+const envPath = path.join(backendRoot, '.env');
 let content = fs.readFileSync(envPath, 'utf8');
 
 const updates = {

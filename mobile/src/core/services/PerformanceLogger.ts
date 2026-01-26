@@ -16,6 +16,8 @@ const MAX_METRICS = 100; // Keep last 100 transitions
 class PerformanceLoggerService {
     private metrics = new Map<string, TransitionMetric>();
     private completedMetrics: TransitionMetric[] = [];
+    private baselineStartMs: number | null = null;
+    private baselineLogged = new Set<string>();
 
     /**
      * Start tracking a video transition
@@ -90,6 +92,52 @@ class PerformanceLoggerService {
             this.metrics.delete(videoId);
             logError(LogCode.VIDEO_LOAD_ERROR, 'Video transition failed', { videoId, error });
         }
+    }
+
+    /**
+     * Mark app start for baseline timing.
+     */
+    markAppStart() {
+        if (this.baselineStartMs !== null) {
+            return;
+        }
+        this.baselineStartMs = Date.now();
+        logPerf(LogCode.PERF_MEASURE_START, 'Baseline start', {
+            checkpoint: 'app_start',
+            timestampMs: this.baselineStartMs,
+        });
+    }
+
+    /**
+     * Mark app ready for baseline timing.
+     */
+    markAppReady(context?: Record<string, unknown>) {
+        this.logBaselineEnd('app_ready', context);
+    }
+
+    /**
+     * Mark first video ready for baseline timing.
+     */
+    markFirstVideoReady(videoId: string, context?: Record<string, unknown>) {
+        this.logBaselineEnd('first_video_ready', { videoId, ...context });
+    }
+
+    private logBaselineEnd(checkpoint: string, context?: Record<string, unknown>) {
+        if (this.baselineLogged.has(checkpoint)) {
+            return;
+        }
+        this.markAppStart();
+        if (this.baselineStartMs === null) {
+            return;
+        }
+        this.baselineLogged.add(checkpoint);
+        const now = Date.now();
+        logPerf(LogCode.PERF_MEASURE_END, 'Baseline checkpoint', {
+            checkpoint,
+            durationMs: now - this.baselineStartMs,
+            timestampMs: now,
+            ...context,
+        });
     }
 
     /**

@@ -1,11 +1,14 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
+const path = require('path');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
 async function runMigration() {
-    const sql = fs.readFileSync('add_soft_delete.sql', 'utf8');
+    const backendRoot = path.resolve(__dirname, '..');
+    const sqlPath = path.join(backendRoot, 'migrations', 'add_soft_delete.sql');
+    const sql = fs.readFileSync(sqlPath, 'utf8');
     // Supabase JS client doesn't support raw SQL execution directly on public API typically without RPC or specific setup usually.
     // However, we can use the technique of creating a function or using PG directly? 
     // Wait, previous interactions suggested using a script. 
@@ -30,7 +33,7 @@ async function runMigration() {
     // I will instruction the user or assume it's done if I can't. 
     // WAIT, I HAVE `process.env.SUPABASE_URL`.
 
-    console.log('SQL Migration file created: add_soft_delete.sql');
+    console.log('SQL Migration file loaded:', sqlPath);
     console.log('Please execute this in your Supabase SQL Editor.');
     console.log('Content:');
     console.log(sql);

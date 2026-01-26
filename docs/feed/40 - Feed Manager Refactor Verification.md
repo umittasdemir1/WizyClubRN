@@ -238,7 +238,7 @@ Kritik sorunlarla başlayarak düzeltmelere geçmemi ister misiniz?
 
 Tamamlandı ✅ 
 
-**VIDEO_SYSTEM_AUDIT.md** dosyası proje root dizinine eklendi: [D:\WizyClub\VIDEO_SYSTEM_AUDIT.md](cci:7://file:///D:/WizyClub/VIDEO_SYSTEM_AUDIT.md:0:0-0:0)
+**docs/video/41 - Video System Audit.md** dosyası proje root dizinine eklendi: [D:\WizyClub\docs/video/41 - Video System Audit.md](cci:7://file:///D:/WizyClub/docs/video/41 - Video System Audit.md:0:0-0:0)
 
 Şimdi kritik sorunları düzeltmeye başlayalım mı?
 
@@ -466,9 +466,9 @@ TypeScript denetimi geçti. Tüm görevler tamamlandı. Task'ı güncelleyip kul
 
 ### User Input
 
-@[FEED_UI_TEST_FLAGS.md] dosyasını okur musun?
+@[docs/feed/37 - Feed Ui Test Flags.md] dosyasını okur musun?
 
-*Viewed [FEED_UI_TEST_FLAGS.md](file:///D:/WizyClub/FEED_UI_TEST_FLAGS.md) *
+*Viewed [docs/feed/37 - Feed Ui Test Flags.md](file:///D:/WizyClub/docs/feed/37 - Feed Ui Test Flags.md) *
 
 ### Planner Response
 

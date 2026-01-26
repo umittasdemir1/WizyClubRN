@@ -13,10 +13,10 @@
 - Do not remove anything without a verification path and a rollback plan.
 
 ## Inventory: What Exists (High-level Map)
-- Root: `backend/`, `mobile/`, `maintenance_scripts/`, `r2-mcp/`, large doc archive in `Lütfen Kontrol Et/`, tool binaries (`ngrok`, `ngrok-v3-stable-linux-amd64.tgz.1`), and multiple feed audit/refactor docs.
+- Root: `backend/`, `mobile/`, `r2-mcp/`, archived docs under `docs/archive/`, tool binaries (`ngrok`, `ngrok-v3-stable-linux-amd64.tgz.1`), and multiple feed audit/refactor docs.
 - Backend: `server.js` monolith, `services/HlsService.js`, `docs/openapi.yaml`, many one-off scripts and SQL files in repo root, and tracked runtime artifacts in `backend/temp_uploads/`.
 - Mobile app: Expo app with route screens under `mobile/app/`, architecture split into `core/`, `data/`, `domain/`, `presentation/`, and a large feed/video subsystem.
-- Tools: `r2-mcp/` package, `maintenance_scripts/` for DB/R2 checks, `.idx/` tool config folder.
+- Tools: `r2-mcp/` package, `backend/scripts/` CLI for DB/R2 checks, `.idx/` tool config folder.
 - Assets: local icons/images under `mobile/assets/` plus some remote references to repo-hosted assets.
 
 ## Delete List (Safe Removals)
@@ -39,13 +39,13 @@
 - `mobile/src/presentation/components/discovery/*` (no imports found outside folder; verify no dynamic or future usage).
 - Deals domain stack: `mobile/src/domain/usecases/GetDealsUseCase.ts`, `mobile/src/domain/repositories/IDealRepository.ts`, `mobile/src/data/repositories/DealRepositoryImpl.ts`, `mobile/src/data/datasources/MockDealDataSource.ts`.
 - User profile domain stack: `mobile/src/domain/usecases/GetUserProfileUseCase.ts`, `mobile/src/domain/repositories/IUserRepository.ts`, `mobile/src/data/repositories/UserRepositoryImpl.ts`.
-- Tooling and archives: `r2-mcp/`, `maintenance_scripts/`, `.idx/`, and the full `Lütfen Kontrol Et/` doc archive.
+- Tooling and archives: `r2-mcp/`, `backend/scripts/`, `.idx/`, and the full `docs/archive/` doc archive.
 
 ## Consolidation Plan (Duplicates to Merge)
 - Theme ownership: `mobile/src/presentation/contexts/ThemeContext.tsx` vs `mobile/src/presentation/store/useThemeStore.ts` (choose one and unify consumption).
 - Feed overlays and UI state: reduce overlapping overlay logic between `ActiveVideoOverlay`, `MetadataLayer`, and related components.
 - Cache/prefetch ownership: align `FeedPrefetchService` with `TrendingCarousel` ad-hoc cache usage.
-- Script sprawl: consolidate backend root scripts and `maintenance_scripts/` into a single `backend/scripts/` CLI with consistent inputs and logs.
+- Script sprawl: consolidate backend root scripts and maintenance tasks into a single `backend/scripts/` CLI with consistent inputs and logs.
 - Doc sprawl: consolidate `LOGGING_GUIDE.md` and `LOGLAMA_KILAVUZU.md`, move legacy notes to `docs/archive/` with an index.
 
 ## Props and Public API Surface Reduction
@@ -140,8 +140,8 @@
 - [REFACTOR] `mobile/src/presentation/components/feed/ActiveVideoOverlay.tsx`, `MetadataLayer.tsx`, `ActionButtons.tsx`: Reduce prop surface by grouping actions/state into one hook or context. Why: excessive props increase coupling and regressions. Risk: medium. Verify: overlay actions still work and UI updates correctly. Dependencies: Phase 1 complete.
 - [REFACTOR] `mobile/src/presentation/components/explore/TrendingCarousel.tsx`, `mobile/src/data/services/FeedPrefetchService.ts`: Consolidate cache/prefetch ownership (single service). Why: duplicate caching rules cause inconsistent UX. Risk: medium. Verify: prefetch behavior matches feed and cache hits remain. Dependencies: Phase 1 complete.
 - [DOC] `LOGGING_GUIDE.md`, `LOGLAMA_KILAVUZU.md`: Merge into a single canonical logging doc and keep translations in one place. Why: duplicated docs drift over time. Risk: low. Verify: new doc referenced from README or root index. Dependencies: Phase 1 complete.
-- [DOC] `Lütfen Kontrol Et/`: Move archive docs to `docs/archive/` with an index file. Why: large doc archive clutters repo root. Risk: low. Verify: docs still accessible via index. Dependencies: Phase 1 complete.
-- [SIMPLIFY] `backend/` root scripts and `maintenance_scripts/`: Consolidate into `backend/scripts/` with a single CLI entry. Why: scripts are duplicated and hard to discover. Risk: medium. Verify: key maintenance tasks still run. Dependencies: Phase 1 complete.
+- [DOC] `docs/archive/`: Move archive docs to `docs/archive/` with an index file. Why: large doc archive clutters repo root. Risk: low. Verify: docs still accessible via index. Dependencies: Phase 1 complete.
+- [SIMPLIFY] `backend/` root scripts and maintenance tasks (formerly `maintenance_scripts/`): Consolidate into `backend/scripts/` with a single CLI entry. Why: scripts are duplicated and hard to discover. Risk: medium. Verify: key maintenance tasks still run. Dependencies: Phase 1 complete.
 - [SIMPLIFY] `backend/*.sql`: Move migrations to `backend/migrations/` with consistent naming and README. Why: root-level SQL sprawl is hard to manage. Risk: medium. Verify: migration instructions updated and paths referenced correctly. Dependencies: Phase 1 complete.
 
 ### Phase 3 — Structural Refactors (Ownership Boundaries)

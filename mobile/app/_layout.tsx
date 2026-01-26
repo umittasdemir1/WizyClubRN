@@ -3,11 +3,10 @@ import { Stack, useSegments } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
-import { ThemeProvider } from '../src/presentation/contexts/ThemeContext';
 import '../global.css';
 import * as SplashScreen from 'expo-splash-screen';
 import { SystemBars } from 'react-native-edge-to-edge';
-import { useThemeStore } from '../src/presentation/store/useThemeStore';
+import { useThemeAppearanceSync, useThemeStore } from '../src/presentation/store/useThemeStore';
 import { useAuthStore } from '../src/presentation/store/useAuthStore';
 import { SessionLogService } from '../src/core/services/SessionLogService';
 import { COLORS, LIGHT_COLORS } from '../src/core/constants';
@@ -20,6 +19,7 @@ import Purchases from 'react-native-purchases';
 import { CONFIG } from '../src/core/config';
 import * as Notifications from 'expo-notifications';
 import { LogCode, logAuth, logError } from '@/core/services/Logger';
+import { PerformanceLogger } from '../src/core/services/PerformanceLogger';
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -53,6 +53,7 @@ function RootNavigator() {
     useEffect(() => {
         if (isInitialized) {
             SplashScreen.hideAsync();
+            PerformanceLogger.markAppReady();
         }
     }, [isInitialized]);
 
@@ -118,6 +119,10 @@ function RootNavigator() {
 
 export default function RootLayout() {
     const isDark = useThemeStore((state) => state.isDark);
+    useThemeAppearanceSync();
+    useEffect(() => {
+        PerformanceLogger.markAppStart();
+    }, []);
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
             <SystemBars
@@ -130,15 +135,13 @@ export default function RootLayout() {
                 barStyle={isDark ? 'light-content' : 'dark-content'}
                 backgroundColor={isDark ? COLORS.background : LIGHT_COLORS.background}
             />
-            <ThemeProvider>
-                <SafeAreaProvider>
-                    <BottomSheetModalProvider>
-                        <RootNavigator />
-                        <InAppBrowserOverlay />
-                        <Toast />
-                    </BottomSheetModalProvider>
-                </SafeAreaProvider>
-            </ThemeProvider>
+            <SafeAreaProvider>
+                <BottomSheetModalProvider>
+                    <RootNavigator />
+                    <InAppBrowserOverlay />
+                    <Toast />
+                </BottomSheetModalProvider>
+            </SafeAreaProvider>
         </GestureHandlerRootView>
     );
 }

@@ -51,31 +51,30 @@ const SCREEN_HEIGHT = Dimensions.get('window').height;
 // Types
 // ============================================================================
 
-interface ActiveVideoOverlayProps {
-    // Video data
+interface ActiveVideoOverlayData {
     video: Video;
     currentUserId?: string;
     activeIndex: number;
+}
 
-    // Playback state (from store)
+interface ActiveVideoOverlayPlayback {
     isFinished: boolean;
     hasError: boolean;
-    isLoading: boolean;
     retryCount: number;
-
-    // UI state
     isCleanScreen: boolean;
     isSeeking: boolean;
     tapIndicator: 'play' | 'pause' | null;
     rateLabel: string | null;
+}
 
-    // Seek sync (SharedValues from video layer)
+interface ActiveVideoOverlayTimeline {
     currentTimeSV: SharedValue<number>;
     durationSV: SharedValue<number>;
     isScrollingSV: SharedValue<boolean>;
     scrollY: SharedValue<number>;
+}
 
-    // Callbacks
+interface ActiveVideoOverlayActions {
     onToggleLike: () => void;
     onToggleSave: () => void;
     onToggleShare: () => void;
@@ -88,37 +87,46 @@ interface ActiveVideoOverlayProps {
     onActionPressOut?: () => void;
 }
 
+interface ActiveVideoOverlayProps {
+    data: ActiveVideoOverlayData;
+    playback: ActiveVideoOverlayPlayback;
+    timeline: ActiveVideoOverlayTimeline;
+    actions: ActiveVideoOverlayActions;
+}
+
 // ============================================================================
 // Component
 // ============================================================================
 
 export const ActiveVideoOverlay = memo(function ActiveVideoOverlay({
-    video,
-    currentUserId,
-    activeIndex,
-    isFinished,
-    hasError,
-    isLoading,
-    retryCount,
-    isCleanScreen,
-    isSeeking,
-    tapIndicator,
-    rateLabel,
-    currentTimeSV,
-    durationSV,
-    isScrollingSV,
-    scrollY,
-    onToggleLike,
-    onToggleSave,
-    onToggleShare,
-    onToggleFollow,
-    onOpenShopping,
-    onOpenDescription,
-    onSeek,
-    onRetry,
-    onActionPressIn,
-    onActionPressOut,
+    data,
+    playback,
+    timeline,
+    actions,
 }: ActiveVideoOverlayProps) {
+    const { video, currentUserId, activeIndex } = data;
+    const {
+        isFinished,
+        hasError,
+        retryCount,
+        isCleanScreen,
+        isSeeking,
+        tapIndicator,
+        rateLabel,
+    } = playback;
+    const { currentTimeSV, durationSV, isScrollingSV, scrollY } = timeline;
+    const {
+        onToggleLike,
+        onToggleSave,
+        onToggleShare,
+        onToggleFollow,
+        onOpenShopping,
+        onOpenDescription,
+        onSeek,
+        onRetry,
+        onActionPressIn,
+        onActionPressOut,
+    } = actions;
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const actionButtonsRef = useRef<ActionButtonsRef>(null);
@@ -278,31 +286,34 @@ export const ActiveVideoOverlay = memo(function ActiveVideoOverlay({
                         {/* Action Buttons (Right side) */}
                         <ActionButtons
                             ref={actionButtonsRef}
-                            videoId={video.id}
-                            isLiked={video.isLiked}
-                            likesCount={video.likesCount}
-                            isSaved={video.isSaved}
-                            savesCount={video.savesCount || 0}
-                            sharesCount={video.sharesCount}
-                            shopsCount={video.shopsCount || 0}
-                            onLike={handleLikePress}
-                            onSave={onToggleSave}
-                            onShare={onToggleShare}
-                            onShop={onOpenShopping}
-                            showShop={!!video.brandUrl}
-                            onProfilePress={handleProfilePress}
-                            onPressIn={onActionPressIn}
-                            onPressOut={onActionPressOut}
+                            state={{
+                                isLiked: video.isLiked,
+                                likesCount: video.likesCount,
+                                isSaved: video.isSaved,
+                                savesCount: video.savesCount || 0,
+                                sharesCount: video.sharesCount,
+                                shopsCount: video.shopsCount || 0,
+                                showShop: !!video.brandUrl,
+                            }}
+                            handlers={{
+                                onLike: handleLikePress,
+                                onSave: onToggleSave,
+                                onShare: onToggleShare,
+                                onShop: onOpenShopping,
+                                onPressIn: onActionPressIn,
+                                onPressOut: onActionPressOut,
+                            }}
                         />
 
                         {/* Metadata Layer (Bottom left) */}
                         <MetadataLayer
-                            video={video}
-                            currentUserId={currentUserId}
-                            onAvatarPress={handleProfilePress}
-                            onFollowPress={onToggleFollow}
-                            onReadMorePress={onOpenDescription}
-                            onCommercialTagPress={() => {}}
+                            data={{ video, currentUserId }}
+                            handlers={{
+                                onAvatarPress: handleProfilePress,
+                                onFollowPress: onToggleFollow,
+                                onReadMorePress: onOpenDescription,
+                                onCommercialTagPress: () => {},
+                            }}
                         />
                     </Animated.View>
 
@@ -322,29 +333,29 @@ export const ActiveVideoOverlay = memo(function ActiveVideoOverlay({
 }, (prevProps, nextProps) => {
     // Custom equality check for optimal re-renders
     return (
-        prevProps.video.id === nextProps.video.id &&
-        prevProps.activeIndex === nextProps.activeIndex &&
-        prevProps.video.isLiked === nextProps.video.isLiked &&
-        prevProps.video.isSaved === nextProps.video.isSaved &&
-        prevProps.video.likesCount === nextProps.video.likesCount &&
-        prevProps.video.savesCount === nextProps.video.savesCount &&
-        prevProps.video.sharesCount === nextProps.video.sharesCount &&
-        prevProps.video.shopsCount === nextProps.video.shopsCount &&
-        prevProps.video.commentsCount === nextProps.video.commentsCount &&
-        prevProps.video.description === nextProps.video.description &&
-        prevProps.video.brandUrl === nextProps.video.brandUrl &&
-        prevProps.video.brandName === nextProps.video.brandName &&
-        prevProps.video.user.username === nextProps.video.user.username &&
-        prevProps.video.user.fullName === nextProps.video.user.fullName &&
-        prevProps.video.user.avatarUrl === nextProps.video.user.avatarUrl &&
-        prevProps.video.user.isFollowing === nextProps.video.user.isFollowing &&
-        prevProps.isFinished === nextProps.isFinished &&
-        prevProps.hasError === nextProps.hasError &&
-        prevProps.isLoading === nextProps.isLoading &&
-        prevProps.isCleanScreen === nextProps.isCleanScreen &&
-        prevProps.isSeeking === nextProps.isSeeking &&
-        prevProps.tapIndicator === nextProps.tapIndicator &&
-        prevProps.rateLabel === nextProps.rateLabel
+        prevProps.data.video.id === nextProps.data.video.id &&
+        prevProps.data.activeIndex === nextProps.data.activeIndex &&
+        prevProps.data.video.isLiked === nextProps.data.video.isLiked &&
+        prevProps.data.video.isSaved === nextProps.data.video.isSaved &&
+        prevProps.data.video.likesCount === nextProps.data.video.likesCount &&
+        prevProps.data.video.savesCount === nextProps.data.video.savesCount &&
+        prevProps.data.video.sharesCount === nextProps.data.video.sharesCount &&
+        prevProps.data.video.shopsCount === nextProps.data.video.shopsCount &&
+        prevProps.data.video.commentsCount === nextProps.data.video.commentsCount &&
+        prevProps.data.video.description === nextProps.data.video.description &&
+        prevProps.data.video.brandUrl === nextProps.data.video.brandUrl &&
+        prevProps.data.video.brandName === nextProps.data.video.brandName &&
+        prevProps.data.video.user.username === nextProps.data.video.user.username &&
+        prevProps.data.video.user.fullName === nextProps.data.video.user.fullName &&
+        prevProps.data.video.user.avatarUrl === nextProps.data.video.user.avatarUrl &&
+        prevProps.data.video.user.isFollowing === nextProps.data.video.user.isFollowing &&
+        prevProps.playback.isFinished === nextProps.playback.isFinished &&
+        prevProps.playback.hasError === nextProps.playback.hasError &&
+        prevProps.playback.isCleanScreen === nextProps.playback.isCleanScreen &&
+        prevProps.playback.isSeeking === nextProps.playback.isSeeking &&
+        prevProps.playback.tapIndicator === nextProps.playback.tapIndicator &&
+        prevProps.playback.rateLabel === nextProps.playback.rateLabel &&
+        prevProps.playback.retryCount === nextProps.playback.retryCount
     );
 });
 

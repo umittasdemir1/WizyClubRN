@@ -1,6 +1,6 @@
 # Video System Audit - Action Plan
 
-Source: VIDEO_SYSTEM_AUDIT.md + current code review
+Source: docs/video/41 - Video System Audit.md + current code review
 Status: draft (awaiting approval)
 
 ## P1 Critical

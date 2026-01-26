@@ -5,26 +5,32 @@ import { Avatar } from '../shared/Avatar';
 import { VerifiedBadge } from '../shared/VerifiedBadge';
 import { textShadowStyle } from '@/core/utils/shadow';
 
-interface MetadataLayerProps {
+interface MetadataLayerData {
     video: Video;
+    currentUserId?: string;
+}
+
+interface MetadataLayerHandlers {
     onAvatarPress: () => void;
     onFollowPress: () => void;
     onReadMorePress: () => void;
     onCommercialTagPress: () => void;
-    currentUserId?: string; // Add currentUserId prop
+}
+
+interface MetadataLayerProps {
+    data: MetadataLayerData;
+    handlers: MetadataLayerHandlers;
 }
 
 const BASE_BOTTOM_POSITION = 80; // Aligned exactly with seekbar center (80px touch area / 2)
 const SAFE_AREA_OFFSET = 0; // No extra offset needed as seekbar is also at 0
 
 export function MetadataLayer({
-    video,
-    currentUserId,
-    onAvatarPress,
-    onFollowPress,
-    onReadMorePress,
-    onCommercialTagPress,
+    data,
+    handlers,
 }: MetadataLayerProps) {
+    const { video, currentUserId } = data;
+    const { onAvatarPress, onFollowPress, onReadMorePress, onCommercialTagPress } = handlers;
     const insets = useSafeAreaInsets();
     const bottom = Math.max(BASE_BOTTOM_POSITION, insets.bottom + SAFE_AREA_OFFSET);
 
