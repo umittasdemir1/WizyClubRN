@@ -125,7 +125,6 @@ interface FeedManagerProps {
 const ScrollPlaceholder = React.memo(function ScrollPlaceholder({
     video,
     isActive,
-    topInset,
     isCleanScreen,
     onDoubleTap,
     onSingleTap,
@@ -137,7 +136,6 @@ const ScrollPlaceholder = React.memo(function ScrollPlaceholder({
 }: {
     video: Video;
     isActive: boolean;
-    topInset: number;
     isCleanScreen: boolean;
     onDoubleTap: (videoId: string) => void;
     onSingleTap: () => void;
@@ -1046,7 +1044,6 @@ export const FeedManager = ({
                 <ScrollPlaceholder
                     video={item}
                     isActive={isActive}
-                    topInset={insets.top}
                     isCleanScreen={isCleanScreen}
                     onDoubleTap={handleDoubleTapLike}
                     onSingleTap={handleFeedTap}
@@ -1060,7 +1057,6 @@ export const FeedManager = ({
         },
         [
             activeVideoId,
-            insets.top,
             isCleanScreen,
             handleDoubleTapLike,
             handleFeedTap,

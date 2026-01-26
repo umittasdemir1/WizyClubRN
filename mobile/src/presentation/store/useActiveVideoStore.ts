@@ -33,8 +33,6 @@ export interface ActiveVideoState {
     viewingMode: 'off' | 'fast' | 'full';
     // Özel feed (Grid'den gelince)
     customFeed: any[] | null;
-    // Önceden yüklenecek video index'leri
-    preloadIndices: number[];
 
     // Actions
     setActiveVideo: (id: string | null, index: number) => void;
@@ -50,7 +48,6 @@ export interface ActiveVideoState {
     setPlaybackRate: (rate: number) => void;
     setViewingMode: (mode: 'off' | 'fast' | 'full') => void;
     setCustomFeed: (videos: any[] | null) => void;
-    setPreloadIndices: (indices: number[]) => void;
 }
 
 export const useActiveVideoStore = create<ActiveVideoState>((set, get) => ({
@@ -66,19 +63,11 @@ export const useActiveVideoStore = create<ActiveVideoState>((set, get) => ({
     playbackRate: 1.0,
     viewingMode: 'off',
     customFeed: null,
-    preloadIndices: [],
 
     setActiveVideo: (id, index) => {
-        // Preload hesapla: Sonraki 2 ve önceki 1 video
-        const preloadIndices: number[] = [];
-        if (index > 0) preloadIndices.push(index - 1);
-        preloadIndices.push(index + 1);
-        preloadIndices.push(index + 2);
-
         set({
             activeVideoId: id,
             activeIndex: index,
-            preloadIndices,
             isPaused: false, // Yeni video başladığında pause'u kaldır
         });
     },
@@ -107,8 +96,6 @@ export const useActiveVideoStore = create<ActiveVideoState>((set, get) => ({
     setViewingMode: (mode) => set({ viewingMode: mode }),
 
     setCustomFeed: (videos) => set({ customFeed: videos }),
-
-    setPreloadIndices: (indices) => set({ preloadIndices: indices }),
 }));
 
 // ===================================
@@ -166,85 +153,6 @@ export function useAppStateSync() {
 }
 
 // ===================================
-// 🚀 VIDEO PRELOADER HOOK
-// ===================================
-// Scroll yönüne göre sonraki videoları önceden yükler.
-
-interface Video {
-    id: string;
-    videoUrl: any;
-    thumbnailUrl: string;
-}
-
-export function useVideoPreloader(
-    videos: Video[],
-    currentIndex: number,
-    preloadCount: number = 2
-) {
-    const setPreloadIndices = useActiveVideoStore((state) => state.setPreloadIndices);
-    const preloadIndices = useActiveVideoStore((state) => state.preloadIndices);
-    const previousIndex = useRef(currentIndex);
-
-    useEffect(() => {
-        if (videos.length === 0) return;
-
-        const indicesToPreload: number[] = [];
-        const scrollDirection = currentIndex > previousIndex.current ? 'down' : 'up';
-        previousIndex.current = currentIndex;
-
-        if (scrollDirection === 'down') {
-            // Aşağı kaydırıyorsa: Sonraki videoları preload et
-            for (let i = 1; i <= preloadCount; i++) {
-                const nextIndex = currentIndex + i;
-                if (nextIndex < videos.length) {
-                    indicesToPreload.push(nextIndex);
-                }
-            }
-        } else {
-            // Yukarı kaydırıyorsa: Önceki videoları preload et
-            for (let i = 1; i <= preloadCount; i++) {
-                const prevIndex = currentIndex - i;
-                if (prevIndex >= 0) {
-                    indicesToPreload.push(prevIndex);
-                }
-            }
-        }
-
-        // Her zaman bir önceki ve sonrakini de ekle
-        if (currentIndex > 0 && !indicesToPreload.includes(currentIndex - 1)) {
-            indicesToPreload.push(currentIndex - 1);
-        }
-        if (currentIndex < videos.length - 1 && !indicesToPreload.includes(currentIndex + 1)) {
-            indicesToPreload.push(currentIndex + 1);
-        }
-
-        setPreloadIndices(indicesToPreload);
-
-        // Debug log (development only)
-        if (__DEV__) {
-            logVideo(LogCode.VIDEO_PRELOAD_INDICES, 'Video preload indices calculated', { indices: indicesToPreload });
-        }
-    }, [videos, currentIndex, preloadCount, setPreloadIndices]);
-
-    return preloadIndices;
-}
-
-// ===================================
-// 🎯 SHOULD VIDEO PLAY HOOK
-// ===================================
-// Bir videonun oynatılıp oynatılmayacağını belirler.
-
-export function useShouldVideoPlay(videoId: string, videoIndex: number): boolean {
-    const activeVideoId = useActiveVideoStore((state) => state.activeVideoId);
-    const isAppActive = useActiveVideoStore((state) => state.isAppActive);
-    const isScreenFocused = useActiveVideoStore((state) => state.isScreenFocused);
-    const isSeeking = useActiveVideoStore((state) => state.isSeeking);
-
-    // Video aktif, uygulama ön planda, ekran odaklı ve seek yapılmıyorsa oynat
-    return activeVideoId === videoId && isAppActive && isScreenFocused && !isSeeking;
-}
-
-// ===================================
 // 🔊 MUTE CONTROLS HOOK
 // ===================================
 export function useMuteControls() {
@@ -254,4 +162,3 @@ export function useMuteControls() {
 
     return { isMuted, toggleMute, setMuted };
 }
-
