@@ -76,3 +76,8 @@ Not: created_at dosya sistemi zaman bilgisinden gelir (UTC).
 ## docs/video
 - [docs/video/41 - Video System Audit.md](<docs/video/41 - Video System Audit.md>) (created_at: 26.01.2026 - 10:47)
 - [docs/video/42 - Video System Audit Todo.md](<docs/video/42 - Video System Audit Todo.md>) (created_at: 26.01.2026 - 11:02)
+
+## Feed / Video Architecture Audits
+- Pool Compatibility Investigation (docs/POOL_COMPATIBILITY_INVESTIGATION.md) (generated: 27.01.2026)
+- Pool Compatibility Investigation (TR) (docs/POOL_COMPATIBILITY_INVESTIGATION_TR.md) (generated: 27.01.2026)
+- Pool Compatibility Investigation TODO (docs/POOL_COMPATIBILITY_INVESTIGATION_TODO.md) (generated: 27.01.2026)
