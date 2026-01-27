@@ -97,17 +97,19 @@
 - **Bağımlılıklar:** TODO-FM01
 - **Durum:** ✅ TAMAMLANDI (2026-01-27)
 
-### [ ] TODO-FM05: FeedOverlays.tsx Bileşeni Oluştur
-- **Dosya:** YENİ: `mobile/src/presentation/components/feed/FeedOverlays.tsx`
+### [X] TODO-FM05: FeedOverlays.tsx Bileşeni Oluştur ✅
+- **Dosya:** `mobile/src/presentation/components/feed/FeedOverlays.tsx`
 - **Eylem:** OLUŞTUR
 - **Risk:** ⚡ ORTA
-- **Bağımlılıklar:** TODO-FM01, TODO-FM04
+- **Bağımlılıklar:** TODO-FM01 ~ FM04
+- **Durum:** ✅ TAMAMLANDI (2026-01-27)
 
-### [ ] TODO-FM06: FeedManager.tsx Refaktör Et
-- **Dosya:** [FeedManager.tsx](file:///d:/WizyClub/mobile/src/presentation/components/feed/FeedManager.tsx)
-- **Eylem:** REFAKTÖR
+### [/] TODO-FM06: FeedManager.tsx'i Refaktör Et 🔄
+- **Dosya:** `mobile/src/presentation/components/feed/FeedManager.tsx`
+- **Eylem:** GÜNCELLE
 - **Risk:** ⚠️ YÜKSEK
-- **Bağımlılıklar:** TODO-FM01 - TODO-FM05
+- **Bağımlılıklar:** TODO-FM01 ~ FM05
+- **Durum:** 🔄 DEVAM EDİYOR - useFeedConfig entegre edildi
 
 ### [ ] TODO-FM07: Entegrasyon Testi & Flag Doğrulaması
 - **Dosya:** Tüm feed modülleri

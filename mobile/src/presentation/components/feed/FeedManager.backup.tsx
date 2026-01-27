@@ -81,22 +81,20 @@ import { CarouselLayer } from './CarouselLayer';
 
 const AnimatedFlashList = Animated.createAnimatedComponent(FlashList);
 
-// Import modular hooks
-import {
-    SCREEN_WIDTH,
-    ITEM_HEIGHT,
-    FEED_FLAGS,
-    FEED_COLORS,
-    VIEWABILITY_CONFIG,
-    VIEWABILITY_THRESHOLD,
-} from './hooks/useFeedConfig';
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const ITEM_HEIGHT = Dimensions.get('window').height;
+const SAVE_ICON_ACTIVE = '#FFFFFF';
+// Global UI kill switch; keep default false to avoid accidental disable.
+const DISABLE_FEED_UI_FOR_TEST = false;
+const DISABLE_ACTIVE_VIDEO_OVERLAY = DISABLE_FEED_UI_FOR_TEST;
+const DISABLE_GLOBAL_OVERLAYS = DISABLE_FEED_UI_FOR_TEST;
+const DISABLE_NON_ACTIVE_UI = DISABLE_FEED_UI_FOR_TEST;
 
-// Legacy flag aliases (for backward compatibility during refactoring)
-const DISABLE_FEED_UI_FOR_TEST = FEED_FLAGS.DISABLE_FEED_UI_FOR_TEST;
-const DISABLE_ACTIVE_VIDEO_OVERLAY = FEED_FLAGS.DISABLE_ACTIVE_VIDEO_OVERLAY;
-const DISABLE_GLOBAL_OVERLAYS = FEED_FLAGS.DISABLE_GLOBAL_OVERLAYS;
-const DISABLE_NON_ACTIVE_UI = FEED_FLAGS.DISABLE_NON_ACTIVE_UI;
-const SAVE_ICON_ACTIVE = FEED_COLORS.SAVE_ICON_ACTIVE;
+const VIEWABILITY_CONFIG = {
+    itemVisiblePercentThreshold: 40,  // ✅ Reduced from 60 for faster transitions
+    minimumViewTime: 50,  // ✅ Reduced from 100ms for snappier feel
+};
+const VIEWABILITY_THRESHOLD = VIEWABILITY_CONFIG.itemVisiblePercentThreshold / 100;
 
 const isFeedVideoItem = (video?: Video | null): boolean => {
     if (!video) return false;
@@ -1012,7 +1010,7 @@ export const FeedManager = ({
             const nextVideo = videosRef.current[newIndex + 1];
             const nextUrl = isFeedVideoItem(nextVideo) ? getVideoUrl(nextVideo) : null;
             if (nextUrl) {
-                VideoCacheService.cacheVideo(nextUrl).catch(() => { });
+                VideoCacheService.cacheVideo(nextUrl).catch(() => {});
             }
         }
 
