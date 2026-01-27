@@ -76,8 +76,6 @@ import { getVideoUrl } from '../../../core/utils/videoUrl';
 import { VideoPlayerPool, type VideoPlayerPoolRef } from './VideoPlayerPool';
 import { BrightnessOverlay } from './BrightnessOverlay';
 import { ActiveVideoOverlay } from './ActiveVideoOverlay';
-import { DoubleTapLike } from './DoubleTapLike';
-import { CarouselLayer } from './CarouselLayer';
 
 const AnimatedFlashList = Animated.createAnimatedComponent(FlashList);
 
@@ -128,81 +126,8 @@ interface FeedManagerProps {
     isCustomFeed?: boolean;
 }
 
-// ============================================================================ 
-// Scroll Placeholder Component (Minimal, transparent)
-// ============================================================================ 
-
-const ScrollPlaceholder = React.memo(function ScrollPlaceholder({
-    video,
-    isActive,
-    isCleanScreen,
-    onDoubleTap,
-    onSingleTap,
-    onLongPress,
-    onPressIn,
-    onPressOut,
-    onCarouselTouchStart,
-    onCarouselTouchEnd,
-}: {
-    video: Video;
-    isActive: boolean;
-    isCleanScreen: boolean;
-    onDoubleTap: (videoId: string) => void;
-    onSingleTap: () => void;
-    onLongPress: (event: any) => void;
-    onPressIn: (event: any) => void;
-    onPressOut: () => void;
-    onCarouselTouchStart?: () => void;
-    onCarouselTouchEnd?: () => void;
-}) {
-    const isCarousel = video.postType === 'carousel' && (video.mediaUrls?.length ?? 0) > 0;
-
-    if (isActive && isCarousel) {
-        return (
-            <View style={styles.placeholderContainer}>
-                <CarouselLayer
-                    mediaUrls={video.mediaUrls ?? []}
-                    isCleanScreen={isCleanScreen}
-                    onDoubleTap={() => onDoubleTap(video.id)}
-                    onSingleTap={onSingleTap}
-                    onLongPress={onLongPress}
-                    onPressIn={onPressIn}
-                    onPressOut={onPressOut}
-                    onCarouselTouchStart={onCarouselTouchStart}
-                    onCarouselTouchEnd={onCarouselTouchEnd}
-                />
-            </View>
-        );
-    }
-
-    const content = <View style={styles.placeholderContainer} />;
-
-    return (
-        <DoubleTapLike
-            onDoubleTap={() => onDoubleTap(video.id)}
-            onSingleTap={onSingleTap}
-            onLongPress={onLongPress}
-            onPressIn={onPressIn}
-            onPressOut={onPressOut}
-        >
-            {content}
-        </DoubleTapLike>
-    );
-}, (prevProps, nextProps) => {
-    // ✅ Custom comparison: Only re-render if needed
-    const isCarousel = (video: Video) => video.postType === 'carousel' && (video.mediaUrls?.length ?? 0) > 0;
-
-    if (isCarousel(prevProps.video) || isCarousel(nextProps.video)) {
-        return (
-            prevProps.video.id === nextProps.video.id &&
-            prevProps.isActive === nextProps.isActive &&
-            prevProps.isCleanScreen === nextProps.isCleanScreen
-        );
-    }
-
-    // Non-carousel: Only re-render if video ID changes
-    return prevProps.video.id === nextProps.video.id;
-});
+// Import extracted component
+import { ScrollPlaceholder } from './ScrollPlaceholder';
 
 // ============================================================================ 
 // Main Component
@@ -1512,11 +1437,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-    },
-    placeholderContainer: {
-        width: SCREEN_WIDTH,
-        height: ITEM_HEIGHT,
-        backgroundColor: 'transparent',
     },
     scrollLayer: {
         ...StyleSheet.absoluteFillObject,
