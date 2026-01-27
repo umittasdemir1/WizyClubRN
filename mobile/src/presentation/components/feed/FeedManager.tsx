@@ -91,9 +91,10 @@ const DISABLE_GLOBAL_OVERLAYS = DISABLE_FEED_UI_FOR_TEST;
 const DISABLE_NON_ACTIVE_UI = DISABLE_FEED_UI_FOR_TEST;
 
 const VIEWABILITY_CONFIG = {
-    itemVisiblePercentThreshold: 50,  // ✅ Reduced from 60 for faster transitions
+    itemVisiblePercentThreshold: 40,  // ✅ Reduced from 60 for faster transitions
     minimumViewTime: 50,  // ✅ Reduced from 100ms for snappier feel
 };
+const VIEWABILITY_THRESHOLD = VIEWABILITY_CONFIG.itemVisiblePercentThreshold / 100;
 
 const isFeedVideoItem = (video?: Video | null): boolean => {
     if (!video) return false;
@@ -260,13 +261,6 @@ export const FeedManager = ({
     const [saveToastMessage, setSaveToastMessage] = useState<string | null>(null);
     const [saveToastActive, setSaveToastActive] = useState(false);
     const [isCarouselInteracting, _setIsCarouselInteracting] = useState(false);
-    const [readyActiveId, setReadyActiveId] = useState<string | null>(null);
-    const [readyActiveIndex, setReadyActiveIndex] = useState<number>(-1);
-    const readyActiveKeyRef = useRef<{ id: string | null; index: number; playable: boolean | null }>({
-        id: null,
-        index: -1,
-        playable: null,
-    });
 
     const scrollHandler = useAnimatedScrollHandler({
         onScroll: (event: any) => {
@@ -565,37 +559,6 @@ export const FeedManager = ({
         lastLoopTimeRef.current = Date.now();
     }, [activeVideoId, currentTimeSV, durationSV]);
 
-    useEffect(() => {
-        if (!activeVideoId) {
-            setReadyActiveId(null);
-            setReadyActiveIndex(-1);
-            readyActiveKeyRef.current = { id: null, index: -1, playable: null };
-            return;
-        }
-
-        const prev = readyActiveKeyRef.current;
-        const idChanged = prev.id !== activeVideoId;
-        const indexChanged = prev.index !== activeIndex;
-        const playableChanged = prev.playable !== isActivePlayable;
-
-        readyActiveKeyRef.current = {
-            id: activeVideoId,
-            index: activeIndex,
-            playable: isActivePlayable,
-        };
-
-        if (!isActivePlayable) {
-            setReadyActiveId(activeVideoId);
-            setReadyActiveIndex(activeIndex);
-            return;
-        }
-
-        if (idChanged || indexChanged || playableChanged) {
-            setReadyActiveId(null);
-            setReadyActiveIndex(-1);
-        }
-    }, [activeVideoId, activeIndex, isActivePlayable]);
-
     // Playback rate sync
     useEffect(() => {
         if (!wasSpeedBoostedRef.current) {
@@ -854,13 +817,6 @@ export const FeedManager = ({
         setPlaybackRate: setPlaybackRateViaController,
     }), [handleSeek, handleRetry, setPlaybackRateViaController]);
 
-    const handleActiveReady = useCallback((videoId: string, index: number) => {
-        const currentId = useActiveVideoStore.getState().activeVideoId;
-        const currentIndex = useActiveVideoStore.getState().activeIndex;
-        if (currentId !== videoId || currentIndex !== index) return;
-        setReadyActiveId(videoId);
-        setReadyActiveIndex(index);
-    }, []);
 
     // ======================================================================== 
     // Callbacks - Actions
@@ -1085,7 +1041,9 @@ export const FeedManager = ({
     const onViewableItemsChanged = useCallback(
         ({ viewableItems }: { viewableItems: ViewToken<Video>[] }) => {
             if (viewableItems.length === 0) return;
-            const targetIndex = Math.round(scrollY.value / ITEM_HEIGHT);
+            const targetIndex = Math.floor(
+                (scrollY.value + ITEM_HEIGHT * (1 - VIEWABILITY_THRESHOLD)) / ITEM_HEIGHT
+            );
             let nextIndex = viewableItems[0].index ?? 0;
             let bestDistance = Math.abs(nextIndex - targetIndex);
             viewableItems.forEach((item) => {
@@ -1225,11 +1183,6 @@ export const FeedManager = ({
         );
     }
 
-    const isOverlayReady =
-        !!activeVideo &&
-        readyActiveId === activeVideoId &&
-        readyActiveIndex === activeIndex;
-
     // ======================================================================== 
     // Main render
     // ======================================================================== 
@@ -1258,7 +1211,6 @@ export const FeedManager = ({
                     onProgress={handleVideoProgress}
                     onVideoEnd={handleVideoEnd}
                     onRemoveVideo={handleRemoveVideo}
-                    onActiveReady={handleActiveReady}
                     scrollY={scrollY}
                 />
                 <BrightnessOverlay />
@@ -1328,12 +1280,12 @@ export const FeedManager = ({
                     Layer 3: ActiveVideoOverlay (z-index: 50)
                     All UI for active video, decoupled from video layer
                     ============================================================ */}
-                {!DISABLE_ACTIVE_VIDEO_OVERLAY && isOverlayReady && !isCleanScreen && (
+                {!DISABLE_ACTIVE_VIDEO_OVERLAY && activeVideo && !isCleanScreen && (
                     <ActiveVideoOverlay
                         data={{
                             video: activeVideo,
                             currentUserId,
-                            activeIndex: readyActiveIndex,
+                            activeIndex,
                             isPlayable: isActivePlayable,
                         }}
                         playback={{

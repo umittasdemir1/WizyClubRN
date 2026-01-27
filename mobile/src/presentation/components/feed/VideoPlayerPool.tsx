@@ -61,7 +61,6 @@ interface VideoPlayerPoolProps {
     onProgress: (index: number, currentTime: number, duration: number) => void;
     onVideoEnd: (index: number) => void;
     onRemoveVideo?: (index: number) => void;
-    onActiveReady?: (videoId: string, index: number) => void;
     scrollY: SharedValue<number>;
 }
 
@@ -274,7 +273,6 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
     onProgress,
     onVideoEnd,
     onRemoveVideo,
-    onActiveReady,
     scrollY,
 }, ref) {
     const netInfo = useNetInfo();
@@ -314,7 +312,6 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
     const retryTimeoutsRef = useRef<Record<number, ReturnType<typeof setTimeout> | null>>({});
     const lastActiveSlotIndexRef = useRef(0);
     const lastResetVideoIdRef = useRef<string | null>(null);
-    const lastNotifiedReadyIdRef = useRef<string | null>(null);
 
     // Track if component is mounted
     const isMountedRef = useRef(true);
@@ -326,10 +323,6 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
 
     useEffect(() => {
         activeVideoIndexRef.current = activeVideoIndex;
-    }, [activeVideoIndex]);
-
-    useEffect(() => {
-        lastNotifiedReadyIdRef.current = null;
     }, [activeVideoIndex]);
 
     // Expose seek function via ref
@@ -372,15 +365,6 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
     const setPlaybackRateFromController = useCallback((rate: number) => {
         onPlaybackRateChange?.(rate);
     }, [onPlaybackRateChange]);
-
-    const notifyActiveReady = useCallback((slotVideoId: string, feedIndex: number) => {
-        if (!onActiveReady) return;
-        if (activeVideoIndexRef.current == null) return;
-        if (feedIndex !== activeVideoIndexRef.current) return;
-        if (lastNotifiedReadyIdRef.current === slotVideoId) return;
-        lastNotifiedReadyIdRef.current = slotVideoId;
-        onActiveReady(slotVideoId, feedIndex);
-    }, [onActiveReady]);
 
     useImperativeHandle(ref, () => ({
         seekTo,
@@ -694,8 +678,7 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
         });
         // ✅ Logging disabled for performance
         onVideoLoaded(feedIndex);
-        notifyActiveReady(slotVideoId, feedIndex);
-    }, [onVideoLoaded, notifyActiveReady]);
+    }, [onVideoLoaded]);
 
     // Handle video error with retry logic
     const handleError = useCallback(async (slotIndex: number, slotVideoId: string, error: OnVideoErrorData) => {
@@ -803,11 +786,8 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
                 slotIndex,
             });
         }
-        if (slot && slot.videoId === slotVideoId) {
-            notifyActiveReady(slotVideoId, slot.index);
-        }
         // ✅ Logging disabled for performance
-    }, [notifyActiveReady]);
+    }, []);
 
     const activeSlotIndex = activeVideoIndex != null
         ? slots.findIndex((slot) => slot.index === activeVideoIndex)
