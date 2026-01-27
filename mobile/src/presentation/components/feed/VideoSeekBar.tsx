@@ -25,10 +25,10 @@ import { useWindowDimensions } from 'react-native';
 // Usage Configuration
 const HORIZONTAL_PADDING = 24;
 const TOUCH_AREA_HEIGHT = 80;
-const THUMB_SIZE = 10; // Diameter of the thumb
+const THUMB_SIZE = 6; // Diameter of the thumb
 const THUMB_WIDTH = THUMB_SIZE; // Match width for circular thumb
-const TRACK_HEIGHT = 1;
-const TRACK_HEIGHT_EXPANDED = 2; // Slimmer track expansion
+const TRACK_HEIGHT = 4;
+const TRACK_HEIGHT_EXPANDED = 5; // Slimmer track expansion
 const TOOLTIP_WIDTH = 100;
 const TOOLTIP_HALF_WIDTH = TOOLTIP_WIDTH / 2;
 const TOOLTIP_SCREEN_MARGIN = 16;
@@ -64,7 +64,7 @@ export function VideoSeekBar({
     const tooltipOpacity = useSharedValue(0);
 
     const POSITION_MODE = 'custom' as 'safe' | 'hidden' | 'custom';
-    const CUSTOM_OFFSET = -4;
+    const CUSTOM_OFFSET = -10;
 
     const insets = useSafeAreaInsets();
     const TAB_BAR_HEIGHT = 0; // Resetting to 0 to find the true baseline
@@ -342,7 +342,7 @@ const styles = StyleSheet.create({
         width: THUMB_WIDTH,
         height: THUMB_SIZE,
         borderRadius: THUMB_SIZE / 2,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: '#FF3B30',
         // No shadows for the line indicator for a cleaner look
     },
     tooltipContainer: {

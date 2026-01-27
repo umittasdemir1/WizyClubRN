@@ -29,10 +29,8 @@ import {
 } from 'react-native';
 import Animated, {
     useAnimatedStyle,
-    withTiming,
     SharedValue,
     useSharedValue,
-    withDelay,
 } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -137,12 +135,7 @@ export const ActiveVideoOverlay = memo(function ActiveVideoOverlay({
     const uiVisibleSV = useSharedValue(0);
 
     useEffect(() => {
-        // Immediate hide
-        uiVisibleSV.value = 0;
-        
-        // Native delay: Wait 50ms, then fade in over 50ms
-        // Ultra-snappier transition
-        uiVisibleSV.value = withDelay(50, withTiming(1, { duration: 50 }));
+        uiVisibleSV.value = 1;
     }, [video.id]);
 
     // ========================================================================
