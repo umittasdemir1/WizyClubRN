@@ -78,6 +78,11 @@ export function VideoSeekBar({
     }, [bottomOffset]);
 
     const animatedProgress = useSharedValue(0);
+    const scrubProgress = useSharedValue(0);
+    const effectiveProgress = useDerivedValue(() => {
+        const value = isScrubbing.value ? scrubProgress.value : animatedProgress.value;
+        return Math.max(0, Math.min(value, 1));
+    });
 
     useAnimatedReaction(
         () => ({
@@ -148,16 +153,20 @@ export function VideoSeekBar({
             trackHeight.value = withTiming(TRACK_HEIGHT_EXPANDED, { duration: 150 });
             tooltipOpacity.value = withTiming(1, { duration: 150 });
 
-            const absoluteX = event.absoluteX - HORIZONTAL_PADDING;
-            const newProgress = Math.max(0, Math.min(absoluteX / BAR_WIDTH, 1));
+            const localX = event.x - HORIZONTAL_PADDING;
+            const clampedX = Math.max(0, Math.min(localX, BAR_WIDTH));
+            const newProgress = BAR_WIDTH > 0 ? clampedX / BAR_WIDTH : 0;
+            scrubProgress.value = newProgress;
             currentTime.value = newProgress * duration.value;
 
             runOnJS(startScrubbing)();
         })
         .onUpdate((event) => {
             'worklet';
-            const absoluteX = event.absoluteX - HORIZONTAL_PADDING;
-            const newProgress = Math.max(0, Math.min(absoluteX / BAR_WIDTH, 1));
+            const localX = event.x - HORIZONTAL_PADDING;
+            const clampedX = Math.max(0, Math.min(localX, BAR_WIDTH));
+            const newProgress = BAR_WIDTH > 0 ? clampedX / BAR_WIDTH : 0;
+            scrubProgress.value = newProgress;
             currentTime.value = newProgress * duration.value;
         })
         .onEnd(() => {
@@ -184,8 +193,9 @@ export function VideoSeekBar({
     const tap = Gesture.Tap()
         .onStart((event) => {
             'worklet';
-            const absoluteX = event.absoluteX - HORIZONTAL_PADDING;
-            const newProgress = Math.max(0, Math.min(absoluteX / BAR_WIDTH, 1));
+            const localX = event.x - HORIZONTAL_PADDING;
+            const clampedX = Math.max(0, Math.min(localX, BAR_WIDTH));
+            const newProgress = BAR_WIDTH > 0 ? clampedX / BAR_WIDTH : 0;
             const seekTime = newProgress * duration.value; // Calculate in worklet
             runOnJS(updateSeek)(seekTime);
         });
@@ -206,6 +216,7 @@ export function VideoSeekBar({
         const dur = duration.value > 0 ? duration.value : 1;
         const time = currentTime.value;
         const isInteracting = isScrubbing.value;
+        const progressValue = effectiveProgress.value;
         let opacity = 1;
 
         if (!isInteracting) {
@@ -221,7 +232,7 @@ export function VideoSeekBar({
         }
 
         return {
-            width: `${animatedProgress.value * 100}%`,
+            width: `${progressValue * 100}%`,
             height: trackHeight.value,
             backgroundColor: isInteracting ? '#FFFFFF' : `rgba(255,255,255,${isInteracting ? 1 : opacity})`,
             borderRadius: trackHeight.value / 2,
@@ -242,14 +253,14 @@ export function VideoSeekBar({
     const animatedThumbStyle = useAnimatedStyle(() => ({
         opacity: thumbOpacity.value,
         transform: [
-            { translateX: animatedProgress.value * BAR_WIDTH - THUMB_WIDTH / 2 },
+            { translateX: effectiveProgress.value * BAR_WIDTH - THUMB_WIDTH / 2 },
             { scale: thumbScale.value },
         ],
     }));
 
     const animatedTooltipStyle = useAnimatedStyle(() => {
         // Calculate visual center in screen coordinates
-        const thumbScreenX = HORIZONTAL_PADDING + (animatedProgress.value * BAR_WIDTH);
+        const thumbScreenX = HORIZONTAL_PADDING + (effectiveProgress.value * BAR_WIDTH);
 
         // Clamp center so tooltip doesn't overflow screen
         // Min X = TOOLTIP_HALF_WIDTH + MARGIN (left edge limit)

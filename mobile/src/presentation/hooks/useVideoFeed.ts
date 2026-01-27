@@ -64,7 +64,6 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
 
     const isMounted = useRef(true);
     const hasInitialFetch = useRef(false); // Prevent multiple initial fetches
-    const activeVideoId = useActiveVideoStore((state) => state.activeVideoId);
 
     // Auth User
     const { user, isInitialized } = useAuthStore();

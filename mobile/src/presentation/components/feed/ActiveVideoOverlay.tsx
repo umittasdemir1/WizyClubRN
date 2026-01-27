@@ -56,6 +56,7 @@ interface ActiveVideoOverlayData {
     video: Video;
     currentUserId?: string;
     activeIndex: number;
+    isPlayable: boolean;
 }
 
 interface ActiveVideoOverlayPlayback {
@@ -104,7 +105,7 @@ export const ActiveVideoOverlay = memo(function ActiveVideoOverlay({
     timeline,
     actions,
 }: ActiveVideoOverlayProps) {
-    const { video, currentUserId, activeIndex } = data;
+    const { video, currentUserId, activeIndex, isPlayable } = data;
     const {
         isFinished,
         hasError,
@@ -150,11 +151,11 @@ export const ActiveVideoOverlay = memo(function ActiveVideoOverlay({
 
     const isSelfProfile = !!currentUserId && video.user.id === currentUserId;
     const profileRoute = isSelfProfile ? '/profile' : `/user/${video.user.id}`;
-
     const showUiOverlays = !isCleanScreen;
     const showTapIndicator = !!tapIndicator && !hasError;
     const showReplayIcon = isFinished && !hasError && !showTapIndicator;
     const showPlayPauseIcon = showTapIndicator || showReplayIcon;
+    const showSeekBar = isPlayable;
 
     // ========================================================================
     // Animated styles
@@ -169,8 +170,8 @@ export const ActiveVideoOverlay = memo(function ActiveVideoOverlay({
     }, [activeIndex, scrollY]);
 
     const uiOpacityStyle = useAnimatedStyle(() => ({
-        opacity: withTiming(isSeeking ? 0 : 1, { duration: 200 }),
-    }), [isSeeking]);
+        opacity: 1,
+    }), []);
 
     // Optimize scroll performance & entry animation
     // 1. Hides instantly when scrolling
@@ -317,14 +318,16 @@ export const ActiveVideoOverlay = memo(function ActiveVideoOverlay({
                     </Animated.View>
 
                     {/* Video SeekBar (Bottom) */}
-                    <VideoSeekBar
-                        currentTime={currentTimeSV}
-                        duration={durationSV}
-                        isScrolling={isScrollingSV}
-                        onSeek={playbackController.seekTo}
-                        isActive={true}
-                        spriteUrl={video.spriteUrl}
-                    />
+                    {showSeekBar && (
+                        <VideoSeekBar
+                            currentTime={currentTimeSV}
+                            duration={durationSV}
+                            isScrolling={isScrollingSV}
+                            onSeek={playbackController.seekTo}
+                            isActive={true}
+                            spriteUrl={video.spriteUrl}
+                        />
+                    )}
                 </Animated.View>
             )}
         </Animated.View>
@@ -342,12 +345,16 @@ export const ActiveVideoOverlay = memo(function ActiveVideoOverlay({
         prevProps.data.video.shopsCount === nextProps.data.video.shopsCount &&
         prevProps.data.video.commentsCount === nextProps.data.video.commentsCount &&
         prevProps.data.video.description === nextProps.data.video.description &&
+        prevProps.data.video.spriteUrl === nextProps.data.video.spriteUrl &&
+        prevProps.data.video.postType === nextProps.data.video.postType &&
         prevProps.data.video.brandUrl === nextProps.data.video.brandUrl &&
         prevProps.data.video.brandName === nextProps.data.video.brandName &&
+        prevProps.data.video.user.id === nextProps.data.video.user.id &&
         prevProps.data.video.user.username === nextProps.data.video.user.username &&
         prevProps.data.video.user.fullName === nextProps.data.video.user.fullName &&
         prevProps.data.video.user.avatarUrl === nextProps.data.video.user.avatarUrl &&
         prevProps.data.video.user.isFollowing === nextProps.data.video.user.isFollowing &&
+        prevProps.data.isPlayable === nextProps.data.isPlayable &&
         prevProps.playback.isFinished === nextProps.playback.isFinished &&
         prevProps.playback.hasError === nextProps.playback.hasError &&
         prevProps.playback.isCleanScreen === nextProps.playback.isCleanScreen &&

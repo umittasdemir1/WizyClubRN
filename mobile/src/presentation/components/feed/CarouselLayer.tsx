@@ -6,6 +6,8 @@ import { shadowStyle } from '@/core/utils/shadow';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.heic', '.heif', '.avif'];
+const AUTO_ADVANCE_INTERVAL_MS = 5000;
+const AUTO_ADVANCE_RESUME_DELAY_MS = 1000;
 
 const isImageUrl = (url: string): boolean => {
     const normalized = url.split('?')[0].toLowerCase();
@@ -49,6 +51,12 @@ export function CarouselLayer({
     const insets = useSafeAreaInsets();
     const loadedIndicesRef = useRef<Set<number>>(new Set());
     const [activeImageLoaded, setActiveImageLoaded] = useState(false);
+    const autoAdvanceTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const isInteractingRef = useRef(false);
+    const lastInteractionRef = useRef(0);
+    const autoAdvanceStartIndexRef = useRef<number | null>(null);
+    const autoAdvanceHasAdvancedRef = useRef(false);
+    const autoAdvanceHasLoopedRef = useRef(false);
 
     const lastActiveIndexRef = useRef(0);
     const normalizedItems = useMemo(
@@ -109,6 +117,9 @@ export function CarouselLayer({
             lastActiveIndexRef.current = 0;
             if (activeIndex !== 0) setActiveIndex(0);
             setActiveImageLoaded(false);
+            autoAdvanceStartIndexRef.current = null;
+            autoAdvanceHasAdvancedRef.current = false;
+            autoAdvanceHasLoopedRef.current = false;
             return;
         }
         if (activeIndex >= normalizedItems.length) {
@@ -133,12 +144,72 @@ export function CarouselLayer({
         });
     }, [activeIndex, normalizedItems]);
 
+    useEffect(() => {
+        if (normalizedItems.length < 2) return;
+
+        if (autoAdvanceTimerRef.current) {
+            clearInterval(autoAdvanceTimerRef.current);
+            autoAdvanceTimerRef.current = null;
+        }
+
+        autoAdvanceTimerRef.current = setInterval(() => {
+            if (!flatListRef.current) return;
+            if (!activeImageLoaded) return;
+            if (isInteractingRef.current) return;
+            if (Date.now() - lastInteractionRef.current < AUTO_ADVANCE_RESUME_DELAY_MS) return;
+
+            if (autoAdvanceHasLoopedRef.current) return;
+
+            if (autoAdvanceStartIndexRef.current == null) {
+                autoAdvanceStartIndexRef.current = lastActiveIndexRef.current;
+                autoAdvanceHasAdvancedRef.current = false;
+                autoAdvanceHasLoopedRef.current = false;
+            }
+
+            const nextIndex = lastActiveIndexRef.current + 1;
+            if (nextIndex >= normalizedItems.length) {
+                autoAdvanceHasLoopedRef.current = true;
+                if (autoAdvanceTimerRef.current) {
+                    clearInterval(autoAdvanceTimerRef.current);
+                    autoAdvanceTimerRef.current = null;
+                }
+                return;
+            }
+
+            flatListRef.current.scrollToOffset({
+                offset: nextIndex * SCREEN_WIDTH,
+                animated: true,
+            });
+            autoAdvanceHasAdvancedRef.current = true;
+        }, AUTO_ADVANCE_INTERVAL_MS);
+
+        return () => {
+            if (autoAdvanceTimerRef.current) {
+                clearInterval(autoAdvanceTimerRef.current);
+                autoAdvanceTimerRef.current = null;
+            }
+        };
+    }, [normalizedItems.length, activeImageLoaded]);
+
     const handleImageDone = useCallback((index: number) => {
         loadedIndicesRef.current.add(index);
         if (index === activeIndex) {
             setActiveImageLoaded(true);
         }
     }, [activeIndex]);
+
+    const handleInteractionStart = useCallback(() => {
+        isInteractingRef.current = true;
+        lastInteractionRef.current = Date.now();
+    }, []);
+
+    const handleInteractionEnd = useCallback(() => {
+        isInteractingRef.current = false;
+        lastInteractionRef.current = Date.now();
+        autoAdvanceStartIndexRef.current = lastActiveIndexRef.current;
+        autoAdvanceHasAdvancedRef.current = false;
+        autoAdvanceHasLoopedRef.current = false;
+    }, []);
 
     const imageItems = normalizedItems;
     const activeItem = normalizedItems[activeIndex];
@@ -167,9 +238,6 @@ export function CarouselLayer({
                 showsHorizontalScrollIndicator={false}
                 directionalLockEnabled
                 nestedScrollEnabled
-                onTouchStart={onCarouselTouchStart}
-                onTouchEnd={onCarouselTouchEnd}
-                onTouchCancel={onCarouselTouchEnd}
                 onScroll={handleScroll}
                 decelerationRate="fast"
                 snapToInterval={SCREEN_WIDTH}
@@ -183,9 +251,30 @@ export function CarouselLayer({
                 initialScrollIndex={0}
                 bounces={false}
                 scrollEventThrottle={16}
-                onScrollBeginDrag={onCarouselTouchStart}
-                onScrollEndDrag={onCarouselTouchEnd}
-                onMomentumScrollEnd={onCarouselTouchEnd}
+                onScrollBeginDrag={(event) => {
+                    handleInteractionStart();
+                    onCarouselTouchStart?.();
+                }}
+                onScrollEndDrag={(event) => {
+                    handleInteractionEnd();
+                    onCarouselTouchEnd?.();
+                }}
+                onMomentumScrollEnd={(event) => {
+                    handleInteractionEnd();
+                    onCarouselTouchEnd?.();
+                }}
+                onTouchStart={(event) => {
+                    handleInteractionStart();
+                    onCarouselTouchStart?.();
+                }}
+                onTouchEnd={(event) => {
+                    handleInteractionEnd();
+                    onCarouselTouchEnd?.();
+                }}
+                onTouchCancel={(event) => {
+                    handleInteractionEnd();
+                    onCarouselTouchEnd?.();
+                }}
             />
 
             {/* Dots Indicator */}
@@ -213,7 +302,7 @@ export function CarouselLayer({
                 <View
                     style={[
                         styles.photoIndexBadge,
-                        { top: insets.top + 72 },
+                        { top: insets.top + 92 },
                     ]}
                     pointerEvents="none"
                 >
@@ -298,7 +387,7 @@ const styles = StyleSheet.create({
     },
     indicatorContainer: {
         position: 'absolute',
-        bottom: 110,
+        bottom: 140,
         flexDirection: 'row',
         left: 0,
         right: 0,
