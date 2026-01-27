@@ -85,7 +85,7 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 const ITEM_HEIGHT = Dimensions.get('window').height;
 const SAVE_ICON_ACTIVE = '#FFFFFF';
 // Global UI kill switch; keep default false to avoid accidental disable.
-const DISABLE_FEED_UI_FOR_TEST = false;
+const DISABLE_FEED_UI_FOR_TEST = true;
 const DISABLE_ACTIVE_VIDEO_OVERLAY = DISABLE_FEED_UI_FOR_TEST;
 const DISABLE_GLOBAL_OVERLAYS = DISABLE_FEED_UI_FOR_TEST;
 const DISABLE_NON_ACTIVE_UI = DISABLE_FEED_UI_FOR_TEST;
