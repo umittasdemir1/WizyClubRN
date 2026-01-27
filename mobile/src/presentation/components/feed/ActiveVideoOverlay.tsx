@@ -43,6 +43,7 @@ import { ActionButtons, ActionButtonsRef } from './ActionButtons';
 import { MetadataLayer } from './MetadataLayer';
 import { VideoSeekBar } from './VideoSeekBar';
 import PlayIcon from '../../../../assets/icons/play.svg';
+import type { VideoPlayerPoolRef } from './VideoPlayerPool';
 
 const MAX_RETRIES = 3;
 const SCREEN_HEIGHT = Dimensions.get('window').height;
@@ -81,8 +82,7 @@ interface ActiveVideoOverlayActions {
     onToggleFollow: () => void;
     onOpenShopping: () => void;
     onOpenDescription: () => void;
-    onSeek: (time: number) => void;
-    onRetry: () => void;
+    playbackController: Pick<VideoPlayerPoolRef, 'seekTo' | 'retryActive'>;
     onActionPressIn?: () => void;
     onActionPressOut?: () => void;
 }
@@ -122,8 +122,7 @@ export const ActiveVideoOverlay = memo(function ActiveVideoOverlay({
         onToggleFollow,
         onOpenShopping,
         onOpenDescription,
-        onSeek,
-        onRetry,
+        playbackController,
         onActionPressIn,
         onActionPressOut,
     } = actions;
@@ -252,7 +251,7 @@ export const ActiveVideoOverlay = memo(function ActiveVideoOverlay({
                         <View style={styles.errorContainer}>
                             <AlertCircle color="#EF4444" size={48} style={{ marginBottom: 12 }} />
                             <Text style={styles.errorText}>Video oynatılamadı</Text>
-                            <Pressable style={styles.retryButton} onPress={onRetry}>
+                            <Pressable style={styles.retryButton} onPress={playbackController.retryActive}>
                                 <RefreshCcw color="#FFF" size={20} />
                                 <Text style={styles.retryText}>Tekrar Dene</Text>
                             </Pressable>
@@ -322,7 +321,7 @@ export const ActiveVideoOverlay = memo(function ActiveVideoOverlay({
                         currentTime={currentTimeSV}
                         duration={durationSV}
                         isScrolling={isScrollingSV}
-                        onSeek={onSeek}
+                        onSeek={playbackController.seekTo}
                         isActive={true}
                         spriteUrl={video.spriteUrl}
                     />

@@ -17,6 +17,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useActiveVideoStore, ActiveVideoState } from '../../store/useActiveVideoStore';
 import { SpritePreview } from './SpritePreview';
+import type { VideoPlayerPoolRef } from './VideoPlayerPool';
 
 // Usage Configuration
 import { useWindowDimensions } from 'react-native';
@@ -36,7 +37,7 @@ interface VideoSeekBarProps {
     currentTime: SharedValue<number>;
     duration: SharedValue<number>;
     isScrolling?: SharedValue<boolean>;
-    onSeek: (time: number) => void;
+    onSeek: VideoPlayerPoolRef['seekTo'];
     isActive?: boolean;
     spriteUrl?: string;
     bottomOffset?: number;

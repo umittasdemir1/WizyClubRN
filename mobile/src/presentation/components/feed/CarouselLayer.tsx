@@ -14,13 +14,11 @@ const isImageUrl = (url: string): boolean => {
 
 interface CarouselItem {
     url: string;
-    type: 'video' | 'image';
     thumbnail?: string;
 }
 
 interface CarouselLayerProps {
     mediaUrls: CarouselItem[];
-    isActive: boolean;
     isCleanScreen?: boolean;
     onDoubleTap?: () => void;
     onSingleTap?: () => void;
@@ -35,7 +33,6 @@ const DOUBLE_TAP_DELAY = 250;
 
 export function CarouselLayer({
     mediaUrls,
-    isActive,
     isCleanScreen = false,
     onDoubleTap,
     onSingleTap,
@@ -55,10 +52,7 @@ export function CarouselLayer({
 
     const lastActiveIndexRef = useRef(0);
     const normalizedItems = useMemo(
-        () =>
-            mediaUrls
-                .filter((item) => item.type === 'image' || isImageUrl(item.url))
-                .map((item) => ({ ...item, type: 'image' as const })),
+        () => mediaUrls.filter((item) => isImageUrl(item.url)),
         [mediaUrls]
     );
 
@@ -126,7 +120,7 @@ export function CarouselLayer({
     }, [activeIndex, normalizedItems.length]);
 
     useEffect(() => {
-        if (!isActive || normalizedItems.length === 0) return;
+        if (normalizedItems.length === 0) return;
         const targets = new Set<number>();
         [activeIndex - 1, activeIndex, activeIndex + 1, activeIndex + 2].forEach((idx) => {
             if (idx >= 0 && idx < normalizedItems.length) targets.add(idx);
@@ -137,7 +131,7 @@ export function CarouselLayer({
                 Image.prefetch(url);
             }
         });
-    }, [activeIndex, isActive, normalizedItems]);
+    }, [activeIndex, normalizedItems]);
 
     const handleImageDone = useCallback((index: number) => {
         loadedIndicesRef.current.add(index);
@@ -229,7 +223,7 @@ export function CarouselLayer({
                 </View>
             )}
 
-            {isActive && !activeImageLoaded && (
+            {normalizedItems.length > 0 && !activeImageLoaded && (
                 <View style={styles.loadingOverlay} pointerEvents="none">
                     <ActivityIndicator color="#FFFFFF" />
                 </View>

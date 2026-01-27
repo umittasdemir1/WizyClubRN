@@ -16,6 +16,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { useSocialStore } from '../store/useSocialStore';
 import { useStartupStore, initStartupTimer } from '../store/useStartupStore';
 import { isVideoCacheDisabled } from '../../core/utils/videoCacheToggle';
+import { getVideoUrl } from '../../core/utils/videoUrl';
 
 // Interfaces
 interface UseVideoFeedReturn {
@@ -36,6 +37,11 @@ interface UseVideoFeedReturn {
     deleteVideo: (videoId: string) => Promise<void>;
     prependVideo: (video: Video) => void;
 }
+
+const isFeedVideoItem = (video: Video): boolean => {
+    if (video.postType === 'carousel') return false;
+    return Boolean(getVideoUrl(video));
+};
 
 export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
     // Repository & UseCases (Memoized to prevent recreation)
@@ -88,13 +94,21 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
         if (hasInitialPrefetched.current || isVideoCacheDisabled()) return;
         if (videos.length === 0) return;
 
+        const initialIndices = videos
+            .map((video, index) => (isFeedVideoItem(video) ? index : null))
+            .filter((index): index is number => index != null)
+            .slice(0, 3);
+
+        if (initialIndices.length === 0) return;
+
         hasInitialPrefetched.current = true;
         logPerf(LogCode.PREFETCH_START, 'Initial video prefetch starting', { reason });
 
-        FeedPrefetchService.getInstance().queueVideos(videos, [0, 1, 2], 0);
-        videos.slice(0, 3).forEach((v) => {
-            if (v.thumbnailUrl) {
-                Image.prefetch(v.thumbnailUrl);
+        FeedPrefetchService.getInstance().queueVideos(videos, initialIndices, 0);
+        initialIndices.forEach((index) => {
+            const video = videos[index];
+            if (video?.thumbnailUrl) {
+                Image.prefetch(video.thumbnailUrl);
             }
         });
     }, [videos]);

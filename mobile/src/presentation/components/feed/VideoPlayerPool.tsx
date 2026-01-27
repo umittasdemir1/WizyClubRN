@@ -28,6 +28,12 @@ const { height: WINDOW_HEIGHT } = Dimensions.get('window');
 const MAX_RETRIES = 3;
 const PosterImage = ExpoImage as unknown as React.ComponentType<ImageProps>;
 
+const isFeedCarouselPost = (video: VideoEntity): boolean => video.postType === 'carousel';
+
+const isPlayableFeedVideo = (video: VideoEntity): boolean => {
+    return !isFeedCarouselPost(video) && Boolean(getVideoUrl(video));
+};
+
 interface PlayerSlot {
     index: number;        // Video index in the feed
     videoId: string;      // Video ID
@@ -49,18 +55,19 @@ interface VideoPlayerPoolProps {
     isMuted: boolean;
     isPaused: boolean;
     playbackRate?: number;
+    onPlaybackRateChange?: (rate: number) => void;
     onVideoLoaded: (index: number) => void;
     onVideoError: (index: number, error: any) => void;
     onProgress: (index: number, currentTime: number, duration: number) => void;
     onVideoEnd: (index: number) => void;
     onRemoveVideo?: (index: number) => void;
-    onSeekReady?: (seekFn: (time: number) => void) => void;
-    onRetryReady?: (retryFn: () => void) => void;
     scrollY: SharedValue<number>;
 }
 
 export interface VideoPlayerPoolRef {
     seekTo: (time: number) => void;
+    retryActive: () => void;
+    setPlaybackRate: (rate: number) => void;
 }
 
 const createEmptySlot = (index: number = -1): PlayerSlot => ({
@@ -260,17 +267,34 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
     isMuted,
     isPaused,
     playbackRate = 1.0,
+    onPlaybackRateChange,
     onVideoLoaded,
     onVideoError,
     onProgress,
     onVideoEnd,
     onRemoveVideo,
-    onSeekReady,
-    onRetryReady,
     scrollY,
 }, ref) {
     const netInfo = useNetInfo();
     const insets = useSafeAreaInsets();
+
+    const playableIndexMap = useMemo(() => {
+        return videos.map((video) => isPlayableFeedVideo(video));
+    }, [videos]);
+
+    const playableIndices = useMemo(() => {
+        return playableIndexMap.flatMap((isPlayable, index) => (isPlayable ? [index] : []));
+    }, [playableIndexMap]);
+
+    const isPlayableIndex = useCallback((index: number | null | undefined): index is number => {
+        if (index == null) return false;
+        return playableIndexMap[index] === true;
+    }, [playableIndexMap]);
+
+    const activeVideoIndex = useMemo(
+        () => (isPlayableIndex(activeIndex) ? activeIndex : null),
+        [activeIndex, isPlayableIndex]
+    );
 
     // 3 Player Refs
     const player1Ref = useRef<VideoRef>(null);
@@ -292,20 +316,28 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
     // Track if component is mounted
     const isMountedRef = useRef(true);
 
-    // Track active index to prevent race conditions
-    const activeIndexRef = useRef(activeIndex);
+    // Track active video index to prevent race conditions
+    const activeVideoIndexRef = useRef<number | null>(activeVideoIndex);
     const recycleCounterRef = useRef(0);
     const recycleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+    useEffect(() => {
+        activeVideoIndexRef.current = activeVideoIndex;
+    }, [activeVideoIndex]);
+
     // Expose seek function via ref
     const seekTo = useCallback((time: number) => {
-        const activeSlotIndex = slots.findIndex((slot) => slot.index === activeIndexRef.current);
-        const resolvedIndex = activeSlotIndex >= 0 ? activeSlotIndex : 0;
-        playerRefs[resolvedIndex]?.current?.seek(time);
+        const activeFeedIndex = activeVideoIndexRef.current;
+        if (activeFeedIndex == null) return;
+        const activeSlotIndex = slots.findIndex((slot) => slot.index === activeFeedIndex);
+        if (activeSlotIndex < 0) return;
+        playerRefs[activeSlotIndex]?.current?.seek(time);
     }, [playerRefs, slots]);
 
     const retryActive = useCallback(() => {
-        const activeSlotIndex = slots.findIndex((slot) => slot.index === activeIndexRef.current);
+        const activeFeedIndex = activeVideoIndexRef.current;
+        if (activeFeedIndex == null) return;
+        const activeSlotIndex = slots.findIndex((slot) => slot.index === activeFeedIndex);
         if (activeSlotIndex < 0) return;
 
         setSlots((prev) => {
@@ -330,18 +362,15 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
         });
     }, [slots, videos]);
 
+    const setPlaybackRateFromController = useCallback((rate: number) => {
+        onPlaybackRateChange?.(rate);
+    }, [onPlaybackRateChange]);
+
     useImperativeHandle(ref, () => ({
         seekTo,
-    }), [seekTo]);
-
-    // Also expose via callback for FeedManager
-    useEffect(() => {
-        onSeekReady?.(seekTo);
-    }, [seekTo, onSeekReady]);
-
-    useEffect(() => {
-        onRetryReady?.(retryActive);
-    }, [retryActive, onRetryReady]);
+        retryActive,
+        setPlaybackRate: setPlaybackRateFromController,
+    }), [seekTo, retryActive, setPlaybackRateFromController]);
 
     // Cleanup on unmount
     useEffect(() => {
@@ -349,13 +378,14 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
     }, [slots]);
 
     useEffect(() => {
-        const currentActiveSlotIndex = slots.findIndex((slot) => slot.index === activeIndex);
+        if (activeVideoIndex == null) return;
+        const currentActiveSlotIndex = slots.findIndex((slot) => slot.index === activeVideoIndex);
         if (currentActiveSlotIndex < 0) return;
         const currentSlot = slots[currentActiveSlotIndex];
         if (currentSlot?.isLoaded || currentSlot?.isReadyForDisplay) {
             lastActiveSlotIndexRef.current = currentActiveSlotIndex;
         }
-    }, [slots, activeIndex]);
+    }, [slots, activeVideoIndex]);
 
     useEffect(() => {
         isMountedRef.current = true;
@@ -374,7 +404,8 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
 
     // Always restart from the beginning when a video becomes active.
     useEffect(() => {
-        const activeVideoId = videos[activeIndex]?.id ?? null;
+        if (activeVideoIndex == null) return;
+        const activeVideoId = videos[activeVideoIndex]?.id ?? null;
         if (!activeVideoId) return;
         if (lastResetVideoIdRef.current === activeVideoId) return;
 
@@ -383,7 +414,7 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
 
         playerRefs[activeSlotIndex]?.current?.seek(0);
         lastResetVideoIdRef.current = activeVideoId;
-    }, [activeIndex, slots, videos, playerRefs]);
+    }, [activeVideoIndex, slots, videos, playerRefs]);
 
     // Initialize/recycle players when activeIndex changes
     useEffect(() => {
@@ -391,7 +422,7 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
 
         // Increment counter for this recycle operation
         const currentRecycleId = ++recycleCounterRef.current;
-        activeIndexRef.current = activeIndex;
+        activeVideoIndexRef.current = activeVideoIndex;
 
         const recycleSlots = async () => {
             // Early exit if a newer recycle has started
@@ -402,10 +433,10 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
 
             const priorSlots = slotsRef.current;
 
-            // Calculate which videos should be in each slot
-            const currentIdx = activeIndex;
-            const nextIdx = Math.min(activeIndex + 1, videos.length - 1);
-            const prevIdx = Math.max(activeIndex - 1, 0);
+            // Calculate which videos should be in each slot (video-only)
+            const currentIdx = activeVideoIndex;
+            const nextIdx = playableIndices.find((idx) => idx > activeIndex) ?? null;
+            const prevIdx = [...playableIndices].reverse().find((idx) => idx < activeIndex) ?? null;
 
             // Get cached paths for each video
             const getSource = async (video: VideoEntity, preferFast: boolean): Promise<string> => {
@@ -441,11 +472,6 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
                 return 'cover';
             };
 
-            // Check if video is carousel (no video, only images)
-            const isCarouselPost = (video: VideoEntity): boolean => {
-                return video.postType === 'carousel' && (!getVideoUrl(video) || (video.mediaUrls?.length ?? 0) > 0);
-            };
-
             const getPreservedSlot = (videoId: string) => priorSlots.find((slot) => slot.videoId === videoId);
             const slotsEqual = (a: PlayerSlot, b: PlayerSlot) =>
                 a.index === b.index &&
@@ -461,18 +487,26 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
                 a.isCarousel === b.isCarousel &&
                 a.retryNonce === b.retryNonce;
 
-            const activeSlotIndex = priorSlots.findIndex((slot) => slot.index === currentIdx);
+            const resolveActiveSlotIndex = () => {
+                if (currentIdx == null) return -1;
+                const existingIndex = priorSlots.findIndex((slot) => slot.index === currentIdx);
+                if (existingIndex >= 0) return existingIndex;
+                const emptyIndex = priorSlots.findIndex((slot) => slot.index < 0);
+                if (emptyIndex >= 0) return emptyIndex;
+                return 0;
+            };
+            const activeSlotIndex = resolveActiveSlotIndex();
             const targetIndices: Array<number | null> = [null, null, null];
             const usedIndices = new Set<number>();
 
-            if (activeSlotIndex >= 0) {
+            if (activeSlotIndex >= 0 && currentIdx != null) {
                 targetIndices[activeSlotIndex] = currentIdx;
                 usedIndices.add(currentIdx);
             }
 
             const remainingTargets = [nextIdx, prevIdx].filter((idx, pos, arr) =>
-                idx !== currentIdx && arr.indexOf(idx) === pos
-            );
+                idx != null && idx !== currentIdx && arr.indexOf(idx) === pos
+            ) as number[];
 
             for (let slotIndex = 0; slotIndex < 3; slotIndex++) {
                 if (slotIndex === activeSlotIndex) continue;
@@ -494,13 +528,12 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
 
             const buildSlotForIndex = async (_slotIndex: number, targetIdx: number | null): Promise<PlayerSlot | null> => {
                 if (currentRecycleId !== recycleCounterRef.current) return null;
-                if (targetIdx == null || !videos[targetIdx]) {
+                if (targetIdx == null || !videos[targetIdx] || !isPlayableIndex(targetIdx)) {
                     return createEmptySlot(-1);
                 }
 
                 const video = videos[targetIdx];
-                const isCarousel = isCarouselPost(video);
-                const source = isCarousel ? '' : await getSource(video, targetIdx === currentIdx);
+                const source = await getSource(video, targetIdx === currentIdx);
 
                 if (currentRecycleId !== recycleCounterRef.current) return null;
 
@@ -511,7 +544,7 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
                     ? preserved.source
                     : null;
 
-                if (!isCarousel && !isValidSource(source)) {
+                if (!isValidSource(source)) {
                     logError(LogCode.ERROR_VALIDATION, 'Invalid source for video', { videoId: video.id, source });
                 }
 
@@ -526,7 +559,7 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
                     resizeMode: getResizeMode(video),
                     retryCount: isSameVideo ? preserved!.retryCount : 0,
                     hasError: isSameVideo ? preserved!.hasError : false,
-                    isCarousel,
+                    isCarousel: false,
                     retryNonce: isSameVideo ? preserved!.retryNonce : 0,
                 };
             };
@@ -545,8 +578,10 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
                 });
             };
 
-            const activeSlotIndexForUpdate = targetIndices.findIndex((idx) => idx === currentIdx);
-            const activeVideo = videos[currentIdx];
+            const activeSlotIndexForUpdate = currentIdx == null
+                ? -1
+                : targetIndices.findIndex((idx) => idx === currentIdx);
+            const activeVideo = currentIdx != null ? videos[currentIdx] : null;
             const activeVideoUrl = activeVideo ? getVideoUrl(activeVideo) : null;
 
             if (activeSlotIndexForUpdate >= 0) {
@@ -623,7 +658,7 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
                 recycleTimeoutRef.current = null;
             }
         };
-    }, [activeIndex, videos]);
+    }, [activeIndex, activeVideoIndex, isPlayableIndex, playableIndices, videos]);
 
     // Handle video loaded
     const handleLoad = useCallback((slotIndex: number, slotVideoId: string, feedIndex: number, _data: OnLoadData) => {
@@ -715,10 +750,10 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
         const slot = slotsRef.current[slotIndex];
         if (!slot || slot.videoId !== slotVideoId) return;
         // ✅ CRITICAL FIX: Track progress for the actual active video, not just slot 0
-        if (slot.index === activeIndex) {
+        if (activeVideoIndex != null && slot.index === activeVideoIndex) {
             onProgress(slot.index, data.currentTime, data.seekableDuration);
         }
-    }, [activeIndex, onProgress]);
+    }, [activeVideoIndex, onProgress]);
 
     // Handle video end
     const handleEnd = useCallback((slotIndex: number, slotVideoId: string, feedIndex: number) => {
@@ -745,7 +780,7 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
             return newSlots;
         });
         const slot = slotsRef.current[slotIndex];
-        if (slot && slot.videoId === slotVideoId && slot.index === activeIndexRef.current) {
+        if (slot && slot.videoId === slotVideoId && slot.index === activeVideoIndexRef.current) {
             PerformanceLogger.markFirstVideoReady(slotVideoId, {
                 feedIndex: slot.index,
                 slotIndex,
@@ -754,27 +789,28 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
         // ✅ Logging disabled for performance
     }, []);
 
-    const activeSlotIndex = slots.findIndex((slot) => slot.index === activeIndex);
-    const resolvedActiveSlotIndex = activeSlotIndex >= 0 ? activeSlotIndex : 0;
-    const resolvedActiveFeedIndex =
-        activeSlotIndex >= 0
-            ? activeIndex
-            : slots[0]?.index ?? activeIndex;
+    const activeSlotIndex = activeVideoIndex != null
+        ? slots.findIndex((slot) => slot.index === activeVideoIndex)
+        : -1;
+    const hasActiveVideo = activeSlotIndex >= 0 && activeVideoIndex != null;
+    const resolvedActiveSlotIndex = hasActiveVideo ? activeSlotIndex : -1;
+    const resolvedActiveFeedIndex = hasActiveVideo ? activeVideoIndex : -1;
 
     // Render a single player
     const renderPlayer = (slotIndex: number, playerRef: React.RefObject<VideoRef | null>) => {
         const slot = slots[slotIndex];
 
         // ✅ CRITICAL FIX: Only ONE slot can be active at a time
-        // Find the FIRST slot that matches activeIndex
-        const isActiveSlot = resolvedActiveSlotIndex === slotIndex;
-        const isNearActive = Math.abs(slot.index - resolvedActiveFeedIndex) <= 1;
-        const activeSlot = slots[resolvedActiveSlotIndex];
+        // Find the FIRST slot that matches active video index
+        const isActiveSlot = hasActiveVideo && resolvedActiveSlotIndex === slotIndex;
+        const isNearActive = hasActiveVideo && Math.abs(slot.index - resolvedActiveFeedIndex) <= 1;
+        const activeSlot = hasActiveVideo ? slots[resolvedActiveSlotIndex] : undefined;
         const activeReady = activeSlot?.isLoaded || activeSlot?.isReadyForDisplay;
         const shouldPlay = isActiveSlot && !isPaused;
-        const isOnTop = activeReady
+        const fallbackSlotIndex = hasActiveVideo ? lastActiveSlotIndexRef.current : -1;
+        const isOnTop = hasActiveVideo && (activeReady
             ? isActiveSlot
-            : lastActiveSlotIndexRef.current === slotIndex;
+            : fallbackSlotIndex === slotIndex);
 
         // ✅ Remove console.log for performance (blocks JS thread)
 
@@ -786,8 +822,8 @@ export const VideoPlayerPool = memo(forwardRef<VideoPlayerPoolRef, VideoPlayerPo
                 isActiveSlot={isActiveSlot}
                 isNearActive={isNearActive}
                 activeFeedIndex={resolvedActiveFeedIndex}
-                isActiveReady={activeReady}
-                lastActiveSlotIndex={lastActiveSlotIndexRef.current}
+                isActiveReady={Boolean(activeReady)}
+                lastActiveSlotIndex={fallbackSlotIndex}
                 isOnTop={isOnTop}
                 shouldPlay={shouldPlay}
                 isMuted={isMuted}

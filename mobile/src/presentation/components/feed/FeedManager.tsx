@@ -73,7 +73,7 @@ import { Image } from 'expo-image';
 import { getVideoUrl } from '../../../core/utils/videoUrl';
 
 // New architecture imports
-import { VideoPlayerPool } from './VideoPlayerPool';
+import { VideoPlayerPool, type VideoPlayerPoolRef } from './VideoPlayerPool';
 import { BrightnessOverlay } from './BrightnessOverlay';
 import { ActiveVideoOverlay } from './ActiveVideoOverlay';
 import { DoubleTapLike } from './DoubleTapLike';
@@ -92,6 +92,12 @@ const DISABLE_NON_ACTIVE_UI = DISABLE_FEED_UI_FOR_TEST;
 const VIEWABILITY_CONFIG = {
     itemVisiblePercentThreshold: 50,  // ✅ Reduced from 60 for faster transitions
     minimumViewTime: 50,  // ✅ Reduced from 100ms for snappier feel
+};
+
+const isFeedVideoItem = (video?: Video | null): boolean => {
+    if (!video) return false;
+    if (video.postType === 'carousel') return false;
+    return Boolean(getVideoUrl(video));
 };
 
 // ============================================================================ 
@@ -152,7 +158,6 @@ const ScrollPlaceholder = React.memo(function ScrollPlaceholder({
             <View style={styles.placeholderContainer}>
                 <CarouselLayer
                     mediaUrls={video.mediaUrls ?? []}
-                    isActive={isActive}
                     isCleanScreen={isCleanScreen}
                     onDoubleTap={() => onDoubleTap(video.id)}
                     onSingleTap={onSingleTap}
@@ -226,7 +231,10 @@ export const FeedManager = ({
     const activeIndex = useActiveVideoStore((state) => state.activeIndex);
     const isSeeking = useActiveVideoStore((state) => state.isSeeking);
     const isPaused = useActiveVideoStore((state) => state.isPaused);
+    const isAppActive = useActiveVideoStore((state) => state.isAppActive);
+    const ignoreAppState = useActiveVideoStore((state) => state.ignoreAppState);
     const togglePause = useActiveVideoStore((state) => state.togglePause);
+    const setPaused = useActiveVideoStore((state) => state.setPaused);
     const setScreenFocused = useActiveVideoStore((state) => state.setScreenFocused);
     const isCleanScreen = useActiveVideoStore((state) => state.isCleanScreen);
     const setCleanScreen = useActiveVideoStore((state) => state.setCleanScreen);
@@ -283,6 +291,7 @@ export const FeedManager = ({
     const videosRef = useRef(videos);
     const wasPlayingBeforeWebViewRef = useRef(false);
     const wasPlayingBeforeShareRef = useRef(false);
+    const wasPlayingBeforeBackgroundRef = useRef(false);
     const activeDurationRef = useRef(0);
     const activeTimeRef = useRef(0);
     const actionButtonsPressingRef = useRef(false);
@@ -295,11 +304,8 @@ export const FeedManager = ({
     const wasSpeedBoostedRef = useRef(false);
     const previousPlaybackRateRef = useRef(playbackRate);
     const lastPressXRef = useRef<number | null>(null);
-    const videoSeekRef = useRef<((time: number) => void) | null>(null);
-    const videoRetryRef = useRef<(() => void) | null>(null);
-    const isScrollingRef = useRef(false);
+    const videoPlayerRef = useRef<VideoPlayerPoolRef | null>(null);
     const lastScrollEndRef = useRef(0);
-    const activeLoadTokenRef = useRef(0);
     const loopCountRef = useRef(0);
     const lastLoopTimeRef = useRef(Date.now());
 
@@ -454,6 +460,28 @@ export const FeedManager = ({
         }
     }, [isInAppBrowserVisible, togglePause]);
 
+    // Pause/resume on app background/foreground
+    useEffect(() => {
+        if (ignoreAppState || isInAppBrowserVisible) return;
+
+        if (!isAppActive) {
+            const currentIsPaused = useActiveVideoStore.getState().isPaused;
+            wasPlayingBeforeBackgroundRef.current = !currentIsPaused;
+            if (!currentIsPaused) {
+                setPaused(true);
+            }
+            return;
+        }
+
+        if (wasPlayingBeforeBackgroundRef.current) {
+            const currentIsPaused = useActiveVideoStore.getState().isPaused;
+            if (currentIsPaused) {
+                setPaused(false);
+            }
+            wasPlayingBeforeBackgroundRef.current = false;
+        }
+    }, [ignoreAppState, isAppActive, isInAppBrowserVisible, setPaused]);
+
     // Cleanup timeouts
     useEffect(() => {
         return () => {
@@ -510,7 +538,6 @@ export const FeedManager = ({
         activeDurationRef.current = 0;
         loopCountRef.current = 0;
         lastLoopTimeRef.current = Date.now();
-        activeLoadTokenRef.current += 1;
     }, [activeVideoId, currentTimeSV, durationSV]);
 
     // Playback rate sync
@@ -597,9 +624,7 @@ export const FeedManager = ({
             if (__DEV__) {
                 logUI(LogCode.DEBUG_INFO, 'Replaying video', { loopCount: loopCountRef.current, maxLoops: 2, videoId: activeVideoId });
             }
-            if (videoSeekRef.current) {
-                videoSeekRef.current(0);
-            }
+            videoPlayerRef.current?.seekTo(0);
             // Ensure video is playing after seek
             const isPausedNow = useActiveVideoStore.getState().isPaused;
             if (isPausedNow) {
@@ -646,7 +671,7 @@ export const FeedManager = ({
 
     const handleFeedTap = useCallback(() => {
         if (DISABLE_NON_ACTIVE_UI) return;
-        if (isScrollingRef.current || Date.now() - lastScrollEndRef.current < 150) return;
+        if (Date.now() - lastScrollEndRef.current < 150) return;
         if (Date.now() < doubleTapBlockUntilRef.current) return;
         if (actionButtonsPressingRef.current) return;
 
@@ -658,9 +683,7 @@ export const FeedManager = ({
             setIsVideoFinished(false);
             loopCountRef.current = 0;
             lastLoopTimeRef.current = Date.now();
-            if (videoSeekRef.current) {
-                videoSeekRef.current(0);
-            }
+            videoPlayerRef.current?.seekTo(0);
             const isPausedNow = useActiveVideoStore.getState().isPaused;
             if (isPausedNow) {
                 togglePause();
@@ -682,7 +705,7 @@ export const FeedManager = ({
 
     const handleDoubleTapLike = useCallback((videoId: string) => {
         if (DISABLE_NON_ACTIVE_UI) return;
-        if (isScrollingRef.current || Date.now() - lastScrollEndRef.current < 150) return;
+        if (Date.now() - lastScrollEndRef.current < 150) return;
         const targetVideo = videosRef.current.find((video) => video.id === videoId);
         if (!targetVideo) return;
         doubleTapBlockUntilRef.current = Date.now() + 350;
@@ -696,6 +719,14 @@ export const FeedManager = ({
         lastPressXRef.current = event?.nativeEvent?.pageX ?? event?.nativeEvent?.locationX ?? null;
     }, []);
 
+    const setPlaybackRateViaController = useCallback((rate: number) => {
+        if (videoPlayerRef.current?.setPlaybackRate) {
+            videoPlayerRef.current.setPlaybackRate(rate);
+            return;
+        }
+        setPlaybackRate(rate);
+    }, [setPlaybackRate]);
+
     const handleLongPress = useCallback((event: any) => {
         if (DISABLE_NON_ACTIVE_UI || DISABLE_GLOBAL_OVERLAYS) return;
         const pressX = lastPressXRef.current ?? event?.nativeEvent?.pageX ?? event?.nativeEvent?.locationX ?? 0;
@@ -704,29 +735,29 @@ export const FeedManager = ({
         if (isRightSide) {
             wasSpeedBoostedRef.current = true;
             previousPlaybackRateRef.current = playbackRate;
-            setPlaybackRate(2.0);
+            setPlaybackRateViaController(2.0);
             setRateLabel('2x');
             return;
         }
 
         if (wasSpeedBoostedRef.current) {
             wasSpeedBoostedRef.current = false;
-            setPlaybackRate(previousPlaybackRateRef.current);
+            setPlaybackRateViaController(previousPlaybackRateRef.current);
             setRateLabel(null);
         }
 
         moreOptionsSheetRef.current?.snapToIndex(0);
         lastPressXRef.current = null;
-    }, [playbackRate, setPlaybackRate]);
+    }, [playbackRate, setPlaybackRateViaController]);
 
     const handlePressOut = useCallback(() => {
         if (DISABLE_NON_ACTIVE_UI) return;
         if (!wasSpeedBoostedRef.current) return;
         wasSpeedBoostedRef.current = false;
-        setPlaybackRate(previousPlaybackRateRef.current);
+        setPlaybackRateViaController(previousPlaybackRateRef.current);
         setRateLabel(null);
         lastPressXRef.current = null;
-    }, [setPlaybackRate]);
+    }, [setPlaybackRateViaController]);
 
     const handleCarouselTouchStart = useCallback(() => {
         if (DISABLE_NON_ACTIVE_UI) return;
@@ -747,15 +778,21 @@ export const FeedManager = ({
     }, []);
 
     const handleSeek = useCallback((time: number) => {
-        videoSeekRef.current?.(time);
+        videoPlayerRef.current?.seekTo(time);
         currentTimeSV.value = time;
     }, [currentTimeSV]);
 
     const handleRetry = useCallback(() => {
         setHasVideoError(false);
         setRetryCount(0);
-        videoRetryRef.current?.();
+        videoPlayerRef.current?.retryActive();
     }, []);
+
+    const playbackController = useMemo(() => ({
+        seekTo: handleSeek,
+        retryActive: handleRetry,
+        setPlaybackRate: setPlaybackRateViaController,
+    }), [handleSeek, handleRetry, setPlaybackRateViaController]);
 
     // ======================================================================== 
     // Callbacks - Actions
@@ -792,7 +829,7 @@ export const FeedManager = ({
         } finally {
             if (activeVideoId === activeVideo.id) {
                 const resumeTime = activeTimeRef.current;
-                if (resumeTime > 0) videoSeekRef.current?.(resumeTime);
+                if (resumeTime > 0) videoPlayerRef.current?.seekTo(resumeTime);
                 if (wasPlayingBeforeShareRef.current) useActiveVideoStore.getState().setPaused(false);
             }
             useActiveVideoStore.getState().setIgnoreAppState(false);
@@ -934,6 +971,7 @@ export const FeedManager = ({
         const newVideo = videosRef.current[newIndex];
         const newId = newVideo?.id ?? null;
         if (!newId || newId === lastActiveIdRef.current) return;
+        const isActiveCarousel = newVideo?.postType === 'carousel';
 
         lastInternalIndex.current = newIndex;
         lastActiveIdRef.current = newId;
@@ -944,10 +982,12 @@ export const FeedManager = ({
         setCleanScreen(false);
         _setIsCarouselInteracting(false);
 
-        const nextVideo = videosRef.current[newIndex + 1];
-        const nextUrl = nextVideo ? getVideoUrl(nextVideo) : null;
-        if (nextUrl) {
-            VideoCacheService.cacheVideo(nextUrl).catch(() => {});
+        if (!isActiveCarousel) {
+            const nextVideo = videosRef.current[newIndex + 1];
+            const nextUrl = isFeedVideoItem(nextVideo) ? getVideoUrl(nextVideo) : null;
+            if (nextUrl) {
+                VideoCacheService.cacheVideo(nextUrl).catch(() => {});
+            }
         }
 
         // Prefetch next thumbnails for faster poster display
@@ -959,13 +999,19 @@ export const FeedManager = ({
         });
 
         // ✅ Defer prefetch to avoid blocking scroll
-        setTimeout(() => {
-            FeedPrefetchService.getInstance().queueVideos(
-                videosRef.current,
-                getPrefetchIndices(newIndex),
-                newIndex
-            );
-        }, 0);
+        if (!isActiveCarousel) {
+            setTimeout(() => {
+                const prefetchIndices = getPrefetchIndices(newIndex).filter((idx) =>
+                    isFeedVideoItem(videosRef.current[idx])
+                );
+                if (prefetchIndices.length === 0) return;
+                FeedPrefetchService.getInstance().queueVideos(
+                    videosRef.current,
+                    prefetchIndices,
+                    newIndex
+                );
+            }, 0);
+        }
     }, [setActiveVideo, setCleanScreen, getPrefetchIndices]);
 
     const onViewableItemsChanged = useCallback(
@@ -1127,18 +1173,18 @@ export const FeedManager = ({
                     3 pre-created players, zero creation during scroll
                     ============================================================ */}
                 <VideoPlayerPool
+                    ref={videoPlayerRef}
                     videos={videos}
                     activeIndex={activeIndex}
                     isMuted={isMuted}
                     isPaused={isPaused}
                     playbackRate={playbackRate}
+                    onPlaybackRateChange={setPlaybackRate}
                     onVideoLoaded={handleVideoLoaded}
                     onVideoError={handleVideoError}
                     onProgress={handleVideoProgress}
                     onVideoEnd={handleVideoEnd}
                     onRemoveVideo={handleRemoveVideo}
-                    onSeekReady={(seekFn) => { videoSeekRef.current = seekFn; }}
-                    onRetryReady={(retryFn) => { videoRetryRef.current = retryFn; }}
                     scrollY={scrollY}
                 />
                 <BrightnessOverlay />
@@ -1200,7 +1246,6 @@ export const FeedManager = ({
                         }}
                         onMomentumScrollEnd={(e) => {
                             isScrollingSV.value = false;
-                            isScrollingRef.current = false;
                             lastScrollEndRef.current = Date.now();
                             const offsetY = e.nativeEvent.contentOffset.y;
                             const newIndex = Math.round(offsetY / ITEM_HEIGHT);
@@ -1243,8 +1288,7 @@ export const FeedManager = ({
                             onToggleFollow: handleToggleFollow,
                             onOpenShopping: handleOpenShopping,
                             onOpenDescription: handleOpenDescription,
-                            onSeek: handleSeek,
-                            onRetry: handleRetry,
+                            playbackController,
                             onActionPressIn: handleActionPressIn,
                             onActionPressOut: handleActionPressOut,
                         }}
