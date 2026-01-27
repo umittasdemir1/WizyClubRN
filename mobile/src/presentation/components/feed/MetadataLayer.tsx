@@ -24,6 +24,7 @@ interface MetadataLayerProps {
 
 const BASE_BOTTOM_POSITION = 80; // Aligned exactly with seekbar center (80px touch area / 2)
 const SAFE_AREA_OFFSET = 0; // No extra offset needed as seekbar is also at 0
+const EMPTY_METADATA_OFFSET = 30;
 
 export function MetadataLayer({
     data,
@@ -41,9 +42,11 @@ export function MetadataLayer({
 
     // Check if description exists and is not empty
     const hasDescription = video.description && video.description.trim().length > 0;
+    const shouldShiftUserRow = !hasDescription && !video.isCommercial;
+    const effectiveBottom = shouldShiftUserRow ? Math.max(0, bottom - EMPTY_METADATA_OFFSET) : bottom;
 
     return (
-        <View style={[styles.container, { bottom }]} pointerEvents="box-none">
+        <View style={[styles.container, { bottom: effectiveBottom }]} pointerEvents="box-none">
             {/* User Row */}
             <View style={styles.userRow}>
                 <Pressable onPress={onAvatarPress} hitSlop={8}>
