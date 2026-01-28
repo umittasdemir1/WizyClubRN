@@ -10,7 +10,7 @@
  * @module presentation/components/feed/hooks/useFeedActions
  */
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Share, Alert, Animated as RNAnimated, Easing } from 'react-native';
 import { FEED_FLAGS } from './useFeedConfig';
 import { Video } from '../../../../domain/entities/Video';
@@ -80,9 +80,9 @@ export interface UseFeedActionsReturn {
     /** Cancel delete */
     cancelDelete: () => void;
     /** Handle seek */
-    handleSeek: (time: number) => void;
+    seekTo: (time: number) => void;
     /** Handle retry */
-    handleRetry: () => void;
+    retryActive: () => void;
     /** Show save toast */
     showSaveToast: (message: string) => void;
     /** Save toast message */
@@ -99,13 +99,7 @@ export interface UseFeedActionsReturn {
     isDeleteModalVisible: boolean;
     /** Set delete modal visible */
     setDeleteModalVisible: (value: boolean) => void;
-    /** Playback controller */
-    playbackController: {
-        seekTo: (time: number) => void;
-        retryActive: () => void;
-        setPlaybackRate: (rate: number) => void;
-    };
-}
+};
 
 // ============================================================================
 // Hook Implementation
@@ -140,9 +134,9 @@ export function useFeedActions(options: UseFeedActionsOptions): UseFeedActionsRe
     // ========================================================================
     // Local State
     // ========================================================================
-    const saveToastMessageRef = useRef<string | null>(null);
-    const saveToastActiveRef = useRef(false);
-    const isDeleteModalVisibleRef = useRef(false);
+    const [saveToastMessage, setSaveToastMessage] = useState<string | null>(null);
+    const [saveToastActive, setSaveToastActive] = useState(false);
+    const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
     const wasPlayingBeforeShareRef = useRef(false);
 
     // ========================================================================
@@ -158,17 +152,21 @@ export function useFeedActions(options: UseFeedActionsOptions): UseFeedActionsRe
     const showSaveToast = useCallback((message: string) => {
         if (FEED_FLAGS.DISABLE_ACTIONS) return;
 
-        saveToastMessageRef.current = message;
+        setSaveToastMessage(message);
 
         // Clear existing timeout
         if (saveToastTimeoutRef.current) {
             clearTimeout(saveToastTimeoutRef.current);
         }
 
+        // Reset positions
+        saveToastTranslateY.setValue(-70);
+        saveToastOpacity.setValue(0);
+
         // Animate in
         RNAnimated.parallel([
             RNAnimated.timing(saveToastTranslateY, {
-                toValue: insetTop + 16,
+                toValue: 0, // Using 0 because FeedOverlays handles top offset
                 duration: 250,
                 easing: Easing.out(Easing.quad),
                 useNativeDriver: true,
@@ -195,7 +193,7 @@ export function useFeedActions(options: UseFeedActionsOptions): UseFeedActionsRe
                     useNativeDriver: true,
                 }),
             ]).start(() => {
-                saveToastMessageRef.current = null;
+                setSaveToastMessage(null);
             });
         }, 2000);
     }, [saveToastOpacity, saveToastTranslateY, insetTop]);
@@ -215,7 +213,7 @@ export function useFeedActions(options: UseFeedActionsOptions): UseFeedActionsRe
 
         const nextSaved = !activeVideo.isSaved;
         toggleSave(activeVideo.id);
-        saveToastActiveRef.current = nextSaved;
+        setSaveToastActive(nextSaved);
         showSaveToast(nextSaved ? 'Kaydedilenlere eklendi' : 'Kaydedilenlerden kaldırıldı');
     }, [activeVideo, toggleSave, showSaveToast]);
 
@@ -280,7 +278,7 @@ export function useFeedActions(options: UseFeedActionsOptions): UseFeedActionsRe
 
     const handleDeletePress = useCallback(() => {
         if (!activeVideoId) return;
-        isDeleteModalVisibleRef.current = true;
+        setDeleteModalVisible(true);
     }, [activeVideoId]);
 
     const handleSheetDelete = useCallback(() => {
@@ -292,22 +290,22 @@ export function useFeedActions(options: UseFeedActionsOptions): UseFeedActionsRe
         if (activeVideoId) {
             deleteVideo(activeVideoId);
         }
-        isDeleteModalVisibleRef.current = false;
+        setDeleteModalVisible(false);
     }, [activeVideoId, deleteVideo]);
 
     const cancelDelete = useCallback(() => {
-        isDeleteModalVisibleRef.current = false;
+        setDeleteModalVisible(false);
     }, []);
 
     // ========================================================================
     // Playback Controls
     // ========================================================================
 
-    const handleSeek = useCallback((time: number) => {
+    const seekTo = useCallback((time: number) => {
         videoPlayerRef.current?.seekTo(time);
     }, [videoPlayerRef]);
 
-    const handleRetry = useCallback(() => {
+    const retryActive = useCallback(() => {
         videoPlayerRef.current?.retryActive();
     }, [videoPlayerRef]);
 
@@ -318,12 +316,6 @@ export function useFeedActions(options: UseFeedActionsOptions): UseFeedActionsRe
         }
         useActiveVideoStore.getState().setPlaybackRate(rate);
     }, [videoPlayerRef]);
-
-    const playbackController = {
-        seekTo: handleSeek,
-        retryActive: handleRetry,
-        setPlaybackRate: setPlaybackRateViaController,
-    };
 
     // ========================================================================
     // Return
@@ -340,16 +332,15 @@ export function useFeedActions(options: UseFeedActionsOptions): UseFeedActionsRe
         handleSheetDelete,
         confirmDeleteVideo,
         cancelDelete,
-        handleSeek,
-        handleRetry,
+        seekTo,
+        retryActive,
         showSaveToast,
-        saveToastMessage: saveToastMessageRef.current,
-        saveToastActive: saveToastActiveRef.current,
-        setSaveToastActive: (value: boolean) => { saveToastActiveRef.current = value; },
+        saveToastMessage,
+        saveToastActive,
+        setSaveToastActive,
         saveToastTranslateY,
         saveToastOpacity,
-        isDeleteModalVisible: isDeleteModalVisibleRef.current,
-        setDeleteModalVisible: (value: boolean) => { isDeleteModalVisibleRef.current = value; },
-        playbackController,
+        isDeleteModalVisible,
+        setDeleteModalVisible,
     };
 }

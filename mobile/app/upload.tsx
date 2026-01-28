@@ -17,7 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { X, Zap, ZapOff, Cog, RefreshCcw } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { UploadModal } from '../src/presentation/components/feed/UploadModal';
+import { UploadModal } from '../src/presentation/components/upload/UploadModal';
 import { LogCode, logError, logUI } from '@/core/services/Logger';
 import { textShadowStyle } from '@/core/utils/shadow';
 

@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useRef } from 'react';
-import { useSharedValue, useAnimatedScrollHandler } from 'react-native-reanimated';
+import { useSharedValue, useAnimatedScrollHandler, SharedValue } from 'react-native-reanimated';
 import type { ViewToken } from 'react-native';
 import { Image } from 'expo-image';
 import {
@@ -58,9 +58,9 @@ export interface UseFeedScrollReturn {
     /** Handle scroll end event */
     handleScrollEnd: (event: any, videosLength: number, listRef: React.RefObject<any>) => void;
     /** Current scroll Y position (SharedValue) */
-    scrollY: { value: number };
+    scrollY: SharedValue<number>;
     /** Whether currently scrolling (SharedValue) */
-    isScrollingSV: { value: boolean };
+    isScrollingSV: SharedValue<boolean>;
     /** Viewability config callback pairs for FlashList */
     viewabilityConfigCallbackPairs: React.MutableRefObject<Array<{
         viewabilityConfig: typeof VIEWABILITY_CONFIG;

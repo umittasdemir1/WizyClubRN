@@ -106,6 +106,21 @@ export const FEED_CONFIG = {
 
     /** Number of videos to prefetch behind current position */
     PREFETCH_BEHIND_COUNT: 1,
+
+    /** Number of players in the recycling pool */
+    POOL_SIZE: 3,
+
+    /** Maximum retries for video playback errors */
+    MAX_RETRIES: 3,
+
+    /** Delay before recycling slots after scroll ends (ms) */
+    RECYCLE_DELAY_MS: 100,
+
+    /** Delay before retrying a failed video (ms) */
+    RETRY_DELAY_MS: 300,
+
+    /** Aspect ratio threshold to switch between cover and contain */
+    ASPECT_RATIO_THRESHOLD: 0.8,
 } as const;
 
 // ============================================================================

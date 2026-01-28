@@ -1,6 +1,6 @@
 # Feed Documentation Index
 
-> **Last Updated:** 2025-01-28  
+> **Last Updated:** 2026-01-27  
 > **Path:** `docs/feed/`
 
 ---
@@ -9,15 +9,19 @@
 
 | Document | Language | Description |
 |----------|----------|-------------|
-| [FEED_CLEANUP_REFACTOR_REPORT_EN.md](./FEED_CLEANUP_REFACTOR_REPORT_EN.md) | 🇬🇧 English | Comprehensive cleanup and refactor readiness analysis of all feed components |
-| [FEED_CLEANUP_REFACTOR_REPORT_TR.md](./FEED_CLEANUP_REFACTOR_REPORT_TR.md) | 🇹🇷 Turkish | Feed bileşeni temizlik ve refaktör hazırlık analizi |
+| [FEED_CODE_REVIEW_CLEANUP_REPORT.md](./FEED_CODE_REVIEW_CLEANUP_REPORT.md) | 🇹🇷 Turkish | **En Güncel** Kapsamlı Kod İnceleme ve Temizlik Analizi (Refaktör Sonrası) |
+| [FEED_CLEANUP_REFACTOR_REPORT_EN.md](./FEED_CLEANUP_REFACTOR_REPORT_EN.md) | 🇬🇧 English | Initial cleanup and refactor readiness analysis |
+| [FEED_CLEANUP_REFACTOR_REPORT_TR.md](./FEED_CLEANUP_REFACTOR_REPORT_TR.md) | 🇹🇷 Turkish | İlk bileşen temizlik ve refaktör hazırlık analizi |
+| [FEED_LAYER_ARCHITECTURE_EN.md](./FEED_LAYER_ARCHITECTURE_EN.md) | 🇬🇧 English | Detailed Layer Architecture Documentation |
+| [FEED_LAYER_ARCHITECTURE_TR.md](./FEED_LAYER_ARCHITECTURE_TR.md) | 🇹🇷 Turkish | Detaylı Katman Mimarisi Dokümantasyonu |
 
 ## TODO Lists
 
 | Document | Language | Description |
 |----------|----------|-------------|
-| [FEED_REFACTOR_TODO_EN.md](./FEED_REFACTOR_TODO_EN.md) | 🇬🇧 English | Exhaustive TODO list with 18 actionable refactor tasks |
-| [FEED_REFACTOR_TODO_TR.md](./FEED_REFACTOR_TODO_TR.md) | 🇹🇷 Turkish | 18 adet aksiyon alınabilir refaktör görevi listesi |
+| [FEED_REFACTOR_TODO_EN.md](./FEED_REFACTOR_TODO_EN.md) | 🇬🇧 English | **Completed** Exhaustive Refactor Task List |
+| [FEED_REFACTOR_TODO_TR.md](./FEED_REFACTOR_TODO_TR.md) | 🇹🇷 Turkish | **Tamamlandı** Kapsamlı Refaktör Görev Listesi |
+| [FEED_CLEANUP_REFACTOR_TODO.md](./FEED_CLEANUP_REFACTOR_TODO.md) | 🇹🇷 Turkish | **Yeni** Final Temizlik ve Refaktör Kontrol Listesi |
 
 ## Historical Documents
 
@@ -60,7 +64,7 @@ mobile/src/presentation/components/feed/
 |--------|-------|
 | Total Files | 16 |
 | Total Lines | ~5,200 |
-| Refactor Readiness | 7/10 |
+| Refactor Readiness | 9/10 (Gold Standard) |
 | High-Risk Tasks | 3 |
 | Medium-Risk Tasks | 4 |
 | Low-Risk Tasks | 11 |

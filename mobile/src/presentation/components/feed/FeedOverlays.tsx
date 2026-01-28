@@ -11,7 +11,7 @@
  * @module presentation/components/feed/FeedOverlays
  */
 
-import React, { forwardRef, useImperativeHandle, useRef } from 'react';
+import React, { forwardRef, useImperativeHandle, useRef, useMemo } from 'react';
 import {
     View,
     Text,
@@ -19,9 +19,10 @@ import {
     Pressable,
     Animated as RNAnimated,
 } from 'react-native';
-import Animated from 'react-native-reanimated';
-import { Bookmark } from 'lucide-react-native';
+import Animated, { SharedValue } from 'react-native-reanimated';
+
 import BottomSheet from '@gorhom/bottom-sheet';
+import { SaveToast } from './SaveToast';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HeaderOverlay } from './HeaderOverlay';
@@ -29,6 +30,7 @@ import { StoryBar } from './StoryBar';
 import { MoreOptionsSheet } from '../sheets/MoreOptionsSheet';
 import { DescriptionSheet } from '../sheets/DescriptionSheet';
 import { DeleteConfirmationModal } from './DeleteConfirmationModal';
+import { ActiveVideoOverlay } from './ActiveVideoOverlay';
 
 import { Video } from '../../../domain/entities/Video';
 import { FEED_FLAGS, FEED_COLORS, SCREEN_WIDTH } from './hooks/useFeedConfig';
@@ -40,6 +42,9 @@ import { FEED_FLAGS, FEED_COLORS, SCREEN_WIDTH } from './hooks/useFeedConfig';
 export interface FeedOverlaysProps {
     /** Active video */
     activeVideo: Video | null;
+    /** Sheet Refs for hook integration */
+    moreOptionsSheetRef: React.RefObject<BottomSheet>;
+    descriptionSheetRef: React.RefObject<BottomSheet>;
     /** Active video ID */
     activeVideoId: string | null;
     /** Current user ID */
@@ -64,6 +69,14 @@ export interface FeedOverlaysProps {
     storyUsers: any[];
     /** UI opacity style */
     uiOpacityStyle: any;
+    /** Current active index */
+    activeIndex: number;
+    /** Is active video playable */
+    isPlayable: boolean;
+    /** Current scroll Y (SharedValue) */
+    scrollY: SharedValue<number>;
+    /** Is currently scrolling (SharedValue) */
+    isScrollingSV: SharedValue<boolean>;
     /** Save toast state */
     saveToast: {
         message: string | null;
@@ -90,6 +103,28 @@ export interface FeedOverlaysProps {
         onFollowPress: () => void;
         onDescriptionChange: (index: number) => void;
         onBack: () => void;
+        onLike: () => void;
+        onSave: () => void;
+        onShare: () => void;
+        onShop: () => void;
+        onDescription: () => void;
+        onActionPressIn: () => void;
+        onActionPressOut: () => void;
+        playbackController: {
+            seekTo: (time: number) => void;
+            retryActive: () => void;
+        };
+    };
+    /** Playback and interaction state */
+    playback: {
+        isPaused: boolean;
+        hasError: boolean;
+        retryCount: number;
+        rateLabel: string | null;
+        tapIndicator: 'play' | 'pause' | null;
+        isFinished: boolean;
+        currentTimeSV: SharedValue<number>;
+        durationSV: SharedValue<number>;
     };
 }
 
@@ -120,11 +155,12 @@ export const FeedOverlays = forwardRef<FeedOverlaysRef, FeedOverlaysProps>(
             saveToast,
             deleteModal,
             actions,
+            playback,
+            moreOptionsSheetRef,
+            descriptionSheetRef,
         } = props;
 
         const insets = useSafeAreaInsets();
-        const moreOptionsSheetRef = useRef<BottomSheet>(null);
-        const descriptionSheetRef = useRef<BottomSheet>(null);
 
         // Expose refs to parent
         useImperativeHandle(ref, () => ({
@@ -141,35 +177,62 @@ export const FeedOverlays = forwardRef<FeedOverlaysRef, FeedOverlaysProps>(
             return null;
         }
 
+        // Memoize ActiveVideoOverlay props to prevent re-renders (Stable Props Pattern)
+        const activeVideoData = useMemo(() => ({
+            video: activeVideo as Video,
+            currentUserId: props.currentUserId || undefined,
+            activeIndex: props.activeIndex,
+            isPlayable: props.isPlayable,
+        }), [activeVideo, props.currentUserId, props.activeIndex, props.isPlayable]);
+
+        const activeVideoPlayback = useMemo(() => ({
+            isFinished: playback.isFinished,
+            hasError: playback.hasError,
+            retryCount: playback.retryCount,
+            isCleanScreen: isCleanScreen,
+            isSeeking: isSeeking,
+            tapIndicator: playback.tapIndicator,
+            rateLabel: playback.rateLabel,
+        }), [playback.isFinished, playback.hasError, playback.retryCount, isCleanScreen, isSeeking, playback.tapIndicator, playback.rateLabel]);
+
+        const activeVideoTimeline = useMemo(() => ({
+            currentTimeSV: playback.currentTimeSV,
+            durationSV: playback.durationSV,
+            isScrollingSV: props.isScrollingSV,
+            scrollY: props.scrollY,
+        }), [playback.currentTimeSV, playback.durationSV, props.isScrollingSV, props.scrollY]);
+
+        const activeVideoActions = useMemo(() => ({
+            onToggleLike: actions.onLike,
+            onToggleSave: actions.onSave,
+            onToggleShare: actions.onShare,
+            onToggleFollow: actions.onFollowPress,
+            onOpenShopping: actions.onShop,
+            onOpenDescription: actions.onDescription,
+            playbackController: actions.playbackController,
+            onActionPressIn: actions.onActionPressIn,
+            onActionPressOut: actions.onActionPressOut,
+        }), [actions.onLike, actions.onSave, actions.onShare, actions.onFollowPress, actions.onShop, actions.onDescription, actions.playbackController, actions.onActionPressIn, actions.onActionPressOut]);
+
         return (
             <>
-                {/* Save Toast */}
-                {saveToast.message && (
-                    <RNAnimated.View
-                        pointerEvents="none"
-                        style={[
-                            styles.saveToast,
-                            saveToast.active ? styles.saveToastActive : styles.saveToastInactive,
-                            {
-                                top: insets.top + 60,
-                                opacity: saveToast.opacity,
-                                transform: [{ translateY: saveToast.translateY }],
-                            },
-                        ]}
-                    >
-                        <View style={styles.saveToastContent}>
-                            <Bookmark
-                                size={18}
-                                color={FEED_COLORS.SAVE_ICON_ACTIVE}
-                                fill={saveToast.active ? FEED_COLORS.SAVE_ICON_ACTIVE : 'none'}
-                                strokeWidth={1.6}
-                            />
-                            <Text style={[styles.saveToastText, styles.saveToastTextActive]}>
-                                {saveToast.message}
-                            </Text>
-                        </View>
-                    </RNAnimated.View>
+                {/* Active Video Overlay (Buttons, Metadata, SeekBar) */}
+                {activeVideo && (
+                    <ActiveVideoOverlay
+                        data={activeVideoData}
+                        playback={activeVideoPlayback}
+                        timeline={activeVideoTimeline}
+                        actions={activeVideoActions}
+                    />
                 )}
+
+                {/* Save Toast */}
+                <SaveToast
+                    message={saveToast.message}
+                    active={saveToast.active}
+                    opacity={saveToast.opacity}
+                    translateY={saveToast.translateY}
+                />
 
                 {/* Header Overlay */}
                 {!isCleanScreen && (
@@ -252,35 +315,5 @@ const styles = StyleSheet.create({
     sheetsContainer: {
         ...StyleSheet.absoluteFillObject,
         zIndex: 9999,
-    },
-    saveToast: {
-        position: 'absolute',
-        alignSelf: 'center',
-        zIndex: 300,
-        minWidth: 280,
-        paddingVertical: 14,
-        paddingHorizontal: 12,
-        borderRadius: 14,
-        alignItems: 'center',
-        overflow: 'hidden',
-    },
-    saveToastActive: {
-        backgroundColor: '#2c2c2e',
-    },
-    saveToastInactive: {
-        backgroundColor: '#2c2c2e',
-    },
-    saveToastText: {
-        fontSize: 17,
-        fontWeight: '400',
-        zIndex: 1,
-    },
-    saveToastTextActive: {
-        color: '#FFFFFF',
-    },
-    saveToastContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
     },
 });

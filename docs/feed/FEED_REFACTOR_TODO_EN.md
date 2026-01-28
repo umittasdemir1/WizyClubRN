@@ -26,40 +26,52 @@
 
 ## Priority 1 (P1) - Critical Tasks
 
-### [ ] TODO-F002: Extract MAX_VIDEO_LOOPS Configuration Constant
-- **File:** [FeedManager.tsx](file:///d:/WizyClub/mobile/src/presentation/components/feed/FeedManager.tsx#L676)
+### [X] TODO-F002: Extract MAX_VIDEO_LOOPS Configuration Constant ✅
+- **File:** [FeedManager.tsx](file:///d:/WizyClub/mobile/src/presentation/components/feed/FeedManager.tsx#L574)
 - **Action:** REFACTOR
 - **Risk:** ✅ LOW
 - **Technical Reason:** Magic number `2` for maximum video loops is hardcoded in `handleVideoEnd`. Should be configurable constant.
+- **Status:** ✅ COMPLETED (2026-01-28)
 
 ---
 
 ## Priority 2 (P2) - High Priority Tasks
 
-### [ ] TODO-F003: Extract SaveToast Component
-- **File:** [FeedManager.tsx](file:///d:/WizyClub/mobile/src/presentation/components/feed/FeedManager.tsx#L1326-L1351)
+### [X] TODO-F003: Extract SaveToast Component ✅
+- **File:** [`mobile/src/presentation/components/feed/SaveToast.tsx`](file:///d:/WizyClub/mobile/src/presentation/components/feed/SaveToast.tsx)
 - **Action:** EXTRACT
 - **Risk:** ✅ LOW
+- **Status:** ✅ COMPLETED (2026-01-28)
 
-### [ ] TODO-F004: Extract SlotRecycler Utility Class
+### [X] TODO-F004: Extract SlotRecycler Utility Class ✅
 - **File:** [VideoPlayerPool.tsx](file:///d:/WizyClub/mobile/src/presentation/components/feed/VideoPlayerPool.tsx#L419-L661)
 - **Action:** EXTRACT
-- **Risk:** ⚡ MEDIUM
+- **Risk:** ✅ LOW
+- **Status:** ✅ COMPLETED (2026-01-28)
 
-### [ ] TODO-F005: Move slotsEqual to Module Scope
-- **File:** [VideoPlayerPool.tsx](file:///d:/WizyClub/mobile/src/presentation/components/feed/VideoPlayerPool.tsx#L476-L488)
+### [X] TODO-F004: SlotRecycler Yardımcı Sınıfını Çıkar ✅
+- **Dosya:** [`mobile/src/presentation/components/feed/utils/SlotRecycler.ts`](file:///d:/WizyClub/mobile/src/presentation/components/feed/utils/SlotRecycler.ts)
+- **Eylem:** ÇIKAR
+- **Risk:** ✅ DÜŞÜK
+- **Durum:** ✅ TAMAMLANDI (2026-01-28)
+
+### [X] TODO-F005: Move slotsEqual to Module Scope ✅
+- **File:** [VideoPlayerPool.tsx](file:///d:/WizyClub/mobile/src/presentation/components/feed/VideoPlayerPool.tsx#L55)
 - **Action:** REFACTOR
 - **Risk:** ✅ LOW
+- **Status:** ✅ COMPLETED (2026-01-28)
 
-### [ ] TODO-F006: Extract VideoErrorHandler Utility
-- **File:** [VideoPlayerPool.tsx](file:///d:/WizyClub/mobile/src/presentation/components/feed/VideoPlayerPool.tsx#L683-L745)
+### [X] TODO-F006: Extract VideoErrorHandler Utility ✅
+- **File:** [`mobile/src/presentation/components/feed/utils/VideoErrorHandler.ts`](file:///d:/WizyClub/mobile/src/presentation/components/feed/utils/VideoErrorHandler.ts)
 - **Action:** EXTRACT
-- **Risk:** ⚡ MEDIUM
+- **Risk:** ✅ LOW
+- **Status:** ✅ COMPLETED (2026-01-28)
 
-### [ ] TODO-F007: Consolidate Magic Numbers in VideoPlayerPool
+### [X] TODO-F007: Consolidate Magic Numbers in VideoPlayerPool ✅
 - **File:** [VideoPlayerPool.tsx](file:///d:/WizyClub/mobile/src/presentation/components/feed/VideoPlayerPool.tsx)
 - **Action:** REFACTOR
 - **Risk:** ✅ LOW
+- **Status:** ✅ COMPLETED (2026-01-28)
 
 ---
 
@@ -69,110 +81,180 @@
 > **Goal:** Split FeedManager.tsx (1524 lines) → 5 modules (~300 lines each)  
 > **Estimated Effort:** 1-2 developer days
 
-### [ ] TODO-FM01: Create useFeedConfig.ts Hook
-- **File:** NEW: `mobile/src/presentation/components/feed/hooks/useFeedConfig.ts`
+### [X] TODO-FM01: Create useFeedConfig.ts Hook ✅
+- **File:** [`mobile/src/presentation/components/feed/hooks/useFeedConfig.ts`](file:///d:/WizyClub/mobile/src/presentation/components/feed/hooks/useFeedConfig.ts)
 - **Action:** CREATE
 - **Risk:** ✅ LOW
 - **Technical Reason:** Centralize all constants, flags, and configuration values.
+- **Status:** ✅ COMPLETED (2026-01-27)
 
-### [ ] TODO-FM02: Create useFeedScroll.ts Hook
-- **File:** NEW: `mobile/src/presentation/components/feed/hooks/useFeedScroll.ts`
+### [X] TODO-FM02: Create useFeedScroll.ts Hook ✅
+- **File:** [`mobile/src/presentation/components/feed/hooks/useFeedScroll.ts`](file:///d:/WizyClub/mobile/src/presentation/components/feed/hooks/useFeedScroll.ts)
 - **Action:** CREATE
 - **Risk:** ⚡ MEDIUM
 - **Dependencies:** TODO-FM01
+- **Status:** ✅ COMPLETED (2026-01-27)
 
-### [ ] TODO-FM03: Create useFeedInteractions.ts Hook
-- **File:** NEW: `mobile/src/presentation/components/feed/hooks/useFeedInteractions.ts`
+### [X] TODO-FM03: Create useFeedInteractions.ts Hook ✅
+- **File:** [`mobile/src/presentation/components/feed/hooks/useFeedInteractions.ts`](file:///d:/WizyClub/mobile/src/presentation/components/feed/hooks/useFeedInteractions.ts)
 - **Action:** CREATE
 - **Risk:** ⚡ MEDIUM
 - **Dependencies:** TODO-FM01, TODO-FM02
+- **Status:** ✅ COMPLETED (2026-01-27)
 
-### [ ] TODO-FM04: Create useFeedActions.ts Hook
-- **File:** NEW: `mobile/src/presentation/components/feed/hooks/useFeedActions.ts`
+### [X] TODO-FM04: Create useFeedActions.ts Hook ✅
+- **File:** [`mobile/src/presentation/components/feed/hooks/useFeedActions.ts`](file:///d:/WizyClub/mobile/src/presentation/components/feed/hooks/useFeedActions.ts)
 - **Action:** CREATE
 - **Risk:** ⚡ MEDIUM
 - **Dependencies:** TODO-FM01
+- **Status:** ✅ COMPLETED (2026-01-27)
 
-### [ ] TODO-FM05: Create FeedOverlays.tsx Component
-- **File:** NEW: `mobile/src/presentation/components/feed/FeedOverlays.tsx`
+### [X] TODO-FM05: Create FeedOverlays.tsx Component ✅
+- **File:** [`mobile/src/presentation/components/feed/FeedOverlays.tsx`](file:///d:/WizyClub/mobile/src/presentation/components/feed/FeedOverlays.tsx)
 - **Action:** CREATE
 - **Risk:** ⚡ MEDIUM
 - **Dependencies:** TODO-FM01, TODO-FM04
+- **Status:** ✅ COMPLETED (2026-01-27)
 
-### [ ] TODO-FM06: Refactor FeedManager.tsx
+### [X] TODO-FM06: Refactor FeedManager.tsx ✅
 - **File:** [FeedManager.tsx](file:///d:/WizyClub/mobile/src/presentation/components/feed/FeedManager.tsx)
 - **Action:** REFACTOR
-- **Risk:** ⚠️ HIGH
+- **Risk:** ✅ COMPLETED
 - **Dependencies:** TODO-FM01 - TODO-FM05
+- **Status:** ✅ COMPLETED (2026-01-28)
 
-### [ ] TODO-FM07: Integration Testing & Flag Verification
+#### [FeedOverlays.tsx](file:///d:/WizyClub/mobile/src/presentation/components/feed/FeedOverlays.tsx)
+- Integrated the new `SaveToast` component and removed local UI code and styles.
+
+### 4. Extract SlotRecycler Utility Class (TODO-F004)
+Extracted the complex player slot allocation logic from `VideoPlayerPool.tsx` into a dedicated `SlotRecycler` class.
+
+#### [SlotRecycler.ts](file:///d:/WizyClub/mobile/src/presentation/components/feed/utils/SlotRecycler.ts)
+- [NEW] Implemented `calculateTargetIndices` to handle current, next, and previous slot assignments.
+
+#### [VideoPlayerPool.tsx](file:///d:/WizyClub/mobile/src/presentation/components/feed/VideoPlayerPool.tsx)
+- Replaced ~100 lines of inline allocation logic with a single call to `SlotRecycler`.
+
+### 5. Extract VideoErrorHandler Utility (TODO-F006)
+Centralized video playback error handling, retry logic, and network fallbacks into a dedicated class.
+
+#### [VideoErrorHandler.ts](file:///d:/WizyClub/mobile/src/presentation/components/feed/utils/VideoErrorHandler.ts)
+- [NEW] Implemented logic for retry limits and cache-to-network fallback.
+
+#### [videoUrl.ts](file:///d:/WizyClub/mobile/src/core/utils/videoUrl.ts)
+- Moved `isValidSource` utility here to be shared across components.
+
+#### [VideoPlayerPool.tsx](file:///d:/WizyClub/mobile/src/presentation/components/feed/VideoPlayerPool.tsx)
+- Simplified error handling callback and integrated the new utility.
+
+### 3. Consolidate Magic Numbers in VideoPlayerPool (TODO-F007)
+Moved all hardcoded magic numbers from `VideoPlayerPool.tsx` to the centralized `FEED_CONFIG` in `useFeedConfig.ts`.
+
+#### [useFeedConfig.ts](file:///d:/WizyClub/mobile/src/presentation/components/feed/hooks/useFeedConfig.ts)
+- Added `POOL_SIZE`, `MAX_RETRIES`, `RECYCLE_DELAY_MS`, `RETRY_DELAY_MS`, and `ASPECT_RATIO_THRESHOLD`.
+
+#### [VideoPlayerPool.tsx](file:///d:/WizyClub/mobile/src/presentation/components/feed/VideoPlayerPool.tsx)
+- Imported `FEED_CONFIG`.
+- Replaced all magic numbers with their corresponding `FEED_CONFIG` constants.
+
+### [X] TODO-FM07: Integration Testing & Flag Verification ✅
 - **File:** All feed modules
 - **Action:** TEST
-- **Risk:** ⚡ MEDIUM
+- **Risk:** ✅ COMPLETED
 - **Dependencies:** TODO-FM06
+- **Status:** ✅ COMPLETED (2026-01-28)
+
+## Phase 4: Architectural Consolidation (Final Polish) ⭐️ NEXT
+> **Goal:** Reduce FeedManager.tsx to ~300 lines by extracting coordination and UI logic.
+> **Estimated Effort:** 0.5 developer days
+
+### [X] TODO-FM08: Extract useFeedLifecycleSync.ts ✅
+- **Action:** EXTRACT
+- **Task:** Move 200+ lines of useEffect hooks (Upload, Browser, AppState) into a sync handler.
+- **Status:** ✅ COMPLETED
+
+### [X] TODO-FM09: Extract FeedStatusViews.tsx ✅
+- **Action:** EXTRACT
+- **Task:** Move Loading, Error, and Empty states into a dedicated view component.
+- **Status:** ✅ COMPLETED
+
+### [X] TODO-FM10: Extract FeedUtils.ts & FeedManager.styles.ts ✅
+- **Action:** CLEANUP
+- **Task:** Move helper functions and styles to separate files.
+- **Status:** ✅ COMPLETED
 
 ---
 
 ## Priority 3 (P3) - Medium Priority Tasks
 
-### [ ] TODO-F008: Optimize handleVideoProgress Dependencies
+### [X] TODO-F008: Optimize handleVideoProgress Dependencies ✅
 - **File:** [FeedManager.tsx](file:///d:/WizyClub/mobile/src/presentation/components/feed/FeedManager.tsx)
 - **Action:** OPTIMIZE
-- **Risk:** ⚡ MEDIUM
+- **Risk:** ✅ OPTIMIZED (Verified)
+- **Status:** ✅ COMPLETED
 
-### [ ] TODO-F009: Optimize handleLongPress Dependencies
+### [X] TODO-F009: Optimize handleLongPress Dependencies ✅
 - **File:** [FeedManager.tsx](file:///d:/WizyClub/mobile/src/presentation/components/feed/FeedManager.tsx)
 - **Action:** OPTIMIZE
-- **Risk:** ⚡ MEDIUM
+- **Risk:** ✅ OPTIMIZED (Ref impl)
+- **Status:** ✅ COMPLETED
 
-### [ ] TODO-F010: Verify SpritePreview Usage
+### [X] TODO-F010: Verify SpritePreview Usage ✅
 - **File:** [SpritePreview.tsx](file:///d:/WizyClub/mobile/src/presentation/components/feed/SpritePreview.tsx)
 - **Action:** VERIFY
-- **Risk:** ✅ LOW
+- **Risk:** ✅ VERIFIED (Active Component)
+- **Status:** ✅ COMPLETED
 
-### [ ] TODO-F011: Document Layer Architecture
-- **File:** New: `docs/feed/FEED_LAYER_ARCHITECTURE.md`
+### [X] TODO-F011: Document Layer Architecture ✅
+- **File:** [FEED_LAYER_ARCHITECTURE_EN.md](file:///d:/WizyClub/docs/feed/FEED_LAYER_ARCHITECTURE_EN.md)
 - **Action:** CREATE
-- **Risk:** ✅ LOW
+- **Risk:** ✅ COMPLETED
+- **Status:** ✅ COMPLETED
 
 ---
 
 ## Priority 4 (P4) - Nice to Have
 
-### [ ] TODO-F012: Consider Context for ActiveVideoOverlay Props
+### [X] TODO-F012: Consider Context for ActiveVideoOverlay Props ✅
 - **File:** [FeedManager.tsx](file:///d:/WizyClub/mobile/src/presentation/components/feed/FeedManager.tsx#L1284-L1317)
 - **Action:** EVALUATE
-- **Risk:** ⚠️ HIGH
+- **Risk:** ✅ KEPT AS IS (Clean enough)
+- **Status:** ✅ COMPLETED
 
-### [ ] TODO-F013: Move Loop Logic to Domain Use Case
+### [X] TODO-F013: Move Loop Logic to Domain Use Case ✅
 - **File:** [FeedManager.tsx](file:///d:/WizyClub/mobile/src/presentation/components/feed/FeedManager.tsx)
 - **Action:** REFACTOR
-- **Risk:** ⚠️ HIGH
+- **Risk:** ✅ KEPT AS IS (Tight UI Handling)
+- **Status:** ✅ COMPLETED
 
-### [ ] TODO-F014: Move Prefetch Logic to Domain Layer
+### [X] TODO-F014: Move Prefetch Logic to Domain Layer ✅
 - **File:** [FeedManager.tsx](file:///d:/WizyClub/mobile/src/presentation/components/feed/FeedManager.tsx)
 - **Action:** EVALUATE
-- **Risk:** ⚠️ HIGH
+- **Risk:** ✅ KEPT AS IS (Tight Pool Integration)
+- **Status:** ✅ COMPLETED
 
-### [ ] TODO-F015: Add Unit Tests for VideoPlayerPool
+### [X] TODO-F015: Add Unit Tests for VideoPlayerPool ❌
 - **File:** New: `mobile/src/presentation/components/feed/__tests__/VideoPlayerPool.test.tsx`
 - **Action:** CREATE
-- **Risk:** ✅ LOW
+- **Risk:** ✅ SKIPPED (User Request)
+- **Status:** ✅ CANCELLED
 
-### [ ] TODO-F016: Add Unit Tests for FeedManager Callbacks
+### [X] TODO-F016: Add Unit Tests for FeedManager Callbacks ❌
 - **File:** New: `mobile/src/presentation/components/feed/__tests__/FeedManager.test.tsx`
 - **Action:** CREATE
-- **Risk:** ✅ LOW
+- **Risk:** ✅ SKIPPED (User Request)
+- **Status:** ✅ CANCELLED
 
 ### [ ] TODO-F017: Add Performance Monitoring
 - **File:** [VideoPlayerPool.tsx](file:///d:/WizyClub/mobile/src/presentation/components/feed/VideoPlayerPool.tsx)
 - **Action:** ENHANCE
 - **Risk:** ✅ LOW
 
-### [ ] TODO-F018: Cleanup Unused Imports
-- **File:** All feed components
+### [X] TODO-F018: Cleanup Unused Imports ✅
+- **File:** All `src/presentation/components/feed` files
 - **Action:** CLEANUP
 - **Risk:** ✅ LOW
+- **Status:** ✅ COMPLETED
 
 ---
 
@@ -181,33 +263,41 @@
 | Priority | Count | Status |
 |----------|-------|--------|
 | 🔴 P1 | 1 | 0 / 1 |
-| 🟠 P2 | 5 | 0 / 5 |
+| 🟠 P2 | 5 | 2 / 5 |
 | 🟠 P2-S (Modular Split) | 7 | 0 / 7 |
 | 🟡 P3 | 4 | 0 / 4 |
 | 🟢 P4 | 7 | 0 / 7 |
-| **TOTAL** | **24** | **0 / 24** |
+| **TOTAL** | **24** | **2 / 24** |
 
 ---
 
 ## Execution Order
 
-### Phase 1: Cleanup (Day 1 AM)
-- [ ] TODO-F002: Extract MAX_VIDEO_LOOPS
+### Phase 1: Cleanup & Quick Wins
+- [x] TODO-F002: Extract `MAX_VIDEO_LOOPS` Constant
+- [x] TODO-F005: Move `slotsEqual` to Module Scope
+- [x] TODO-F007: Consolidate Magic Numbers in `VideoPlayerPool`
 
-### Phase 2: Quick Wins (Day 1 PM)
-- [ ] TODO-F005: Move slotsEqual to module scope
-- [ ] TODO-F007: Consolidate magic numbers
+### Phase 2: Component & Utility Extraction (P2 Tasks)
+- [x] TODO-F003: Extract `SaveToast` Component
+- [x] TODO-F004: Extract `SlotRecycler` Utility Class
+- [x] TODO-F006: Extract `VideoErrorHandler` Utility
 
 ### Phase 3: Modular Splitting (Day 2-3)
-- [ ] TODO-FM01: Create useFeedConfig.ts ⭐ START HERE
-- [ ] TODO-FM02: Create useFeedScroll.ts
-- [ ] TODO-FM03: Create useFeedInteractions.ts
-- [ ] TODO-FM04: Create useFeedActions.ts
-- [ ] TODO-FM05: Create FeedOverlays.tsx
-- [ ] TODO-FM06: Refactor FeedManager.tsx
-- [ ] TODO-FM07: Integration testing
+- [x] TODO-FM01: Create useFeedConfig.ts
+- [x] TODO-FM02: Create useFeedScroll.ts
+- [x] TODO-FM03: Create useFeedInteractions.ts
+- [x] TODO-FM04: Create useFeedActions.ts
+- [x] TODO-FM05: Create FeedOverlays.tsx
+- [x] TODO-FM06: Refactor FeedManager.tsx
+- [x] TODO-FM07: Integration testing
 
-### Phase 4: Polish (Day 4)
+### Phase 4: Architectural Consolidation (Final Polish)
+- [x] TODO-FM08: Extract lifecycle sync logic to `useFeedLifecycleSync.ts`
+- [x] TODO-FM09: Extract feed status views to `FeedStatusViews.tsx`
+- [x] TODO-FM10: Style and utility cleanup (`FeedUtils.ts`, `FeedManager.styles.ts`)
+
+### Phase 5: Final Verification (Day 4)
 - [ ] Remaining P3 tasks
 - [ ] P4 tasks as time permits
 

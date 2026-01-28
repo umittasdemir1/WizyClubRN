@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, Dimensions } from 'react-native';
-import { BlurView } from 'expo-blur';
+
 
 interface DeleteConfirmationModalProps {
     visible: boolean;

@@ -10,7 +10,7 @@
  * @module presentation/components/feed/hooks/useFeedInteractions
  */
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { SCREEN_WIDTH, FEED_FLAGS } from './useFeedConfig';
 import { Video } from '../../../../domain/entities/Video';
 import { useActiveVideoStore } from '../../../store/useActiveVideoStore';
@@ -121,12 +121,11 @@ export function useFeedInteractions(options: UseFeedInteractionsOptions): UseFee
     const lastPressXRef = useRef<number | null>(null);
     const wasSpeedBoostedRef = useRef(false);
     const previousPlaybackRateRef = useRef(playbackRate);
+    // ========================================================================
+    // Local State
+    // ========================================================================
+    const [tapIndicator, setTapIndicator] = useState<null | 'play' | 'pause'>(null);
     const tapIndicatorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    // ========================================================================
-    // Local State (using ref for tap indicator to avoid re-renders)
-    // ========================================================================
-    const tapIndicatorRef = useRef<null | 'play' | 'pause'>(null);
 
     // ========================================================================
     // Show Tap Indicator
@@ -134,12 +133,12 @@ export function useFeedInteractions(options: UseFeedInteractionsOptions): UseFee
     const showTapIndicator = useCallback((type: 'play' | 'pause') => {
         if (FEED_FLAGS.DISABLE_INTERACTIONS) return;
 
-        tapIndicatorRef.current = type;
+        setTapIndicator(type);
         if (tapIndicatorTimeoutRef.current) {
             clearTimeout(tapIndicatorTimeoutRef.current);
         }
         tapIndicatorTimeoutRef.current = setTimeout(() => {
-            tapIndicatorRef.current = null;
+            setTapIndicator(null);
         }, 500);
     }, []);
 
@@ -238,6 +237,13 @@ export function useFeedInteractions(options: UseFeedInteractionsOptions): UseFee
     // ========================================================================
     // Handle Long Press (Speed Boost or Options)
     // ========================================================================
+    // Keep latest playbackRate in ref for stable callbacks
+    const currentPlaybackRateRef = useRef(playbackRate);
+    currentPlaybackRateRef.current = playbackRate;
+
+    // ========================================================================
+    // Handle Long Press (Speed Boost or Options)
+    // ========================================================================
     const handleLongPress = useCallback((event: any) => {
         if (FEED_FLAGS.DISABLE_INTERACTIONS || FEED_FLAGS.DISABLE_OVERLAYS) return;
 
@@ -247,7 +253,7 @@ export function useFeedInteractions(options: UseFeedInteractionsOptions): UseFee
         if (isRightSide) {
             // Speed boost on right side
             wasSpeedBoostedRef.current = true;
-            previousPlaybackRateRef.current = playbackRate;
+            previousPlaybackRateRef.current = currentPlaybackRateRef.current;
             setPlaybackRateViaController(2.0);
             setRateLabel('2x');
             return;
@@ -263,7 +269,7 @@ export function useFeedInteractions(options: UseFeedInteractionsOptions): UseFee
         // Open options sheet
         moreOptionsSheetRef.current?.snapToIndex(0);
         lastPressXRef.current = null;
-    }, [playbackRate, setPlaybackRateViaController, setRateLabel, moreOptionsSheetRef]);
+    }, [setPlaybackRateViaController, setRateLabel, moreOptionsSheetRef]);
 
     // ========================================================================
     // Handle Press Out (Reset Speed)
@@ -317,7 +323,7 @@ export function useFeedInteractions(options: UseFeedInteractionsOptions): UseFee
         handleActionPressIn,
         handleActionPressOut,
         showTapIndicator,
-        tapIndicator: tapIndicatorRef.current,
+        tapIndicator,
         setPlaybackRateViaController,
         actionButtonsPressingRef,
         doubleTapBlockUntilRef,

@@ -13,3 +13,11 @@ export const getVideoUrl = (video: { videoUrl?: unknown } | null | undefined): s
 
     return null;
 };
+export const isValidSource = (source: string | undefined | null): source is string => {
+    if (!source || typeof source !== 'string') return false;
+    if (source.trim() === '') return false;
+    // Must be a URL or file path
+    return source.startsWith('http://') ||
+        source.startsWith('https://') ||
+        source.startsWith('file://');
+};

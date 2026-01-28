@@ -172,7 +172,7 @@ export const ActiveVideoOverlay = memo(function ActiveVideoOverlay({
     const contentOpacityStyle = useAnimatedStyle(() => {
         const isScrolling = isScrollingSV.value;
         const visibility = uiVisibleSV.value;
-        
+
         // If scrolling, force hide (0). Otherwise use the visibility animation value.
         return {
             opacity: isScrolling ? 0.3 : visibility
@@ -305,7 +305,7 @@ export const ActiveVideoOverlay = memo(function ActiveVideoOverlay({
                                 onAvatarPress: handleProfilePress,
                                 onFollowPress: onToggleFollow,
                                 onReadMorePress: onOpenDescription,
-                                onCommercialTagPress: () => {},
+                                onCommercialTagPress: () => { },
                             }}
                         />
                     </Animated.View>
@@ -324,37 +324,6 @@ export const ActiveVideoOverlay = memo(function ActiveVideoOverlay({
                 </Animated.View>
             )}
         </Animated.View>
-    );
-}, (prevProps, nextProps) => {
-    // Custom equality check for optimal re-renders
-    return (
-        prevProps.data.video.id === nextProps.data.video.id &&
-        prevProps.data.activeIndex === nextProps.data.activeIndex &&
-        prevProps.data.video.isLiked === nextProps.data.video.isLiked &&
-        prevProps.data.video.isSaved === nextProps.data.video.isSaved &&
-        prevProps.data.video.likesCount === nextProps.data.video.likesCount &&
-        prevProps.data.video.savesCount === nextProps.data.video.savesCount &&
-        prevProps.data.video.sharesCount === nextProps.data.video.sharesCount &&
-        prevProps.data.video.shopsCount === nextProps.data.video.shopsCount &&
-        prevProps.data.video.commentsCount === nextProps.data.video.commentsCount &&
-        prevProps.data.video.description === nextProps.data.video.description &&
-        prevProps.data.video.spriteUrl === nextProps.data.video.spriteUrl &&
-        prevProps.data.video.postType === nextProps.data.video.postType &&
-        prevProps.data.video.brandUrl === nextProps.data.video.brandUrl &&
-        prevProps.data.video.brandName === nextProps.data.video.brandName &&
-        prevProps.data.video.user.id === nextProps.data.video.user.id &&
-        prevProps.data.video.user.username === nextProps.data.video.user.username &&
-        prevProps.data.video.user.fullName === nextProps.data.video.user.fullName &&
-        prevProps.data.video.user.avatarUrl === nextProps.data.video.user.avatarUrl &&
-        prevProps.data.video.user.isFollowing === nextProps.data.video.user.isFollowing &&
-        prevProps.data.isPlayable === nextProps.data.isPlayable &&
-        prevProps.playback.isFinished === nextProps.playback.isFinished &&
-        prevProps.playback.hasError === nextProps.playback.hasError &&
-        prevProps.playback.isCleanScreen === nextProps.playback.isCleanScreen &&
-        prevProps.playback.isSeeking === nextProps.playback.isSeeking &&
-        prevProps.playback.tapIndicator === nextProps.playback.tapIndicator &&
-        prevProps.playback.rateLabel === nextProps.playback.rateLabel &&
-        prevProps.playback.retryCount === nextProps.playback.retryCount
     );
 });
 
