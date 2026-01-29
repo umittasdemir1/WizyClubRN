@@ -340,12 +340,13 @@ export const FeedManager = ({
                         onEndReached={hasMore ? loadMore : null}
                         onEndReachedThreshold={0.5}
                         ListFooterComponent={isLoadingMore ? <ActivityIndicator style={styles.footerLoader} color="#FFF" /> : null}
-                        removeClippedSubviews={true}
+                        removeClippedSubviews={false}
                         maxToRenderPerBatch={1}
                         windowSize={3}
                         drawDistance={ITEM_HEIGHT * 1.5}
                         scrollEnabled={!isCarouselInteracting}
                         onScroll={scrollApi.scrollHandler}
+                        scrollEventThrottle={16}
                         onMomentumScrollEnd={(e: any) => scrollApi.handleScrollEnd(e, videos.length, listRef)}
                     />
                 </View>

@@ -14,53 +14,83 @@
 import { Dimensions } from 'react-native';
 
 // ============================================================================
-// FEED FLAGS - UI Layer Toggle System
+// FEED FLAGS - Normalized UI Control System
 // ============================================================================
 
 /**
- * Global UI kill switches for testing and debugging.
- * Set DISABLE_ALL to true to disable all UI layers at once.
- * Individual flags can be toggled independently when DISABLE_ALL is false.
+ * Global flags to control feed layers and logic. 
+ * Separated into Core Logic (essential functionality) and UI Layers (visual only).
+ * 
+ * DESIGN RULES:
+ * 1. CORE_LOGIC flags are never affected by MASTER switches (DISABLE_ALL_UI).
+ * 2. Each UI layer has exactly one controlling flag.
+ * 3. Master switches only affect UI_LAYER flags to ensure deterministic testability.
  */
 export const FEED_FLAGS = {
-    /** Master switch - disables all UI when true */
-    DISABLE_ALL: true,
-
-    /** Disables scroll-based active video changes */
+    // --- CORE LOGIC FLAGS (Deterministic Behavior) ---
+    /** Disables scroll-based active video index management */
     DISABLE_SCROLL_HANDLING: false,
+    /** Disables all user interactions (tap, longpress, swipes) */
+    DISABLE_INTERACTION_HANDLING: false,
 
-    /** Disables tap, double-tap, long-press interactions */
-    DISABLE_INTERACTIONS: false,
+    // --- UI LAYER FLAGS (Pure Visual Overlays) ---
+    /** Master switch - Disables all visual UI layers (excluding video itself) */
+    DISABLE_ALL_UI: false,
 
-    /** Disables like, save, share, follow actions */
-    DISABLE_ACTIONS: false,
+    // Active Video Overlay Granular Controls
+    /** Disables the profile picture in metadata */
+    DISABLE_AVATAR: false,
+    /** Disables the user's full name/display name */
+    DISABLE_FULL_NAME: false,
+    /** Disables the @username handle */
+    DISABLE_USERNAME: false,
+    /** Disables the video description/caption */
+    DISABLE_DESCRIPTION: false,
+    /** Disables the video progression seekbar */
+    DISABLE_SEEKBAR: false,
+    /** Disables action buttons (Like, Save, Share, Shop) */
+    DISABLE_ACTION_BUTTONS: false,
+    /** Disables the commercial/sponsored tag */
+    DISABLE_COMMERCIAL_TAG: false,
 
-    /** Disables header, story bar, sheets, modals */
-    DISABLE_OVERLAYS: false,
-
-    // Legacy flags (kept for backward compatibility)
-    /** Disables all feed UI for testing video rendering */
-    DISABLE_FEED_UI_FOR_TEST: false,
-
-    /** Disables ActiveVideoOverlay component */
+    // Global Overlays
+    /** Master switch for the entire active video overlay layer */
     DISABLE_ACTIVE_VIDEO_OVERLAY: false,
+    /** Disables the top navigation and status bar overlay */
+    DISABLE_HEADER_OVERLAY: false,
+    /** Disables the horizontal story carousel layer */
+    DISABLE_STORY_BAR: false,
+    /** Disables all bottom sheet components (More, Description, Shopping) */
+    DISABLE_SHEETS: false,
+    /** Disables all pop-up confirmation and info modals */
+    DISABLE_MODALS: false,
+    /** Disables save, error, and status toast notifications */
+    DISABLE_TOASTS: false,
 
-    /** Disables global overlays (header, sheets, modals) */
-    DISABLE_GLOBAL_OVERLAYS: false,
-
-    /** Disables non-active UI elements */
-    DISABLE_NON_ACTIVE_UI: false,
+    // --- ALIASES & LEGACY WRAPPERS (Migration Support) ---
+    /** Legacy alias: Targets overall UI test mode */
+    DISABLE_FEED_UI_FOR_TEST: false,
 } as const;
 
 /**
- * Helper function to check if a feature is disabled.
- * Respects DISABLE_ALL as master switch.
+ * Deterministic helper to check if a feature or layer is disabled.
+ * Ensures consistent behavior by isolating core logic from UI master switches.
  *
- * @param flag - The flag key to check
- * @returns true if the feature is disabled
+ * @param flag - The specific flag key from FEED_FLAGS
+ * @returns boolean - true if the feature is disabled
  */
 export const isDisabled = (flag: keyof typeof FEED_FLAGS): boolean => {
-    if (FEED_FLAGS.DISABLE_ALL || FEED_FLAGS.DISABLE_FEED_UI_FOR_TEST) return true;
+    // Core Logic protection: Never allow master switches to break core functionality
+    const isCoreLogic = flag === 'DISABLE_SCROLL_HANDLING' || flag === 'DISABLE_INTERACTION_HANDLING';
+
+    // Global UI kill-switches (Only affect visual layers)
+    const isMasterUISwitchActive = FEED_FLAGS.DISABLE_ALL_UI || FEED_FLAGS.DISABLE_FEED_UI_FOR_TEST;
+
+    if (!isCoreLogic && isMasterUISwitchActive) {
+        return true;
+    }
+
+    // Direct flag check
     return FEED_FLAGS[flag];
 };
 

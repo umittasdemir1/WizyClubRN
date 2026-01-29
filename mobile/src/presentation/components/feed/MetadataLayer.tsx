@@ -4,6 +4,7 @@ import { Video } from '../../../domain/entities/Video';
 import { Avatar } from '../shared/Avatar';
 import { VerifiedBadge } from '../shared/VerifiedBadge';
 import { textShadowStyle } from '@/core/utils/shadow';
+import { isDisabled } from './hooks/useFeedConfig';
 
 interface MetadataLayerData {
     video: Video;
@@ -49,28 +50,34 @@ export function MetadataLayer({
         <View style={[styles.container, { bottom: effectiveBottom }]} pointerEvents="box-none">
             {/* User Row */}
             <View style={styles.userRow}>
-                <Pressable onPress={onAvatarPress} hitSlop={8}>
-                    <Avatar url={video.user.avatarUrl} size={40} hasBorder={true} />
-                </Pressable>
+                {!isDisabled('DISABLE_AVATAR') && (
+                    <Pressable onPress={onAvatarPress} hitSlop={8}>
+                        <Avatar url={video.user.avatarUrl} size={40} hasBorder={true} />
+                    </Pressable>
+                )}
 
                 <Pressable
                     onPress={onAvatarPress}
                     style={styles.nameContainer}
                     hitSlop={8}
                 >
-                    <View style={styles.nameRow}>
-                        <Text style={styles.nameText}>
-                            {video.user.fullName || video.user.username}
+                    {!isDisabled('DISABLE_FULL_NAME') && (
+                        <View style={styles.nameRow}>
+                            <Text style={styles.nameText}>
+                                {video.user.fullName || video.user.username}
+                            </Text>
+                            {video.user.isVerified === true && (
+                                <View style={styles.verifiedBadge}>
+                                    <VerifiedBadge size={16} />
+                                </View>
+                            )}
+                        </View>
+                    )}
+                    {!isDisabled('DISABLE_USERNAME') && (
+                        <Text style={styles.handleText}>
+                            @{video.user.username.replace(/\s+/g, '_').toLowerCase()}
                         </Text>
-                        {video.user.isVerified === true && (
-                            <View style={styles.verifiedBadge}>
-                                <VerifiedBadge size={16} />
-                            </View>
-                        )}
-                    </View>
-                    <Text style={styles.handleText}>
-                        @{video.user.username.replace(/\s+/g, '_').toLowerCase()}
-                    </Text>
+                    )}
                 </Pressable>
 
                 {showFollowButton && (
@@ -85,7 +92,7 @@ export function MetadataLayer({
             </View>
 
             {/* Description Row - Only show if description exists - Positioned between user and commercial tag */}
-            {hasDescription && (
+            {hasDescription && !isDisabled('DISABLE_DESCRIPTION') && (
                 <Pressable
                     style={styles.descriptionRow}
                     onPress={onReadMorePress}
@@ -105,7 +112,7 @@ export function MetadataLayer({
             )}
 
             {/* Commercial Tag - Always at bottom: -40 */}
-            {video.isCommercial && (
+            {video.isCommercial && !isDisabled('DISABLE_COMMERCIAL_TAG') && (
                 <Pressable
                     style={styles.commercialTag}
                     onPress={onCommercialTagPress}

@@ -1,30 +1,40 @@
-# WizyClub Run Tasks (Cloud IDE)
+# WizyClub Run Tasks (Local & Cloud)
 
-Bu rehber sadece **VS Code Tasks** ile calistirma icindir. Terminalden manuel komut yoktur.
+Bu rehber **VS Code Tasks** ile projeyi bir bütün olarak (Backend + Frontend + UI Tools) çalıştırmak içindir.
 
-## 1) Task Calistirma
+## 1) Task Çalıştırma
 
-Cloud IDE (Firebase Studio / IDX) icinde:
+VS Code içinde:
 - **F1** veya **Ctrl+Shift+P**
 - `Tasks: Run Task` yaz
-- Asagidaki task'lardan birini sec:
-  - **EV: Backend + Expo**
-  - **IS: Backend + Ngrok + Expo**
+- Aşağıdaki ana modlardan birini seç:
+  - **EV: Backend + Expo + UI**: Yerel geliştirme için (Backend + Expo + UI Paneli)
+  - **IS: Backend + Ngrok + Expo + UI**: Dış dünya testi için (Backend + Ngrok + Expo Tunnel + UI Paneli)
 
-Her biri ayri terminal panelinde paralel calisir.
+Her mod kendi içinde gerekli tüm servisleri ayrı terminal sekmelerinde paralel başlatır.
 
-## 2) Task'lar Neyi Calistirir?
+## 2) Modlar Neyi Çalıştırır?
 
-**EV: Backend + Expo**
-- `backend/` icinde: `npm start`
-- `mobile/` icinde: `npx expo start --dev-client --clear`
+**EV: Backend + Expo + UI**
+- `backend/`: API Sunucusu (`npm start`)
+- `mobile/`: Expo Geliştirici Sunucusu (`npx expo start`)
+- Root: **UI Yönetim Paneli** (`node scripts/ui.js`)
 
-**IS: Backend + Ngrok + Expo**
-- `backend/` icinde: `npm start`
-- repo root'ta: `./ngrok http 3000`
-- `mobile/` icinde: `npx expo start --dev-client --tunnel --clear`
+**IS: Backend + Ngrok + Expo + UI**
+- `backend/`: API Sunucusu
+- Root: Ngrok Tüneli (`ngrok http 3000`)
+- `mobile/`: Expo Tunnel Modu
+- Root: **UI Yönetim Paneli** (`node scripts/ui.js`)
 
-## 3) Dikkat Edilecekler
+## 3) Yeni Cihaz / IDE Kurulumu
+
+Eğer başka bir bilgisayara veya IDE'ye geçerseniz, `ui` kısayolunu aktif etmek için terminale (PowerShell) şu komutu yapıştırın:
+
+```powershell
+if (!(Test-Path $PROFILE)) { New-Item -Path $PROFILE -Type File -Force }; Add-Content $PROFILE "`nfunction ui { node ""$PWD\scripts\ui.js"" `$args }" -ErrorAction SilentlyContinue; function ui { node "$PWD\scripts\ui.js" $args }
+```
+
+## 4) Dikkat Edilecekler
 
 - `mobile/.env` her ortamda ayarlanmali (ozellikle iste ngrok URL).
 - Bazen `./ngrok` calismayabilir ya da guncelleme gerekebilir.

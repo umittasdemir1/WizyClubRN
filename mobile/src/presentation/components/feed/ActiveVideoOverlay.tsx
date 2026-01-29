@@ -35,6 +35,7 @@ import Animated, {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Pause, Repeat1, RefreshCcw, AlertCircle } from 'lucide-react-native';
+import { isDisabled } from './hooks/useFeedConfig';
 
 import { Video } from '../../../domain/entities/Video';
 import { ActionButtons, ActionButtonsRef } from './ActionButtons';
@@ -281,26 +282,28 @@ export const ActiveVideoOverlay = memo(function ActiveVideoOverlay({
                     {/* UI Content - Fades out during scroll for performance */}
                     <Animated.View style={[StyleSheet.absoluteFill, contentOpacityStyle]} pointerEvents="box-none">
                         {/* Action Buttons (Right side) */}
-                        <ActionButtons
-                            ref={actionButtonsRef}
-                            state={{
-                                isLiked: video.isLiked,
-                                likesCount: video.likesCount,
-                                isSaved: video.isSaved,
-                                savesCount: video.savesCount || 0,
-                                sharesCount: video.sharesCount,
-                                shopsCount: video.shopsCount || 0,
-                                showShop: !!video.brandUrl,
-                            }}
-                            handlers={{
-                                onLike: handleLikePress,
-                                onSave: onToggleSave,
-                                onShare: onToggleShare,
-                                onShop: onOpenShopping,
-                                onPressIn: onActionPressIn,
-                                onPressOut: onActionPressOut,
-                            }}
-                        />
+                        {!isDisabled('DISABLE_ACTION_BUTTONS') && (
+                            <ActionButtons
+                                ref={actionButtonsRef}
+                                state={{
+                                    isLiked: video.isLiked,
+                                    likesCount: video.likesCount,
+                                    isSaved: video.isSaved,
+                                    savesCount: video.savesCount || 0,
+                                    sharesCount: video.sharesCount,
+                                    shopsCount: video.shopsCount || 0,
+                                    showShop: !!video.brandUrl,
+                                }}
+                                handlers={{
+                                    onLike: handleLikePress,
+                                    onSave: onToggleSave,
+                                    onShare: onToggleShare,
+                                    onShop: onOpenShopping,
+                                    onPressIn: onActionPressIn,
+                                    onPressOut: onActionPressOut,
+                                }}
+                            />
+                        )}
 
                         {/* Metadata Layer (Bottom left) */}
                         <MetadataLayer
@@ -315,7 +318,7 @@ export const ActiveVideoOverlay = memo(function ActiveVideoOverlay({
                     </Animated.View>
 
                     {/* Video SeekBar (Bottom) */}
-                    {showSeekBar && (
+                    {showSeekBar && !isDisabled('DISABLE_SEEKBAR') && (
                         <VideoSeekBar
                             currentTime={currentTimeSV}
                             duration={durationSV}

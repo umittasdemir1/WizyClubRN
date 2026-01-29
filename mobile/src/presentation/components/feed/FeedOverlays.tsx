@@ -110,6 +110,7 @@ export interface FeedOverlaysProps {
         onDescription: () => void;
         onActionPressIn: () => void;
         onActionPressOut: () => void;
+        onRestart: () => void;
         playbackController: {
             seekTo: (time: number) => void;
             retryActive: () => void;
@@ -172,8 +173,8 @@ export const FeedOverlays = forwardRef<FeedOverlaysRef, FeedOverlaysProps>(
             },
         }));
 
-        // Skip rendering if overlays disabled
-        if (isDisabled('DISABLE_GLOBAL_OVERLAYS')) {
+        // Global UI Master Check
+        if (isDisabled('DISABLE_ALL_UI')) {
             return null;
         }
 
@@ -218,7 +219,7 @@ export const FeedOverlays = forwardRef<FeedOverlaysRef, FeedOverlaysProps>(
         return (
             <>
                 {/* Active Video Overlay (Buttons, Metadata, SeekBar) */}
-                {activeVideo && (
+                {activeVideo && !isDisabled('DISABLE_ACTIVE_VIDEO_OVERLAY') && (
                     <ActiveVideoOverlay
                         data={activeVideoData}
                         playback={activeVideoPlayback}
@@ -236,7 +237,7 @@ export const FeedOverlays = forwardRef<FeedOverlaysRef, FeedOverlaysProps>(
                 />
 
                 {/* Header Overlay */}
-                {!isCleanScreen && (
+                {!isCleanScreen && !isDisabled('DISABLE_HEADER_OVERLAY') && (
                     <Animated.View
                         style={[StyleSheet.absoluteFill, { zIndex: 100 }, uiOpacityStyle]}
                         pointerEvents={isSeeking ? 'none' : 'box-none'}
@@ -257,7 +258,7 @@ export const FeedOverlays = forwardRef<FeedOverlaysRef, FeedOverlaysProps>(
                 )}
 
                 {/* Story Bar */}
-                {!isCleanScreen && showStories && (
+                {!isCleanScreen && showStories && !isDisabled('DISABLE_STORY_BAR') && (
                     <StoryBar
                         isVisible={activeTab === 'stories'}
                         storyUsers={storyUsers}
@@ -274,27 +275,33 @@ export const FeedOverlays = forwardRef<FeedOverlaysRef, FeedOverlaysProps>(
                 {/* Bottom Sheets & Modals Container */}
                 <View style={styles.sheetsContainer} pointerEvents="box-none">
                     {/* More Options Sheet */}
-                    <MoreOptionsSheet
-                        ref={moreOptionsSheetRef}
-                        onCleanScreenPress={actions.onCleanScreen}
-                        onDeletePress={isOwnActiveVideo ? actions.onSheetDelete : undefined}
-                        isCleanScreen={isCleanScreen}
-                    />
+                    {!isDisabled('DISABLE_SHEETS') && (
+                        <MoreOptionsSheet
+                            ref={moreOptionsSheetRef}
+                            onCleanScreenPress={actions.onCleanScreen}
+                            onDeletePress={isOwnActiveVideo ? actions.onSheetDelete : undefined}
+                            isCleanScreen={isCleanScreen}
+                        />
+                    )}
 
                     {/* Description Sheet */}
-                    <DescriptionSheet
-                        ref={descriptionSheetRef}
-                        video={activeVideo}
-                        onFollowPress={actions.onFollowPress}
-                        onChange={actions.onDescriptionChange}
-                    />
+                    {!isDisabled('DISABLE_SHEETS') && (
+                        <DescriptionSheet
+                            ref={descriptionSheetRef}
+                            video={activeVideo}
+                            onFollowPress={actions.onFollowPress}
+                            onChange={actions.onDescriptionChange}
+                        />
+                    )}
 
                     {/* Delete Modal */}
-                    <DeleteConfirmationModal
-                        visible={deleteModal.visible}
-                        onCancel={deleteModal.onCancel}
-                        onConfirm={deleteModal.onConfirm}
-                    />
+                    {!isDisabled('DISABLE_MODALS') && (
+                        <DeleteConfirmationModal
+                            visible={deleteModal.visible}
+                            onCancel={deleteModal.onCancel}
+                            onConfirm={deleteModal.onConfirm}
+                        />
+                    )}
                 </View>
             </>
         );
