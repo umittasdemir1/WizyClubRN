@@ -40,3 +40,27 @@ Bu flag sadece test amacli. Gercek kullanima donerken `false` yapmalisin.
 ## Not (Refactor Sonrasi)
 
 Flag'ler artik `useFeedConfig.ts` icindeki `FEED_FLAGS` altinda toplanmistir.
+
+## Terminalden Hizli Ac/Kapat
+
+Repo root'ta:
+```bash
+./UI Açık   # UI acik
+./UI Kapalı # UI kapali
+```
+
+Bu komutlar `DISABLE_ALL` ve `DISABLE_FEED_UI_FOR_TEST` flag'lerini otomatik gunceller.
+Degisiklikten sonra Expo reload gerekebilir.
+
+### Kisa komut (PATH/alias)
+
+Artik direkt su da calisir:
+```bash
+ui Açık
+ui Kapalı
+```
+
+Degisikliklerin aktif olmasi icin yeni terminal acabilir ya da:
+```bash
+source ~/.bashrc
+```

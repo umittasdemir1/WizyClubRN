@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+MODE="${1:-}"
+FILE="mobile/src/presentation/components/feed/hooks/useFeedConfig.ts"
+
+usage() {
+  cat <<'EOF'
+Usage (repo root):
+  ./UI Açık
+  ./UI Kapalı
+
+Alternatives:
+  ./UI acik
+  ./UI kapali
+  ./UI on|off
+EOF
+}
+
+if [[ -z "${MODE}" || "${MODE}" == "-h" || "${MODE}" == "--help" ]]; then
+  usage
+  exit 1
+fi
+
+case "${MODE}" in
+  Açık|acik|açik|on|open|true|1|enable|enabled)
+    VALUE="false"
+    ;;
+  Kapalı|kapali|kapalı|off|close|false|0|disable|disabled)
+    VALUE="true"
+    ;;
+  *)
+    usage
+    exit 1
+    ;;
+esac
+
+if [[ ! -f "${FILE}" ]]; then
+  echo "Dosya bulunamadi: ${FILE}"
+  exit 1
+fi
+
+update_flag() {
+  local flag="$1"
+  local value="$2"
+  if ! grep -q "${flag}" "${FILE}"; then
+    echo "Flag bulunamadi: ${flag}"
+    exit 1
+  fi
+  sed -i -E "s/(${flag}:\\s*)(true|false)/\\1${value}/" "${FILE}"
+}
+
+update_flag "DISABLE_ALL" "${VALUE}"
+update_flag "DISABLE_FEED_UI_FOR_TEST" "${VALUE}"
+
+current_all=$(grep -n "DISABLE_ALL" "${FILE}" | head -n1 | sed -E "s/.*DISABLE_ALL:\\s*(true|false).*/\\1/")
+current_legacy=$(grep -n "DISABLE_FEED_UI_FOR_TEST" "${FILE}" | head -n1 | sed -E "s/.*DISABLE_FEED_UI_FOR_TEST:\\s*(true|false).*/\\1/")
+
+echo "OK: DISABLE_ALL=${current_all}, DISABLE_FEED_UI_FOR_TEST=${current_legacy}"
+echo "Not: Degisiklikten sonra Expo reload gerekebilir."
