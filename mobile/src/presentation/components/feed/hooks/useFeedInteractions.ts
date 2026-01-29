@@ -10,7 +10,7 @@
  * @module presentation/components/feed/hooks/useFeedInteractions
  */
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, useMemo } from 'react';
 import { SCREEN_WIDTH, FEED_FLAGS } from './useFeedConfig';
 import { Video } from '../../../../domain/entities/Video';
 import { useActiveVideoStore } from '../../../store/useActiveVideoStore';
@@ -113,14 +113,21 @@ export function useFeedInteractions(options: UseFeedInteractionsOptions): UseFee
     } = options;
 
     // ========================================================================
-    // Refs
+    // Refs for stable callbacks
     // ========================================================================
+    const isVideoFinishedRef = useRef(isVideoFinished);
+    isVideoFinishedRef.current = isVideoFinished;
+
+    const activeTabRef = useRef(activeTab);
+    activeTabRef.current = activeTab;
+
     const actionButtonsPressingRef = useRef(false);
     const doubleTapBlockUntilRef = useRef(0);
     const lastScrollEndRef = useRef(0);
     const lastPressXRef = useRef<number | null>(null);
     const wasSpeedBoostedRef = useRef(false);
     const previousPlaybackRateRef = useRef(playbackRate);
+
     // ========================================================================
     // Local State
     // ========================================================================
@@ -166,7 +173,7 @@ export function useFeedInteractions(options: UseFeedInteractionsOptions): UseFee
         if (Date.now() < doubleTapBlockUntilRef.current) return;
 
         // Handle restart when video is finished
-        if (isVideoFinished) {
+        if (isVideoFinishedRef.current) {
             if (__DEV__) {
                 logUI(LogCode.INTERACTION_TAP, 'Manual restart triggered');
             }
@@ -182,7 +189,7 @@ export function useFeedInteractions(options: UseFeedInteractionsOptions): UseFee
         }
 
         // Handle story tab tap
-        if (activeTab === 'stories') {
+        if (activeTabRef.current === 'stories') {
             setActiveTab('foryou');
             setTimeout(() => {
                 if (useActiveVideoStore.getState().isPaused) togglePause();
@@ -194,8 +201,6 @@ export function useFeedInteractions(options: UseFeedInteractionsOptions): UseFee
             showTapIndicator(wasPaused ? 'play' : 'pause');
         }
     }, [
-        activeTab,
-        isVideoFinished,
         togglePause,
         showTapIndicator,
         setActiveTab,
@@ -241,9 +246,6 @@ export function useFeedInteractions(options: UseFeedInteractionsOptions): UseFee
     const currentPlaybackRateRef = useRef(playbackRate);
     currentPlaybackRateRef.current = playbackRate;
 
-    // ========================================================================
-    // Handle Long Press (Speed Boost or Options)
-    // ========================================================================
     const handleLongPress = useCallback((event: any) => {
         if (FEED_FLAGS.DISABLE_INTERACTIONS || FEED_FLAGS.DISABLE_OVERLAYS) return;
 
@@ -312,7 +314,7 @@ export function useFeedInteractions(options: UseFeedInteractionsOptions): UseFee
     // ========================================================================
     // Return
     // ========================================================================
-    return {
+    return useMemo(() => ({
         handleFeedTap,
         handleDoubleTapLike,
         handlePressIn,
@@ -328,5 +330,18 @@ export function useFeedInteractions(options: UseFeedInteractionsOptions): UseFee
         actionButtonsPressingRef,
         doubleTapBlockUntilRef,
         lastScrollEndRef,
-    };
+    }), [
+        handleFeedTap,
+        handleDoubleTapLike,
+        handlePressIn,
+        handleLongPress,
+        handlePressOut,
+        handleCarouselTouchStart,
+        handleCarouselTouchEnd,
+        handleActionPressIn,
+        handleActionPressOut,
+        showTapIndicator,
+        tapIndicator,
+        setPlaybackRateViaController,
+    ]);
 }

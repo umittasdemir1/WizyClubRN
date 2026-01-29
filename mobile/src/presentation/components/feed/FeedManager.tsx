@@ -185,6 +185,8 @@ export const FeedManager = ({
         toggleShare, deleteVideo, togglePause, openInAppBrowser,
         setCleanScreen, isCleanScreen, descriptionSheetRef, moreOptionsSheetRef,
         videoPlayerRef, activeTimeRef: videoCallbacks.activeTimeRef,
+        setIsVideoFinished: videoCallbacks.setIsVideoFinished,
+        loopCountRef: videoCallbacks.loopCountRef,
         insetTop: insets.top,
     });
 
@@ -243,18 +245,19 @@ export const FeedManager = ({
         onFollowPress: actionApi.handleToggleFollow,
         onDescriptionChange: (index: number) => index > 0 && !isPaused && togglePause(),
         onBack: () => router.back(),
-        onLike: () => interactionApi.handleDoubleTapLike(activeVideoId!),
+        onLike: actionApi.handleToggleLike,
         onSave: actionApi.handleToggleSave,
         onShare: actionApi.handleToggleShare,
         onShop: actionApi.handleOpenShopping,
         onDescription: actionApi.handleOpenDescription,
+        onRestart: interactionApi.handleFeedTap,
         onActionPressIn: interactionApi.handleActionPressIn,
         onActionPressOut: interactionApi.handleActionPressOut,
         playbackController: {
             seekTo: actionApi.seekTo,
             retryActive: actionApi.retryActive
         }
-    }), [toggleMute, router, actionApi, interactionApi, isPaused, togglePause, activeVideoId]);
+    }), [toggleMute, router, actionApi, interactionApi, isPaused, togglePause]);
 
     const renderItem = useCallback(({ item }: { item: Video }) => (
         <ScrollPlaceholder

@@ -209,10 +209,11 @@ export const FeedOverlays = forwardRef<FeedOverlaysRef, FeedOverlaysProps>(
             onToggleFollow: actions.onFollowPress,
             onOpenShopping: actions.onShop,
             onOpenDescription: actions.onDescription,
+            onRestart: actions.onRestart,
             playbackController: actions.playbackController,
             onActionPressIn: actions.onActionPressIn,
             onActionPressOut: actions.onActionPressOut,
-        }), [actions.onLike, actions.onSave, actions.onShare, actions.onFollowPress, actions.onShop, actions.onDescription, actions.playbackController, actions.onActionPressIn, actions.onActionPressOut]);
+        }), [actions.onLike, actions.onSave, actions.onShare, actions.onFollowPress, actions.onShop, actions.onDescription, actions.onRestart, actions.playbackController, actions.onActionPressIn, actions.onActionPressOut]);
 
         return (
             <>

@@ -81,6 +81,7 @@ interface ActiveVideoOverlayActions {
     onToggleFollow: () => void;
     onOpenShopping: () => void;
     onOpenDescription: () => void;
+    onRestart: () => void;
     playbackController: Pick<VideoPlayerPoolRef, 'seekTo' | 'retryActive'>;
     onActionPressIn?: () => void;
     onActionPressOut?: () => void;
@@ -121,6 +122,7 @@ export const ActiveVideoOverlay = memo(function ActiveVideoOverlay({
         onToggleFollow,
         onOpenShopping,
         onOpenDescription,
+        onRestart,
         playbackController,
         onActionPressIn,
         onActionPressOut,
@@ -224,10 +226,12 @@ export const ActiveVideoOverlay = memo(function ActiveVideoOverlay({
 
                 {/* Play/Pause/Replay Icons */}
                 {showUiOverlays && showPlayPauseIcon && (
-                    <View style={styles.iconContainer} pointerEvents="none">
+                    <View style={styles.iconContainer} pointerEvents="box-none">
                         <View style={styles.iconBackground}>
                             {showReplayIcon ? (
-                                <Repeat1 size={44} color="#FFFFFF" strokeWidth={1.2} />
+                                <Pressable onPress={onRestart}>
+                                    <Repeat1 size={44} color="#FFFFFF" strokeWidth={1.2} />
+                                </Pressable>
                             ) : tapIndicator === 'pause' ? (
                                 <Pause size={44} color="#FFFFFF" fill="#FFFFFF" strokeWidth={0} />
                             ) : (

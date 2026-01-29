@@ -25,9 +25,7 @@ import { useWindowDimensions } from 'react-native';
 // Usage Configuration
 const HORIZONTAL_PADDING = 24;
 const TOUCH_AREA_HEIGHT = 80;
-const THUMB_SIZE = 6; // Diameter of the thumb
-const THUMB_WIDTH = THUMB_SIZE; // Match width for circular thumb
-const TRACK_HEIGHT = 4;
+const TRACK_HEIGHT = 3;
 const TRACK_HEIGHT_EXPANDED = 5; // Slimmer track expansion
 const TOOLTIP_WIDTH = 100;
 const TOOLTIP_HALF_WIDTH = TOOLTIP_WIDTH / 2;
@@ -64,7 +62,7 @@ export function VideoSeekBar({
     const tooltipOpacity = useSharedValue(0);
 
     const POSITION_MODE = 'custom' as 'safe' | 'hidden' | 'custom';
-    const CUSTOM_OFFSET = -10;
+    const CUSTOM_OFFSET = -13;
 
     const insets = useSafeAreaInsets();
     const TAB_BAR_HEIGHT = 0; // Resetting to 0 to find the true baseline
@@ -209,7 +207,7 @@ export function VideoSeekBar({
             [0, 1],
             ['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.3)']
         ),
-        borderRadius: trackHeight.value / 2,
+        borderRadius: 0,
     }));
 
     const animatedProgressStyle = useAnimatedStyle(() => {
@@ -235,7 +233,7 @@ export function VideoSeekBar({
             width: `${progressValue * 100}%`,
             height: trackHeight.value,
             backgroundColor: isInteracting ? '#FFFFFF' : `rgba(255,255,255,${isInteracting ? 1 : opacity})`,
-            borderRadius: trackHeight.value / 2,
+            borderRadius: 0,
         };
     });
 
@@ -245,18 +243,6 @@ export function VideoSeekBar({
         }
         return { opacity: withTiming(1, { duration: 150 }) };
     });
-
-    const thumbOpacity = useDerivedValue(() => {
-        return withTiming(isScrubbing.value ? 1 : 0, { duration: 200 });
-    });
-
-    const animatedThumbStyle = useAnimatedStyle(() => ({
-        opacity: thumbOpacity.value,
-        transform: [
-            { translateX: effectiveProgress.value * BAR_WIDTH - THUMB_WIDTH / 2 },
-            { scale: thumbScale.value },
-        ],
-    }));
 
     const animatedTooltipStyle = useAnimatedStyle(() => {
         // Calculate visual center in screen coordinates
@@ -287,7 +273,6 @@ export function VideoSeekBar({
                         <Animated.View style={[styles.trackBackground, animatedTrackStyle]}>
                             <Animated.View style={[styles.progressFill, animatedProgressStyle]} />
                         </Animated.View>
-                        <Animated.View style={[styles.thumb, animatedThumbStyle]} />
                     </View>
                 </Animated.View>
             </GestureDetector>
@@ -313,7 +298,7 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         alignItems: 'center',
-        zIndex: 100,
+        zIndex: 9999,
     },
     touchArea: {
         width: '100%',
@@ -335,15 +320,6 @@ const styles = StyleSheet.create({
         left: 0,
         top: 0,
         bottom: 0,
-    },
-    thumb: {
-        position: 'absolute',
-        left: 0,
-        width: THUMB_WIDTH,
-        height: THUMB_SIZE,
-        borderRadius: THUMB_SIZE / 2,
-        backgroundColor: '#FF3B30',
-        // No shadows for the line indicator for a cleaner look
     },
     tooltipContainer: {
         position: 'absolute',

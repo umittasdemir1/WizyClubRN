@@ -381,7 +381,8 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
         }
     }, [videos, globalToggleFollow, user]);
 
-    const toggleShare = useCallback((videoId: string) => {
+    const toggleShare = useCallback(async (videoId: string) => {
+        // 1. Optimistic UI update
         setVideos((prevVideos) =>
             prevVideos.map((video) => {
                 if (video.id === videoId) {
@@ -393,6 +394,20 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
                 return video;
             })
         );
+
+        // 2. Sync with Database using atomic RPC
+        try {
+            const { supabase } = require('../../core/supabase');
+            const { error } = await supabase.rpc('increment_video_counter', { 
+                video_id: videoId, 
+                counter_column: 'shares_count' 
+            });
+            
+            if (error) throw error;
+            logData(LogCode.DB_UPDATE, 'Share count synced to DB via RPC', { videoId });
+        } catch (error) {
+            logError(LogCode.DB_UPDATE, 'Failed to sync share count', error);
+        }
     }, []);
 
     const toggleShop = useCallback((videoId: string) => {
