@@ -22,7 +22,7 @@ import { useStoryViewer } from '../../hooks/useStoryViewer';
 import { Video } from '../../../domain/entities/Video';
 
 // Modular Hooks & Architecture
-import { ITEM_HEIGHT, FEED_FLAGS } from './hooks/useFeedConfig';
+import { ITEM_HEIGHT, isDisabled } from './hooks/useFeedConfig';
 import { useFeedScroll } from './hooks/useFeedScroll';
 import { useFeedInteractions } from './hooks/useFeedInteractions';
 import { useFeedActions } from './hooks/useFeedActions';
@@ -295,9 +295,9 @@ export const FeedManager = ({
 
     return (
         <SwipeWrapper
-            onSwipeLeft={FEED_FLAGS.DISABLE_INTERACTIONS ? undefined : handleSwipeLeft}
-            onSwipeRight={FEED_FLAGS.DISABLE_INTERACTIONS ? undefined : () => !isCustomFeed && router.push('/upload')}
-            disabled={isCustomFeed || FEED_FLAGS.DISABLE_INTERACTIONS}
+            onSwipeLeft={isDisabled('DISABLE_INTERACTIONS') ? undefined : handleSwipeLeft}
+            onSwipeRight={isDisabled('DISABLE_INTERACTIONS') ? undefined : () => !isCustomFeed && router.push('/upload')}
+            disabled={isCustomFeed || isDisabled('DISABLE_INTERACTIONS')}
         >
             <View style={styles.container}>
                 <VideoPlayerPool
@@ -350,7 +350,7 @@ export const FeedManager = ({
                     />
                 </View>
 
-                {!FEED_FLAGS.DISABLE_OVERLAYS && (
+                {!isDisabled('DISABLE_OVERLAYS') && (
                     <FeedOverlays
                         ref={overlaysRef as any}
                         moreOptionsSheetRef={moreOptionsSheetRef}

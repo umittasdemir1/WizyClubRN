@@ -18,7 +18,7 @@ import {
     ITEM_HEIGHT,
     VIEWABILITY_CONFIG,
     VIEWABILITY_THRESHOLD,
-    FEED_FLAGS,
+    isDisabled,
 } from './useFeedConfig';
 import { Video } from '../../../../domain/entities/Video';
 import { VideoCacheService } from '../../../../data/services/VideoCacheService';
@@ -141,7 +141,7 @@ export function useFeedScroll(options: UseFeedScrollOptions): UseFeedScrollRetur
     // ========================================================================
     const getPrefetchIndices = useCallback((newIndex: number): number[] => {
         // Skip if scroll handling is disabled
-        if (FEED_FLAGS.DISABLE_SCROLL_HANDLING) return [];
+        if (isDisabled('DISABLE_SCROLL_HANDLING')) return [];
 
         const now = Date.now();
         const lastIndex = lastViewableIndexRef.current;
@@ -172,7 +172,7 @@ export function useFeedScroll(options: UseFeedScrollOptions): UseFeedScrollRetur
     // ========================================================================
     const setActiveFromIndex = useCallback((newIndex: number) => {
         // Skip if scroll handling is disabled
-        if (FEED_FLAGS.DISABLE_SCROLL_HANDLING) return;
+        if (isDisabled('DISABLE_SCROLL_HANDLING')) return;
 
         // Validate index
         if (newIndex < 0 || newIndex >= videosRef.current.length) return;
@@ -245,7 +245,7 @@ export function useFeedScroll(options: UseFeedScrollOptions): UseFeedScrollRetur
     const onViewableItemsChanged = useCallback(
         ({ viewableItems }: { viewableItems: ViewToken<Video>[] }) => {
             // Skip if scroll handling is disabled
-            if (FEED_FLAGS.DISABLE_SCROLL_HANDLING) return;
+            if (isDisabled('DISABLE_SCROLL_HANDLING')) return;
 
             if (viewableItems.length === 0) return;
 

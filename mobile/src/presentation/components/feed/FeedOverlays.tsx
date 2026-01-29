@@ -33,7 +33,7 @@ import { DeleteConfirmationModal } from './DeleteConfirmationModal';
 import { ActiveVideoOverlay } from './ActiveVideoOverlay';
 
 import { Video } from '../../../domain/entities/Video';
-import { FEED_FLAGS, FEED_COLORS, SCREEN_WIDTH } from './hooks/useFeedConfig';
+import { FEED_COLORS, SCREEN_WIDTH, isDisabled } from './hooks/useFeedConfig';
 
 // ============================================================================
 // Types
@@ -173,7 +173,7 @@ export const FeedOverlays = forwardRef<FeedOverlaysRef, FeedOverlaysProps>(
         }));
 
         // Skip rendering if overlays disabled
-        if (FEED_FLAGS.DISABLE_GLOBAL_OVERLAYS) {
+        if (isDisabled('DISABLE_GLOBAL_OVERLAYS')) {
             return null;
         }
 

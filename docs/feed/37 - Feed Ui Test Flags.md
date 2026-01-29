@@ -6,13 +6,16 @@ Bu dokuman, feed ekraninda test icin UI katmanlarini kapatma/geri acma yapisini 
 
 Feed icindeki tum UI katmanlarini tek bir flag ile kapatmak icin:
 
-- Dosya: `mobile/src/presentation/components/feed/FeedManager.tsx`
-- Flag: `DISABLE_FEED_UI_FOR_TEST`
+- Dosya: `mobile/src/presentation/components/feed/hooks/useFeedConfig.ts`
+- Flag: `FEED_FLAGS.DISABLE_ALL` (master) veya `FEED_FLAGS.DISABLE_FEED_UI_FOR_TEST` (legacy)
 
 ### Kapali hale getirme
 
 ```ts
-const DISABLE_FEED_UI_FOR_TEST = true;
+// Master kapatma
+FEED_FLAGS.DISABLE_ALL = true;
+// veya legacy flag
+FEED_FLAGS.DISABLE_FEED_UI_FOR_TEST = true;
 ```
 
 Bu durumda asagidakiler kapatilir:
@@ -24,7 +27,8 @@ Bu durumda asagidakiler kapatilir:
 ### Geri acma
 
 ```ts
-const DISABLE_FEED_UI_FOR_TEST = false;
+FEED_FLAGS.DISABLE_ALL = false;
+FEED_FLAGS.DISABLE_FEED_UI_FOR_TEST = false;
 ```
 
 Bu degisiklikle tum UI katmanlari ve etkileşimler normale döner.
@@ -32,3 +36,7 @@ Bu degisiklikle tum UI katmanlari ve etkileşimler normale döner.
 ## Not
 
 Bu flag sadece test amacli. Gercek kullanima donerken `false` yapmalisin.
+
+## Not (Refactor Sonrasi)
+
+Flag'ler artik `useFeedConfig.ts` icindeki `FEED_FLAGS` altinda toplanmistir.

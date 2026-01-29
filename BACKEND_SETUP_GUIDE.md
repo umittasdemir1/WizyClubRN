@@ -1,5 +1,23 @@
 # 🚀 WizyClub Backend Kurulum Rehberi
 
+## 🧩 VS Code Tasks (IDE icinde tek komut)
+
+`.vscode/tasks.json` eklendi. VS Code'da:
+- `Cmd/Ctrl+Shift+P` → **Tasks: Run Task**
+- `EV: Backend + Expo` veya `IS: Backend + Ngrok + Expo` sec
+
+Her biri otomatik terminal panelleri acip komutlari calistirir:
+- **EV:** `backend` icinde `npm start` + `mobile` icinde `npx expo start --dev-client --clear`
+- **IS:** `backend` icinde `npm start` + `ngrok http 3000` + `mobile` icinde `npx expo start --dev-client --tunnel --clear`
+
+`mobile/.env` yine manuel guncellenmeli (ozellikle iste ngrok URL).
+
+Ilk kurulumda shell fonksiyonlari `~/.bashrc` icine eklendi.
+Degisikliklerin aktif olmasi icin yeni terminal acabilir ya da:
+```bash
+source ~/.bashrc
+```
+
 ## 🏢 İŞTE (Cloud - Firebase Studio)
 
 ### Günlük Çalıştırma (3 Terminal):
@@ -19,7 +37,7 @@ wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
 tar xvzf ngrok-v3-stable-linux-amd64.tgz
 
 # Çalıştır
-
+./ngrok http 3000
 ```
 
 **Terminal 3: Mobile**

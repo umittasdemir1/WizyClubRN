@@ -24,7 +24,7 @@ import { Dimensions } from 'react-native';
  */
 export const FEED_FLAGS = {
     /** Master switch - disables all UI when true */
-    DISABLE_ALL: false,
+    DISABLE_ALL: true,
 
     /** Disables scroll-based active video changes */
     DISABLE_SCROLL_HANDLING: false,
@@ -60,7 +60,7 @@ export const FEED_FLAGS = {
  * @returns true if the feature is disabled
  */
 export const isDisabled = (flag: keyof typeof FEED_FLAGS): boolean => {
-    if (FEED_FLAGS.DISABLE_ALL) return true;
+    if (FEED_FLAGS.DISABLE_ALL || FEED_FLAGS.DISABLE_FEED_UI_FOR_TEST) return true;
     return FEED_FLAGS[flag];
 };
 
