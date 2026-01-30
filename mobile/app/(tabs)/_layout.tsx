@@ -3,9 +3,11 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import { useNotificationStore } from '../../src/presentation/store/useNotificationStore';
+import { useAuthStore } from '../../src/presentation/store/useAuthStore';
 import { COLORS, LIGHT_COLORS } from '../../src/core/constants';
 import { useEffect, useState } from 'react';
 import { MOCK_NOTIFICATIONS } from '../../src/data/mock/notifications';
+import { Image } from 'expo-image';
 
 // Import SVGs
 import HomeIcon from '../../assets/icons/home.svg';
@@ -39,6 +41,37 @@ function NotificationTabIcon({ color }: { color: string }) {
                     {showCount && <Text style={styles.badgeText}>{displayCount}</Text>}
                 </View>
             )}
+        </View>
+    );
+}
+
+// Profile Avatar Tab Icon
+function ProfileAvatarTabIcon({ color, focused }: { color: string; focused: boolean }) {
+    const user = useAuthStore((state) => state.user);
+    const avatarUrl = user?.user_metadata?.avatar_url;
+
+    // Fallback to SVG icon if no avatar
+    if (!avatarUrl) {
+        return (
+            <View style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}>
+                <ProfileIcon width={28} height={28} color={color} />
+            </View>
+        );
+    }
+
+    return (
+        <View style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}>
+            <View style={[
+                styles.avatarWrapper,
+                focused && styles.avatarWrapperActive
+            ]}>
+                <Image
+                    source={{ uri: avatarUrl }}
+                    style={styles.avatarImage}
+                    contentFit="cover"
+                    transition={200}
+                />
+            </View>
         </View>
     );
 }
@@ -114,10 +147,8 @@ export default function TabLayout() {
             <Tabs.Screen
                 name="profile"
                 options={{
-                    tabBarIcon: ({ color }) => (
-                        <View style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}>
-                            <ProfileIcon width={28} height={28} color={color} />
-                        </View>
+                    tabBarIcon: ({ color, focused }) => (
+                        <ProfileAvatarTabIcon color={color} focused={focused} />
                     ),
                 }}
             />
@@ -139,9 +170,9 @@ const styles = StyleSheet.create({
         paddingHorizontal: 4,
     },
     badgeDot: {
-        minWidth: 8,
-        height: 8,
-        borderRadius: 4,
+        minWidth: 6,
+        height: 6,
+        borderRadius: 3,
         top: 10,
         right: 12,
         paddingHorizontal: 0,
@@ -150,5 +181,21 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 10,
         fontWeight: '700',
+    },
+    avatarWrapper: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    avatarWrapperActive: {
+        borderWidth: 1,
+        borderColor: '#FFFFFF',
+    },
+    avatarImage: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
     },
 });

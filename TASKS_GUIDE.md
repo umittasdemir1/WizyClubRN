@@ -28,10 +28,16 @@ Her mod kendi içinde gerekli tüm servisleri ayrı terminal sekmelerinde parale
 
 ## 3) Yeni Cihaz / IDE Kurulumu
 
-Eğer başka bir bilgisayara veya IDE'ye geçerseniz, `ui` kısayolunu aktif etmek için terminale (PowerShell) şu komutu yapıştırın:
+Eğer başka bir bilgisayara veya IDE'ye geçerseniz, `ui` kısayolunu aktif etmek için:
 
+**Bash/Linux (Firebase Studio vb.):**
+```bash
+bash scripts/setup-ui-alias.sh
+```
+
+**PowerShell (Windows/VS Code):**
 ```powershell
-if (!(Test-Path $PROFILE)) { New-Item -Path $PROFILE -Type File -Force }; Add-Content $PROFILE "`nfunction ui { node ""$PWD\scripts\ui.js"" `$args }" -ErrorAction SilentlyContinue; function ui { node "$PWD\scripts\ui.js" $args }
+.\scripts\setup-ui-alias.ps1
 ```
 
 ## 4) Dikkat Edilecekler

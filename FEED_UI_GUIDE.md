@@ -12,10 +12,21 @@ ui
 ```
 
 ### 2. Yeni Ortam / IDE Kurulumu (Kalıcı Kısayol)
-Eğer başka bir bilgisayara geçerseniz veya kısayol çalışmazsa, bir kez şu komutu terminale yapıştırın:
-```powershell
-if (!(Test-Path $PROFILE)) { New-Item -Path $PROFILE -Type File -Force }; Add-Content $PROFILE "`nfunction ui { node ""$PWD\scripts\ui.js"" `$args }" -ErrorAction SilentlyContinue; function ui { node "$PWD\scripts\ui.js" $args }
+Eğer başka bir bilgisayara geçerseniz veya kısayol çalışmazsa, terminale şunu yazın:
+
+**Bash/Linux (Firebase Studio vb.):**
+```bash
+bash scripts/setup-ui-alias.sh
 ```
+
+**PowerShell (Windows/VS Code):**
+```powershell
+.\scripts\setup-ui-alias.ps1
+```
+
+Alternatif olarak manuel kurulum:
+- **Bash:** `echo 'alias ui="node $HOME/WizyClubRN/scripts/ui.js"' >> ~/.bashrc && source ~/.bashrc`
+- **PowerShell:** `if (!(Test-Path $PROFILE)) { New-Item -Path $PROFILE -Type File -Force }; Add-Content $PROFILE "`nfunction ui { node `"$PWD\scripts\ui.js`" `$args }"; . $PROFILE`
 
 ### 3. İnteraktif Menü Kontrolleri
 Açılan **"ARAYÜZ YÖNETİM PANELİ"** üzerinden:

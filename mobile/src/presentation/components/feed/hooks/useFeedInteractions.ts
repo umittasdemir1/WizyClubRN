@@ -138,7 +138,7 @@ export function useFeedInteractions(options: UseFeedInteractionsOptions): UseFee
     // Show Tap Indicator
     // ========================================================================
     const showTapIndicator = useCallback((type: 'play' | 'pause') => {
-        if (isDisabled('DISABLE_INTERACTIONS')) return;
+        if (isDisabled('DISABLE_INTERACTION_HANDLING')) return;
 
         setTapIndicator(type);
         if (tapIndicatorTimeoutRef.current) {
@@ -164,7 +164,7 @@ export function useFeedInteractions(options: UseFeedInteractionsOptions): UseFee
     // Handle Single Tap (Play/Pause Toggle)
     // ========================================================================
     const handleFeedTap = useCallback(() => {
-        if (isDisabled('DISABLE_INTERACTIONS')) return;
+        if (isDisabled('DISABLE_INTERACTION_HANDLING')) return;
 
         // Block taps during action button presses
         if (actionButtonsPressingRef.current) return;
@@ -177,6 +177,7 @@ export function useFeedInteractions(options: UseFeedInteractionsOptions): UseFee
             if (__DEV__) {
                 logUI(LogCode.INTERACTION_TAP, 'Manual restart triggered');
             }
+            isVideoFinishedRef.current = false;
             setIsVideoFinished(false);
             loopCountRef.current = 0;
             lastLoopTimeRef.current = Date.now();
@@ -214,7 +215,7 @@ export function useFeedInteractions(options: UseFeedInteractionsOptions): UseFee
     // Handle Double Tap Like
     // ========================================================================
     const handleDoubleTapLike = useCallback((videoId: string) => {
-        if (isDisabled('DISABLE_INTERACTIONS')) return;
+        if (isDisabled('DISABLE_INTERACTION_HANDLING')) return;
 
         // Block if scrolling just ended
         if (Date.now() - lastScrollEndRef.current < 150) return;
@@ -235,7 +236,7 @@ export function useFeedInteractions(options: UseFeedInteractionsOptions): UseFee
     // Handle Press In (Track Position)
     // ========================================================================
     const handlePressIn = useCallback((event: any) => {
-        if (isDisabled('DISABLE_INTERACTIONS')) return;
+        if (isDisabled('DISABLE_INTERACTION_HANDLING')) return;
         lastPressXRef.current = event?.nativeEvent?.pageX ?? event?.nativeEvent?.locationX ?? null;
     }, []);
 
@@ -247,7 +248,7 @@ export function useFeedInteractions(options: UseFeedInteractionsOptions): UseFee
     currentPlaybackRateRef.current = playbackRate;
 
     const handleLongPress = useCallback((event: any) => {
-        if (isDisabled('DISABLE_INTERACTIONS') || isDisabled('DISABLE_OVERLAYS')) return;
+        if (isDisabled('DISABLE_INTERACTION_HANDLING') || isDisabled('DISABLE_ACTIVE_VIDEO_OVERLAY')) return;
 
         const pressX = lastPressXRef.current ?? event?.nativeEvent?.pageX ?? event?.nativeEvent?.locationX ?? 0;
         const isRightSide = pressX > SCREEN_WIDTH * 0.8;
@@ -277,7 +278,7 @@ export function useFeedInteractions(options: UseFeedInteractionsOptions): UseFee
     // Handle Press Out (Reset Speed)
     // ========================================================================
     const handlePressOut = useCallback(() => {
-        if (isDisabled('DISABLE_INTERACTIONS')) return;
+        if (isDisabled('DISABLE_INTERACTION_HANDLING')) return;
 
         if (!wasSpeedBoostedRef.current) return;
 
@@ -291,12 +292,12 @@ export function useFeedInteractions(options: UseFeedInteractionsOptions): UseFee
     // Handle Carousel Touch
     // ========================================================================
     const handleCarouselTouchStart = useCallback(() => {
-        if (isDisabled('DISABLE_INTERACTIONS')) return;
+        if (isDisabled('DISABLE_INTERACTION_HANDLING')) return;
         setIsCarouselInteracting(true);
     }, [setIsCarouselInteracting]);
 
     const handleCarouselTouchEnd = useCallback(() => {
-        if (isDisabled('DISABLE_INTERACTIONS')) return;
+        if (isDisabled('DISABLE_INTERACTION_HANDLING')) return;
         setIsCarouselInteracting(false);
     }, [setIsCarouselInteracting]);
 
