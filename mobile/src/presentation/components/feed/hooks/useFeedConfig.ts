@@ -45,13 +45,13 @@ export const FEED_FLAGS = {
     /** Disable video playback in feed (show only thumbnails) */
     INF_DISABLE_INLINE_VIDEO: false,
     /** Disable user header (avatar + name + handle) */
-    INF_DISABLE_USER_HEADER: false,
+    INF_DISABLE_USER_HEADER: true,
     /** Disable action buttons row (like, save, share, shop) */
-    INF_DISABLE_ACTIONS: false,
+    INF_DISABLE_ACTIONS: true,
     /** Disable description text */
-    INF_DISABLE_DESCRIPTION: false,
+    INF_DISABLE_DESCRIPTION: true,
     /** Disable action button animations (particle burst, heartbeat) */
-    INF_DISABLE_ACTION_ANIMATIONS: false,
+    INF_DISABLE_ACTION_ANIMATIONS: true,
     /** Disable header tabs (Senin İçin / Takip) */
     INF_DISABLE_HEADER_TABS: true,
     /** Disable thumbnail/poster display during video loading */

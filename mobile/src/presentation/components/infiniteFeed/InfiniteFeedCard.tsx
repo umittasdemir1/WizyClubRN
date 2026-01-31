@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import VideoPlayer from 'react-native-video';
@@ -65,7 +65,26 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         return 1;
     }, [item.width, item.height]);
 
-    const handleOpen = () => onOpen(item.id, index);
+    // ✅ [PERF] Stabilize callbacks to prevent InfiniteFeedActions re-renders
+    const handleOpen = useCallback(() => {
+        onOpen(item.id, index);
+    }, [item.id, index, onOpen]);
+
+    const handleLike = useCallback(() => {
+        onLike(item.id);
+    }, [item.id, onLike]);
+
+    const handleSave = useCallback(() => {
+        onSave(item.id);
+    }, [item.id, onSave]);
+
+    const handleShare = useCallback(() => {
+        onShare(item.id);
+    }, [item.id, onShare]);
+
+    const handleShop = useCallback(() => {
+        onShop(item.id);
+    }, [item.id, onShop]);
 
     return (
         <Pressable style={styles.card} onPress={handleOpen}>
@@ -137,10 +156,10 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                         isLiked={item.isLiked}
                         isSaved={item.isSaved}
                         showShop={!!item.brandUrl}
-                        onLike={() => onLike(item.id)}
-                        onSave={() => onSave(item.id)}
-                        onShare={() => onShare(item.id)}
-                        onShop={() => onShop(item.id)}
+                        onLike={handleLike}
+                        onSave={handleSave}
+                        onShare={handleShare}
+                        onShop={handleShop}
                     />
                 </View>
             )}

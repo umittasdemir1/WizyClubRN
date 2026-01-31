@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import Animated, {
     useSharedValue,
@@ -26,6 +26,9 @@ const PARTICLE_SIZE = 4;
 const LIKE_PARTICLE_COLORS = ['#FF2146', '#FF3B30', '#FF6B6B', '#FF8A80'];
 const SAVE_PARTICLE_COLORS = ['#FFD700', '#FFC107', '#FFB300', '#FFE082'];
 const WHITE = '#FFFFFF';
+
+// ✅ Pre-calculate particle angles to avoid Math.random() in render
+const PARTICLE_ANGLES = Array.from({ length: PARTICLE_COUNT }).map((_, i) => (Math.PI * 2 * i) / PARTICLE_COUNT + (Math.random() * 0.5));
 
 interface ActionButtonProps {
     icon: typeof Heart;
@@ -55,7 +58,8 @@ interface InfiniteFeedActionsProps {
     onShop: () => void;
 }
 
-function BurstParticle({ angle, color, burst }: { angle: number; color: string; burst: SharedValue<number> }) {
+// ✅ [PERF] Memoized BurstParticle
+const BurstParticle = React.memo(function BurstParticle({ angle, color, burst }: { angle: number; color: string; burst: SharedValue<number> }) {
     const animatedStyle = useAnimatedStyle(() => {
         const progress = burst.value;
         const distance = interpolate(progress, [0, 1], [0, PARTICLE_DISTANCE], Extrapolation.CLAMP);
@@ -72,9 +76,10 @@ function BurstParticle({ angle, color, burst }: { angle: number; color: string; 
     });
 
     return <Animated.View style={[styles.particle, { backgroundColor: color }, animatedStyle]} />;
-}
+});
 
-function ActionButton({
+// ✅ [PERF] Memoized ActionButton
+const ActionButton = React.memo(function ActionButton({
     icon: Icon,
     count,
     onPress,
@@ -104,7 +109,7 @@ function ActionButton({
         transform: [{ scale: scale.value }],
     }));
 
-    const handlePress = () => {
+    const handlePress = useCallback(() => {
         const nextActive = canToggle ? !localActive : localActive;
         if (canToggle) {
             setLocalActive(nextActive);
@@ -124,11 +129,12 @@ function ActionButton({
             }
         }
         onPress?.();
-    };
+    }, [canToggle, localActive, triggerBurst, onPress]);
 
     const iconColor = localActive && activeColor ? activeColor : WHITE;
     const iconFill = localActive && activeColor ? activeColor : 'none';
     const strokeWidth = localActive ? 2 : 1.2;
+
     return (
         <Pressable
             onPress={handlePress}
@@ -137,20 +143,16 @@ function ActionButton({
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
             <Animated.View style={[styles.iconWrapper, animatedStyle]}>
-                {enableBurst && (
+                {enableBurst && localActive && (
                     <View style={styles.particles}>
-                        {Array.from({ length: PARTICLE_COUNT }).map((_, index) => {
-                            const angle = (Math.PI * 2 * Math.random());
-                            const color = burstColors[index % burstColors.length];
-                            return (
-                                <BurstParticle
-                                    key={index}
-                                    angle={angle}
-                                    color={color}
-                                    burst={burst}
-                                />
-                            );
-                        })}
+                        {PARTICLE_ANGLES.map((angle, index) => (
+                            <BurstParticle
+                                key={index}
+                                angle={angle}
+                                color={burstColors[index % burstColors.length]}
+                                burst={burst}
+                            />
+                        ))}
                     </View>
                 )}
                 <Icon
@@ -163,9 +165,10 @@ function ActionButton({
             <Text style={[styles.actionCount, { color: colors.textPrimary }]}>{formatCount(count)}</Text>
         </Pressable>
     );
-}
+});
 
-export function InfiniteFeedActions({
+// ✅ [PERF] Memoized InfiniteFeedActions
+export const InfiniteFeedActions = React.memo(function InfiniteFeedActions({
     colors,
     likesCount,
     savesCount,
@@ -244,7 +247,7 @@ export function InfiniteFeedActions({
             ) : null}
         </Animated.View>
     );
-}
+});
 
 const styles = StyleSheet.create({
     actionsRow: {
