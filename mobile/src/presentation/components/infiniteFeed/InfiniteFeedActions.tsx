@@ -135,6 +135,11 @@ const ActionButton = React.memo(function ActionButton({
     const iconFill = localActive && activeColor ? activeColor : 'none';
     const strokeWidth = localActive ? 2 : 1.2;
 
+    const countStyle = useMemo(() => [
+        styles.actionCount,
+        { color: colors.textPrimary }
+    ], [colors.textPrimary]);
+
     return (
         <Pressable
             onPress={handlePress}
@@ -143,7 +148,7 @@ const ActionButton = React.memo(function ActionButton({
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
             <Animated.View style={[styles.iconWrapper, animatedStyle]}>
-                {enableBurst && localActive && (
+                {enableBurst && localActive && !FEED_FLAGS.INF_DISABLE_ACTION_ANIMATIONS && (
                     <View style={styles.particles}>
                         {PARTICLE_ANGLES.map((angle, index) => (
                             <BurstParticle
@@ -162,7 +167,7 @@ const ActionButton = React.memo(function ActionButton({
                     strokeWidth={strokeWidth}
                 />
             </Animated.View>
-            <Text style={[styles.actionCount, { color: colors.textPrimary }]}>{formatCount(count)}</Text>
+            <Text style={countStyle}>{formatCount(count)}</Text>
         </Pressable>
     );
 });

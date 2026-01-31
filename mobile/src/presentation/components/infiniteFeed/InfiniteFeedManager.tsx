@@ -121,7 +121,8 @@ export function InfiniteFeedManager({
                 extraData={activeInlineId}
                 viewabilityConfig={viewabilityConfig}
                 onViewableItemsChanged={onViewableItemsChanged}
-                estimatedItemSize={400}
+                estimatedItemSize={500}
+                removeClippedSubviews={true}
                 showsVerticalScrollIndicator={false}
                 ListHeaderComponent={!FEED_FLAGS.INF_DISABLE_HEADER_TABS ? (
                     <InfiniteFeedHeader

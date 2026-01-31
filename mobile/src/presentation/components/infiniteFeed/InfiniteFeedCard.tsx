@@ -86,6 +86,32 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         onShop(item.id);
     }, [item.id, onShop]);
 
+    // ✅ [PERF] Memoize dynamic styles to prevent object reference churn
+    const mediaWrapperStyle = useMemo(() => [
+        styles.mediaWrapper,
+        { aspectRatio }
+    ], [aspectRatio]);
+
+    const fullNameStyle = useMemo(() => [
+        styles.fullName,
+        { color: colors.textPrimary }
+    ], [colors.textPrimary]);
+
+    const handleStyle = useMemo(() => [
+        styles.handle,
+        { color: colors.textSecondary }
+    ], [colors.textSecondary]);
+
+    const descriptionTextStyle = useMemo(() => [
+        styles.description,
+        { color: colors.textPrimary }
+    ], [colors.textPrimary]);
+
+    const readMoreTextStyle = useMemo(() => [
+        styles.readMore,
+        { color: colors.textSecondary }
+    ], [colors.textSecondary]);
+
     return (
         <Pressable style={styles.card} onPress={handleOpen}>
             {/* ✅ USER HEADER - Controlled by INF_DISABLE_USER_HEADER */}
@@ -98,10 +124,10 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                             <View style={[styles.avatar, { backgroundColor: colors.card }]} />
                         )}
                         <View style={styles.headerText}>
-                            <Text style={[styles.fullName, { color: colors.textPrimary }]} numberOfLines={1}>
+                            <Text style={fullNameStyle} numberOfLines={1}>
                                 {item.user?.fullName || 'WizyClub User'}
                             </Text>
-                            <Text style={[styles.handle, { color: colors.textSecondary }]} numberOfLines={1}>
+                            <Text style={handleStyle} numberOfLines={1}>
                                 @{item.user?.username || 'wizyclub'}
                             </Text>
                         </View>
@@ -112,7 +138,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
             {/* MEDIA - Video or Image */}
             {isVideo && videoUrl ? (
                 <Pressable
-                    style={[styles.mediaWrapper, { aspectRatio }]}
+                    style={mediaWrapperStyle}
                     onPress={handleOpen}
                 >
                     <VideoPlayer
@@ -137,7 +163,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                 </Pressable>
             ) : hasThumbnail ? (
                 <Pressable
-                    style={[styles.mediaWrapper, { aspectRatio }]}
+                    style={mediaWrapperStyle}
                     onPress={handleOpen}
                 >
                     <Image source={{ uri: thumbnail }} style={styles.media} contentFit="cover" />
@@ -167,13 +193,13 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
             {/* ✅ DESCRIPTION - Controlled by INF_DISABLE_DESCRIPTION */}
             {!disableDescription && !!item.description && (
                 <View style={styles.cardContent}>
-                    <Text style={[styles.description, { color: colors.textPrimary }]}>
+                    <Text style={descriptionTextStyle}>
                         {isDescriptionExpanded || item.description.length <= DESCRIPTION_LIMIT
                             ? item.description
                             : item.description.substring(0, DESCRIPTION_LIMIT)}
                         {!isDescriptionExpanded && item.description.length > DESCRIPTION_LIMIT && (
                             <Text
-                                style={[styles.readMore, { color: colors.textSecondary }]}
+                                style={readMoreTextStyle}
                                 onPress={() => setIsDescriptionExpanded(true)}
                             >
                                 {'...Daha fazla'}
@@ -181,7 +207,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                         )}
                         {isDescriptionExpanded && item.description.length > DESCRIPTION_LIMIT && (
                             <Text
-                                style={[styles.readMore, { color: colors.textSecondary }]}
+                                style={readMoreTextStyle}
                                 onPress={() => setIsDescriptionExpanded(false)}
                             >
                                 {' Daha az'}

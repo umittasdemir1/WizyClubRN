@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { Alert } from 'react-native';
 import { Video } from '../../domain/entities/Video';
 import { GetVideoFeedUseCase } from '../../domain/usecases/GetVideoFeedUseCase';
@@ -352,14 +352,14 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
         }
     }, [toggleSaveUseCase, user]);
 
-    // Sync local videos with global following state
-    const syncedVideos = videos.map(v => ({
+    // ✅ [PERF] Memoize synced videos to prevent new object references on every render
+    const syncedVideos = useMemo(() => videos.map(v => ({
         ...v,
         user: {
             ...v.user,
             isFollowing: followingMap[v.user.id] ?? v.user.isFollowing
         }
-    }));
+    })), [videos, followingMap]);
 
     const toggleFollow = useCallback(async (videoId: string) => {
         if (!user) {
@@ -398,11 +398,11 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
         // 2. Sync with Database using atomic RPC
         try {
             const { supabase } = require('../../core/supabase');
-            const { error } = await supabase.rpc('increment_video_counter', { 
-                video_id: videoId, 
-                counter_column: 'shares_count' 
+            const { error } = await supabase.rpc('increment_video_counter', {
+                video_id: videoId,
+                counter_column: 'shares_count'
             });
-            
+
             if (error) throw error;
             logData(LogCode.DB_UPDATE, 'Share count synced to DB via RPC', { videoId });
         } catch (error) {
