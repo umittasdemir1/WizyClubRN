@@ -1,11 +1,13 @@
 import { FeedManager } from '../../src/presentation/components/feed/FeedManager';
+import { InfiniteFeedManager } from '../../src/presentation/components/infiniteFeed/InfiniteFeedManager';
+import { FEED_FLAGS } from '../../src/presentation/components/feed/hooks/useFeedConfig';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import { useActiveVideoStore } from '../../src/presentation/store/useActiveVideoStore';
 import { useEffect, useRef } from 'react';
 import { useIsFocused } from '@react-navigation/native';
 import { logVideo, LogCode } from '@/core/services/Logger';
 
-export default function FeedScreen() {
+export default function HomeFeedScreen() {
     const isFocused = useIsFocused();
     const isPaused = useActiveVideoStore((state) => state.isPaused);
     const setPaused = useActiveVideoStore((state) => state.setPaused);
@@ -30,18 +32,21 @@ export default function FeedScreen() {
         prependVideo,
     } = useVideoFeed();
 
-    // Discovery feed always shows regularVideos (not customFeed)
     const videos = regularVideos;
     const isLoading = isLoadingRegular;
     const error = errorRegular;
 
-    // Debug logging - only log when feed is initially loaded or significantly changes
+    // Debug logging
     useEffect(() => {
         if (videos.length > 0) {
-            logVideo(LogCode.VIDEO_FEED_READY, 'Discovery feed ready', { videoCount: videos.length });
+            logVideo(LogCode.VIDEO_FEED_READY, 'Home feed ready', {
+                videoCount: videos.length,
+                mode: FEED_FLAGS.USE_INFINITE_FEED ? 'infinite' : 'pool'
+            });
         }
-    }, [videos.length]); // Changed from [videos] to [videos.length] to reduce re-renders
+    }, [videos.length]);
 
+    // Focus/blur handling
     useEffect(() => {
         if (prevFocused.current === isFocused) return;
 
@@ -63,6 +68,27 @@ export default function FeedScreen() {
         prevFocused.current = isFocused;
     }, [isFocused, setPaused, setScreenFocused]);
 
+    // 🔀 Conditional render based on USE_INFINITE_FEED flag
+    if (FEED_FLAGS.USE_INFINITE_FEED) {
+        return (
+            <InfiniteFeedManager
+                videos={videos}
+                isLoading={isLoading}
+                isRefreshing={isRefreshing}
+                isLoadingMore={isLoadingMore}
+                hasMore={hasMore}
+                error={error}
+                refreshFeed={refreshFeed}
+                loadMore={loadMore}
+                toggleLike={toggleLike}
+                toggleSave={toggleSave}
+                toggleShare={toggleShare}
+                toggleShop={toggleShop}
+            />
+        );
+    }
+
+    // Pool-based TikTok feed (default when flag is false)
     return (
         <FeedManager
             videos={videos}

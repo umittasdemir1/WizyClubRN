@@ -25,31 +25,50 @@ const C = {
 
 // Özellik açıklamaları (Menüde görünecek olanlar)
 const FLAG_DESCRIPTIONS = {
-    // --- ÇEKİRDEK MANTIK (Asla Master Switch'ten etkilenmez) ---
+    // ═══════════════════════════════════════════════════════════════════════
+    // ÇEKİRDEK MANTIK (Her iki modda da geçerli)
+    // ═══════════════════════════════════════════════════════════════════════
     DISABLE_SCROLL_HANDLING: '[CORE] Kaydırma ve Video Değişimi',
     DISABLE_INTERACTION_HANDLING: '[CORE] Global Dokunma Mantığı',
 
-    // --- GENEL ANAHTARLAR ---
-    DISABLE_ALL_UI: '[MASTER] Tüm Arayüzü Kapat (Tertemiz Ekran)',
-    DISABLE_ACTIVE_VIDEO_OVERLAY: '[MASTER] Video Üstü Katman (Tümü)',
+    // ═══════════════════════════════════════════════════════════════════════
+    // MOD SEÇİMİ
+    // ═══════════════════════════════════════════════════════════════════════
+    USE_INFINITE_FEED: '[MOD] 🔄 Infinite Feed (X/Instagram tarzı)',
 
-    // --- PARÇALI (GRANÜLER) KONTROLLER ---
-    DISABLE_AVATAR: '[PARÇA] Profil Resmi (Avatar)',
-    DISABLE_FULL_NAME: '[PARÇA] Kullanıcı Adı / Başlık',
-    DISABLE_USERNAME: '[PARÇA] Kullanıcı Etiketi (@handle)',
-    DISABLE_DESCRIPTION: '[PARÇA] Video Açıklaması / Metni',
-    DISABLE_SEEKBAR: '[PARÇA] Video İlerleme Çubuğu (SeekBar)',
-    DISABLE_ACTION_BUTTONS: '[PARÇA] Sağ Butonlar (Beğen, Kaydet vb.)',
-    DISABLE_COMMERCIAL_TAG: '[PARÇA] Ticari İş Birliği Etiketi',
+    // ═══════════════════════════════════════════════════════════════════════
+    // INFINITE FEED FLAGS (Sadece USE_INFINITE_FEED=true iken geçerli)
+    // ═══════════════════════════════════════════════════════════════════════
+    INF_DISABLE_ALL_UI: '[INF-MASTER] Tüm InfiniteFeed Arayüzü',
+    INF_DISABLE_INLINE_VIDEO: '[INF] Video Oynatma (Sadece Thumbnail)',
+    INF_DISABLE_USER_HEADER: '[INF] Kullanıcı Başlığı (Avatar + İsim)',
+    INF_DISABLE_ACTIONS: '[INF] Butonlar (Beğen, Kaydet, Paylaş)',
+    INF_DISABLE_DESCRIPTION: '[INF] Açıklama Metni',
+    INF_DISABLE_ACTION_ANIMATIONS: '[INF] Buton Animasyonları (Particle)',
+    INF_DISABLE_HEADER_TABS: '[INF] Sekme Başlığı (Senin İçin / Takip)',
+    INF_DISABLE_THUMBNAIL: '[INF] Thumbnail/Poster Gösterimi',
 
-    // --- GLOBAL KATMANLAR ---
-    DISABLE_HEADER_OVERLAY: '[KATMAN] Tepe Menü (Header)',
-    DISABLE_STORY_BAR: '[KATMAN] Hikaye Çubuğu (Stories)',
-    DISABLE_SHEETS: '[KATMAN] Alt Pencereler (Sheets)',
-    DISABLE_MODALS: '[KATMAN] Onay Kutuları (Modals)',
-    DISABLE_TOASTS: '[KATMAN] Bildirimler (Toasts)',
+    // ═══════════════════════════════════════════════════════════════════════
+    // POOL PLAYER FLAGS (Sadece USE_INFINITE_FEED=false iken geçerli)
+    // ═══════════════════════════════════════════════════════════════════════
+    DISABLE_ALL_UI: '[POOL-MASTER] Tüm Arayüzü Kapat',
+    DISABLE_ACTIVE_VIDEO_OVERLAY: '[POOL-MASTER] Video Üstü Katman',
+    DISABLE_AVATAR: '[POOL] Profil Resmi (Avatar)',
+    DISABLE_FULL_NAME: '[POOL] Kullanıcı Adı / Başlık',
+    DISABLE_USERNAME: '[POOL] Kullanıcı Etiketi (@handle)',
+    DISABLE_DESCRIPTION: '[POOL] Video Açıklaması',
+    DISABLE_SEEKBAR: '[POOL] Video İlerleme Çubuğu (SeekBar)',
+    DISABLE_ACTION_BUTTONS: '[POOL] Sağ Butonlar (Beğen, Kaydet)',
+    DISABLE_COMMERCIAL_TAG: '[POOL] Ticari İş Birliği Etiketi',
+    DISABLE_HEADER_OVERLAY: '[POOL] Tepe Menü (Header)',
+    DISABLE_STORY_BAR: '[POOL] Hikaye Çubuğu (Stories)',
+    DISABLE_SHEETS: '[POOL] Alt Pencereler (Sheets)',
+    DISABLE_MODALS: '[POOL] Onay Kutuları (Modals)',
+    DISABLE_TOASTS: '[POOL] Bildirimler (Toasts)',
 
-    // --- ESKİ / TEST ---
+    // ═══════════════════════════════════════════════════════════════════════
+    // ESKİ / TEST
+    // ═══════════════════════════════════════════════════════════════════════
     DISABLE_FEED_UI_FOR_TEST: '[TEST] Saf Video Modu (Legacy)'
 };
 
@@ -104,6 +123,8 @@ function showMenu() {
 
         flags.forEach((f, i) => {
             const cursor = i === index ? `${C.yellow}${C.bold} > ${C.reset}` : '   ';
+            // isActive=true means DISABLE flag is ON = feature is OFF
+            // isActive=false means DISABLE flag is OFF = feature is ON
             const status = f.isActive
                 ? `${C.red}${C.bold}[KAPALI]${C.reset}`
                 : `${C.green}${C.bold}[AÇIK]${C.reset}`;

@@ -33,6 +33,33 @@ export const FEED_FLAGS = {
     /** Disables all user interactions (tap, longpress, swipes) */
     DISABLE_INTERACTION_HANDLING: false,
 
+    // --- FEED MODE FLAGS ---
+    /** Use Infinite Feed (X/Instagram style) instead of Pool-based TikTok feed */
+    USE_INFINITE_FEED: true,
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // INFINITE FEED FLAGS (Only applies when USE_INFINITE_FEED is true)
+    // ═══════════════════════════════════════════════════════════════════════
+    /** Master switch for all InfiniteFeed overlays */
+    INF_DISABLE_ALL_UI: false,
+    /** Disable video playback in feed (show only thumbnails) */
+    INF_DISABLE_INLINE_VIDEO: false,
+    /** Disable user header (avatar + name + handle) */
+    INF_DISABLE_USER_HEADER: false,
+    /** Disable action buttons row (like, save, share, shop) */
+    INF_DISABLE_ACTIONS: false,
+    /** Disable description text */
+    INF_DISABLE_DESCRIPTION: false,
+    /** Disable action button animations (particle burst, heartbeat) */
+    INF_DISABLE_ACTION_ANIMATIONS: false,
+    /** Disable header tabs (Senin İçin / Takip) */
+    INF_DISABLE_HEADER_TABS: true,
+    /** Disable thumbnail/poster display during video loading */
+    INF_DISABLE_THUMBNAIL: false,
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // POOL PLAYER FLAGS (Only applies when USE_INFINITE_FEED is false)
+    // ═══════════════════════════════════════════════════════════════════════
     // --- UI LAYER FLAGS (Pure Visual Overlays) ---
     /** Master switch - Disables all visual UI layers (excluding video itself) */
     DISABLE_ALL_UI: false,
