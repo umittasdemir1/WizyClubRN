@@ -43,6 +43,7 @@ import { InteractionRepositoryImpl } from '../../src/data/repositories/Interacti
 import { ToggleFollowUseCase } from '../../src/domain/usecases/ToggleFollowUseCase';
 import { useSocialStore } from '../../src/presentation/store/useSocialStore';
 import { VerifiedBadge } from '../../src/presentation/components/shared/VerifiedBadge';
+import { isFeedVideoItem } from '../../src/presentation/components/feed/utils/FeedUtils';
 import { logSocial, logError, logUI, LogCode } from '@/core/services/Logger';
 import { shadowStyle } from '@/core/utils/shadow';
 
@@ -217,17 +218,26 @@ export default function UserProfileScreen() {
   // --------------------------
 
   const safeVideos = videos || [];
+  const videoOnlyItems = safeVideos.filter(isFeedVideoItem);
   const postsData = safeVideos.map(v => ({ id: v.id, thumbnail: v.thumbnailUrl, views: v.likesCount?.toString() || '0', type: 'video' as const, videoUrl: v.videoUrl }));
-  const videosData = safeVideos.map(v => ({ id: v.id, thumbnail: v.thumbnailUrl, views: v.likesCount?.toString() || '0', videoUrl: v.videoUrl }));
+  const videosData = videoOnlyItems.map(v => ({ id: v.id, thumbnail: v.thumbnailUrl, views: v.likesCount?.toString() || '0', videoUrl: v.videoUrl }));
   const tagsData: any[] = [];
 
   const pagerRef = useRef<React.ElementRef<typeof PagerView>>(null);
   const [activeTab, setActiveTab] = useState(0);
-  const gridItemSize = Math.floor((SCREEN_WIDTH - 8) / 3);
-  const gridItemHeight = gridItemSize * 1.25; // 4:5 ratio
-  const gridHeight = Math.ceil(postsData.length / 3) * (gridItemHeight + 2) + 20;
+  const GRID_COLUMNS = 3;
+  const GRID_GAP = 2;
+  const GRID_PADDING = 2;
 
-  const videosHeight = Math.ceil(videosData.length / 3) * (gridItemSize * (16 / 9) + 1) + 20;
+  const gridItemSize = Math.floor(
+    (SCREEN_WIDTH - GRID_PADDING * 2 - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS
+  );
+  const gridItemHeight = gridItemSize * 1.25; // 4:5 ratio
+  const gridRows = Math.ceil(postsData.length / GRID_COLUMNS);
+  const gridHeight = gridRows * (gridItemHeight + GRID_GAP) + GRID_GAP;
+
+  const videoRows = Math.ceil(videosData.length / GRID_COLUMNS);
+  const videosHeight = videoRows * (gridItemSize * (16 / 9) + GRID_GAP) + GRID_GAP;
   const tagsHeight = 300;
   const shopHeight = 260;
   const showShopTab = profileUser?.isVerified === true && profileUser?.shopEnabled === true;
@@ -239,13 +249,13 @@ export default function UserProfileScreen() {
 
   const pagerPages = [
     <View key="0">
-      <MediaGrid items={postsData} isDark={isDark} aspectRatio={0.8} onPreview={showPreview} onPreviewEnd={hidePreview} gap={2} padding={2} />
+      <MediaGrid items={postsData} isDark={isDark} aspectRatio={0.8} onPreview={showPreview} onPreviewEnd={hidePreview} gap={GRID_GAP} padding={GRID_PADDING} />
     </View>,
     <View key="1">
-      <MediaGrid items={videosData.map((video) => ({ ...video, type: 'video' as const }))} isDark={isDark} aspectRatio={9 / 16} onPreview={showPreview} onPreviewEnd={hidePreview} gap={2} padding={2} />
+      <MediaGrid items={videosData.map((video) => ({ ...video, type: 'video' as const }))} isDark={isDark} aspectRatio={9 / 16} onPreview={showPreview} onPreviewEnd={hidePreview} gap={GRID_GAP} padding={GRID_PADDING} />
     </View>,
     <View key="2">
-      <MediaGrid items={tagsData} isDark={isDark} aspectRatio={0.8} onPreview={showPreview} onPreviewEnd={hidePreview} gap={2} padding={2} />
+      <MediaGrid items={tagsData} isDark={isDark} aspectRatio={0.8} onPreview={showPreview} onPreviewEnd={hidePreview} gap={GRID_GAP} padding={GRID_PADDING} />
       {tagsData.length === 0 && (
         <View style={{ padding: 40, alignItems: 'center' }}>
           <Text style={{ color: textSecondary }}>Etiketlenmiş gönderi yok</Text>

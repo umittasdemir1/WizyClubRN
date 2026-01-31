@@ -52,6 +52,7 @@ import { VerifiedBadge } from '../../src/presentation/components/shared/Verified
 import { ProfileSettingsOverlay } from '../../src/presentation/components/profile/ProfileSettingsOverlay';
 import { UserActivityRepositoryImpl } from '../../src/data/repositories/UserActivityRepositoryImpl';
 import { Video as VideoEntity } from '../../src/domain/entities/Video';
+import { isFeedVideoItem } from '../../src/presentation/components/feed/utils/FeedUtils';
 import { logApi, logError, logUI, LogCode } from '@/core/services/Logger';
 import { shadowStyle } from '@/core/utils/shadow';
 
@@ -698,21 +699,31 @@ export default function ProfileScreen() {
   };
 
   const safeVideos = videos || [];
+  const videoOnlyItems = safeVideos.filter(isFeedVideoItem);
   const postsData = safeVideos.map((v: any) => ({ id: v.id, thumbnail: v.thumbnailUrl, views: v.likesCount?.toString() || '0', type: 'video' as const, videoUrl: v.videoUrl }));
-  const videosData = safeVideos.map((v: any) => ({ id: v.id, thumbnail: v.thumbnailUrl, views: v.likesCount?.toString() || '0', videoUrl: v.videoUrl }));
+  const videosData = videoOnlyItems.map((v: any) => ({ id: v.id, thumbnail: v.thumbnailUrl, views: v.likesCount?.toString() || '0', videoUrl: v.videoUrl }));
   const savedData = (savedVideosData || []).map((v: any) => ({ id: v.id, thumbnail: v.thumbnailUrl, views: v.likesCount?.toString() || '0', type: 'video' as const, videoUrl: v.videoUrl }));
   const tagsData: any[] = [];
   const tabBarHeight = useBottomTabBarHeight();
   const modalBackdropBottom = tabBarHeight;
 
   // Calculate grid height including the Drafts folder (always shown)
-  const totalGridItems = postsData.length + 1;
-  const gridItemSize = Math.floor((SCREEN_WIDTH - 8) / 3); // 8 = PADDING(2)*2 + GAP(2)*2
-  const gridItemHeight = gridItemSize * 1.25; // Aspect Ratio 0.8 (4:5) -> Height = Width * 1.25
-  const gridHeight = Math.ceil(totalGridItems / 3) * (gridItemHeight + 2) + 20; // +2 for gap
+  const GRID_COLUMNS = 3;
+  const GRID_GAP = 2;
+  const GRID_PADDING = 2;
 
-  const videosHeight = Math.ceil(videosData.length / 3) * (gridItemSize * (16 / 9) + 1) + 20;
-  const savedHeight = Math.ceil(savedData.length / 3) * (gridItemHeight + 2) + 20;
+  const totalGridItems = postsData.length + 1;
+  const gridItemSize = Math.floor(
+    (SCREEN_WIDTH - GRID_PADDING * 2 - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS
+  );
+  const gridItemHeight = gridItemSize * 1.25; // Aspect Ratio 0.8 (4:5) -> Height = Width * 1.25
+  const gridRows = Math.ceil(totalGridItems / GRID_COLUMNS);
+  const gridHeight = gridRows * (gridItemHeight + GRID_GAP) + GRID_GAP;
+
+  const videoRows = Math.ceil(videosData.length / GRID_COLUMNS);
+  const videosHeight = videoRows * (gridItemSize * (16 / 9) + GRID_GAP) + GRID_GAP;
+  const savedRows = Math.ceil(savedData.length / GRID_COLUMNS);
+  const savedHeight = savedRows * (gridItemHeight + GRID_GAP) + GRID_GAP;
   const tagsHeight = 300;
   const shopHeight = 260;
   const showShopTab = currentUser?.isVerified === true && shopEnabled;
@@ -792,8 +803,8 @@ export default function ProfileScreen() {
           onPress={handleVideoPress}
           onPreviewEnd={hidePreview}
           headerComponent={draftsHeader}
-          gap={2}
-          padding={2}
+          gap={GRID_GAP}
+          padding={GRID_PADDING}
         />
       </View>
     ),
@@ -806,8 +817,8 @@ export default function ProfileScreen() {
           onPress={handleVideoPress}
           onPreview={showPreview}
           onPreviewEnd={hidePreview}
-          gap={2}
-          padding={2}
+          gap={GRID_GAP}
+          padding={GRID_PADDING}
         />
       </View>
     ),
@@ -819,8 +830,8 @@ export default function ProfileScreen() {
           aspectRatio={0.8}
           onPreview={showPreview}
           onPreviewEnd={hidePreview}
-          gap={2}
-          padding={2}
+          gap={GRID_GAP}
+          padding={GRID_PADDING}
         />
         {tagsData.length === 0 && (
           <View style={{ padding: 40, alignItems: 'center' }}>
@@ -838,8 +849,8 @@ export default function ProfileScreen() {
           onPress={handleSavedPress}
           onPreview={showPreview}
           onPreviewEnd={hidePreview}
-          gap={2}
-          padding={2}
+          gap={GRID_GAP}
+          padding={GRID_PADDING}
         />
         {savedData.length === 0 && (
           <View style={{ padding: 40, alignItems: 'center' }}>

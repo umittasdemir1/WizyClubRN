@@ -49,7 +49,7 @@ export const MediaGrid: React.FC<MediaGridProps> = ({
   };
 
   return (
-    <View style={[styles.container, { paddingHorizontal: padding, rowGap: gap }]}>
+    <View style={[styles.container, { paddingHorizontal: padding, paddingTop: gap }]}>
       {headerComponent && (
         <View style={{ marginRight: gap, marginBottom: gap }}>
           {headerComponent}
@@ -92,7 +92,6 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginTop: 5,
   },
   item: {
     position: 'relative',

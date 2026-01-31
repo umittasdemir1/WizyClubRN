@@ -35,7 +35,7 @@ export const FEED_FLAGS = {
 
     // --- UI LAYER FLAGS (Pure Visual Overlays) ---
     /** Master switch - Disables all visual UI layers (excluding video itself) */
-    DISABLE_ALL_UI: true,
+    DISABLE_ALL_UI: false,
 
     // Active Video Overlay Granular Controls
     /** Disables the profile picture in metadata */
