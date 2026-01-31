@@ -35,13 +35,13 @@ export const FEED_FLAGS = {
 
     // --- FEED MODE FLAGS ---
     /** Use Infinite Feed (X/Instagram style) instead of Pool-based TikTok feed */
-    USE_INFINITE_FEED: true,
+    USE_INFINITE_FEED: false,
 
     // ═══════════════════════════════════════════════════════════════════════
     // INFINITE FEED FLAGS (Only applies when USE_INFINITE_FEED is true)
     // ═══════════════════════════════════════════════════════════════════════
     /** Master switch for all InfiniteFeed overlays */
-    INF_DISABLE_ALL_UI: false,
+    INF_DISABLE_ALL_UI: true,
     /** Disable video playback in feed (show only thumbnails) */
     INF_DISABLE_INLINE_VIDEO: false,
     /** Disable user header (avatar + name + handle) */
@@ -49,11 +49,9 @@ export const FEED_FLAGS = {
     /** Disable action buttons row (like, save, share, shop) */
     INF_DISABLE_ACTIONS: false,
     /** Disable description text */
-    INF_DISABLE_DESCRIPTION: true,
+    INF_DISABLE_DESCRIPTION: false,
     /** Disable action button animations (particle burst, heartbeat) */
-    INF_DISABLE_ACTION_ANIMATIONS: true,
-    /** Disable Pool feed action button animations */
-    POOL_DISABLE_ACTION_ANIMATIONS: false,
+    INF_DISABLE_ACTION_ANIMATIONS: false,
     /** Disable header tabs (Senin İçin / Takip) */
     INF_DISABLE_HEADER_TABS: true,
     /** Disable thumbnail/poster display during video loading */
@@ -65,6 +63,10 @@ export const FEED_FLAGS = {
     // --- UI LAYER FLAGS (Pure Visual Overlays) ---
     /** Master switch - Disables all visual UI layers (excluding video itself) */
     DISABLE_ALL_UI: false,
+    /** Disable Pool feed action button animations */
+    POOL_DISABLE_ACTION_ANIMATIONS: true,
+    /** Disable Pool feed thumbnail/poster display */
+    POOL_DISABLE_THUMBNAIL: true,
 
     // Active Video Overlay Granular Controls
     /** Disables the profile picture in metadata */

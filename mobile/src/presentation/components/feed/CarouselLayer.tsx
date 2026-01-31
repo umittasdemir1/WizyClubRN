@@ -3,6 +3,7 @@ import { View, StyleSheet, Dimensions, FlatList, Pressable, GestureResponderEven
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { shadowStyle } from '@/core/utils/shadow';
+import { FEED_FLAGS } from './hooks/useFeedConfig';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.heic', '.heif', '.avif'];
@@ -357,7 +358,7 @@ function CarouselMediaItem({
                 contentFit="contain"
                 cachePolicy="memory-disk"
                 priority="high"
-                placeholder={item.thumbnail ? { uri: item.thumbnail } : undefined}
+                placeholder={(!FEED_FLAGS.POOL_DISABLE_THUMBNAIL && item.thumbnail) ? { uri: item.thumbnail } : undefined}
                 onLoad={() => onImageDone(index)}
                 onError={() => onImageDone(index)}
             />

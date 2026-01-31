@@ -23,7 +23,7 @@ import { useNetInfo } from '@react-native-community/netinfo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LogCode, logError } from '@/core/services/Logger';
 import { PerformanceLogger } from '@/core/services/PerformanceLogger';
-import { FEED_CONFIG } from './hooks/useFeedConfig';
+import { FEED_CONFIG, FEED_FLAGS } from './hooks/useFeedConfig';
 import { SlotRecycler, type PlayerSlot } from './utils/SlotRecycler';
 import { VideoErrorHandler, ErrorAction } from './utils/VideoErrorHandler';
 
@@ -238,7 +238,7 @@ const PlayerSlotRenderer = memo(function PlayerSlotRenderer({
 
             {/* ✅ Poster Image Overlay - Shows until video is ready for display */}
             {/* Prevents black screen flashes during fast scroll */}
-            {!slot.isReadyForDisplay && slot.thumbnailUrl && (
+            {!slot.isReadyForDisplay && slot.thumbnailUrl && !FEED_FLAGS.POOL_DISABLE_THUMBNAIL && (
                 <PosterImage
                     source={{ uri: slot.thumbnailUrl }}
                     style={[
