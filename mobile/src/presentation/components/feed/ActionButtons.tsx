@@ -1,5 +1,6 @@
 import React, { memo, useState, useEffect, forwardRef, useImperativeHandle, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { FEED_FLAGS } from './hooks/useFeedConfig';
 import { textShadowStyle } from '@/core/utils/shadow';
 import Animated, {
     useSharedValue,
@@ -58,6 +59,8 @@ const PARTICLE_SIZE = 4;
 const LIKE_PARTICLE_COLORS = ['#FF2146', '#FF3B30', '#FF6B6B', '#FF8A80'];
 const SAVE_PARTICLE_COLORS = ['#FFD700', '#FFC107', '#FFB300', '#FFE082'];
 
+// ✅ Pre-calculate particle angles to avoid Math.random() in render
+const PARTICLE_ANGLES = Array.from({ length: PARTICLE_COUNT }).map((_, i) => (Math.PI * 2 * i) / PARTICLE_COUNT + (Math.random() * 0.5));
 
 interface ActionButtonProps {
     onPress: () => void;
@@ -78,7 +81,8 @@ interface ActionButtonRef {
     animate: () => void;
 }
 
-function BurstParticle({ angle, color, burst }: { angle: number; color: string; burst: SharedValue<number> }) {
+// ✅ [PERF] Memoized BurstParticle
+const BurstParticle = memo(function BurstParticle({ angle, color, burst }: { angle: number; color: string; burst: SharedValue<number> }) {
     const animatedStyle = useAnimatedStyle(() => {
         const progress = burst.value;
         const distance = interpolate(progress, [0, 1], [0, PARTICLE_DISTANCE], Extrapolate.CLAMP);
@@ -95,9 +99,9 @@ function BurstParticle({ angle, color, burst }: { angle: number; color: string; 
     });
 
     return <Animated.View style={[styles.particle, { backgroundColor: color }, animatedStyle]} />;
-}
+});
 
-const ActionButton = forwardRef<ActionButtonRef, ActionButtonProps>(
+const ActionButton = memo(forwardRef<ActionButtonRef, ActionButtonProps>(
     ({ onPress, onLongPress, onPressIn, onPressOut, IconComponent, count, zeroText, isActive, activeColor, canToggle = true, enableBurst = false, burstColors = LIKE_PARTICLE_COLORS }, ref) => {
         const [localActive, setLocalActive] = useState(isActive);
         const scale = useSharedValue(1);
@@ -117,13 +121,17 @@ const ActionButton = forwardRef<ActionButtonRef, ActionButtonProps>(
         useImperativeHandle(ref, () => ({
             animate: () => {
                 setLocalActive(true);
-                triggerBurst();
-                scale.value = withSequence(
-                    withTiming(1.3, { duration: HEARTBEAT_DURATION, easing: Easing.out(Easing.ease) }),
-                    withTiming(0.9, { duration: HEARTBEAT_DURATION, easing: Easing.inOut(Easing.ease) }),
-                    withTiming(1.15, { duration: HEARTBEAT_DURATION, easing: Easing.inOut(Easing.ease) }),
-                    withTiming(1, { duration: HEARTBEAT_DURATION, easing: Easing.out(Easing.ease) })
-                );
+
+                // ✅ Animations controlled by POOL_DISABLE_ACTION_ANIMATIONS flag
+                if (!FEED_FLAGS.POOL_DISABLE_ACTION_ANIMATIONS) {
+                    triggerBurst();
+                    scale.value = withSequence(
+                        withTiming(1.3, { duration: HEARTBEAT_DURATION, easing: Easing.out(Easing.ease) }),
+                        withTiming(0.9, { duration: HEARTBEAT_DURATION, easing: Easing.inOut(Easing.ease) }),
+                        withTiming(1.15, { duration: HEARTBEAT_DURATION, easing: Easing.inOut(Easing.ease) }),
+                        withTiming(1, { duration: HEARTBEAT_DURATION, easing: Easing.out(Easing.ease) })
+                    );
+                }
             },
         }));
 
@@ -137,15 +145,18 @@ const ActionButton = forwardRef<ActionButtonRef, ActionButtonProps>(
                 setLocalActive(nextActive);
             }
 
-            scale.value = withSequence(
-                withTiming(1.3, { duration: HEARTBEAT_DURATION, easing: Easing.out(Easing.ease) }),
-                withTiming(0.9, { duration: HEARTBEAT_DURATION, easing: Easing.inOut(Easing.ease) }),
-                withTiming(1.15, { duration: HEARTBEAT_DURATION, easing: Easing.inOut(Easing.ease) }),
-                withTiming(1, { duration: HEARTBEAT_DURATION, easing: Easing.out(Easing.ease) })
-            );
+            // ✅ Animations controlled by POOL_DISABLE_ACTION_ANIMATIONS flag
+            if (!FEED_FLAGS.POOL_DISABLE_ACTION_ANIMATIONS) {
+                scale.value = withSequence(
+                    withTiming(1.3, { duration: HEARTBEAT_DURATION, easing: Easing.out(Easing.ease) }),
+                    withTiming(0.9, { duration: HEARTBEAT_DURATION, easing: Easing.inOut(Easing.ease) }),
+                    withTiming(1.15, { duration: HEARTBEAT_DURATION, easing: Easing.inOut(Easing.ease) }),
+                    withTiming(1, { duration: HEARTBEAT_DURATION, easing: Easing.out(Easing.ease) })
+                );
 
-            if (nextActive) {
-                triggerBurst();
+                if (nextActive) {
+                    triggerBurst();
+                }
             }
             onPress();
         };
@@ -163,20 +174,16 @@ const ActionButton = forwardRef<ActionButtonRef, ActionButtonProps>(
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
                 <Animated.View style={[styles.iconWrapper, animatedStyle]}>
-                    {enableBurst && (
+                    {enableBurst && localActive && !FEED_FLAGS.POOL_DISABLE_ACTION_ANIMATIONS && (
                         <View style={styles.particles}>
-                            {Array.from({ length: PARTICLE_COUNT }).map((_, index) => {
-                                const angle = (Math.PI * 2 * Math.random());
-                                const color = burstColors[index % burstColors.length];
-                                return (
-                                    <BurstParticle
-                                        key={index}
-                                        angle={angle}
-                                        color={color}
-                                        burst={burst}
-                                    />
-                                );
-                            })}
+                            {PARTICLE_ANGLES.map((angle, index) => (
+                                <BurstParticle
+                                    key={index}
+                                    angle={angle}
+                                    color={burstColors[index % burstColors.length]}
+                                    burst={burst}
+                                />
+                            ))}
                         </View>
                     )}
                     <IconComponent
@@ -198,7 +205,7 @@ const ActionButton = forwardRef<ActionButtonRef, ActionButtonProps>(
             </Pressable>
         );
     }
-);
+));
 
 export const ActionButtons = memo(forwardRef<ActionButtonsRef, ActionButtonsProps>(function ActionButtons({
     state,

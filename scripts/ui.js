@@ -59,6 +59,7 @@ const FLAG_DESCRIPTIONS = {
     DISABLE_DESCRIPTION: '[POOL] Video Açıklaması',
     DISABLE_SEEKBAR: '[POOL] Video İlerleme Çubuğu (SeekBar)',
     DISABLE_ACTION_BUTTONS: '[POOL] Sağ Butonlar (Beğen, Kaydet)',
+    POOL_DISABLE_ACTION_ANIMATIONS: '[POOL] Buton Animasyonları (Particle)',
     DISABLE_COMMERCIAL_TAG: '[POOL] Ticari İş Birliği Etiketi',
     DISABLE_HEADER_OVERLAY: '[POOL] Tepe Menü (Header)',
     DISABLE_STORY_BAR: '[POOL] Hikaye Çubuğu (Stories)',
