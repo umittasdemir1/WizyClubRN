@@ -169,16 +169,12 @@ export const ActiveVideoOverlay = memo(function ActiveVideoOverlay({
         opacity: 1,
     }), []);
 
-    // Optimize scroll performance & entry animation
-    // 1. Hides instantly when scrolling
-    // 2. Fades in smoothly after delay when video changes
+    // UI content opacity (keep stable during scroll)
     const contentOpacityStyle = useAnimatedStyle(() => {
-        const isScrolling = isScrollingSV.value;
         const visibility = uiVisibleSV.value;
 
-        // If scrolling, force hide (0). Otherwise use the visibility animation value.
         return {
-            opacity: isScrolling ? 0.3 : visibility
+            opacity: visibility
         };
     }, []);
 

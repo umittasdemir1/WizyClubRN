@@ -1,135 +1,77 @@
 import React from 'react';
-import { View, Text, StyleSheet, Dimensions, Pressable } from 'react-native';
+import { View, StyleSheet, Dimensions, Pressable } from 'react-native';
 import { Image } from 'expo-image';
-import { Play } from 'lucide-react-native';
+import { VideoTabIcon } from '../shared/VideoTabIcon';
+import { CarouselIcon } from '../shared/CarouselIcon';
+import { PhotoIcon } from '../shared/PhotoIcon';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const GAP = 2;
-const PADDING = 2;
-// 3 columns
-const COLUMN_WIDTH = (SCREEN_WIDTH - (PADDING * 2) - (GAP * 2)) / 3;
-
-// Aspect Ratios: Squares are 1:1, Large matches the stack height
-const SMALL_HEIGHT = COLUMN_WIDTH; // 1:1 Square
-// Calculate Large Height to perfectly match 2 stacked small items + gap
-const LARGE_HEIGHT = (SMALL_HEIGHT * 2) + GAP;
+const PADDING = 0;
+// 2 columns
+const COLUMN_WIDTH = (SCREEN_WIDTH - GAP) / 2;
+const ITEM_HEIGHT = (COLUMN_WIDTH * 5) / 4;
+const ICON_SIZE = 28;
+const ICON_BG_SIZE = 34;
 
 interface DiscoveryItem {
     id: string;
     thumbnailUrl: string;
-    views: string;
-    isLarge?: boolean;
-    videoUrl: string;
+    videoUrl?: string;
+    mediaType?: 'video' | 'carousel' | 'photo';
 }
 
 interface MasonryFeedProps {
     data: DiscoveryItem[];
     onItemPress: (id: string) => void;
     onPreview?: (item: DiscoveryItem) => void;
-    onPreviewEnd?: () => void;
     isDark?: boolean;
 }
 
-export function MasonryFeed({ data, onItemPress, onPreview, onPreviewEnd, isDark = true }: MasonryFeedProps) {
+export function MasonryFeed({ data, onItemPress, onPreview, isDark = true }: MasonryFeedProps) {
     const itemBg = isDark ? '#222222' : '#F2F2F7';
-
-    // Chunk data into groups of 5 (1 Large + 2 Small + 2 Small)
-    const chunks = [];
-    for (let i = 0; i < data.length; i += 5) {
-        chunks.push(data.slice(i, i + 5));
-    }
-
-    const renderLargeItem = (item: DiscoveryItem) => (
-        <Pressable
-            key={item.id}
-            style={[styles.item, { width: COLUMN_WIDTH, height: LARGE_HEIGHT, backgroundColor: itemBg }]}
-            onPress={() => onItemPress(item.id)}
-            onLongPress={() => onPreview?.(item)}
-            delayLongPress={300}
-        >
-            <Image
-                source={{ uri: item.thumbnailUrl }}
-                style={styles.thumbnail}
-                contentFit="cover"
-                cachePolicy="memory-disk"
-                transition={0}
-                priority="high"
-            />
-            <View style={styles.statsBadge}>
-                <Play size={10} color="white" strokeWidth={2.5} />
-                <Text style={styles.statsText}>{item.views}</Text>
-            </View>
-        </Pressable>
-    );
-
-    const renderSmallItem = (item: DiscoveryItem) => (
-        <Pressable
-            key={item.id}
-            style={[styles.item, { width: COLUMN_WIDTH, height: SMALL_HEIGHT, backgroundColor: itemBg }]}
-            onPress={() => onItemPress(item.id)}
-            onLongPress={() => onPreview?.(item)}
-            delayLongPress={300}
-        >
-            <Image
-                source={{ uri: item.thumbnailUrl }}
-                style={styles.thumbnail}
-                contentFit="cover"
-                cachePolicy="memory-disk"
-                transition={0}
-                priority="high"
-            />
-            <View style={styles.statsBadge}>
-                <Play size={10} color="white" strokeWidth={2.5} />
-                <Text style={styles.statsText}>{item.views}</Text>
-            </View>
-        </Pressable>
-    );
-
-    const SmallColumn = ({ items }: { items: DiscoveryItem[] }) => (
-        <View style={[styles.columnWrapper, { gap: GAP }]}>
-            {items.map(item => renderSmallItem(item))}
-        </View>
-    );
 
     return (
         <View style={styles.container}>
-            {chunks.map((chunk, rowIndex) => {
-                const isEvenRow = rowIndex % 2 === 0;
-
-                // We need at least 1 item to render a row
-                if (chunk.length === 0) return null;
-
-                const largeItem = chunk[0];
-                const col2Items = chunk.slice(1, 3);
-                const col3Items = chunk.slice(3, 5);
-
-                const LargeColumn = () => (
-                    <View style={styles.columnWrapper}>
-                        {renderLargeItem(largeItem)}
-                    </View>
-                );
-
-                // Row Even: [Large] [Small] [Small]
-                // Row Odd:  [Small] [Small] [Large]
-
-                return (
-                    <View key={rowIndex} style={[styles.row, { marginBottom: GAP }]}>
-                        {isEvenRow ? (
-                            <>
-                                <LargeColumn />
-                                {col2Items.length > 0 && <SmallColumn items={col2Items} />}
-                                {col3Items.length > 0 && <SmallColumn items={col3Items} />}
-                            </>
-                        ) : (
-                            <>
-                                {col2Items.length > 0 && <SmallColumn items={col2Items} />}
-                                {col3Items.length > 0 && <SmallColumn items={col3Items} />}
-                                <LargeColumn />
-                            </>
-                        )}
-                    </View>
-                );
-            })}
+            {data.map((item, index) => (
+                <Pressable
+                    key={item.id}
+                    style={[
+                        styles.item,
+                        {
+                            width: COLUMN_WIDTH,
+                            marginRight: index % 2 === 0 ? GAP : 0,
+                            marginBottom: GAP,
+                            backgroundColor: itemBg,
+                        },
+                    ]}
+                    onPress={() => onItemPress(item.id)}
+                    onLongPress={item.videoUrl ? () => onPreview?.(item) : undefined}
+                    delayLongPress={300}
+                >
+                    <Image
+                        source={{ uri: item.thumbnailUrl }}
+                        style={styles.thumbnail}
+                        contentFit="cover"
+                        cachePolicy="memory-disk"
+                        transition={0}
+                        priority="high"
+                    />
+                    {item.mediaType ? (
+                        <View style={styles.iconWrapper}>
+                            <View style={styles.iconBubble}>
+                                {item.mediaType === 'video' ? (
+                                    <VideoTabIcon size={ICON_SIZE} color="#FFFFFF" />
+                                ) : item.mediaType === 'carousel' ? (
+                                    <CarouselIcon size={ICON_SIZE} color="#FFFFFF" />
+                                ) : (
+                                    <PhotoIcon size={ICON_SIZE} color="#FFFFFF" />
+                                )}
+                            </View>
+                        </View>
+                    ) : null}
+                </Pressable>
+            ))}
         </View>
     );
 }
@@ -138,38 +80,33 @@ const styles = StyleSheet.create({
     container: {
         paddingHorizontal: PADDING,
         paddingBottom: 100,
-    },
-    row: {
         flexDirection: 'row',
-        gap: GAP,
-    },
-    columnWrapper: {
-        flexDirection: 'column',
+        flexWrap: 'wrap',
     },
     item: {
         borderRadius: 0,
         overflow: 'hidden',
         backgroundColor: '#1a1a1a',
         position: 'relative',
+        height: ITEM_HEIGHT,
     },
     thumbnail: {
         ...StyleSheet.absoluteFillObject,
     },
-    statsBadge: {
+    iconWrapper: {
         position: 'absolute',
-        top: 6,
         right: 6,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
+        top: 6,
+        width: ICON_BG_SIZE,
+        height: ICON_BG_SIZE,
+        borderRadius: 6,
     },
-    statsText: {
-        color: 'white',
-        fontSize: 10,
-        fontWeight: '700',
+    iconBubble: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 6,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'transparent',
     },
 });

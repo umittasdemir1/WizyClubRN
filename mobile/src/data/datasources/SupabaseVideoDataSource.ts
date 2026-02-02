@@ -134,6 +134,36 @@ export class SupabaseVideoDataSource {
         }));
     }
 
+    async searchVideos(query: string, limit: number = 20, userId?: string): Promise<Video[]> {
+        const trimmed = query.trim();
+        if (!trimmed) return [];
+
+        const normalized = trimmed.replace(/\s+/g, ' ').trim();
+        const term = normalized.startsWith('#') ? normalized.slice(1) : normalized;
+        const escaped = term.replace(/[%_]/g, '\\$&');
+        const ilikeTerm = `%${escaped}%`;
+
+        const { data, error } = await supabase
+            .from('videos')
+            .select('id')
+            .is('deleted_at', null)
+            .ilike('description', ilikeTerm)
+            .order('created_at', { ascending: false })
+            .limit(limit);
+
+        if (error) {
+            logError(LogCode.DB_QUERY_ERROR, 'Search videos by description error', { query, error });
+            return [];
+        }
+
+        const ids = (data as Array<{ id: string }> | null)?.map((row) => row.id) || [];
+        if (!ids.length) return [];
+
+        const videos = await this.getVideosByIds(ids, userId);
+        const videoMap = new Map(videos.map((video) => [video.id, video]));
+        return ids.map((id) => videoMap.get(id)).filter(Boolean) as Video[];
+    }
+
     async getStories(): Promise<Story[]> {
         const now = new Date().toISOString();
         const { data: { user } } = await supabase.auth.getUser();
@@ -266,6 +296,7 @@ export class SupabaseVideoDataSource {
             thumbnailUrl: dto.thumbnail_url,
             description: dto.description || '',
             likesCount: dto.likes_count || 0,
+            viewsCount: dto.views_count || 0,
             commentsCount: 0,
             sharesCount: dto.shares_count || 0,
             shopsCount: dto.shops_count || 0,

@@ -5,14 +5,17 @@ interface AvatarProps {
     url: string;
     size?: number;
     hasBorder?: boolean;
+    borderWidth?: number;
 }
 
-export function Avatar({ url, size = 40, hasBorder = false }: AvatarProps) {
+export function Avatar({ url, size = 40, hasBorder = false, borderWidth = 2 }: AvatarProps) {
+    const borderStyle = hasBorder ? [styles.border, { borderWidth }] : null;
+
     return (
         <View style={[
             styles.container,
             { width: size, height: size, borderRadius: size / 2 },
-            hasBorder && styles.border
+            borderStyle
         ]}>
             <Image
                 source={{ uri: url }}
@@ -30,7 +33,6 @@ const styles = StyleSheet.create({
         backgroundColor: '#333',
     },
     border: {
-        borderWidth: 2,
         borderColor: 'white',
     },
 });

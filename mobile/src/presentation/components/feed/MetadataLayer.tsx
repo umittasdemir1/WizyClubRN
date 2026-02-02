@@ -52,7 +52,9 @@ export function MetadataLayer({
             <View style={styles.userRow}>
                 {!isDisabled('DISABLE_AVATAR') && (
                     <Pressable onPress={onAvatarPress} hitSlop={8}>
-                        <Avatar url={video.user.avatarUrl} size={40} hasBorder={true} />
+                        <View style={styles.avatarBorder}>
+                            <Avatar url={video.user.avatarUrl} size={40} />
+                        </View>
                     </Pressable>
                 )}
 
@@ -140,6 +142,15 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         marginBottom: 12,
+    },
+    avatarBorder: {
+        width: 45,
+        height: 45,
+        borderRadius: 22.5,
+        borderWidth: 1,
+        borderColor: 'white',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     nameRow: {
         flexDirection: 'row',

@@ -69,6 +69,12 @@ export interface FeedOverlaysProps {
     storyUsers: any[];
     /** UI opacity style */
     uiOpacityStyle: any;
+    /** Preloaded overlay items (active + neighbors) */
+    overlayItems?: Array<{
+        video: Video;
+        index: number;
+        isPlayable: boolean;
+    }>;
     /** Current active index */
     activeIndex: number;
     /** Is active video playable */
@@ -142,7 +148,6 @@ export const FeedOverlays = forwardRef<FeedOverlaysRef, FeedOverlaysProps>(
     (props, ref) => {
         const {
             activeVideo,
-            activeVideoId,
             isOwnActiveVideo,
             isCleanScreen,
             isSeeking,
@@ -178,13 +183,31 @@ export const FeedOverlays = forwardRef<FeedOverlaysRef, FeedOverlaysProps>(
             return null;
         }
 
-        // Memoize ActiveVideoOverlay props to prevent re-renders (Stable Props Pattern)
-        const activeVideoData = useMemo(() => ({
-            video: activeVideo as Video,
-            currentUserId: props.currentUserId || undefined,
-            activeIndex: props.activeIndex,
-            isPlayable: props.isPlayable,
-        }), [activeVideo, props.currentUserId, props.activeIndex, props.isPlayable]);
+        const overlayTargets = useMemo(() => {
+            if (props.overlayItems && props.overlayItems.length > 0) {
+                return props.overlayItems;
+            }
+            if (activeVideo) {
+                return [{
+                    video: activeVideo,
+                    index: props.activeIndex,
+                    isPlayable: props.isPlayable,
+                }];
+            }
+            return [];
+        }, [props.overlayItems, activeVideo, props.activeIndex, props.isPlayable]);
+
+        const overlayDataList = useMemo(() => (
+            overlayTargets.map((item) => ({
+                key: item.video.id,
+                data: {
+                    video: item.video,
+                    currentUserId: props.currentUserId || undefined,
+                    activeIndex: item.index,
+                    isPlayable: item.isPlayable,
+                }
+            }))
+        ), [overlayTargets, props.currentUserId]);
 
         const activeVideoPlayback = useMemo(() => ({
             isFinished: playback.isFinished,
@@ -219,13 +242,18 @@ export const FeedOverlays = forwardRef<FeedOverlaysRef, FeedOverlaysProps>(
         return (
             <>
                 {/* Active Video Overlay (Buttons, Metadata, SeekBar) */}
-                {activeVideo && !isDisabled('DISABLE_ACTIVE_VIDEO_OVERLAY') && (
-                    <ActiveVideoOverlay
-                        data={activeVideoData}
-                        playback={activeVideoPlayback}
-                        timeline={activeVideoTimeline}
-                        actions={activeVideoActions}
-                    />
+                {overlayDataList.length > 0 && !isDisabled('DISABLE_ACTIVE_VIDEO_OVERLAY') && (
+                    <>
+                        {overlayDataList.map((overlay) => (
+                            <ActiveVideoOverlay
+                                key={overlay.key}
+                                data={overlay.data}
+                                playback={activeVideoPlayback}
+                                timeline={activeVideoTimeline}
+                                actions={activeVideoActions}
+                            />
+                        ))}
+                    </>
                 )}
 
                 {/* Save Toast */}

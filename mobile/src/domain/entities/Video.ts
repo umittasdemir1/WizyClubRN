@@ -6,6 +6,7 @@ export interface Video {
     thumbnailUrl: string;
     description: string;
     likesCount: number;
+    viewsCount?: number;
     commentsCount: number;
     sharesCount: number;
     shopsCount: number;

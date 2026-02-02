@@ -22,7 +22,7 @@ import { useStoryViewer } from '../../hooks/useStoryViewer';
 import { Video } from '../../../domain/entities/Video';
 
 // Modular Hooks & Architecture
-import { ITEM_HEIGHT, isDisabled } from './hooks/useFeedConfig';
+import { FEED_CONFIG, ITEM_HEIGHT, isDisabled } from './hooks/useFeedConfig';
 import { useFeedScroll } from './hooks/useFeedScroll';
 import { useFeedInteractions } from './hooks/useFeedInteractions';
 import { useFeedActions } from './hooks/useFeedActions';
@@ -139,6 +139,12 @@ export const FeedManager = ({
     const activeVideo = useMemo(() => videos.find((v) => v.id === activeVideoId) || null, [videos, activeVideoId]);
     const isOwnActiveVideo = !!activeVideo && activeVideo.user?.id === user?.id;
     const isActivePlayable = useMemo(() => (activeVideo ? isFeedVideoItem(activeVideo) : false), [activeVideo]);
+
+    const resolvedActiveIndex = useMemo(() => {
+        if (activeIndex >= 0) return activeIndex;
+        if (!activeVideoId) return -1;
+        return videos.findIndex((video) => video.id === activeVideoId);
+    }, [activeIndex, activeVideoId, videos]);
 
     const storyUsers = useMemo(() => {
         return storyListData.reduce((acc: any[], story) => {
@@ -259,6 +265,23 @@ export const FeedManager = ({
         }
     }), [toggleMute, router, actionApi, interactionApi, isPaused, togglePause]);
 
+    const overlayItems = useMemo(() => {
+        if (!videos.length || resolvedActiveIndex < 0) return [];
+        const startIndex = Math.max(0, resolvedActiveIndex - FEED_CONFIG.UI_PRELOAD_BEHIND_COUNT);
+        const endIndex = Math.min(videos.length - 1, resolvedActiveIndex + FEED_CONFIG.UI_PRELOAD_AHEAD_COUNT);
+        const items = [];
+        for (let index = startIndex; index <= endIndex; index += 1) {
+            const video = videos[index];
+            if (!video) continue;
+            items.push({
+                video,
+                index,
+                isPlayable: isFeedVideoItem(video),
+            });
+        }
+        return items;
+    }, [videos, resolvedActiveIndex]);
+
     const renderItem = useCallback(({ item }: { item: Video }) => (
         <ScrollPlaceholder
             video={item} isActive={item.id === activeVideoId}
@@ -364,7 +387,8 @@ export const FeedManager = ({
                         hasUnseenStories={hasUnseenStories}
                         showStories={showStories} isCustomFeed={isCustomFeed}
                         storyUsers={storyUsers} uiOpacityStyle={uiOpacityStyle}
-                        activeIndex={activeIndex} isPlayable={isActivePlayable}
+                        overlayItems={overlayItems}
+                        activeIndex={resolvedActiveIndex} isPlayable={isActivePlayable}
                         scrollY={scrollApi.scrollY} isScrollingSV={scrollApi.isScrollingSV}
                         saveToast={saveToastProps}
                         deleteModal={deleteModalProps}

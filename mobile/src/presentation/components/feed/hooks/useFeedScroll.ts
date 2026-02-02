@@ -15,6 +15,7 @@ import { useSharedValue, useAnimatedScrollHandler, SharedValue } from 'react-nat
 import type { ViewToken } from 'react-native';
 import { Image } from 'expo-image';
 import {
+    FEED_CONFIG,
     ITEM_HEIGHT,
     VIEWABILITY_CONFIG,
     VIEWABILITY_THRESHOLD,
@@ -150,13 +151,19 @@ export function useFeedScroll(options: UseFeedScrollOptions): UseFeedScrollRetur
         const deltaMs = Math.max(1, now - lastTs);
         const fastSwipe = deltaIndex > 1 || deltaMs < 350;
         const forward = newIndex >= lastIndex;
-        const prefetchCount = fastSwipe ? 3 : 2;
+        const prefetchAhead = FEED_CONFIG.PREFETCH_AHEAD_COUNT + (fastSwipe ? 1 : 0);
+        const prefetchBehind = FEED_CONFIG.PREFETCH_BEHIND_COUNT;
         const indices = new Set<number>();
         const maxIndex = videosRef.current.length - 1;
 
         // Calculate prefetch indices based on scroll direction
-        for (let i = 1; i <= prefetchCount; i++) {
+        for (let i = 1; i <= prefetchAhead; i++) {
             const idx = forward ? newIndex + i : newIndex - i;
+            if (idx >= 0 && idx <= maxIndex) indices.add(idx);
+        }
+
+        for (let i = 1; i <= prefetchBehind; i++) {
+            const idx = forward ? newIndex - i : newIndex + i;
             if (idx >= 0 && idx <= maxIndex) indices.add(idx);
         }
 
@@ -197,20 +204,31 @@ export function useFeedScroll(options: UseFeedScrollOptions): UseFeedScrollRetur
         setCleanScreen(false);
         setIsCarouselInteracting(false);
 
-        // Cache next video
+        // Cache current/next videos
         if (!isActiveCarousel) {
+            const currentUrl = isFeedVideoItem(newVideo) ? getVideoUrl(newVideo) : null;
             const nextVideo = videosRef.current[newIndex + 1];
             const nextUrl = isFeedVideoItem(nextVideo) ? getVideoUrl(nextVideo) : null;
+            if (currentUrl) {
+                VideoCacheService.warmupCache(currentUrl);
+            }
             if (nextUrl) {
+                VideoCacheService.warmupCache(nextUrl);
                 VideoCacheService.cacheVideo(nextUrl).catch(() => { });
             }
         }
 
         // Prefetch next thumbnails for faster poster display
-        [newIndex + 1, newIndex + 2].forEach((idx) => {
+        [newIndex - 1, newIndex + 1, newIndex + 2].forEach((idx) => {
             const video = videosRef.current[idx];
             if (video?.thumbnailUrl) {
                 Image.prefetch(video.thumbnailUrl);
+            }
+            if (isFeedVideoItem(video)) {
+                const url = getVideoUrl(video);
+                if (url) {
+                    VideoCacheService.warmupCache(url);
+                }
             }
         });
 

@@ -22,17 +22,15 @@ import MoreIcon from '../../assets/icons/more.svg';
 
 // New Components
 import { TrendingHeader } from '../../src/presentation/components/explore/TrendingHeader';
-import { FilterBar } from '../../src/presentation/components/explore/FilterBar';
 import { StoryRail } from '../../src/presentation/components/explore/StoryRail';
 import { TrendingCarousel } from '../../src/presentation/components/explore/TrendingCarousel';
 import { MasonryFeed } from '../../src/presentation/components/explore/MasonryFeed';
 import { useActiveVideoStore } from '../../src/presentation/store/useActiveVideoStore';
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
 import { SystemBars } from 'react-native-edge-to-edge';
+import { getVideoUrl } from '../../src/core/utils/videoUrl';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const CATEGORIES = ['Senin İçin', 'Takip Edilen', 'Popüler'];
-
 interface PreviewModalProps {
     item: {
         id: string;
@@ -204,17 +202,9 @@ export default function ExploreScreen() {
     const bgBody = themeColors.background;
     const setActiveVideo = useActiveVideoStore((state) => state.setActiveVideo);
 
-    const [selectedCategory, setSelectedCategory] = useState('Senin İçin');
     const [refreshing, setRefreshing] = useState(false);
     const [previewItem, setPreviewItem] = useState<{ id: string; thumbnailUrl: string; videoUrl: string; username?: string; fullName?: string; avatarUrl?: string } | null>(null);
     const showSkeleton = videos.length === 0 || isLoading;
-    const carouselItemWidth = SCREEN_WIDTH * 0.38;
-    const carouselItemHeight = carouselItemWidth * (16 / 9);
-    const gridGap = 2;
-    const gridPadding = 2;
-    const gridColumnWidth = (SCREEN_WIDTH - (gridPadding * 2) - (gridGap * 2)) / 3;
-    const gridSmallHeight = gridColumnWidth;
-    const gridLargeHeight = (gridSmallHeight * 2) + gridGap;
 
     useFocusEffect(
         useCallback(() => {
@@ -243,8 +233,15 @@ export default function ExploreScreen() {
         router.push(`/story/${id}`);
     };
 
-    const showPreview = (item: any) => setPreviewItem(item);
+    const showPreview = (item: any) => {
+        if (item?.videoUrl) {
+            setPreviewItem(item);
+        }
+    };
     const hidePreview = () => setPreviewItem(null);
+    const handleSearchPress = () => {
+        router.push('/search');
+    };
 
     const handlePreviewAction = (type: 'like' | 'save' | 'share' | 'shop', id: string) => {
         switch (type) {
@@ -255,17 +252,28 @@ export default function ExploreScreen() {
         }
     };
 
-    const trendingData = videos.slice(0, 5).map(v => ({
-        id: v.id,
-        title: v.description || "Video Başlığı",
-        username: v.user.username,
-        fullName: v.user.fullName,
-        avatarUrl: v.user.avatarUrl,
-        thumbnailUrl: v.thumbnailUrl,
-        videoUrl: v.videoUrl,
-        views: '1.6k',
-        comments: '1.1k'
-    }));
+    const trendingData = videos
+        .map((v) => {
+            if (v.postType === 'carousel') return null;
+            const videoUrl = getVideoUrl(v);
+            if (!videoUrl) return null;
+            if (v.mediaUrls?.length && !v.mediaUrls.some((media) => media.type === 'video')) {
+                return null;
+            }
+            return {
+                id: v.id,
+                title: v.description || "Video Başlığı",
+                username: v.user.username,
+                fullName: v.user.fullName,
+                avatarUrl: v.user.avatarUrl,
+                thumbnailUrl: v.thumbnailUrl,
+                videoUrl,
+                views: '1.6k',
+                comments: '1.1k'
+            };
+        })
+        .filter((item): item is NonNullable<typeof item> => item != null)
+        .slice(0, 5);
 
     const { stories: storyListData } = useStoryViewer();
 
@@ -288,16 +296,25 @@ export default function ExploreScreen() {
 
     let creators = Array.from(storyCreatorsMap.values());
 
-    const discoveryItems = videos.map((v, i) => ({
-        id: v.id,
-        thumbnailUrl: v.thumbnailUrl,
-        videoUrl: v.videoUrl,
-        views: '1.2k',
-        username: v.user.username,
-        fullName: v.user.fullName,
-        avatarUrl: v.user.avatarUrl,
-        isLarge: i % 3 === 0
-    }));
+    const discoveryItems = videos.map((v, i) => {
+        const media = v.mediaUrls ?? [];
+        const hasVideoMedia = media.some((item) => item.type === 'video');
+        const videoUrl = getVideoUrl(v) || '';
+        const isCarousel = v.postType === 'carousel';
+        const isVideo = !isCarousel && (hasVideoMedia || Boolean(videoUrl));
+        const mediaType = isCarousel ? 'carousel' : isVideo ? 'video' : 'photo';
+
+        return {
+            id: v.id,
+            thumbnailUrl: v.thumbnailUrl,
+            videoUrl,
+            mediaType,
+            username: v.user.username,
+            fullName: v.user.fullName,
+            avatarUrl: v.user.avatarUrl,
+            isLarge: i % 3 === 0
+        };
+    });
 
     if (showSkeleton) {
         return (
@@ -324,7 +341,8 @@ export default function ExploreScreen() {
                     <TrendingHeader
                         title="Şimdi Keşfet"
                         isDark={isDark}
-                        showSearch={false}
+                        showSearch={true}
+                        onSearchPress={handleSearchPress}
                     />
 
                     <ScrollView
@@ -335,14 +353,6 @@ export default function ExploreScreen() {
                             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={isDark ? "#fff" : "#000"} />
                         }
                     >
-                        {/* Filter Bar */}
-                        <FilterBar
-                            categories={CATEGORIES}
-                            selectedCategory={selectedCategory}
-                            onSelect={setSelectedCategory}
-                            isDark={isDark}
-                        />
-
                         {/* 1. Stories Section */}
                         {creators.length > 0 && (
                             <>
@@ -380,7 +390,6 @@ export default function ExploreScreen() {
                             data={discoveryItems}
                             onItemPress={handleVideoPress}
                             onPreview={showPreview}
-                            onPreviewEnd={hidePreview}
                             isDark={isDark}
                         />
                     </ScrollView>

@@ -4,6 +4,52 @@ import { CONFIG } from '../../core/config';
 import { LogCode, logData, logError } from '@/core/services/Logger';
 
 export class SupabaseProfileDataSource {
+    async searchProfiles(query: string, limit: number = 20, viewerId?: string): Promise<any[]> {
+        const trimmed = query.trim();
+        if (!trimmed) return [];
+
+        const normalized = trimmed.replace(/\s+/g, ' ').trim();
+        const escaped = normalized.replace(/[%_]/g, '\\$&');
+        const ilikeTerm = `%${escaped}%`;
+
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .or(`username.ilike.${ilikeTerm},full_name.ilike.${ilikeTerm},bio.ilike.${ilikeTerm}`)
+            .order('followers_count', { ascending: false })
+            .limit(limit);
+
+        if (error) {
+            logError(LogCode.DB_QUERY_ERROR, 'Profile search error', { query: normalized, error });
+            return [];
+        }
+
+        const profiles = (data as any[]) || [];
+        if (!profiles.length) return [];
+
+        if (viewerId) {
+            const ids = profiles.map((profile) => profile.id).filter(Boolean);
+            if (ids.length > 0) {
+                const { data: follows, error: followsError } = await supabase
+                    .from('follows')
+                    .select('following_id')
+                    .eq('follower_id', viewerId)
+                    .in('following_id', ids);
+
+                if (followsError) {
+                    logError(LogCode.DB_QUERY_ERROR, 'Profile search follows error', { query: normalized, error: followsError });
+                } else {
+                    const followingSet = new Set((follows as Array<{ following_id: string }> | null)?.map((row) => row.following_id) || []);
+                    profiles.forEach((profile) => {
+                        profile.is_following = followingSet.has(profile.id);
+                    });
+                }
+            }
+        }
+
+        return profiles;
+    }
+
     async getProfile(userId: string, viewerId?: string): Promise<any> {
         const { data, error } = await supabase
             .from('profiles')

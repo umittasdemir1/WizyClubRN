@@ -15,6 +15,10 @@ export class VideoRepositoryImpl implements IVideoRepository {
         return this.dataSource.getVideos(page, limit, userId, authorId);
     }
 
+    async searchVideos(query: string, limit: number, userId?: string): Promise<Video[]> {
+        return this.dataSource.searchVideos(query, limit, userId);
+    }
+
     async toggleLike(videoId: string): Promise<boolean> {
         // In a real app, this would call the API.
         // For mock, we just return true to simulate success.

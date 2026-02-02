@@ -17,6 +17,7 @@ import { useSocialStore } from '../store/useSocialStore';
 import { useStartupStore, initStartupTimer } from '../store/useStartupStore';
 import { isVideoCacheDisabled } from '../../core/utils/videoCacheToggle';
 import { getVideoUrl } from '../../core/utils/videoUrl';
+import { FEED_CONFIG } from '../components/feed/hooks/useFeedConfig';
 
 // Interfaces
 interface UseVideoFeedReturn {
@@ -96,7 +97,7 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
         const initialIndices = videos
             .map((video, index) => (isFeedVideoItem(video) ? index : null))
             .filter((index): index is number => index != null)
-            .slice(0, 3);
+            .slice(0, FEED_CONFIG.PREFETCH_AHEAD_COUNT);
 
         if (initialIndices.length === 0) return;
 
@@ -106,6 +107,10 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
         FeedPrefetchService.getInstance().queueVideos(videos, initialIndices, 0);
         initialIndices.forEach((index) => {
             const video = videos[index];
+            const videoUrl = video ? getVideoUrl(video) : null;
+            if (videoUrl) {
+                VideoCacheService.warmupCache(videoUrl);
+            }
             if (video?.thumbnailUrl) {
                 Image.prefetch(video.thumbnailUrl);
             }

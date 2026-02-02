@@ -41,11 +41,11 @@ export const FEED_FLAGS = {
     // INFINITE FEED FLAGS (Only applies when USE_INFINITE_FEED is true)
     // ═══════════════════════════════════════════════════════════════════════
     /** Master switch for all InfiniteFeed overlays */
-    INF_DISABLE_ALL_UI: true,
+    INF_DISABLE_ALL_UI: false,
     /** Disable video playback in feed (show only thumbnails) */
     INF_DISABLE_INLINE_VIDEO: false,
     /** Disable user header (avatar + name + handle) */
-    INF_DISABLE_USER_HEADER: true,
+    INF_DISABLE_USER_HEADER: false,
     /** Disable action buttons row (like, save, share, shop) */
     INF_DISABLE_ACTIONS: false,
     /** Disable description text */
@@ -53,9 +53,9 @@ export const FEED_FLAGS = {
     /** Disable action button animations (particle burst, heartbeat) */
     INF_DISABLE_ACTION_ANIMATIONS: false,
     /** Disable header tabs (Senin İçin / Takip) */
-    INF_DISABLE_HEADER_TABS: true,
+    INF_DISABLE_HEADER_TABS: false,
     /** Disable thumbnail/poster display during video loading */
-    INF_DISABLE_THUMBNAIL: true,
+    INF_DISABLE_THUMBNAIL: false,
 
     // ═══════════════════════════════════════════════════════════════════════
     // POOL PLAYER FLAGS (Only applies when USE_INFINITE_FEED is false)
@@ -64,9 +64,9 @@ export const FEED_FLAGS = {
     /** Master switch - Disables all visual UI layers (excluding video itself) */
     DISABLE_ALL_UI: false,
     /** Disable Pool feed action button animations */
-    POOL_DISABLE_ACTION_ANIMATIONS: true,
+    POOL_DISABLE_ACTION_ANIMATIONS: false,
     /** Disable Pool feed thumbnail/poster display */
-    POOL_DISABLE_THUMBNAIL: true,
+    POOL_DISABLE_THUMBNAIL: false,
 
     // Active Video Overlay Granular Controls
     /** Disables the profile picture in metadata */
@@ -167,6 +167,12 @@ export const FEED_CONFIG = {
 
     /** Number of videos to prefetch behind current position */
     PREFETCH_BEHIND_COUNT: 1,
+
+    /** Number of UI overlays to pre-mount ahead of current position */
+    UI_PRELOAD_AHEAD_COUNT: 2,
+
+    /** Number of UI overlays to pre-mount behind current position */
+    UI_PRELOAD_BEHIND_COUNT: 0,
 
     /** Number of players in the recycling pool */
     POOL_SIZE: 3,
