@@ -55,6 +55,7 @@ export function InfiniteFeedManager({
 
     const [activeTab, setActiveTab] = useState<FeedTab>('Senin İçin');
     const [activeInlineId, setActiveInlineId] = useState<string | null>(null);
+    const [isCarouselInteracting, setIsCarouselInteracting] = useState(false);
 
     const setCustomFeed = useActiveVideoStore((state) => state.setCustomFeed);
     const setActiveVideo = useActiveVideoStore((state) => state.setActiveVideo);
@@ -75,6 +76,14 @@ export function InfiniteFeedManager({
         router.push('/custom-feed' as any);
     }, [videos, setCustomFeed, setActiveVideo, router]);
 
+    const handleCarouselTouchStart = useCallback(() => {
+        setIsCarouselInteracting(true);
+    }, []);
+
+    const handleCarouselTouchEnd = useCallback(() => {
+        setIsCarouselInteracting(false);
+    }, []);
+
     const renderItem = useCallback(({ item, index }: { item: VideoEntity; index: number }) => (
         <InfiniteFeedCard
             item={item}
@@ -90,8 +99,10 @@ export function InfiniteFeedManager({
             onFollow={toggleFollow}
             onShare={toggleShare}
             onShop={toggleShop}
+            onCarouselTouchStart={handleCarouselTouchStart}
+            onCarouselTouchEnd={handleCarouselTouchEnd}
         />
-    ), [activeInlineId, currentUserId, handleOpenVideo, isMuted, themeColors, toggleFollow, toggleLike, toggleSave, toggleShare, toggleShop]);
+    ), [activeInlineId, currentUserId, handleCarouselTouchEnd, handleCarouselTouchStart, handleOpenVideo, isMuted, themeColors, toggleFollow, toggleLike, toggleSave, toggleShare, toggleShop]);
 
     // ✅ Video starts when 40% visible
     const viewabilityConfig = useRef({
@@ -142,6 +153,7 @@ export function InfiniteFeedManager({
                 estimatedItemSize={500}
                 removeClippedSubviews={true}
                 showsVerticalScrollIndicator={false}
+                scrollEnabled={!isCarouselInteracting}
                 ListHeaderComponent={!FEED_FLAGS.INF_DISABLE_HEADER_TABS ? (
                     <InfiniteFeedHeader
                         activeTab={activeTab}

@@ -6,6 +6,7 @@ import VideoPlayer from 'react-native-video';
 import { getVideoUrl } from '../../../core/utils/videoUrl';
 import { Video as VideoEntity } from '../../../domain/entities/Video';
 import { InfiniteFeedActions } from './InfiniteFeedActions';
+import { CarouselLayer } from '../feed/CarouselLayer';
 import { VerifiedBadge } from '../shared/VerifiedBadge';
 import { ThemeColors } from './types';
 import { FEED_FLAGS } from '../feed/hooks/useFeedConfig';
@@ -48,6 +49,8 @@ interface InfiniteFeedCardProps {
     onShare: (id: string) => void;
     onShop: (id: string) => void;
     onMore?: (id: string) => void;
+    onCarouselTouchStart?: () => void;
+    onCarouselTouchEnd?: () => void;
 }
 
 export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
@@ -65,6 +68,8 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     onShare,
     onShop,
     onMore,
+    onCarouselTouchStart,
+    onCarouselTouchEnd,
 }: InfiniteFeedCardProps) {
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
@@ -83,10 +88,11 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     }, [item.mediaUrls, item.thumbnailUrl]);
 
     const videoUrl = getVideoUrl(item);
-    const isVideo = item.postType !== 'carousel' && !!videoUrl;
+    const isCarousel = item.postType === 'carousel' && (item.mediaUrls?.length ?? 0) > 0;
+    const isVideo = !isCarousel && !!videoUrl;
     // ✅ VIDEO FLAG: If disabled, never render video (only thumbnail)
     const shouldRenderVideo = isVideo && isActive && !disableInlineVideo;
-    const hasMedia = isVideo || Boolean(thumbnail);
+    const hasMedia = isCarousel || isVideo || Boolean(thumbnail);
     const hasThumbnail = Boolean(thumbnail);
     const aspectRatio = useMemo(() => {
         if (item.width && item.height && item.width > 0 && item.height > 0) {
@@ -167,103 +173,159 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
 
     const showFollowButton = !item.user?.isFollowing && item.user?.id !== currentUserId;
 
-    return (
-        <Pressable style={styles.card} onPress={handleOpen}>
+    const cardBody = (
+        <>
             {/* MEDIA - Video or Image */}
             {hasMedia ? (
-                <Pressable
-                    style={mediaWrapperStyle}
-                    onPress={handleOpen}
-                >
-                    {isVideo && videoUrl ? (
-                        <VideoPlayer
-                            source={{ uri: videoUrl }}
-                            style={styles.media}
-                            resizeMode="contain"
-                            repeat={true}
-                            paused={!isActive}
-                            muted={isMuted}
-                            playInBackground={false}
-                            playWhenInactive={false}
-                            progressUpdateInterval={1000}
-                            poster={!disableThumbnail ? thumbnail : undefined}
-                            posterResizeMode="cover"
-                            bufferConfig={{
-                                minBufferMs: 500,
-                                maxBufferMs: 2000,
-                                bufferForPlaybackMs: 250,
-                                bufferForPlaybackAfterRebufferMs: 500,
-                            }}
+                isCarousel ? (
+                    <View style={mediaWrapperStyle}>
+                        <CarouselLayer
+                            mediaUrls={item.mediaUrls ?? []}
+                            onSingleTap={handleOpen}
+                            onCarouselTouchStart={onCarouselTouchStart}
+                            onCarouselTouchEnd={onCarouselTouchEnd}
                         />
-                    ) : hasThumbnail ? (
-                        <Image source={{ uri: thumbnail }} style={styles.media} contentFit="cover" />
-                    ) : null}
-
-                    {/* ✅ USER HEADER - Top-left overlay on media */}
-                    {!disableUserHeader && (
-                        <View style={styles.mediaHeaderOverlay}>
-                            <View style={styles.userInfoRow}>
-                                {item.user?.avatarUrl ? (
-                                    <Image source={{ uri: item.user.avatarUrl }} style={styles.avatar} contentFit="cover" />
-                                ) : (
-                                    <View style={[styles.avatar, { backgroundColor: colors.card }]} />
-                                )}
-                                <View style={styles.headerText}>
-                                    <View style={styles.nameRow}>
-                                        <Text style={fullNameStyle} numberOfLines={1}>
-                                            {item.user?.fullName || 'WizyClub User'}
+                        {/* ✅ USER HEADER - Top-left overlay on media */}
+                        {!disableUserHeader && (
+                            <View style={styles.mediaHeaderOverlay}>
+                                <View style={styles.userInfoRow}>
+                                    {item.user?.avatarUrl ? (
+                                        <Image source={{ uri: item.user.avatarUrl }} style={styles.avatar} contentFit="cover" />
+                                    ) : (
+                                        <View style={[styles.avatar, { backgroundColor: colors.card }]} />
+                                    )}
+                                    <View style={styles.headerText}>
+                                        <View style={styles.nameRow}>
+                                            <Text style={fullNameStyle} numberOfLines={1}>
+                                                {item.user?.fullName || 'WizyClub User'}
+                                            </Text>
+                                            {item.user?.isVerified === true && (
+                                                <View style={styles.verifiedBadge}>
+                                                    <VerifiedBadge size={16} />
+                                                </View>
+                                            )}
+                                        </View>
+                                        <Text style={handleStyle} numberOfLines={1}>
+                                            @{item.user?.username || 'wizyclub'}
                                         </Text>
-                                        {item.user?.isVerified === true && (
-                                            <View style={styles.verifiedBadge}>
-                                                <VerifiedBadge size={16} />
-                                            </View>
-                                        )}
                                     </View>
-                                    <Text style={handleStyle} numberOfLines={1}>
-                                        @{item.user?.username || 'wizyclub'}
-                                    </Text>
                                 </View>
                             </View>
-                        </View>
-                    )}
-
-                    <View style={styles.mediaTopRightActions} pointerEvents="box-none">
-                        {!disableUserHeader && showFollowButton && (
-                            <Pressable style={styles.followPill} onPress={handleFollow} hitSlop={8}>
-                                <Text style={styles.followText}>Takip Et</Text>
-                            </Pressable>
                         )}
-                        <Pressable
-                            style={styles.moreButton}
-                            onPress={(event) => {
-                                event.stopPropagation?.();
-                                handleMore();
-                            }}
-                            hitSlop={10}
-                        >
-                            <MoreVertical size={22} color="#FFFFFF" strokeWidth={2.4} />
-                        </Pressable>
-                    </View>
 
-                    {isVideo && (
-                        <View style={styles.mediaRightBottomActions} pointerEvents="box-none">
+                        <View style={styles.mediaTopRightActions} pointerEvents="box-none">
+                            {!disableUserHeader && showFollowButton && (
+                                <Pressable style={styles.followPill} onPress={handleFollow} hitSlop={8}>
+                                    <Text style={styles.followText}>Takip Et</Text>
+                                </Pressable>
+                            )}
                             <Pressable
-                                style={styles.volumeButton}
+                                style={styles.moreButton}
                                 onPress={(event) => {
                                     event.stopPropagation?.();
-                                    handleToggleMute();
+                                    handleMore();
                                 }}
                                 hitSlop={10}
                             >
-                                {isMuted ? (
-                                    <VolumeX size={16} color="#FFFFFF" strokeWidth={1.6} />
-                                ) : (
-                                    <Volume2 size={16} color="#FFFFFF" strokeWidth={1.6} />
-                                )}
+                                <MoreVertical size={22} color="#FFFFFF" strokeWidth={2.4} />
                             </Pressable>
                         </View>
-                    )}
-                </Pressable>
+                    </View>
+                ) : (
+                    <Pressable
+                        style={mediaWrapperStyle}
+                        onPress={handleOpen}
+                    >
+                        {isVideo && videoUrl ? (
+                            <VideoPlayer
+                                source={{ uri: videoUrl }}
+                                style={styles.media}
+                                resizeMode="contain"
+                                repeat={true}
+                                paused={!isActive}
+                                muted={isMuted}
+                                playInBackground={false}
+                                playWhenInactive={false}
+                                progressUpdateInterval={1000}
+                                poster={!disableThumbnail ? thumbnail : undefined}
+                                posterResizeMode="cover"
+                                bufferConfig={{
+                                    minBufferMs: 500,
+                                    maxBufferMs: 2000,
+                                    bufferForPlaybackMs: 250,
+                                    bufferForPlaybackAfterRebufferMs: 500,
+                                }}
+                            />
+                        ) : hasThumbnail ? (
+                            <Image source={{ uri: thumbnail }} style={styles.media} contentFit="cover" />
+                        ) : null}
+
+                        {/* ✅ USER HEADER - Top-left overlay on media */}
+                        {!disableUserHeader && (
+                            <View style={styles.mediaHeaderOverlay}>
+                                <View style={styles.userInfoRow}>
+                                    {item.user?.avatarUrl ? (
+                                        <Image source={{ uri: item.user.avatarUrl }} style={styles.avatar} contentFit="cover" />
+                                    ) : (
+                                        <View style={[styles.avatar, { backgroundColor: colors.card }]} />
+                                    )}
+                                    <View style={styles.headerText}>
+                                        <View style={styles.nameRow}>
+                                            <Text style={fullNameStyle} numberOfLines={1}>
+                                                {item.user?.fullName || 'WizyClub User'}
+                                            </Text>
+                                            {item.user?.isVerified === true && (
+                                                <View style={styles.verifiedBadge}>
+                                                    <VerifiedBadge size={16} />
+                                                </View>
+                                            )}
+                                        </View>
+                                        <Text style={handleStyle} numberOfLines={1}>
+                                            @{item.user?.username || 'wizyclub'}
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
+                        )}
+
+                        <View style={styles.mediaTopRightActions} pointerEvents="box-none">
+                            {!disableUserHeader && showFollowButton && (
+                                <Pressable style={styles.followPill} onPress={handleFollow} hitSlop={8}>
+                                    <Text style={styles.followText}>Takip Et</Text>
+                                </Pressable>
+                            )}
+                            <Pressable
+                                style={styles.moreButton}
+                                onPress={(event) => {
+                                    event.stopPropagation?.();
+                                    handleMore();
+                                }}
+                                hitSlop={10}
+                            >
+                                <MoreVertical size={22} color="#FFFFFF" strokeWidth={2.4} />
+                            </Pressable>
+                        </View>
+
+                        {isVideo && (
+                            <View style={styles.mediaRightBottomActions} pointerEvents="box-none">
+                                <Pressable
+                                    style={styles.volumeButton}
+                                    onPress={(event) => {
+                                        event.stopPropagation?.();
+                                        handleToggleMute();
+                                    }}
+                                    hitSlop={10}
+                                >
+                                    {isMuted ? (
+                                        <VolumeX size={16} color="#FFFFFF" strokeWidth={1.6} />
+                                    ) : (
+                                        <Volume2 size={16} color="#FFFFFF" strokeWidth={1.6} />
+                                    )}
+                                </Pressable>
+                            </View>
+                        )}
+                    </Pressable>
+                )
             ) : null}
 
             {/* ✅ ACTIONS - Controlled by INF_DISABLE_ACTIONS */}
@@ -325,6 +387,14 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                     {showTimeHint && <Text style={styles.timeHint}>{relativeTime}</Text>}
                 </View>
             )}
+        </>
+    );
+
+    return isCarousel ? (
+        <View style={styles.card}>{cardBody}</View>
+    ) : (
+        <Pressable style={styles.card} onPress={handleOpen}>
+            {cardBody}
         </Pressable>
     );
 });
