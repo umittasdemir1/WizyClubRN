@@ -35,7 +35,13 @@ export const FEED_FLAGS = {
 
     // --- FEED MODE FLAGS ---
     /** Use Infinite Feed (X/Instagram style) instead of Pool-based TikTok feed */
-    USE_INFINITE_FEED: false,
+    USE_INFINITE_FEED: true,
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // EXPLORE FLAGS
+    // ═══════════════════════════════════════════════════════════════════════
+    /** Disable Explore "Önerilenler" section (header + carousel) */
+    DISABLE_EXPLORE_RECOMMENDED_SECTION: true,
 
     // ═══════════════════════════════════════════════════════════════════════
     // INFINITE FEED FLAGS (Only applies when USE_INFINITE_FEED is true)

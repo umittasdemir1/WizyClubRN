@@ -82,6 +82,7 @@ export default function HomeFeedScreen() {
                 loadMore={loadMore}
                 toggleLike={toggleLike}
                 toggleSave={toggleSave}
+                toggleFollow={toggleFollow}
                 toggleShare={toggleShare}
                 toggleShop={toggleShop}
             />

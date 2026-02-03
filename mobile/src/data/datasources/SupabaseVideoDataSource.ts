@@ -143,23 +143,58 @@ export class SupabaseVideoDataSource {
         const escaped = term.replace(/[%_]/g, '\\$&');
         const ilikeTerm = `%${escaped}%`;
 
-        const { data, error } = await supabase
-            .from('videos')
-            .select('id')
-            .is('deleted_at', null)
-            .ilike('description', ilikeTerm)
-            .order('created_at', { ascending: false })
-            .limit(limit);
+        const [
+            { data: descriptionData, error: descriptionError },
+            { data: profileData, error: profileError },
+        ] = await Promise.all([
+            supabase
+                .from('videos')
+                .select('id')
+                .is('deleted_at', null)
+                .ilike('description', ilikeTerm)
+                .order('created_at', { ascending: false })
+                .limit(limit),
+            supabase
+                .from('profiles')
+                .select('id')
+                .or(`username.ilike.${ilikeTerm},full_name.ilike.${ilikeTerm}`)
+                .limit(50),
+        ]);
 
-        if (error) {
-            logError(LogCode.DB_QUERY_ERROR, 'Search videos by description error', { query, error });
-            return [];
+        if (descriptionError) {
+            logError(LogCode.DB_QUERY_ERROR, 'Search videos by description error', { query, error: descriptionError });
         }
 
-        const ids = (data as Array<{ id: string }> | null)?.map((row) => row.id) || [];
+        if (profileError) {
+            logError(LogCode.DB_QUERY_ERROR, 'Search profiles by name error', { query, error: profileError });
+        }
+
+        const descriptionIds = (descriptionData as Array<{ id: string }> | null)?.map((row) => row.id) || [];
+        const profileIds = (profileData as Array<{ id: string }> | null)?.map((row) => row.id) || [];
+
+        let authorIds: string[] = [];
+        if (profileIds.length > 0) {
+            const { data: authorData, error: authorError } = await supabase
+                .from('videos')
+                .select('id')
+                .is('deleted_at', null)
+                .in('user_id', profileIds)
+                .order('created_at', { ascending: false })
+                .limit(limit);
+
+            if (authorError) {
+                logError(LogCode.DB_QUERY_ERROR, 'Search videos by author error', { query, error: authorError });
+            }
+
+            authorIds = (authorData as Array<{ id: string }> | null)?.map((row) => row.id) || [];
+        }
+
+        const ids = Array.from(new Set([...descriptionIds, ...authorIds])).slice(0, limit);
         if (!ids.length) return [];
 
-        const videos = await this.getVideosByIds(ids, userId);
+        // Search grid doesn't need like/save/follow state; skip extra queries for speed.
+        const includeInteractions = false;
+        const videos = await this.getVideosByIds(ids, includeInteractions ? userId : undefined);
         const videoMap = new Map(videos.map((video) => [video.id, video]));
         return ids.map((id) => videoMap.get(id)).filter(Boolean) as Video[];
     }
@@ -301,6 +336,7 @@ export class SupabaseVideoDataSource {
             sharesCount: dto.shares_count || 0,
             shopsCount: dto.shops_count || 0,
             spriteUrl: dto.sprite_url,
+            createdAt: dto.created_at,
             isLiked: interactions?.isLiked || false,
             isSaved: interactions?.isSaved || false,
             savesCount: dto.saves_count || 0,

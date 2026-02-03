@@ -1,11 +1,12 @@
-import { View, StyleSheet, ScrollView, RefreshControl, Text, Pressable, Dimensions, Modal, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, RefreshControl, Text, Pressable, Dimensions, Modal, ActivityIndicator, Animated } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import { useStoryViewer } from '../../src/presentation/hooks/useStoryViewer';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
+import { isDisabled } from '../../src/presentation/components/feed/hooks/useFeedConfig';
 import Video from 'react-native-video';
 import { Image } from 'expo-image';
 import { VideoCacheService } from '../../src/data/services/VideoCacheService';
@@ -201,9 +202,11 @@ export default function ExploreScreen() {
     const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
     const bgBody = themeColors.background;
     const setActiveVideo = useActiveVideoStore((state) => state.setActiveVideo);
+    const isRecommendedDisabled = isDisabled('DISABLE_EXPLORE_RECOMMENDED_SECTION');
 
     const [refreshing, setRefreshing] = useState(false);
     const [previewItem, setPreviewItem] = useState<{ id: string; thumbnailUrl: string; videoUrl: string; username?: string; fullName?: string; avatarUrl?: string } | null>(null);
+    const scrollY = useRef(new Animated.Value(0)).current;
     const showSkeleton = videos.length === 0 || isLoading;
 
     useFocusEffect(
@@ -220,6 +223,17 @@ export default function ExploreScreen() {
         await refreshFeed();
         setRefreshing(false);
     }, [refreshFeed]);
+
+    const headerOpacity = scrollY.interpolate({
+        inputRange: [0, 24],
+        outputRange: [1, 0],
+        extrapolate: 'clamp',
+    });
+    const headerTranslateY = scrollY.interpolate({
+        inputRange: [0, 24],
+        outputRange: [0, -24],
+        extrapolate: 'clamp',
+    });
 
     const handleVideoPress = (id: string) => {
         const index = videos.findIndex(v => v.id === id);
@@ -325,6 +339,13 @@ export default function ExploreScreen() {
             >
                 <View style={[styles.container, styles.loadingContainer, { backgroundColor: bgBody }]}>
                     <ActivityIndicator size="large" color={isDark ? '#fff' : '#000'} />
+                    <View
+                        pointerEvents="none"
+                        style={[
+                            styles.statusBarOverlay,
+                            { height: insets.top, backgroundColor: bgBody },
+                        ]}
+                    />
                 </View>
             </SwipeWrapper>
         );
@@ -338,21 +359,27 @@ export default function ExploreScreen() {
                 edgeOnly={!!previewItem}
             >
                 <View style={[styles.container, { backgroundColor: bgBody }]}>
-                    <TrendingHeader
-                        title="Şimdi Keşfet"
-                        isDark={isDark}
-                        showSearch={true}
-                        onSearchPress={handleSearchPress}
-                    />
-
-                    <ScrollView
+                    <Animated.ScrollView
                         scrollEnabled={!previewItem}
                         showsVerticalScrollIndicator={false}
                         contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
+                        scrollEventThrottle={16}
+                        onScroll={Animated.event(
+                            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+                            { useNativeDriver: true }
+                        )}
                         refreshControl={
                             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={isDark ? "#fff" : "#000"} />
                         }
                     >
+                        <Animated.View style={{ opacity: headerOpacity, transform: [{ translateY: headerTranslateY }] }}>
+                            <TrendingHeader
+                                title="Şimdi Keşfet"
+                                isDark={isDark}
+                                showSearch={true}
+                                onSearchPress={handleSearchPress}
+                            />
+                        </Animated.View>
                         {/* 1. Stories Section */}
                         {creators.length > 0 && (
                             <>
@@ -368,22 +395,26 @@ export default function ExploreScreen() {
                         )}
 
                         {/* 2. Featured Carousel Section */}
-                        <View style={styles.sectionHeader}>
-                            <Text style={[styles.carouselTitle, { color: themeColors.textPrimary }]}>
-                                Önerilenler
-                            </Text>
-                            <MoreIcon width={24} height={24} color={isDark ? '#FFFFFF' : '#000000'} />
-                        </View>
-                        <TrendingCarousel
-                            data={trendingData}
-                            onItemPress={handleVideoPress}
-                            onPreview={showPreview}
-                            onPreviewEnd={hidePreview}
-                            isDark={isDark}
-                            scrollEnabled={!previewItem}
-                            isPreviewActive={!!previewItem}
-                            isScreenFocused={isFocused}
-                        />
+                        {!isRecommendedDisabled && (
+                            <>
+                                <View style={styles.sectionHeader}>
+                                    <Text style={[styles.carouselTitle, { color: themeColors.textPrimary }]}>
+                                        Önerilenler
+                                    </Text>
+                                    <MoreIcon width={24} height={24} color={isDark ? '#FFFFFF' : '#000000'} />
+                                </View>
+                                <TrendingCarousel
+                                    data={trendingData}
+                                    onItemPress={handleVideoPress}
+                                    onPreview={showPreview}
+                                    onPreviewEnd={hidePreview}
+                                    isDark={isDark}
+                                    scrollEnabled={!previewItem}
+                                    isPreviewActive={!!previewItem}
+                                    isScreenFocused={isFocused}
+                                />
+                            </>
+                        )}
 
                         {/* 3. Masonry Grid */}
                         <MasonryFeed
@@ -392,7 +423,14 @@ export default function ExploreScreen() {
                             onPreview={showPreview}
                             isDark={isDark}
                         />
-                    </ScrollView>
+                    </Animated.ScrollView>
+                    <View
+                        pointerEvents="none"
+                        style={[
+                            styles.statusBarOverlay,
+                            { height: insets.top, backgroundColor: bgBody },
+                        ]}
+                    />
                 </View>
             </SwipeWrapper>
 
@@ -547,5 +585,12 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         marginTop: 20,
         textAlign: 'center' as const,
+    },
+    statusBarOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 20,
     },
 });

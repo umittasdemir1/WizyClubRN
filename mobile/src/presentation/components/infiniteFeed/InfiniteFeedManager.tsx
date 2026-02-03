@@ -2,9 +2,11 @@ import React, { useCallback, useRef, useState } from 'react';
 import { View, Text, Pressable, RefreshControl, ActivityIndicator } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { SystemBars } from 'react-native-edge-to-edge';
 import { useActiveVideoStore, useMuteControls } from '../../store/useActiveVideoStore';
 import { useThemeStore } from '../../store/useThemeStore';
+import { useAuthStore } from '../../store/useAuthStore';
 import { DARK_COLORS, LIGHT_COLORS } from '../../../core/constants';
 import { getVideoUrl } from '../../../core/utils/videoUrl';
 import { Video as VideoEntity } from '../../../domain/entities/Video';
@@ -24,6 +26,7 @@ interface InfiniteFeedManagerProps {
     loadMore: () => void;
     toggleLike: (id: string) => void;
     toggleSave: (id: string) => void;
+    toggleFollow: (id: string) => void;
     toggleShare: (id: string) => void;
     toggleShop: (id: string) => void;
 }
@@ -39,6 +42,7 @@ export function InfiniteFeedManager({
     loadMore,
     toggleLike,
     toggleSave,
+    toggleFollow,
     toggleShare,
     toggleShop,
 }: InfiniteFeedManagerProps) {
@@ -46,13 +50,24 @@ export function InfiniteFeedManager({
     const router = useRouter();
     const isDark = useThemeStore((state) => state.isDark);
     const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
-    const { isMuted } = useMuteControls();
+    const { isMuted, toggleMute } = useMuteControls();
+    const currentUserId = useAuthStore((state) => state.user?.id);
 
     const [activeTab, setActiveTab] = useState<FeedTab>('Senin İçin');
     const [activeInlineId, setActiveInlineId] = useState<string | null>(null);
 
     const setCustomFeed = useActiveVideoStore((state) => state.setCustomFeed);
     const setActiveVideo = useActiveVideoStore((state) => state.setActiveVideo);
+
+    useFocusEffect(
+        useCallback(() => {
+            SystemBars.setStyle({
+                statusBar: isDark ? 'light' : 'dark',
+                navigationBar: isDark ? 'light' : 'dark',
+            });
+            SystemBars.setHidden({ statusBar: false, navigationBar: false });
+        }, [isDark])
+    );
 
     const handleOpenVideo = useCallback((id: string, index: number) => {
         setCustomFeed(videos);
@@ -67,17 +82,20 @@ export function InfiniteFeedManager({
             colors={themeColors}
             isActive={item.id === activeInlineId}
             isMuted={isMuted}
+            currentUserId={currentUserId}
+            onToggleMute={toggleMute}
             onOpen={handleOpenVideo}
             onLike={toggleLike}
             onSave={toggleSave}
+            onFollow={toggleFollow}
             onShare={toggleShare}
             onShop={toggleShop}
         />
-    ), [activeInlineId, handleOpenVideo, isMuted, themeColors, toggleLike, toggleSave, toggleShare, toggleShop]);
+    ), [activeInlineId, currentUserId, handleOpenVideo, isMuted, themeColors, toggleFollow, toggleLike, toggleSave, toggleShare, toggleShop]);
 
     // ✅ Video starts when 40% visible
     const viewabilityConfig = useRef({
-        itemVisiblePercentThreshold: 40,
+        itemVisiblePercentThreshold: 60,
         minimumViewTime: 100,
     }).current;
 
@@ -130,6 +148,7 @@ export function InfiniteFeedManager({
                         onTabChange={setActiveTab}
                         colors={themeColors}
                         insetTop={insets.top}
+                        onUploadPress={() => router.push('/upload')}
                     />
                 ) : (
                     <View style={{ height: insets.top }} />
@@ -152,6 +171,13 @@ export function InfiniteFeedManager({
                 contentContainerStyle={{
                     paddingBottom: insets.bottom + 80,
                 }}
+            />
+            <View
+                pointerEvents="none"
+                style={[
+                    styles.statusBarOverlay,
+                    { height: insets.top, backgroundColor: themeColors.background },
+                ]}
             />
         </View>
     );

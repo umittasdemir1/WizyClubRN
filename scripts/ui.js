@@ -37,6 +37,11 @@ const FLAG_DESCRIPTIONS = {
     USE_INFINITE_FEED: '[MOD] 🔄 Infinite Feed (X/Instagram tarzı)',
 
     // ═══════════════════════════════════════════════════════════════════════
+    // EXPLORE FLAGS
+    // ═══════════════════════════════════════════════════════════════════════
+    DISABLE_EXPLORE_RECOMMENDED_SECTION: '[EXPLORE] Önerilenler (Başlık + Carousel)',
+
+    // ═══════════════════════════════════════════════════════════════════════
     // INFINITE FEED FLAGS (Sadece USE_INFINITE_FEED=true iken geçerli)
     // ═══════════════════════════════════════════════════════════════════════
     INF_DISABLE_ALL_UI: '[INF-MASTER] Tüm InfiniteFeed Arayüzü',

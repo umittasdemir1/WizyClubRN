@@ -8,9 +8,9 @@ import { PhotoIcon } from '../shared/PhotoIcon';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const GAP = 2;
 const PADDING = 0;
-// 2 columns
-const COLUMN_WIDTH = (SCREEN_WIDTH - GAP) / 2;
-const ITEM_HEIGHT = (COLUMN_WIDTH * 5) / 4;
+const COLUMN_COUNT = 3;
+const COLUMN_WIDTH_PERCENT = `${100 / COLUMN_COUNT}%`;
+const ITEM_ASPECT_RATIO = 3 / 4;
 const ICON_SIZE = 28;
 const ICON_BG_SIZE = 34;
 
@@ -36,40 +36,34 @@ export function MasonryFeed({ data, onItemPress, onPreview, isDark = true }: Mas
             {data.map((item, index) => (
                 <Pressable
                     key={item.id}
-                    style={[
-                        styles.item,
-                        {
-                            width: COLUMN_WIDTH,
-                            marginRight: index % 2 === 0 ? GAP : 0,
-                            marginBottom: GAP,
-                            backgroundColor: itemBg,
-                        },
-                    ]}
+                    style={styles.item}
                     onPress={() => onItemPress(item.id)}
                     onLongPress={item.videoUrl ? () => onPreview?.(item) : undefined}
                     delayLongPress={300}
                 >
-                    <Image
-                        source={{ uri: item.thumbnailUrl }}
-                        style={styles.thumbnail}
-                        contentFit="cover"
-                        cachePolicy="memory-disk"
-                        transition={0}
-                        priority="high"
-                    />
-                    {item.mediaType ? (
-                        <View style={styles.iconWrapper}>
-                            <View style={styles.iconBubble}>
-                                {item.mediaType === 'video' ? (
-                                    <VideoTabIcon size={ICON_SIZE} color="#FFFFFF" />
-                                ) : item.mediaType === 'carousel' ? (
-                                    <CarouselIcon size={ICON_SIZE} color="#FFFFFF" />
-                                ) : (
-                                    <PhotoIcon size={ICON_SIZE} color="#FFFFFF" />
-                                )}
+                    <View style={[styles.itemInner, { backgroundColor: itemBg }]}>
+                        <Image
+                            source={{ uri: item.thumbnailUrl }}
+                            style={styles.thumbnail}
+                            contentFit="cover"
+                            cachePolicy="memory-disk"
+                            transition={0}
+                            priority="high"
+                        />
+                        {item.mediaType ? (
+                            <View style={styles.iconWrapper}>
+                                <View style={styles.iconBubble}>
+                                    {item.mediaType === 'video' ? (
+                                        <VideoTabIcon size={ICON_SIZE} color="#FFFFFF" />
+                                    ) : item.mediaType === 'carousel' ? (
+                                        <CarouselIcon size={ICON_SIZE} color="#FFFFFF" />
+                                    ) : (
+                                        <PhotoIcon size={ICON_SIZE} color="#FFFFFF" />
+                                    )}
+                                </View>
                             </View>
-                        </View>
-                    ) : null}
+                        ) : null}
+                    </View>
                 </Pressable>
             ))}
         </View>
@@ -82,13 +76,19 @@ const styles = StyleSheet.create({
         paddingBottom: 100,
         flexDirection: 'row',
         flexWrap: 'wrap',
+        marginHorizontal: -GAP / 2,
     },
     item: {
+        width: COLUMN_WIDTH_PERCENT,
+        paddingHorizontal: GAP / 2,
+        paddingBottom: GAP,
+    },
+    itemInner: {
         borderRadius: 0,
         overflow: 'hidden',
         backgroundColor: '#1a1a1a',
         position: 'relative',
-        height: ITEM_HEIGHT,
+        aspectRatio: ITEM_ASPECT_RATIO,
     },
     thumbnail: {
         ...StyleSheet.absoluteFillObject,

@@ -1,15 +1,37 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Image } from 'expo-image';
+import { Volume2, VolumeX, MoreVertical } from 'lucide-react-native';
 import VideoPlayer from 'react-native-video';
 import { getVideoUrl } from '../../../core/utils/videoUrl';
 import { Video as VideoEntity } from '../../../domain/entities/Video';
 import { InfiniteFeedActions } from './InfiniteFeedActions';
+import { VerifiedBadge } from '../shared/VerifiedBadge';
 import { ThemeColors } from './types';
 import { FEED_FLAGS } from '../feed/hooks/useFeedConfig';
 
 const DESCRIPTION_LIMIT = 70;
 const CARD_HORIZONTAL_PADDING = 16;
+const MINUTE = 60;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+const WEEK = 7 * DAY;
+const MONTH = 30 * DAY;
+const YEAR = 365 * DAY;
+
+const formatRelativeTime = (value?: string) => {
+    if (!value) return '';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return '';
+    const diffSeconds = Math.max(0, Math.floor((Date.now() - parsed.getTime()) / 1000));
+    if (diffSeconds < MINUTE) return 'Az önce';
+    if (diffSeconds < HOUR) return `${Math.floor(diffSeconds / MINUTE)} dakika önce`;
+    if (diffSeconds < DAY) return `${Math.floor(diffSeconds / HOUR)} saat önce`;
+    if (diffSeconds < WEEK) return `${Math.floor(diffSeconds / DAY)} gün önce`;
+    if (diffSeconds < MONTH) return `${Math.floor(diffSeconds / WEEK)} hafta önce`;
+    if (diffSeconds < YEAR) return `${Math.floor(diffSeconds / MONTH)} ay önce`;
+    return `${Math.floor(diffSeconds / YEAR)} yıl önce`;
+};
 
 interface InfiniteFeedCardProps {
     item: VideoEntity;
@@ -17,11 +39,15 @@ interface InfiniteFeedCardProps {
     colors: ThemeColors;
     isActive: boolean;
     isMuted: boolean;
+    currentUserId?: string;
+    onToggleMute: () => void;
     onOpen: (id: string, index: number) => void;
     onLike: (id: string) => void;
     onSave: (id: string) => void;
+    onFollow: (id: string) => void;
     onShare: (id: string) => void;
     onShop: (id: string) => void;
+    onMore?: (id: string) => void;
 }
 
 export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
@@ -30,11 +56,15 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     colors,
     isActive,
     isMuted,
+    currentUserId,
+    onToggleMute,
     onOpen,
     onLike,
     onSave,
+    onFollow,
     onShare,
     onShop,
+    onMore,
 }: InfiniteFeedCardProps) {
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
@@ -78,6 +108,14 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         onSave(item.id);
     }, [item.id, onSave]);
 
+    const handleFollow = useCallback(() => {
+        onFollow(item.id);
+    }, [item.id, onFollow]);
+
+    const handleToggleMute = useCallback(() => {
+        onToggleMute();
+    }, [onToggleMute]);
+
     const handleShare = useCallback(() => {
         onShare(item.id);
     }, [item.id, onShare]);
@@ -85,6 +123,10 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     const handleShop = useCallback(() => {
         onShop(item.id);
     }, [item.id, onShop]);
+
+    const handleMore = useCallback(() => {
+        onMore?.(item.id);
+    }, [item.id, onMore]);
 
     // ✅ [PERF] Memoize dynamic styles to prevent object reference churn
     const mediaWrapperStyle = useMemo(() => [
@@ -109,64 +151,118 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
 
     const readMoreTextStyle = useMemo(() => [
         styles.readMore,
-        { color: colors.textSecondary }
-    ], [colors.textSecondary]);
+        { color: colors.textPrimary }
+    ], [colors.textPrimary]);
+
+    const descriptionValue = item.description?.trim() ?? '';
+    const hasDescription = descriptionValue.length > 0;
+    const displayName = item.user?.fullName || item.user?.username || 'WizyClub User';
+    const truncatedDescription =
+        isDescriptionExpanded || descriptionValue.length <= DESCRIPTION_LIMIT
+            ? descriptionValue
+            : descriptionValue.substring(0, DESCRIPTION_LIMIT);
+    const relativeTime = useMemo(() => formatRelativeTime(item.createdAt), [item.createdAt]);
+    const showDescriptionBlock = !disableDescription && hasDescription;
+    const showTimeHint = relativeTime.length > 0;
+
+    const showFollowButton = !item.user?.isFollowing && item.user?.id !== currentUserId;
 
     return (
         <Pressable style={styles.card} onPress={handleOpen}>
-            {/* ✅ USER HEADER - Controlled by INF_DISABLE_USER_HEADER */}
-            {!disableUserHeader && (
-                <View style={styles.cardContent}>
-                    <View style={styles.cardHeader}>
-                        {item.user?.avatarUrl ? (
-                            <Image source={{ uri: item.user.avatarUrl }} style={styles.avatar} contentFit="cover" />
-                        ) : (
-                            <View style={[styles.avatar, { backgroundColor: colors.card }]} />
-                        )}
-                        <View style={styles.headerText}>
-                            <Text style={fullNameStyle} numberOfLines={1}>
-                                {item.user?.fullName || 'WizyClub User'}
-                            </Text>
-                            <Text style={handleStyle} numberOfLines={1}>
-                                @{item.user?.username || 'wizyclub'}
-                            </Text>
-                        </View>
-                    </View>
-                </View>
-            )}
-
             {/* MEDIA - Video or Image */}
-            {isVideo && videoUrl ? (
+            {hasMedia ? (
                 <Pressable
                     style={mediaWrapperStyle}
                     onPress={handleOpen}
                 >
-                    <VideoPlayer
-                        source={{ uri: videoUrl }}
-                        style={styles.media}
-                        resizeMode="contain"
-                        repeat={true}
-                        paused={!isActive}
-                        muted={isMuted}
-                        playInBackground={false}
-                        playWhenInactive={false}
-                        progressUpdateInterval={1000}
-                        poster={!disableThumbnail ? thumbnail : undefined}
-                        posterResizeMode="cover"
-                        bufferConfig={{
-                            minBufferMs: 500,
-                            maxBufferMs: 2000,
-                            bufferForPlaybackMs: 250,
-                            bufferForPlaybackAfterRebufferMs: 500,
-                        }}
-                    />
-                </Pressable>
-            ) : hasThumbnail ? (
-                <Pressable
-                    style={mediaWrapperStyle}
-                    onPress={handleOpen}
-                >
-                    <Image source={{ uri: thumbnail }} style={styles.media} contentFit="cover" />
+                    {isVideo && videoUrl ? (
+                        <VideoPlayer
+                            source={{ uri: videoUrl }}
+                            style={styles.media}
+                            resizeMode="contain"
+                            repeat={true}
+                            paused={!isActive}
+                            muted={isMuted}
+                            playInBackground={false}
+                            playWhenInactive={false}
+                            progressUpdateInterval={1000}
+                            poster={!disableThumbnail ? thumbnail : undefined}
+                            posterResizeMode="cover"
+                            bufferConfig={{
+                                minBufferMs: 500,
+                                maxBufferMs: 2000,
+                                bufferForPlaybackMs: 250,
+                                bufferForPlaybackAfterRebufferMs: 500,
+                            }}
+                        />
+                    ) : hasThumbnail ? (
+                        <Image source={{ uri: thumbnail }} style={styles.media} contentFit="cover" />
+                    ) : null}
+
+                    {/* ✅ USER HEADER - Top-left overlay on media */}
+                    {!disableUserHeader && (
+                        <View style={styles.mediaHeaderOverlay}>
+                            <View style={styles.userInfoRow}>
+                                {item.user?.avatarUrl ? (
+                                    <Image source={{ uri: item.user.avatarUrl }} style={styles.avatar} contentFit="cover" />
+                                ) : (
+                                    <View style={[styles.avatar, { backgroundColor: colors.card }]} />
+                                )}
+                                <View style={styles.headerText}>
+                                    <View style={styles.nameRow}>
+                                        <Text style={fullNameStyle} numberOfLines={1}>
+                                            {item.user?.fullName || 'WizyClub User'}
+                                        </Text>
+                                        {item.user?.isVerified === true && (
+                                            <View style={styles.verifiedBadge}>
+                                                <VerifiedBadge size={16} />
+                                            </View>
+                                        )}
+                                    </View>
+                                    <Text style={handleStyle} numberOfLines={1}>
+                                        @{item.user?.username || 'wizyclub'}
+                                    </Text>
+                                </View>
+                            </View>
+                        </View>
+                    )}
+
+                    <View style={styles.mediaTopRightActions} pointerEvents="box-none">
+                        {!disableUserHeader && showFollowButton && (
+                            <Pressable style={styles.followPill} onPress={handleFollow} hitSlop={8}>
+                                <Text style={styles.followText}>Takip Et</Text>
+                            </Pressable>
+                        )}
+                        <Pressable
+                            style={styles.moreButton}
+                            onPress={(event) => {
+                                event.stopPropagation?.();
+                                handleMore();
+                            }}
+                            hitSlop={10}
+                        >
+                            <MoreVertical size={22} color="#FFFFFF" strokeWidth={2.4} />
+                        </Pressable>
+                    </View>
+
+                    {isVideo && (
+                        <View style={styles.mediaRightBottomActions} pointerEvents="box-none">
+                            <Pressable
+                                style={styles.volumeButton}
+                                onPress={(event) => {
+                                    event.stopPropagation?.();
+                                    handleToggleMute();
+                                }}
+                                hitSlop={10}
+                            >
+                                {isMuted ? (
+                                    <VolumeX size={16} color="#FFFFFF" strokeWidth={1.6} />
+                                ) : (
+                                    <Volume2 size={16} color="#FFFFFF" strokeWidth={1.6} />
+                                )}
+                            </Pressable>
+                        </View>
+                    )}
                 </Pressable>
             ) : null}
 
@@ -187,33 +283,46 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                         onShare={handleShare}
                         onShop={handleShop}
                     />
+                    {!showDescriptionBlock && showTimeHint && (
+                        <Text style={styles.timeHint}>{relativeTime}</Text>
+                    )}
+                </View>
+            )}
+            {disableActions && !showDescriptionBlock && showTimeHint && (
+                <View style={styles.cardContent}>
+                    <Text style={styles.timeHint}>{relativeTime}</Text>
                 </View>
             )}
 
             {/* ✅ DESCRIPTION - Controlled by INF_DISABLE_DESCRIPTION */}
-            {!disableDescription && !!item.description && (
+            {showDescriptionBlock && (
                 <View style={styles.cardContent}>
                     <Text style={descriptionTextStyle}>
-                        {isDescriptionExpanded || item.description.length <= DESCRIPTION_LIMIT
-                            ? item.description
-                            : item.description.substring(0, DESCRIPTION_LIMIT)}
-                        {!isDescriptionExpanded && item.description.length > DESCRIPTION_LIMIT && (
-                            <Text
-                                style={readMoreTextStyle}
-                                onPress={() => setIsDescriptionExpanded(true)}
-                            >
-                                {'...Daha fazla'}
-                            </Text>
-                        )}
-                        {isDescriptionExpanded && item.description.length > DESCRIPTION_LIMIT && (
-                            <Text
-                                style={readMoreTextStyle}
-                                onPress={() => setIsDescriptionExpanded(false)}
-                            >
-                                {' Daha az'}
-                            </Text>
-                        )}
+                        <Text style={[readMoreTextStyle, styles.displayName]}>{displayName}</Text>
+                        {hasDescription ? (
+                            <>
+                                {' '}
+                                {truncatedDescription}
+                                {!isDescriptionExpanded && descriptionValue.length > DESCRIPTION_LIMIT && (
+                                    <Text
+                                        style={readMoreTextStyle}
+                                        onPress={() => setIsDescriptionExpanded(true)}
+                                    >
+                                        {'...Daha fazla'}
+                                    </Text>
+                                )}
+                                {isDescriptionExpanded && descriptionValue.length > DESCRIPTION_LIMIT && (
+                                    <Text
+                                        style={readMoreTextStyle}
+                                        onPress={() => setIsDescriptionExpanded(false)}
+                                    >
+                                        {' Daha az'}
+                                    </Text>
+                                )}
+                            </>
+                        ) : null}
                     </Text>
+                    {showTimeHint && <Text style={styles.timeHint}>{relativeTime}</Text>}
                 </View>
             )}
         </Pressable>
@@ -222,7 +331,8 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
 
 const styles = StyleSheet.create({
     card: {
-        paddingVertical: 16,
+        paddingTop: 0,
+        paddingBottom: 16,
     },
     cardContent: {
         paddingHorizontal: CARD_HORIZONTAL_PADDING,
@@ -240,34 +350,127 @@ const styles = StyleSheet.create({
     },
     headerText: {
         flex: 1,
+        minWidth: 0,
+    },
+    userInfoRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        flex: 1,
+        minWidth: 0,
+    },
+    nameRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        flexWrap: 'nowrap',
+    },
+    verifiedBadge: {
+        marginLeft: 2,
+        alignSelf: 'center',
     },
     fullName: {
         fontSize: 15,
         fontWeight: '700',
+        flexShrink: 1,
     },
     handle: {
         fontSize: 13,
-        marginTop: 2,
+        marginTop: 0,
     },
     description: {
         fontSize: 15,
         lineHeight: 20,
         marginTop: 10,
+        fontWeight: '350',
     },
     readMore: {
         fontSize: 14,
         fontWeight: '600',
     },
+    displayName: {
+        fontSize: 16,
+    },
+    timeHint: {
+        marginTop: 6,
+        fontSize: 13,
+        color: 'rgba(255, 255, 255, 0.6)',
+        fontWeight: '400',
+    },
     mediaWrapper: {
-        marginTop: 12,
+        marginTop: 0,
         width: '100%',
         borderRadius: 0,
         borderWidth: 0,
+        position: 'relative',
     },
     media: {
         width: '100%',
         height: '100%',
         backgroundColor: '#111',
+    },
+    mediaHeaderOverlay: {
+        position: 'absolute',
+        top: 12,
+        left: 12,
+        maxWidth: '65%',
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    mediaTopRightActions: {
+        position: 'absolute',
+        top: 12,
+        right: 4,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    moreButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'transparent',
+        borderWidth: 0,
+        borderColor: 'transparent',
+    },
+    mediaRightBottomActions: {
+        position: 'absolute',
+        right: 12,
+        bottom: 12,
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 10,
+    },
+    volumeButton: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(0,0,0,0.35)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.25)',
+    },
+    followPill: {
+        backgroundColor: 'transparent',
+        paddingHorizontal: 12,
+        paddingVertical: 5,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.35)',
+        alignSelf: 'center',
+        marginRight: 0,
+        shadowColor: 'transparent',
+        shadowOpacity: 0,
+        shadowRadius: 0,
+        shadowOffset: { width: 0, height: 0 },
+        elevation: 0,
+    },
+    followText: {
+        color: 'white',
+        fontSize: 15,
+        fontWeight: '600',
     },
     mediaPlaceholder: {
         width: '100%',

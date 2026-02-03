@@ -34,4 +34,11 @@ export const styles = StyleSheet.create({
     footerLoader: {
         paddingVertical: 20,
     },
+    statusBarOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 20,
+    },
 });

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, FlatList, ActivityIndicator, Keyboard, BackHandler, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, FlatList, Keyboard, BackHandler, useWindowDimensions, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SystemBars } from 'react-native-edge-to-edge';
@@ -7,6 +7,7 @@ import { ArrowLeft, Search, X, Clock } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import VideoPlayer from 'react-native-video';
+import { VideoCacheService } from '../src/data/services/VideoCacheService';
 import { useThemeStore } from '../src/presentation/store/useThemeStore';
 import { useAuthStore } from '../src/presentation/store/useAuthStore';
 import { useProfileSearch } from '../src/presentation/hooks/useProfileSearch';
@@ -26,6 +27,7 @@ const MIN_QUERY_LENGTH = 1;
 const RESULT_LIMIT = 30;
 const POST_LIMIT = 30;
 const SEARCH_DEBOUNCE_MS = 350;
+const POST_GRID_GAP = 2;
 
 type RecentUser = Pick<User, 'id' | 'username' | 'fullName' | 'avatarUrl' | 'isVerified' | 'followersCount'>;
 type RecentItem = { type: 'query'; value: string } | { type: 'user'; user: RecentUser };
@@ -57,13 +59,23 @@ export default function SearchScreen() {
     const isDark = useThemeStore((state) => state.isDark);
     const theme = isDark ? DARK_COLORS : LIGHT_COLORS;
     const [query, setQuery] = useState('');
+    const [committedQuery, setCommittedQuery] = useState('');
     const [recentItems, setRecentItems] = useState<RecentItem[]>([]);
     const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const lastProfileQueryRef = useRef<string>('');
+    const lastPostQueryRef = useRef<string>('');
     const [selectedTab, setSelectedTab] = useState<SearchTab>('Senin İçin');
     const [isCommittedSearch, setIsCommittedSearch] = useState(false);
     const [activePostIndex, setActivePostIndex] = useState<number | null>(null);
+    const [videoSources, setVideoSources] = useState<Record<string, { uri: string }>>({});
+    const [readyVideoIds, setReadyVideoIds] = useState<Record<string, boolean>>({});
+    const [scrollY, setScrollY] = useState(0);
+    const [listHeight, setListHeight] = useState(0);
+    const [footerOffsetY, setFooterOffsetY] = useState(0);
+    const [gridLocalY, setGridLocalY] = useState(0);
+    const [tileLayouts, setTileLayouts] = useState<Record<string, { y: number; height: number }>>({});
     const { width: windowWidth } = useWindowDimensions();
-    const postTileWidth = (windowWidth - 1) / 2;
+    const postTileWidth = (windowWidth - POST_GRID_GAP) / 2;
 
     const { results, isLoading, error, search, clear } = useProfileSearch(RESULT_LIMIT);
     const { results: postResults, isLoading: isPostsLoading, error: postsError, search: searchPosts, clear: clearPosts } = useVideoSearch(POST_LIMIT);
@@ -78,6 +90,27 @@ export default function SearchScreen() {
             }, []),
         [postResults]
     );
+    const gridOffsetY = footerOffsetY + gridLocalY;
+    const visibleIndices = useMemo(() => {
+        if (!listHeight) return [];
+        const top = scrollY;
+        const bottom = scrollY + listHeight;
+        const visible: number[] = [];
+        postResults.forEach((post, index) => {
+            const layout = tileLayouts[post.id];
+            if (!layout) return;
+            const y = gridOffsetY + layout.y;
+            if (y + layout.height > top && y < bottom) {
+                visible.push(index);
+            }
+        });
+        return visible;
+    }, [gridOffsetY, listHeight, postResults, scrollY, tileLayouts]);
+    const visibleVideoIndices = useMemo(() => {
+        if (!visibleIndices.length) return [];
+        const visibleSet = new Set(visibleIndices);
+        return videoIndices.filter((index) => visibleSet.has(index));
+    }, [videoIndices, visibleIndices]);
 
     useFocusEffect(
         useCallback(() => {
@@ -87,6 +120,10 @@ export default function SearchScreen() {
             });
         }, [isDark])
     );
+
+    useEffect(() => {
+        VideoCacheService.initialize();
+    }, []);
 
     useEffect(() => {
         const onBackPress = () => {
@@ -150,13 +187,16 @@ export default function SearchScreen() {
         }
 
         if (trimmed.length < MIN_QUERY_LENGTH) {
+            lastProfileQueryRef.current = '';
+            lastPostQueryRef.current = '';
+            setCommittedQuery('');
             clear();
             clearPosts();
             return;
         }
 
         searchTimeoutRef.current = setTimeout(() => {
-            search(trimmed);
+            runProfileSearch(trimmed);
         }, SEARCH_DEBOUNCE_MS);
 
         return () => {
@@ -164,26 +204,62 @@ export default function SearchScreen() {
                 clearTimeout(searchTimeoutRef.current);
             }
         };
-    }, [query, search, clear, clearPosts]);
+    }, [query, clear, clearPosts, runProfileSearch]);
 
     useEffect(() => {
-        if (!isCommittedSearch || selectedTab !== 'Senin İçin' || videoIndices.length === 0) {
+        setVideoSources({});
+        setReadyVideoIds({});
+        setTileLayouts({});
+    }, [postResults]);
+
+    useEffect(() => {
+        if (!isCommittedSearch || selectedTab !== 'Senin İçin' || visibleVideoIndices.length === 0) {
             setActivePostIndex(null);
             return;
         }
-        setActivePostIndex((prev) => (prev !== null && videoIndices.includes(prev) ? prev : videoIndices[0]));
-    }, [isCommittedSearch, selectedTab, videoIndices]);
+        setActivePostIndex((prev) => (prev !== null && visibleVideoIndices.includes(prev) ? prev : visibleVideoIndices[0]));
+    }, [isCommittedSearch, selectedTab, visibleVideoIndices]);
 
     useEffect(() => {
         if (!isCommittedSearch || selectedTab !== 'Senin İçin') return;
-        if (activePostIndex === null || !videoIndices.includes(activePostIndex)) return;
+        if (activePostIndex === null || !visibleVideoIndices.includes(activePostIndex)) return;
         const timer = setTimeout(() => {
-            const currentIndex = videoIndices.indexOf(activePostIndex);
-            const nextIndex = videoIndices[(currentIndex + 1) % videoIndices.length];
+            const currentIndex = visibleVideoIndices.indexOf(activePostIndex);
+            const nextIndex = visibleVideoIndices[(currentIndex + 1) % visibleVideoIndices.length];
             setActivePostIndex(nextIndex);
         }, 5000);
         return () => clearTimeout(timer);
-    }, [isCommittedSearch, selectedTab, activePostIndex, videoIndices]);
+    }, [isCommittedSearch, selectedTab, activePostIndex, visibleVideoIndices]);
+
+    useEffect(() => {
+        const activePost = activePostIndex !== null ? postResults[activePostIndex] : null;
+        if (!activePost) return;
+        const media = resolvePostMedia(activePost);
+        if (!media.videoUrl) return;
+
+        let isCancelled = false;
+        const loadSource = async () => {
+            const cachedPath = await VideoCacheService.getCachedVideoPath(media.videoUrl!);
+            if (isCancelled) return;
+            setVideoSources((prev) => {
+                const nextUri = cachedPath || media.videoUrl!;
+                if (prev[activePost.id]?.uri === nextUri) return prev;
+                return { ...prev, [activePost.id]: { uri: nextUri } };
+            });
+
+            if (!cachedPath) {
+                VideoCacheService.cacheVideo(media.videoUrl!).then((newPath) => {
+                    if (isCancelled || !newPath) return;
+                    setVideoSources((prev) => ({ ...prev, [activePost.id]: { uri: newPath } }));
+                });
+            }
+        };
+
+        loadSource();
+        return () => {
+            isCancelled = true;
+        };
+    }, [activePostIndex, postResults]);
 
 
     const placeholderColor = useMemo(
@@ -202,6 +278,31 @@ export default function SearchScreen() {
 
     const hasQuery = query.trim().length > 0;
     const shouldSearch = query.trim().length >= MIN_QUERY_LENGTH;
+    const searchLabel = (committedQuery || query).trim();
+    const searchingText = searchLabel ? `"${searchLabel}" aranıyor...` : 'Aranıyor...';
+
+    const runProfileSearch = useCallback(
+        (value: string, options?: { force?: boolean }) => {
+            const trimmed = value.trim();
+            if (trimmed.length < MIN_QUERY_LENGTH) return;
+            if (!options?.force && trimmed === lastProfileQueryRef.current) return;
+            lastProfileQueryRef.current = trimmed;
+            search(trimmed);
+        },
+        [search]
+    );
+
+    const runPostSearch = useCallback(
+        (value: string, options?: { force?: boolean }) => {
+            const trimmed = value.trim();
+            if (trimmed.length < MIN_QUERY_LENGTH) return;
+            if (!options?.force && trimmed === lastPostQueryRef.current) return;
+            lastPostQueryRef.current = trimmed;
+            clearPosts();
+            searchPosts(trimmed);
+        },
+        [clearPosts, searchPosts]
+    );
 
     const handleBack = () => {
         if (isCommittedSearch) {
@@ -247,24 +348,40 @@ export default function SearchScreen() {
 
     const handleClear = () => {
         setQuery('');
+        setCommittedQuery('');
+        lastProfileQueryRef.current = '';
+        lastPostQueryRef.current = '';
         clear();
         clearPosts();
         setIsCommittedSearch(false);
     };
 
+    const commitSearch = useCallback(
+        (value: string, options?: { force?: boolean }) => {
+            const trimmed = value.trim();
+            if (trimmed.length < MIN_QUERY_LENGTH) return;
+            if (searchTimeoutRef.current) {
+                clearTimeout(searchTimeoutRef.current);
+            }
+            setIsCommittedSearch(true);
+            setSelectedTab('Senin İçin');
+            setCommittedQuery(trimmed);
+            const forceProfile = options?.force || Boolean(error);
+            const forcePosts = options?.force || Boolean(postsError);
+            runProfileSearch(trimmed, forceProfile ? { force: true } : undefined);
+            runPostSearch(trimmed, forcePosts ? { force: true } : undefined);
+            addRecentQuery(trimmed);
+            Keyboard.dismiss();
+        },
+        [addRecentQuery, error, postsError, runPostSearch, runProfileSearch]
+    );
+
     const handleSubmit = () => {
-        const trimmed = query.trim();
-        if (trimmed.length < MIN_QUERY_LENGTH) return;
-        if (searchTimeoutRef.current) {
-            clearTimeout(searchTimeoutRef.current);
-        }
-        setIsCommittedSearch(true);
-        setSelectedTab('Senin İçin');
-        search(trimmed);
-        clearPosts();
-        searchPosts(trimmed);
-        addRecentQuery(trimmed);
-        Keyboard.dismiss();
+        commitSearch(query);
+    };
+
+    const handleRetry = () => {
+        commitSearch(query, { force: true });
     };
 
     const handleRemoveRecent = (item: RecentItem) => {
@@ -351,13 +468,7 @@ export default function SearchScreen() {
                     <Pressable
                         style={styles.resultContent}
                         onPress={() => {
-                            setSelectedTab('Senin İçin');
-                            setIsCommittedSearch(true);
-                            addRecentQuery(item.value);
-                            search(item.value);
-                            clearPosts();
-                            searchPosts(item.value);
-                            Keyboard.dismiss();
+                            commitSearch(item.value);
                         }}
                     >
                         <View style={[styles.searchBubble, { backgroundColor: inputColors.backgroundColor }]}>
@@ -381,13 +492,7 @@ export default function SearchScreen() {
                 <View style={styles.resultRow}>
                     <Pressable style={styles.resultContent} onPress={() => {
                         setQuery(item.value);
-                        setSelectedTab('Senin İçin');
-                        setIsCommittedSearch(true);
-                        addRecentQuery(item.value);
-                        search(item.value);
-                        clearPosts();
-                        searchPosts(item.value);
-                        Keyboard.dismiss();
+                        commitSearch(item.value);
                     }}>
                         <View style={[styles.searchBubble, { backgroundColor: inputColors.backgroundColor }]}>
                             <Clock size={18} color={inputColors.iconColor} />
@@ -443,6 +548,8 @@ export default function SearchScreen() {
     const renderPostTile = (post: VideoEntity, index: number) => {
         const media = resolvePostMedia(post);
         const isActiveVideo = media.isVideo && index === activePostIndex;
+        const source = isActiveVideo && media.videoUrl ? (videoSources[post.id] ?? { uri: media.videoUrl }) : null;
+        const isReady = readyVideoIds[post.id] === true;
 
         return (
             <View
@@ -451,28 +558,42 @@ export default function SearchScreen() {
                     styles.postTile,
                     {
                         width: postTileWidth,
-                        marginRight: index % 2 === 0 ? 1 : 0,
-                        marginBottom: 1,
+                        marginRight: index % 2 === 0 ? POST_GRID_GAP : 0,
+                        marginBottom: POST_GRID_GAP,
                     },
                 ]}
+                onLayout={(event) => {
+                    const { y, height } = event.nativeEvent.layout;
+                    setTileLayouts((prev) => {
+                        const current = prev[post.id];
+                        if (current && current.y === y && current.height === height) return prev;
+                        return { ...prev, [post.id]: { y, height } };
+                    });
+                }}
             >
-                {isActiveVideo && media.videoUrl ? (
-                    <VideoPlayer
-                        source={{ uri: media.videoUrl }}
-                        style={styles.postTileImage}
-                        paused={false}
-                        muted
-                        volume={0}
-                        repeat={false}
-                        resizeMode="cover"
-                        playInBackground={false}
-                        playWhenInactive={false}
-                    />
-                ) : media.imageUrl ? (
-                    <Image source={{ uri: media.imageUrl }} style={styles.postTileImage} contentFit="cover" />
-                ) : (
-                    <View style={[styles.postTileImage, styles.postTileFallback]} />
-                )}
+                <View style={styles.postMedia}>
+                    {media.imageUrl ? (
+                        <Image source={{ uri: media.imageUrl }} style={styles.postMediaFill} contentFit="cover" />
+                    ) : (
+                        <View style={[styles.postMediaFill, styles.postMediaFallback]} />
+                    )}
+                    {isActiveVideo && media.videoUrl && source ? (
+                        <VideoPlayer
+                            source={source}
+                            style={[styles.postMediaFill, { opacity: isReady ? 1 : 0 }]}
+                            paused={false}
+                            muted
+                            volume={0}
+                            repeat={false}
+                            resizeMode="cover"
+                            playInBackground={false}
+                            playWhenInactive={false}
+                            onReadyForDisplay={() => {
+                                setReadyVideoIds((prev) => (prev[post.id] ? prev : { ...prev, [post.id]: true }));
+                            }}
+                        />
+                    ) : null}
+                </View>
                 {media.isVideo ? (
                     <View style={styles.postOverlay}>
                         <VideoTabIcon color="#FFFFFF" size={24} />
@@ -483,14 +604,6 @@ export default function SearchScreen() {
         );
     };
 
-    const ResultsHeader = () => (
-        isLoading ? (
-            <View style={styles.resultsHeader}>
-                <ActivityIndicator size="small" color={theme.textPrimary} />
-            </View>
-        ) : null
-    );
-
     const ResultsEmpty = () => {
         if (isLoading) return null;
         if (error) {
@@ -498,13 +611,48 @@ export default function SearchScreen() {
                 <View style={styles.emptyState}>
                     <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>Arama hatasi</Text>
                     <Text style={[styles.emptyText, { color: theme.textSecondary }]}>{error}</Text>
-                    <Pressable style={[styles.retryButton, { borderColor: theme.textPrimary }]} onPress={handleSubmit}>
+                    <Pressable style={[styles.retryButton, { borderColor: theme.textPrimary }]} onPress={handleRetry}>
                         <Text style={[styles.retryText, { color: theme.textPrimary }]}>Tekrar dene</Text>
                     </Pressable>
                 </View>
             );
         }
         return null;
+    };
+
+    const AccountsHeader = () => {
+        if (isLoading) {
+            return (
+                <View style={[styles.loadingHeaderRow, styles.sectionTitleSpacing]}>
+                    <ActivityIndicator size="small" color={theme.textSecondary} />
+                    <Text style={[styles.sectionTitle, styles.loadingHeaderText, { color: theme.textSecondary }]}>
+                        {searchingText}
+                    </Text>
+                </View>
+            );
+        }
+        if (forYouResults.length > 0) {
+            return (
+                <Text style={[styles.sectionTitle, styles.sectionTitleSpacing, { color: theme.textPrimary }]}>Hesaplar</Text>
+            );
+        }
+        return null;
+    };
+
+    const PostsHeader = () => {
+        if (!isLoading && isPostsLoading) {
+            return (
+                <View style={[styles.loadingHeaderRow, styles.sectionTitleSpacing]}>
+                    <ActivityIndicator size="small" color={theme.textSecondary} />
+                    <Text style={[styles.sectionTitle, styles.loadingHeaderText, { color: theme.textSecondary }]}>
+                        {searchingText}
+                    </Text>
+                </View>
+            );
+        }
+        return (
+            <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Gönderiler</Text>
+        );
     };
 
     return (
@@ -613,26 +761,25 @@ export default function SearchScreen() {
                             keyExtractor={(item) => item.id}
                             renderItem={renderResultItem}
                             contentContainerStyle={[styles.resultsContent, { paddingBottom: insets.bottom + 24 }]}
-                            ListHeaderComponent={
-                                <>
-                                    {forYouResults.length > 0 ? (
-                                        <Text style={[styles.sectionTitle, styles.sectionTitleSpacing, { color: theme.textPrimary }]}>Hesaplar</Text>
-                                    ) : null}
-                                    <ResultsHeader />
-                                </>
-                            }
+                            onLayout={(event) => setListHeight(event.nativeEvent.layout.height)}
+                            onScroll={(event) => setScrollY(event.nativeEvent.contentOffset.y)}
+                            scrollEventThrottle={16}
+                            ListHeaderComponent={<AccountsHeader />}
                             ListFooterComponent={
-                                <View>
+                                <View onLayout={(event) => setFooterOffsetY(event.nativeEvent.layout.y)}>
                                     <View style={styles.sectionSpacer} />
-                                    {isPostsLoading ? (
-                                        <ActivityIndicator size="small" color={theme.textPrimary} />
-                                    ) : postsError ? null : postResults.length > 0 ? (
+                                    {postsError ? null : (!isLoading && (isPostsLoading || postResults.length > 0)) ? (
                                         <>
-                                            <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Gönderiler</Text>
+                                            <PostsHeader />
                                             <View style={styles.sectionSpacer} />
-                                            <View style={[styles.postGrid, { width: windowWidth, marginLeft: -16 }]}>
-                                                {postResults.map((post, index) => renderPostTile(post, index))}
-                                            </View>
+                                            {isPostsLoading ? null : (
+                                                <View
+                                                    style={[styles.postGrid, { width: windowWidth, marginLeft: -16 }]}
+                                                    onLayout={(event) => setGridLocalY(event.nativeEvent.layout.y)}
+                                                >
+                                                    {postResults.map((post, index) => renderPostTile(post, index))}
+                                                </View>
+                                            )}
                                         </>
                                     ) : null}
                                 </View>
@@ -648,7 +795,6 @@ export default function SearchScreen() {
                             keyExtractor={(item) => item.id}
                             renderItem={renderResultItem}
                             contentContainerStyle={[styles.resultsContent, { paddingBottom: insets.bottom + 24 }]}
-                            ListHeaderComponent={ResultsHeader}
                             ListEmptyComponent={ResultsEmpty}
                             keyboardShouldPersistTaps="handled"
                             showsVerticalScrollIndicator={false}
@@ -659,6 +805,10 @@ export default function SearchScreen() {
                     )}
                 </>
             )}
+            <View
+                pointerEvents="none"
+                style={[styles.systemNavBarSpacer, { height: insets.bottom, backgroundColor: DARK_COLORS.background }]}
+            />
         </View>
     );
 }
@@ -721,6 +871,14 @@ const styles = StyleSheet.create({
     sectionTitleSpacing: {
         marginBottom: 16,
     },
+    loadingHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    loadingHeaderText: {
+        fontWeight: '500',
+    },
     sectionSpacer: {
         height: 16,
     },
@@ -732,12 +890,15 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingTop: 16,
     },
-    resultsHeader: {
-        paddingVertical: 8,
-    },
     tabBarWrapper: {
         borderBottomWidth: 1,
         marginTop: 8,
+    },
+    systemNavBarSpacer: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
     },
     tabBar: {
         paddingHorizontal: 16,
@@ -821,11 +982,17 @@ const styles = StyleSheet.create({
         alignItems: 'stretch',
         position: 'relative',
     },
-    postTileImage: {
+    postMedia: {
         width: '100%',
         aspectRatio: 4 / 5,
+        backgroundColor: 'rgba(0,0,0,0.1)',
     },
-    postTileFallback: {
+    postMediaFill: {
+        ...StyleSheet.absoluteFillObject,
+        width: '100%',
+        height: '100%',
+    },
+    postMediaFallback: {
         backgroundColor: 'rgba(0,0,0,0.2)',
     },
     postOverlay: {

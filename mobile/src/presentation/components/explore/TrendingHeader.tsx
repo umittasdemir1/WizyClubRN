@@ -21,7 +21,6 @@ export function TrendingHeader({
     const insets = useSafeAreaInsets();
     const textColor = isDark ? '#FFFFFF' : '#000000';
     const iconColor = isDark ? '#FFFFFF' : '#000000';
-    const btnBg = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
 
     return (
         <View style={[styles.container, { paddingTop: insets.top + 10 }]}>
@@ -31,10 +30,10 @@ export function TrendingHeader({
                 rightElement
             ) : showSearch ? (
                 <TouchableOpacity
-                    style={[styles.iconButton, { backgroundColor: btnBg }]}
+                    style={styles.iconButton}
                     onPress={onSearchPress}
                 >
-                    <Search size={22} color={iconColor} />
+                    <Search size={22} color={iconColor} strokeWidth={2.4} />
                 </TouchableOpacity>
             ) : (
                 <View style={{ width: 44 }} /> 
