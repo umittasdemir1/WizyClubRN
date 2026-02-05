@@ -11,6 +11,7 @@ import { InfiniteCarouselLayer } from './InfiniteCarouselLayer';
 import { VerifiedBadge } from '../shared/VerifiedBadge';
 import { ThemeColors } from './types';
 import { FEED_FLAGS } from '../feed/hooks/useFeedConfig';
+import { shadowStyle } from '@/core/utils/shadow';
 
 const DESCRIPTION_LIMIT = 70;
 const CARD_HORIZONTAL_PADDING = 16;
@@ -21,6 +22,20 @@ const WEEK = 7 * DAY;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
 const CAROUSEL_ASPECT_RATIO = 3 / 4;
+
+const mixWithWhite = (hex: string, amount: number) => {
+    if (!hex.startsWith('#')) return hex;
+    let normalized = hex.replace('#', '').trim();
+    if (normalized.length === 3) {
+        normalized = normalized.split('').map((c) => c + c).join('');
+    }
+    if (normalized.length !== 6) return hex;
+    const r = parseInt(normalized.slice(0, 2), 16);
+    const g = parseInt(normalized.slice(2, 4), 16);
+    const b = parseInt(normalized.slice(4, 6), 16);
+    const mix = (channel: number) => Math.round(channel + (255 - channel) * amount);
+    return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
+};
 
 const formatRelativeTime = (value?: string) => {
     if (!value) return '';
@@ -172,6 +187,27 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         styles.displayName,
         { color: colors.textPrimary }
     ], [colors.textPrimary]);
+    const isDarkTheme = colors.textPrimary.toLowerCase() === '#ffffff';
+    const cardBackground = useMemo(() => mixWithWhite(colors.background, 0.03), [colors.background]);
+    const cardBorderColor = useMemo(
+        () => (isDarkTheme ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'),
+        [isDarkTheme]
+    );
+    const cardShadowStyle = useMemo(() => shadowStyle({
+        color: '#000000',
+        offset: { width: 0, height: 6 },
+        radius: 14,
+        opacity: isDarkTheme ? 0.35 : 0.18,
+        elevation: 6,
+    }), [isDarkTheme]);
+    const cardOuterStyle = useMemo(() => [
+        styles.card,
+        cardShadowStyle,
+    ], [cardShadowStyle]);
+    const cardInnerStyle = useMemo(() => [
+        styles.cardInner,
+        { backgroundColor: cardBackground, borderColor: cardBorderColor }
+    ], [cardBackground, cardBorderColor]);
 
     const descriptionValue = item.description?.trim() ?? '';
     const hasDescription = descriptionValue.length > 0;
@@ -404,22 +440,32 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     );
 
     return (
-        <Animated.View style={styles.card} layout={LinearTransition.duration(220)}>
-            {isCarousel ? (
-                cardBody
-            ) : (
-                <Pressable onPress={handleOpen}>
-                    {cardBody}
-                </Pressable>
-            )}
+        <Animated.View style={cardOuterStyle} layout={LinearTransition.duration(220)}>
+            <View style={cardInnerStyle}>
+                {isCarousel ? (
+                    cardBody
+                ) : (
+                    <Pressable onPress={handleOpen}>
+                        {cardBody}
+                    </Pressable>
+                )}
+            </View>
         </Animated.View>
     );
 });
 
 const styles = StyleSheet.create({
     card: {
+        marginHorizontal: 8,
+        marginVertical: 6,
+        borderRadius: 12,
+    },
+    cardInner: {
         paddingTop: 0,
-        paddingBottom: 16,
+        paddingBottom: 12,
+        borderRadius: 12,
+        overflow: 'hidden',
+        borderWidth: 1,
     },
     cardContent: {
         paddingHorizontal: CARD_HORIZONTAL_PADDING,
