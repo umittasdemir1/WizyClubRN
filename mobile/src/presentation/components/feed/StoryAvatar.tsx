@@ -6,8 +6,8 @@ import { useStoryStore } from '../../store/useStoryStore';
 
 const AVATAR_SIZE = 64;
 // Desired specs: 3px thickness, 3px gap
-const THICKNESS = 3;
-const GAP = 3;
+const THICKNESS = 1.5;
+const GAP = 1.5;
 const RING_SIZE = AVATAR_SIZE + (THICKNESS * 2) + (GAP * 2); // 64 + 6 + 6 = 76
 
 interface StoryAvatarProps {

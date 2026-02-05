@@ -1064,6 +1064,45 @@ function setUploadProgress(id, stage, percent) {
     console.log(`📊 [PROGRESS] ${id}: ${stage} - ${percent}%`);
 }
 
+function extractDimensionsFromProbe(metadata) {
+    if (!metadata || !Array.isArray(metadata.streams)) {
+        return { width: 0, height: 0 };
+    }
+    const stream =
+        metadata.streams.find(s => s.codec_type === 'video' && s.width && s.height) ||
+        metadata.streams.find(s => s.width && s.height);
+    let width = stream?.width || 0;
+    let height = stream?.height || 0;
+    const rotation = stream?.tags && stream.tags.rotate ? parseInt(stream.tags.rotate, 10) : 0;
+    if (Math.abs(rotation) === 90 || Math.abs(rotation) === 270) {
+        [width, height] = [height, width];
+    }
+    return { width, height };
+}
+
+function pickMostPortrait(current, candidate) {
+    if (!candidate?.width || !candidate?.height) return current;
+    if (!current?.width || !current?.height) return candidate;
+    const currentRatio = current.width / current.height;
+    const candidateRatio = candidate.width / candidate.height;
+    return candidateRatio < currentRatio ? candidate : current;
+}
+
+async function safeProbeDimensions(inputPath) {
+    try {
+        const metadata = await new Promise((resolve, reject) => {
+            ffmpeg(inputPath).ffprobe((err, data) => {
+                if (err) reject(err);
+                else resolve(data);
+            });
+        });
+        return extractDimensionsFromProbe(metadata);
+    } catch (error) {
+        console.warn('⚠️ [PROBE] Failed to read media dimensions:', error?.message || error);
+        return { width: 0, height: 0 };
+    }
+}
+
 // Endpoint: HLS Video Upload (Supports Carousels)
 app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
     const files = req.files;
@@ -1090,8 +1129,9 @@ app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
         const mediaUrls = [];
         let firstThumbUrl = '';
         let firstSpriteUrl = '';
-        let finalWidth = 0;
-        let finalHeight = 0;
+        let finalWidth = 1080;
+        let finalHeight = 1920;
+        let portraitBase = { width: 0, height: 0 };
 
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
@@ -1110,19 +1150,11 @@ app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
                     });
                 });
 
-                const videoStream = metadata.streams.find(s => s.codec_type === 'video');
-                let width = videoStream ? videoStream.width : 0;
-                let height = videoStream ? videoStream.height : 0;
+                const { width, height } = extractDimensionsFromProbe(metadata);
                 const duration = parseFloat(metadata.format.duration || 0);
-                const rotation = videoStream.tags && videoStream.tags.rotate ? parseInt(videoStream.tags.rotate, 10) : 0;
-                if (Math.abs(rotation) === 90 || Math.abs(rotation) === 270) {
-                    [width, height] = [height, width];
-                }
-
-                if (i === 0) {
-                    finalWidth = width;
-                    finalHeight = height;
-                }
+                portraitBase = pickMostPortrait(portraitBase, { width, height });
+                const safeWidth = width || 1080;
+                const safeHeight = height || 1920;
 
                 const processedThumbPath = path.join(tempOutputDir, `thumb_${uniqueId}_${i}.jpg`);
                 await new Promise((resolve, reject) => {
@@ -1145,7 +1177,7 @@ app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
                 await new Promise((resolve, reject) => {
                     ffmpeg(inputPath)
                         .videoCodec('libx264')
-                        .size(width > 1080 ? '1080x?' : `${width}x${height}`)
+                        .size(safeWidth > 1080 ? '1080x?' : `${safeWidth}x${safeHeight}`)
                         .outputOptions(['-crf 26', '-preset veryfast', '-movflags +faststart', '-pix_fmt yuv420p'])
                         .on('end', resolve)
                         .on('error', reject)
@@ -1160,24 +1192,29 @@ app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
                     firstSpriteUrl = spriteUrl;
                 }
 
-                mediaUrls.push({ url: videoUrl, type: 'video', thumbnail: thumbUrl, sprite: spriteUrl });
+                mediaUrls.push({ url: videoUrl, type: 'video', thumbnail: thumbUrl, sprite: spriteUrl, width: safeWidth, height: safeHeight });
 
                 if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
                 if (fs.existsSync(processedThumbPath)) fs.unlinkSync(processedThumbPath);
                 if (fs.existsSync(optimizedPath)) fs.unlinkSync(optimizedPath);
             } else {
+                const { width, height } = await safeProbeDimensions(inputPath);
+                portraitBase = pickMostPortrait(portraitBase, { width, height });
                 const imageKey = `${baseKey}/image.jpg`;
                 const imageUrl = await uploadToR2(inputPath, imageKey, file.mimetype);
 
                 if (i === 0) {
                     firstThumbUrl = imageUrl;
-                    finalWidth = 1080;
-                    finalHeight = 1920;
                 }
 
-                mediaUrls.push({ url: imageUrl, type: 'image' });
+                mediaUrls.push({ url: imageUrl, type: 'image', width, height });
                 if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
             }
+        }
+
+        if (portraitBase.width && portraitBase.height) {
+            finalWidth = portraitBase.width;
+            finalHeight = portraitBase.height;
         }
 
         const { data, error } = await supabase
@@ -1240,6 +1277,7 @@ app.post('/upload-story', upload.array('video', 10), async (req, res) => {
         let firstThumbUrl = '';
         let finalWidth = 1080;
         let finalHeight = 1920;
+        let portraitBase = { width: 0, height: 0 };
 
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
@@ -1256,9 +1294,10 @@ app.post('/upload-story', upload.array('video', 10), async (req, res) => {
                     });
                 });
 
-                const videoStream = metadata.streams.find(s => s.codec_type === 'video');
-                let width = videoStream?.width || 1080;
-                let height = videoStream?.height || 1920;
+                const { width, height } = extractDimensionsFromProbe(metadata);
+                portraitBase = pickMostPortrait(portraitBase, { width, height });
+                const safeWidth = width || 1080;
+                const safeHeight = height || 1920;
 
                 const videoKey = `${baseKey}/story.mp4`;
                 await uploadToR2(inputPath, videoKey, file.mimetype);
@@ -1283,21 +1322,26 @@ app.post('/upload-story', upload.array('video', 10), async (req, res) => {
 
                 if (i === 0) {
                     firstThumbUrl = thumbnailUrl;
-                    finalWidth = width;
-                    finalHeight = height;
                 }
 
-                mediaUrls.push({ url: storyUrl, type: 'video', thumbnail: thumbnailUrl });
+                mediaUrls.push({ url: storyUrl, type: 'video', thumbnail: thumbnailUrl, width: safeWidth, height: safeHeight });
                 if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
                 if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
             } else {
+                const { width, height } = await safeProbeDimensions(inputPath);
+                portraitBase = pickMostPortrait(portraitBase, { width, height });
                 const imageKey = `${baseKey}/story.jpg`;
                 const imageUrl = await uploadToR2(inputPath, imageKey, file.mimetype);
 
                 if (i === 0) firstThumbUrl = imageUrl;
-                mediaUrls.push({ url: imageUrl, type: 'image' });
+                mediaUrls.push({ url: imageUrl, type: 'image', width, height });
                 if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
             }
+        }
+
+        if (portraitBase.width && portraitBase.height) {
+            finalWidth = portraitBase.width;
+            finalHeight = portraitBase.height;
         }
 
         const isCommercial = commercialType && commercialType !== 'İş Birliği İçermiyor';

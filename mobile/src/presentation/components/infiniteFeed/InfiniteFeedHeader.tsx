@@ -5,8 +5,9 @@ import { Image as ExpoImage } from 'expo-image';
 import { useUploadStore } from '../../store/useUploadStore';
 import { textShadowStyle } from '@/core/utils/shadow';
 import { ThemeColors } from './types';
+import { InfiniteStoryBar } from './InfiniteStoryBar';
 
-export const FEED_TABS = ['Senin İçin', 'Takip Edilen'] as const;
+export const FEED_TABS = ['Takipte', 'Sana Özel'] as const;
 export type FeedTab = (typeof FEED_TABS)[number];
 
 interface InfiniteFeedHeaderProps {
@@ -15,23 +16,33 @@ interface InfiniteFeedHeaderProps {
     colors: ThemeColors;
     insetTop: number;
     onUploadPress?: () => void;
+    storyUsers: {
+        id: string;
+        username: string;
+        avatarUrl: string;
+        hasUnseenStory: boolean;
+    }[];
+    onStoryAvatarPress: (userId: string) => void;
 }
 
 export function InfiniteFeedHeader({
-    activeTab: _activeTab,
-    onTabChange: _onTabChange,
+    activeTab,
+    onTabChange,
     colors,
     insetTop,
     onUploadPress,
+    storyUsers,
+    onStoryAvatarPress,
 }: InfiniteFeedHeaderProps) {
-    const baseHeight = insetTop + 16; // 6 top padding + 10 bottom padding
+    const headerTopPadding = insetTop + 12;
+    const baseHeight = headerTopPadding + 10;
     const headerMinHeight = baseHeight * 3;
     return (
         <View
             style={[
                 styles.header,
                 {
-                    paddingTop: insetTop + 6,
+                    paddingTop: headerTopPadding - 10,
                     minHeight: headerMinHeight,
                     borderBottomColor: colors.border,
                     backgroundColor: colors.background,
@@ -42,6 +53,42 @@ export function InfiniteFeedHeader({
                 <UploadButton onPress={onUploadPress} />
                 <UploadThumbnail />
             </View>
+            <View style={[styles.centerOverlay, { top: headerTopPadding - 10 }]} pointerEvents="box-none">
+                <View style={styles.tabContainer}>
+                    {FEED_TABS.map((tab, index) => (
+                        <React.Fragment key={tab}>
+                            <Pressable
+                                onPress={() => onTabChange(tab)}
+                                style={styles.tabButton}
+                                hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+                            >
+                                <Text
+                                    style={[
+                                        styles.tabText,
+                                        activeTab === tab && styles.tabTextActive,
+                                        { color: activeTab === tab ? colors.textPrimary : colors.textSecondary },
+                                    ]}
+                                >
+                                    {tab}
+                                </Text>
+                            </Pressable>
+                            {index === 0 ? (
+                                <View
+                                    style={[
+                                        styles.tabDivider,
+                                        { backgroundColor: colors.textSecondary },
+                                    ]}
+                                />
+                            ) : null}
+                        </React.Fragment>
+                    ))}
+                </View>
+            </View>
+            <InfiniteStoryBar
+                storyUsers={storyUsers}
+                onAvatarPress={onStoryAvatarPress}
+                backgroundColor={colors.background}
+            />
         </View>
     );
 }
@@ -58,7 +105,7 @@ function UploadButton({ onPress }: { onPress?: () => void }) {
             onPress={onPress}
             hitSlop={12}
         >
-            <Plus width={32} height={32} color="#FFFFFF" strokeWidth={1.6} />
+            <Plus width={28} height={28} color="#FFFFFF" />
         </Pressable>
     );
 }
@@ -116,18 +163,52 @@ const thumbnailStyles = StyleSheet.create({
 const styles = StyleSheet.create({
     header: {
         paddingHorizontal: 16,
-        paddingBottom: 10,
-        borderBottomWidth: 1,
+        paddingBottom: 0,
         alignItems: 'flex-start',
+        position: 'relative',
     },
     leftColumn: {
         flexDirection: 'column',
         alignItems: 'center',
         gap: 8,
+        marginLeft: -10,
+    },
+    centerOverlay: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        alignItems: 'center',
+        top: 0,
+    },
+    tabContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginLeft: 18,
+    },
+    tabButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 8,
+        gap: 4,
+        position: 'relative',
+    },
+    tabText: {
+        fontSize: 17,
+        fontWeight: '700',
+        letterSpacing: 0.3,
+    },
+    tabTextActive: {
+        color: '#FFFFFF',
+    },
+    tabDivider: {
+        width: 1,
+        height: 12,
+        opacity: 0.2,
     },
     iconButton: {
-        padding: 10,
-        marginTop: 8,
-        marginLeft: -6,
+        padding: 8,
+        marginTop: -3,
     },
 });

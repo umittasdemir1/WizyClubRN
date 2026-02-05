@@ -1,12 +1,13 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
+import Animated, { LinearTransition } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { Volume2, VolumeX, MoreVertical } from 'lucide-react-native';
 import VideoPlayer from 'react-native-video';
 import { getVideoUrl } from '../../../core/utils/videoUrl';
 import { Video as VideoEntity } from '../../../domain/entities/Video';
 import { InfiniteFeedActions } from './InfiniteFeedActions';
-import { CarouselLayer } from '../feed/CarouselLayer';
+import { InfiniteCarouselLayer } from './InfiniteCarouselLayer';
 import { VerifiedBadge } from '../shared/VerifiedBadge';
 import { ThemeColors } from './types';
 import { FEED_FLAGS } from '../feed/hooks/useFeedConfig';
@@ -19,6 +20,7 @@ const DAY = 24 * HOUR;
 const WEEK = 7 * DAY;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
+const CAROUSEL_ASPECT_RATIO = 3 / 4;
 
 const formatRelativeTime = (value?: string) => {
     if (!value) return '';
@@ -134,11 +136,17 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         onMore?.(item.id);
     }, [item.id, onMore]);
 
+    const handleToggleDescription = useCallback(() => {
+        if (!canToggleDescription) return;
+        setIsDescriptionExpanded(prev => !prev);
+    }, [canToggleDescription]);
+
     // ✅ [PERF] Memoize dynamic styles to prevent object reference churn
+    const effectiveAspectRatio = isCarousel ? CAROUSEL_ASPECT_RATIO : aspectRatio;
     const mediaWrapperStyle = useMemo(() => [
         styles.mediaWrapper,
-        { aspectRatio }
-    ], [aspectRatio]);
+        { aspectRatio: effectiveAspectRatio }
+    ], [effectiveAspectRatio]);
 
     const fullNameStyle = useMemo(() => [
         styles.fullName,
@@ -157,14 +165,20 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
 
     const readMoreTextStyle = useMemo(() => [
         styles.readMore,
+        { color: colors.textSecondary }
+    ], [colors.textSecondary]);
+
+    const displayNameTextStyle = useMemo(() => [
+        styles.displayName,
         { color: colors.textPrimary }
     ], [colors.textPrimary]);
 
     const descriptionValue = item.description?.trim() ?? '';
     const hasDescription = descriptionValue.length > 0;
-    const displayName = item.user?.fullName || item.user?.username || 'WizyClub User';
+    const canToggleDescription = descriptionValue.length > DESCRIPTION_LIMIT;
+    const displayName = item.user?.username || item.user?.fullName || 'wizyclub';
     const truncatedDescription =
-        isDescriptionExpanded || descriptionValue.length <= DESCRIPTION_LIMIT
+        isDescriptionExpanded || !canToggleDescription
             ? descriptionValue
             : descriptionValue.substring(0, DESCRIPTION_LIMIT);
     const relativeTime = useMemo(() => formatRelativeTime(item.createdAt), [item.createdAt]);
@@ -179,8 +193,9 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
             {hasMedia ? (
                 isCarousel ? (
                     <View style={mediaWrapperStyle}>
-                        <CarouselLayer
+                        <InfiniteCarouselLayer
                             mediaUrls={item.mediaUrls ?? []}
+                            backgroundColor={colors.background}
                             onSingleTap={handleOpen}
                             onCarouselTouchStart={onCarouselTouchStart}
                             onCarouselTouchEnd={onCarouselTouchEnd}
@@ -359,26 +374,24 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
             {/* ✅ DESCRIPTION - Controlled by INF_DISABLE_DESCRIPTION */}
             {showDescriptionBlock && (
                 <View style={styles.cardContent}>
-                    <Text style={descriptionTextStyle}>
-                        <Text style={[readMoreTextStyle, styles.displayName]}>{displayName}</Text>
+                    <Text style={descriptionTextStyle} onPress={handleToggleDescription}>
+                        <Text style={displayNameTextStyle}>{displayName}</Text>
                         {hasDescription ? (
                             <>
                                 {' '}
                                 {truncatedDescription}
-                                {!isDescriptionExpanded && descriptionValue.length > DESCRIPTION_LIMIT && (
+                                {!isDescriptionExpanded && canToggleDescription && (
                                     <Text
                                         style={readMoreTextStyle}
-                                        onPress={() => setIsDescriptionExpanded(true)}
                                     >
-                                        {'...Daha fazla'}
+                                        {'...daha fazla'}
                                     </Text>
                                 )}
-                                {isDescriptionExpanded && descriptionValue.length > DESCRIPTION_LIMIT && (
+                                {isDescriptionExpanded && canToggleDescription && (
                                     <Text
                                         style={readMoreTextStyle}
-                                        onPress={() => setIsDescriptionExpanded(false)}
                                     >
-                                        {' Daha az'}
+                                        {' daha az'}
                                     </Text>
                                 )}
                             </>
@@ -390,12 +403,16 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         </>
     );
 
-    return isCarousel ? (
-        <View style={styles.card}>{cardBody}</View>
-    ) : (
-        <Pressable style={styles.card} onPress={handleOpen}>
-            {cardBody}
-        </Pressable>
+    return (
+        <Animated.View style={styles.card} layout={LinearTransition.duration(220)}>
+            {isCarousel ? (
+                cardBody
+            ) : (
+                <Pressable onPress={handleOpen}>
+                    {cardBody}
+                </Pressable>
+            )}
+        </Animated.View>
     );
 });
 
@@ -449,7 +466,7 @@ const styles = StyleSheet.create({
         marginTop: 0,
     },
     description: {
-        fontSize: 15,
+        fontSize: 14,
         lineHeight: 20,
         marginTop: 10,
         fontWeight: '350',
@@ -459,7 +476,8 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     displayName: {
-        fontSize: 16,
+        fontSize: 14,
+        fontWeight: '600',
     },
     timeHint: {
         marginTop: 6,

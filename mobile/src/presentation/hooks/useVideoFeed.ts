@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { Alert } from 'react-native';
+import { Alert, Share } from 'react-native';
 import { Video } from '../../domain/entities/Video';
 import { GetVideoFeedUseCase } from '../../domain/usecases/GetVideoFeedUseCase';
 import { ToggleLikeUseCase } from '../../domain/usecases/ToggleLikeUseCase';
@@ -386,8 +386,7 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
         }
     }, [videos, globalToggleFollow, user]);
 
-    const toggleShare = useCallback(async (videoId: string) => {
-        // 1. Optimistic UI update
+    const incrementShareCount = useCallback(async (videoId: string) => {
         setVideos((prevVideos) =>
             prevVideos.map((video) => {
                 if (video.id === videoId) {
@@ -400,7 +399,6 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
             })
         );
 
-        // 2. Sync with Database using atomic RPC
         try {
             const { supabase } = require('../../core/supabase');
             const { error } = await supabase.rpc('increment_video_counter', {
@@ -414,6 +412,21 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
             logError(LogCode.DB_UPDATE, 'Failed to sync share count', error);
         }
     }, []);
+
+    const toggleShare = useCallback(async (videoId: string) => {
+        const video = videos.find(v => v.id === videoId);
+        if (!video) return;
+
+        const shareUrl = `wizyclub://video/${videoId}`;
+        const message = video.description ? `${video.description}\n${shareUrl}` : shareUrl;
+
+        try {
+            await Share.share({ message, url: shareUrl });
+            await incrementShareCount(videoId);
+        } catch (error) {
+            logError(LogCode.ERROR_CAUGHT, 'Share failed', error);
+        }
+    }, [videos, incrementShareCount]);
 
     const toggleShop = useCallback((videoId: string) => {
         setVideos((prevVideos) =>

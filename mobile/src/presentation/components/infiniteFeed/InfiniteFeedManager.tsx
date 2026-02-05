@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, RefreshControl, ActivityIndicator } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,6 +14,7 @@ import { InfiniteFeedHeader, FeedTab } from './InfiniteFeedHeader';
 import { InfiniteFeedCard } from './InfiniteFeedCard';
 import { styles } from './InfiniteFeedManager.styles';
 import { FEED_FLAGS } from '../feed/hooks/useFeedConfig';
+import { useStoryViewer } from '../../hooks/useStoryViewer';
 
 interface InfiniteFeedManagerProps {
     videos: VideoEntity[];
@@ -30,6 +31,7 @@ interface InfiniteFeedManagerProps {
     toggleShare: (id: string) => void;
     toggleShop: (id: string) => void;
 }
+
 
 export function InfiniteFeedManager({
     videos,
@@ -52,8 +54,9 @@ export function InfiniteFeedManager({
     const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
     const { isMuted, toggleMute } = useMuteControls();
     const currentUserId = useAuthStore((state) => state.user?.id);
+    const { stories: storyListData } = useStoryViewer();
 
-    const [activeTab, setActiveTab] = useState<FeedTab>('Senin İçin');
+    const [activeTab, setActiveTab] = useState<FeedTab>('Sana Özel');
     const [activeInlineId, setActiveInlineId] = useState<string | null>(null);
     const [isCarouselInteracting, setIsCarouselInteracting] = useState(false);
 
@@ -75,6 +78,23 @@ export function InfiniteFeedManager({
         setActiveVideo(id, index);
         router.push('/custom-feed' as any);
     }, [videos, setCustomFeed, setActiveVideo, router]);
+
+    const handleStoryAvatarPress = useCallback((userId: string) => {
+        router.push(`/story/${userId}` as any);
+    }, [router]);
+
+    const storyUsers = useMemo(() => {
+        return storyListData.reduce((acc: any[], story) => {
+            if (!acc.find((u) => u.id === story.user.id)) {
+                acc.push({ ...story.user, hasUnseenStory: !story.isViewed });
+            } else if (!story.isViewed) {
+                const user = acc.find((u) => u.id === story.user.id);
+                if (user) user.hasUnseenStory = true;
+            }
+            return acc;
+        }, []);
+    }, [storyListData]);
+
 
     const handleCarouselTouchStart = useCallback(() => {
         setIsCarouselInteracting(true);
@@ -161,6 +181,8 @@ export function InfiniteFeedManager({
                         colors={themeColors}
                         insetTop={insets.top}
                         onUploadPress={() => router.push('/upload')}
+                        storyUsers={storyUsers}
+                        onStoryAvatarPress={handleStoryAvatarPress}
                     />
                 ) : (
                     <View style={{ height: insets.top }} />

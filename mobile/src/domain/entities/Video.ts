@@ -30,6 +30,8 @@ export interface Video {
         url: string;
         type: 'video' | 'image';
         thumbnail?: string;
+        width?: number;
+        height?: number;
     }[];
     postType?: 'video' | 'carousel';
 }

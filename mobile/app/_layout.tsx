@@ -12,7 +12,7 @@ import { SessionLogService } from '../src/core/services/SessionLogService';
 import { COLORS, LIGHT_COLORS } from '../src/core/constants';
 import { useEffect, useRef } from 'react';
 import { Platform, StatusBar } from 'react-native';
-import { useKeepAwake } from 'expo-keep-awake';
+import { activateKeepAwake, deactivateKeepAwake } from 'expo-keep-awake';
 import Toast from 'react-native-toast-message';
 import { InAppBrowserOverlay } from '../src/presentation/components/shared/InAppBrowserOverlay';
 import Purchases from 'react-native-purchases';
@@ -43,7 +43,17 @@ function RootNavigator() {
     const hasConfiguredPurchases = useRef(false);
 
     // Keep the screen awake during video playback/app usage
-    useKeepAwake();
+    useEffect(() => {
+        if (Platform.OS === 'web') return;
+        activateKeepAwake().catch((err) => {
+            logError(LogCode.ERROR_CAUGHT, 'KeepAwake activation failed', err);
+        });
+        return () => {
+            deactivateKeepAwake().catch(() => {
+                // no-op
+            });
+        };
+    }, []);
 
     useEffect(() => {
         // Initialize auth state on app start
