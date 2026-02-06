@@ -68,6 +68,26 @@ export function InfiniteCarouselLayer({
         () => mediaUrls.filter((item) => isImageUrl(item.url)),
         [mediaUrls]
     );
+    const mediaIdentityKey = useMemo(
+        () => normalizedItems.map((item) => item.url).join('|'),
+        [normalizedItems]
+    );
+
+    useEffect(() => {
+        loadedIndicesRef.current.clear();
+        lastActiveIndexRef.current = 0;
+        setActiveIndex(0);
+        setActiveImageLoaded(false);
+        autoAdvanceStartIndexRef.current = null;
+        autoAdvanceHasAdvancedRef.current = false;
+        autoAdvanceHasLoopedRef.current = false;
+
+        if (normalizedItems.length > 0) {
+            requestAnimationFrame(() => {
+                flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+            });
+        }
+    }, [mediaIdentityKey, normalizedItems.length]);
 
     const handleScroll = useCallback((event: any) => {
         if (normalizedItems.length === 0) return;
@@ -368,7 +388,7 @@ function CarouselMediaItem({
                 contentFit="cover"
                 cachePolicy="memory-disk"
                 priority="high"
-                placeholder={(!FEED_FLAGS.POOL_DISABLE_THUMBNAIL && item.thumbnail) ? { uri: item.thumbnail } : undefined}
+                placeholder={(!FEED_FLAGS.INF_DISABLE_THUMBNAIL && item.thumbnail) ? { uri: item.thumbnail } : undefined}
                 onLoad={() => onImageDone(index)}
                 onError={() => onImageDone(index)}
             />

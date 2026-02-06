@@ -6,6 +6,7 @@ import { logCache, LogCode } from '@/core/services/Logger';
 
 interface PrefetchItem {
   url: string;
+  cacheKey: string;
   priority: number; // Lower = higher priority (0 = highest)
 }
 
@@ -19,6 +20,10 @@ class FeedPrefetchService {
   private networkType: NetInfoStateType | null = null;
   private activeIndex: number | null = null;
   private generation = 0;
+
+  private getQueueKey(url: string): string {
+    return VideoCacheService.getStableCacheKey(url) ?? url;
+  }
 
   static getInstance(): FeedPrefetchService {
     if (!FeedPrefetchService.instance) {
@@ -55,7 +60,8 @@ class FeedPrefetchService {
     indices.forEach((index) => {
       const video = videos[index];
       if (!video || typeof video.videoUrl !== 'string') return;
-      if (this.queued.has(video.videoUrl)) return;
+      const queueKey = this.getQueueKey(video.videoUrl);
+      if (this.queued.has(queueKey)) return;
       if (this.queue.length >= this.maxQueueSize) return;
 
       // Calculate priority based on distance from current video
@@ -74,8 +80,8 @@ class FeedPrefetchService {
         }
       }
 
-      this.queue.push({ url: video.videoUrl, priority });
-      this.queued.add(video.videoUrl);
+      this.queue.push({ url: video.videoUrl, cacheKey: queueKey, priority });
+      this.queued.add(queueKey);
     });
 
     // Sort queue by priority (lowest number = highest priority)
@@ -104,11 +110,12 @@ class FeedPrefetchService {
   queueSingleVideo(url: string, priority: number = 5) {
     if (isVideoCacheDisabled()) return;
     if (typeof url !== 'string') return;
-    if (this.queued.has(url)) return;
+    const queueKey = this.getQueueKey(url);
+    if (this.queued.has(queueKey)) return;
     if (this.queue.length >= this.maxQueueSize) return;
 
-    this.queue.push({ url, priority });
-    this.queued.add(url);
+    this.queue.push({ url, cacheKey: queueKey, priority });
+    this.queued.add(queueKey);
 
     // Re-sort to maintain priority order
     this.queue.sort((a, b) => a.priority - b.priority);
@@ -120,7 +127,8 @@ class FeedPrefetchService {
    * Bump priority of a URL if it's already in queue
    */
   bumpPriority(url: string, newPriority: number = 0) {
-    const item = this.queue.find(i => i.url === url);
+    const queueKey = this.getQueueKey(url);
+    const item = this.queue.find(i => i.cacheKey === queueKey);
     if (item && newPriority < item.priority) {
       item.priority = newPriority;
       this.queue.sort((a, b) => a.priority - b.priority);
@@ -143,7 +151,7 @@ class FeedPrefetchService {
 
       // Download all in parallel
       await Promise.allSettled(
-        batch.map(async ({ url, priority }) => {
+        batch.map(async ({ url, cacheKey, priority }) => {
           try {
             const memoryCached = VideoCacheService.getMemoryCachedPath(url);
             if (memoryCached) {
@@ -155,7 +163,7 @@ class FeedPrefetchService {
           } catch (error) {
             logCache(LogCode.CACHE_ERROR, 'Feed prefetch failed to cache video', { error, url });
           } finally {
-            this.queued.delete(url);
+            this.queued.delete(cacheKey);
           }
         })
       );

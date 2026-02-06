@@ -19,6 +19,29 @@ export class VideoCacheService {
     private static memoryCache = new Map<string, { path: string; expiresAt: number }>();
     private static downloadInFlight = new Map<string, Promise<string | null>>();
 
+    static getStableCacheKey(url: string | number): string | null {
+        if (typeof url !== 'string') return null;
+        const trimmed = url.trim();
+        if (!trimmed) return null;
+
+        // file:// sources are already local and stable.
+        if (trimmed.startsWith('file://')) {
+            return trimmed.split('#')[0].split('?')[0];
+        }
+
+        try {
+            const parsed = new URL(trimmed);
+            if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+                // Strip query/hash so signed URL params don't bust cache identity.
+                return `${parsed.origin}${parsed.pathname}`;
+            }
+        } catch {
+            // Fallback below
+        }
+
+        return trimmed.split('#')[0].split('?')[0];
+    }
+
     private static ensureCacheDirectory() {
         // Skip on web
         if (Platform.OS === 'web' || !CACHE_DIRECTORY) return;
@@ -29,10 +52,13 @@ export class VideoCacheService {
     }
 
     private static getFromMemoryCache(url: string): string | null {
-        const entry = VideoCacheService.memoryCache.get(url);
+        const cacheKey = VideoCacheService.getStableCacheKey(url);
+        if (!cacheKey) return null;
+
+        const entry = VideoCacheService.memoryCache.get(cacheKey);
         if (!entry) return null;
         if (entry.expiresAt <= Date.now()) {
-            VideoCacheService.memoryCache.delete(url);
+            VideoCacheService.memoryCache.delete(cacheKey);
             return null;
         }
         if (Platform.OS === 'web' || !CACHE_DIRECTORY) {
@@ -42,28 +68,31 @@ export class VideoCacheService {
             return entry.path;
         }
         try {
-            const filename = VideoCacheService.getFilename(url);
+            const filename = VideoCacheService.getFilename(cacheKey);
             const file = new File(CACHE_DIRECTORY, filename);
             const fileInfo = file.info();
             if (!fileInfo.exists || (fileInfo.size ?? 0) <= 0) {
-                VideoCacheService.memoryCache.delete(url);
+                VideoCacheService.memoryCache.delete(cacheKey);
                 return null;
             }
         } catch {
-            VideoCacheService.memoryCache.delete(url);
+            VideoCacheService.memoryCache.delete(cacheKey);
             return null;
         }
         return entry.path;
     }
 
     private static setMemoryCache(url: string, path: string) {
+        const cacheKey = VideoCacheService.getStableCacheKey(url);
+        if (!cacheKey) return;
+
         if (VideoCacheService.memoryCache.size >= MAX_MEMORY_CACHE_SIZE) {
             const oldestKey = VideoCacheService.memoryCache.keys().next().value as string | undefined;
             if (oldestKey) {
                 VideoCacheService.memoryCache.delete(oldestKey);
             }
         }
-        VideoCacheService.memoryCache.set(url, {
+        VideoCacheService.memoryCache.set(cacheKey, {
             path,
             expiresAt: Date.now() + MEMORY_CACHE_TTL,
         });
@@ -112,22 +141,25 @@ export class VideoCacheService {
 
     static async getCachedVideoPath(url: string | number): Promise<string | null> {
         if (typeof url !== 'string') return null;
+        const rawUrl = url;
+        const cacheKey = VideoCacheService.getStableCacheKey(rawUrl);
+        if (!cacheKey) return null;
         // On web, return original URL (no caching)
         if (Platform.OS === 'web') return null;
 
-        const cached = VideoCacheService.getFromMemoryCache(url);
+        const cached = VideoCacheService.getFromMemoryCache(cacheKey);
         if (cached) return cached;
 
         VideoCacheService.ensureCacheDirectory();
-        const filename = VideoCacheService.getFilename(url);
+        const filename = VideoCacheService.getFilename(cacheKey);
         const file = new File(CACHE_DIRECTORY!, filename);
 
         try {
             const fileInfo = file.info();
             if (fileInfo.exists) {
                 if ((fileInfo.size ?? 0) > 0) {
-                    VideoCacheService.setMemoryCache(url, file.uri);
-                    logCache(LogCode.CACHE_HIT, 'Cache hit for video', { url: url.substring(0, 50) });
+                    VideoCacheService.setMemoryCache(cacheKey, file.uri);
+                    logCache(LogCode.CACHE_HIT, 'Cache hit for video', { url: rawUrl.substring(0, 50) });
                     return file.uri;
                 }
                 (file as any).delete();
@@ -141,16 +173,19 @@ export class VideoCacheService {
     // ✅ NEW: Non-blocking cache warmup (doesn't block UI)
     static warmupCache(url: string | number): void {
         if (typeof url !== 'string') return;
+        const rawUrl = url;
+        const cacheKey = VideoCacheService.getStableCacheKey(rawUrl);
+        if (!cacheKey) return;
 
         // Already in memory cache, no need to warmup
-        if (VideoCacheService.getFromMemoryCache(url)) return;
+        if (VideoCacheService.getFromMemoryCache(cacheKey)) return;
 
         // Schedule disk check without blocking
         setTimeout(async () => {
             try {
-                const path = await VideoCacheService.getCachedVideoPath(url);
+                const path = await VideoCacheService.getCachedVideoPath(cacheKey);
                 if (path) {
-                    logCache(LogCode.CACHE_WARMUP, 'Cache warmed up', { url: url.substring(0, 50) });
+                    logCache(LogCode.CACHE_WARMUP, 'Cache warmed up', { url: rawUrl.substring(0, 50) });
                 }
             } catch (error) {
                 // Silently ignore warmup errors
@@ -160,28 +195,31 @@ export class VideoCacheService {
 
     static async cacheVideo(url: string | number): Promise<string | null> {
         if (typeof url !== 'string') return null;
+        const rawUrl = url;
+        const cacheKey = VideoCacheService.getStableCacheKey(rawUrl);
+        if (!cacheKey) return null;
         // On web, return original URL (no caching)
         if (Platform.OS === 'web') return null;
 
-        const cached = VideoCacheService.getFromMemoryCache(url);
+        const cached = VideoCacheService.getFromMemoryCache(cacheKey);
         if (cached) return cached;
 
-        const existingPromise = VideoCacheService.downloadInFlight.get(url);
+        const existingPromise = VideoCacheService.downloadInFlight.get(cacheKey);
         if (existingPromise) return existingPromise;
 
         VideoCacheService.ensureCacheDirectory();
-        const filename = VideoCacheService.getFilename(url);
+        const filename = VideoCacheService.getFilename(cacheKey);
         const file = new File(CACHE_DIRECTORY!, filename);
 
         const downloadPromise = (async () => {
             try {
                 const fileInfo = file.info();
                 if (fileInfo.exists && (fileInfo.size ?? 0) > 0) {
-                    VideoCacheService.setMemoryCache(url, file.uri);
+                    VideoCacheService.setMemoryCache(cacheKey, file.uri);
                     return file.uri;
                 }
-                const downloaded = await (File as any).downloadFileAsync(url, file, { idempotent: true });
-                VideoCacheService.setMemoryCache(url, downloaded.uri);
+                const downloaded = await (File as any).downloadFileAsync(rawUrl, file, { idempotent: true });
+                VideoCacheService.setMemoryCache(cacheKey, downloaded.uri);
                 return downloaded.uri;
             } catch (error) {
                 try {
@@ -189,32 +227,35 @@ export class VideoCacheService {
                 } catch {
                     // Ignore cleanup errors
                 }
-                logError(LogCode.CACHE_ERROR, 'Failed to download video', { url: url.substring(0, 50), error });
+                logError(LogCode.CACHE_ERROR, 'Failed to download video', { url: rawUrl.substring(0, 50), error });
                 return null;
             } finally {
-                VideoCacheService.downloadInFlight.delete(url);
+                VideoCacheService.downloadInFlight.delete(cacheKey);
             }
         })();
 
-        VideoCacheService.downloadInFlight.set(url, downloadPromise);
+        VideoCacheService.downloadInFlight.set(cacheKey, downloadPromise);
         return downloadPromise;
     }
 
     static async deleteCachedVideo(url: string | number): Promise<void> {
         if (typeof url !== 'string') return;
+        const rawUrl = url;
+        const cacheKey = VideoCacheService.getStableCacheKey(rawUrl);
+        if (!cacheKey) return;
         // Skip on web
         if (Platform.OS === 'web') return;
 
         VideoCacheService.ensureCacheDirectory();
-        const filename = VideoCacheService.getFilename(url);
+        const filename = VideoCacheService.getFilename(cacheKey);
         const file = new File(CACHE_DIRECTORY!, filename);
 
         try {
-            VideoCacheService.memoryCache.delete(url);
+            VideoCacheService.memoryCache.delete(cacheKey);
             if (file.exists) {
                 (file as any).delete();
             }
-            logCache(LogCode.CACHE_DELETE, 'Cached video deleted', { url: url.substring(0, 50) });
+            logCache(LogCode.CACHE_DELETE, 'Cached video deleted', { url: rawUrl.substring(0, 50) });
         } catch (error) {
             logError(LogCode.CACHE_ERROR, 'Error deleting cached video', error);
         }

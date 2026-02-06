@@ -1,31 +1,39 @@
-# Tema Yönetim Paneli Görev Takibi
+# Infinite Feed Stabilization Task List (February 6, 2026)
 
-## Hedef
-- `tema` komutuyla açılan yeni bir terminal arayüzü oluşturmak.
-- Uygulamada kullanılan tema renklerini (light/dark) bu arayüzden görüntülemek ve güncellemek.
-- Her renk için kullanım yeri bilgisini göstermek.
-- Her renk için "varsayılana sıfırla" aksiyonu eklemek.
-- Varsayılan değerleri ayrı bir dosyada tutmak.
+## Completed Steps
+1. [x] Infinite feed codebase tarandı ve tüm ilgili dosyalar çıkarıldı.
+2. [x] `InfiniteFeedManager` ve `InfiniteFeedCard` üzerinde kök neden analizi yapıldı.
+3. [x] Pasif kartlarda gereksiz video mount engellendi (`active-only inline video`).
+4. [x] Poster->video geçişi için `onReadyForDisplay` tabanlı overlay eklendi.
+5. [x] FlashList clipping kaynaklı siyah ekran riski azaltıldı (`removeClippedSubviews=false`).
+6. [x] Viewability algoritması top-most visible item mantığına geçirildi.
+7. [x] FlashList recycling state leak düzeltildi (card + carousel state reset).
+8. [x] Thumbnail fallback güvenli hale getirildi (yanlış URL fallback engellendi).
+9. [x] Feed veri katmanında gereksiz obje churn azaltıldı (`syncedVideos` identity korunumu).
+10. [x] Derin code review raporu yazıldı (`docs/feed/INFINITE_FEED_DEEP_REVIEW_2026-02-06.md`).
+11. [x] Thumbnail->black screen geçişi için derin teknik araştırma yapıldı ve kaynaklı raporlandı (`docs/feed/INFINITE_FEED_THUMBNAIL_BLACK_SCREEN_RESEARCH_2026-02-06.md`).
+12. [x] Prefetch/preload/cache/buffer zinciri audit edildi ve güçlendirildi (`docs/feed/INFINITE_FEED_PREFETCH_PRELOAD_CACHE_BUFFER_AUDIT_2026-02-06.md`).
+13. [x] Acil siyah ekran için active-video zorunlu cache + source lock + native poster düzeltmesi uygulandı.
+14. [x] TSX/TypeScript kontrolü çalıştırıldı (`npx tsc --noEmit`) ve başarıyla geçti.
+15. [x] Active video commit akışı scroll-settle anına taşındı (`onMomentumScrollEnd` / no-momentum `onScrollEndDrag`).
+16. [x] Scroll sırasında global pause katmanı eklendi (`isFeedScrolling`) ve autoplay jitter azaltıldı.
+17. [x] Infinite card'da strict source lock + first-frame görünürlük gating geri alındı (`videoHidden` + ready/progress/fallback reveal).
+18. [x] Prefetch/cache/scroll/video zinciri için telemetry logları eklendi (`logVideo`, `logCache`, `logPerf`).
+19. [x] 25 swipe doğrulama checklist dokümanı eklendi (`docs/feed/INFINITE_FEED_SWIPE_LOG_CHECKLIST_2026-02-06.md`).
+20. [x] Son değişikliklerden sonra TSX/TypeScript doğrulaması tekrar çalıştırıldı (`cd mobile && npx tsc --noEmit`).
+21. [x] Video cache key stabilizasyonu uygulandı (signed/query URL parametreleri cache identity'den ayrıldı).
+22. [x] Active video resolved source erken sıfırlama engellendi (cache fallback korunarak network thrash azaltıldı).
+23. [x] Siyah ekran korumasını bozmadan hızlı başlangıç için pending-video pre-mount + active-only play modeli eklendi.
+24. [x] Viewability anında active commit (A/B flag) etkinleştirildi ve scroll sırasında aktif video pause kaldırıldı.
+25. [x] Hızlı scroll boş ekran algısı için pending-window pre-mount genişletildi ve thumbnail yoksa siyah yerine UI-temelli placeholder uygulandı.
+26. [x] App-level cache envanteri çıkarıldı ve detaylı rapor yazıldı (`docs/feed/APP_CACHE_SETTINGS_AUDIT_2026-02-06.md`).
+27. [x] Kritik kök neden düzeltildi: `refreshFeed` içindeki global `VideoCacheService.clearCache()` kaldırıldı (`mobile/src/presentation/hooks/useVideoFeed.ts`).
+28. [x] Android native crash için `ReactExoplayerView` null/stale-callback guard patch’i script’e eklendi ve uygulandı (`mobile/scripts/patch-react-native-video.js`).
+29. [x] Native patch doğrulandı: `onEvents` stale callback guard + `videoLoaded` null guard aktif (`mobile/node_modules/react-native-video/.../ReactExoplayerView.java`).
+30. [x] Son değişikliklerden sonra TSX/TypeScript doğrulaması tekrar planlandı ve çalıştırıldı (`cd mobile && npx tsc --noEmit`).
 
-## Adımlar
-- [x] 1. Mevcut `ui` script altyapısını ve komut eşlemesini analiz et.
-- [x] 2. Tema renkleri için yeni kaynak dosya yapısını tasarla (aktif config + defaults + kullanım notları).
-- [x] 3. `mobile/src/core/constants/index.ts` dosyasını yeni tema kaynak dosyasını kullanacak şekilde güncelle.
-- [x] 4. `scripts/tema.js` interaktif yönetim scriptini yaz.
-- [x] 5. `tema` komutunu çağıracak yardımcı script/alias dosyalarını ekle.
-- [x] 6. Dokümantasyonu güncelle (`THEME_COLORS.md` + kullanım notu).
-- [x] 7. Tüm değişiklikler sonrası typecheck doğrulaması yap.
-
-## İlerleme Günlüğü
-- 2026-02-06: `scripts/ui.js`, alias setup dosyaları ve wrapper komutları incelendi. `ui` komutunun FEED flag düzenleme mantığı doğrulandı.
-- 2026-02-06: `mobile/src/core/constants/theme-colors.defaults.json` ve `mobile/src/core/constants/theme-colors.config.json` oluşturuldu. Varsayılan + aktif tema renkleri ayrıştırıldı, kullanım yerleri defaults dosyasına eklendi.
-- 2026-02-06: `mobile/src/core/constants/index.ts` tema renklerini doğrudan hardcode yerine `theme-colors.config.json` kaynağından okuyacak şekilde güncellendi.
-- 2026-02-06: `scripts/tema.js` eklendi. Tema anahtarlarını listeleme, light/dark düzenleme, seçili/tüm tema için varsayılana sıfırlama ve kullanım yolu gösterimi tamamlandı.
-- 2026-02-06: `scripts/TEMA`, `scripts/tema.bat`, `scripts/setup-tema-alias.sh`, `scripts/setup-tema-alias.ps1` dosyaları eklendi ve çalıştırma izinleri ayarlandı.
-- 2026-02-06: `THEME_COLORS.md` yeni tema altyapısına göre güncellendi; `tema` komutu kullanımı, reset akışı, aktif değerler ve kullanım yerleri dokümante edildi.
-- 2026-02-06: Tüm adımlar sonrası tekrar `cd mobile && npx tsc --noEmit` çalıştırıldı, typecheck temiz geçti (0 hata).
-- 2026-02-06: Kesinti sonrası devam edildi; `node scripts/tema.js list`, `node scripts/tema.js reset background`, `node scripts/tema.js reset` komutları doğrulandı.
-- 2026-02-06: Devam doğrulaması sonrası tekrar `cd mobile && npx tsc --noEmit` çalıştırıldı, typecheck temiz geçti.
-- 2026-02-06: Kullanıcı oturumunda `tema` bulunamama sorunu için `scripts/setup-tema-alias.sh` ve `scripts/setup-tema-alias.ps1` güçlendirildi; `~/.local/bin/tema` ve `~/.local/bin/TEMA` launcher kurulumu eklendi, `TEMA` alias desteği eklendi.
-- 2026-02-06: Kurulum tekrar çalıştırıldı ve yeni interactive shell doğrulamasında `tema` + `TEMA` komutları çözümlendi.
-- 2026-02-06: `THEME_GUIDE.md` eklendi. Farkli IDE kurulum adimlari, baslatma komutlari, kullanim tuslari ve sorun giderme adimlari dokumante edildi.
+## Next Steps (Manual Runtime Validation)
+1. [ ] Gerçek cihazda hızlı scroll (aşağı/yukarı) smoke testi.
+2. [ ] Karışık içerik (video + carousel) aktif item doğrulaması.
+3. [ ] Düşük ağ koşullarında poster->video geçiş doğrulaması.
+4. [ ] 25 swipe checklist'ine göre log PASS/FAIL doğrulaması.

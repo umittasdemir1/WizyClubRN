@@ -57,11 +57,13 @@ export const FEED_FLAGS = {
     /** Disable description text */
     INF_DISABLE_DESCRIPTION: false,
     /** Disable action button animations (particle burst, heartbeat) */
-    INF_DISABLE_ACTION_ANIMATIONS: false,
+    INF_DISABLE_ACTION_ANIMATIONS: true,
     /** Disable header tabs (Senin İçin / Takip) */
     INF_DISABLE_HEADER_TABS: false,
     /** Disable thumbnail/poster display during video loading */
     INF_DISABLE_THUMBNAIL: false,
+    /** Commit active item immediately on viewability change (no settle wait) */
+    INF_ACTIVE_COMMIT_ON_VIEWABLE: true,
 
     // ═══════════════════════════════════════════════════════════════════════
     // POOL PLAYER FLAGS (Only applies when USE_INFINITE_FEED is false)

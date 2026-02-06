@@ -1,9 +1,9 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import Animated, { LinearTransition } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { Volume2, VolumeX, MoreVertical } from 'lucide-react-native';
-import VideoPlayer from 'react-native-video';
+import VideoPlayer, { type OnBufferData, type OnLoadStartData, type OnProgressData, type OnVideoErrorData } from 'react-native-video';
+import type { NetInfoStateType } from '@react-native-community/netinfo';
 import { getVideoUrl } from '../../../core/utils/videoUrl';
 import { Video as VideoEntity } from '../../../domain/entities/Video';
 import { InfiniteFeedActions } from './InfiniteFeedActions';
@@ -11,7 +11,9 @@ import { InfiniteCarouselLayer } from './InfiniteCarouselLayer';
 import { VerifiedBadge } from '../shared/VerifiedBadge';
 import { ThemeColors } from './types';
 import { FEED_FLAGS } from '../feed/hooks/useFeedConfig';
+import { getBufferConfig } from '../../../core/utils/bufferConfig';
 import { shadowStyle } from '@/core/utils/shadow';
+import { LogCode, logVideo } from '@/core/services/Logger';
 
 const DESCRIPTION_LIMIT = 70;
 const CARD_HORIZONTAL_PADDING = 16;
@@ -22,6 +24,10 @@ const WEEK = 7 * DAY;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
 const CAROUSEL_ASPECT_RATIO = 3 / 4;
+const FIRST_FRAME_FALLBACK_MS = 1200;
+
+const isNonEmptyString = (value: unknown): value is string =>
+    typeof value === 'string' && value.trim().length > 0;
 
 const mixWithWhite = (hex: string, amount: number) => {
     if (!hex.startsWith('#')) return hex;
@@ -56,7 +62,9 @@ interface InfiniteFeedCardProps {
     index: number;
     colors: ThemeColors;
     isActive: boolean;
+    isPendingActive?: boolean;
     isMuted: boolean;
+    isPaused: boolean;
     currentUserId?: string;
     onToggleMute: () => void;
     onOpen: (id: string, index: number) => void;
@@ -68,6 +76,9 @@ interface InfiniteFeedCardProps {
     onMore?: (id: string) => void;
     onCarouselTouchStart?: () => void;
     onCarouselTouchEnd?: () => void;
+    isMeasurement?: boolean;
+    resolvedVideoSource?: string | null;
+    networkType?: NetInfoStateType | null;
 }
 
 export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
@@ -75,7 +86,9 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     index,
     colors,
     isActive,
+    isPendingActive = false,
     isMuted,
+    isPaused,
     currentUserId,
     onToggleMute,
     onOpen,
@@ -87,8 +100,16 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     onMore,
     onCarouselTouchStart,
     onCarouselTouchEnd,
+    isMeasurement = false,
+    resolvedVideoSource = null,
+    networkType = null,
 }: InfiniteFeedCardProps) {
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+    const [playbackSource, setPlaybackSource] = useState<string | null>(null);
+    const [isVideoVisible, setIsVideoVisible] = useState(false);
+    const firstFrameSeenRef = useRef(false);
+    const bufferingStateRef = useRef(false);
+    const readyFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // ✅ FLAG CONTROLS
     const disableAllUI = FEED_FLAGS.INF_DISABLE_ALL_UI;
@@ -98,19 +119,53 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     const disableDescription = FEED_FLAGS.INF_DISABLE_DESCRIPTION || disableAllUI;
     const disableThumbnail = FEED_FLAGS.INF_DISABLE_THUMBNAIL;
 
+    useEffect(() => {
+        setIsDescriptionExpanded(false);
+    }, [item.id]);
+
+    const clearReadyFallbackTimer = useCallback(() => {
+        if (!readyFallbackTimerRef.current) return;
+        clearTimeout(readyFallbackTimerRef.current);
+        readyFallbackTimerRef.current = null;
+    }, []);
+
     const thumbnail = useMemo(() => {
-        if (item.thumbnailUrl) return item.thumbnailUrl;
-        const fallback = item.mediaUrls?.[0];
-        return fallback?.thumbnail || fallback?.url || '';
+        if (isNonEmptyString(item.thumbnailUrl)) return item.thumbnailUrl;
+        const mediaItems = item.mediaUrls ?? [];
+        const firstImage = mediaItems.find((mediaItem) => mediaItem.type === 'image' && isNonEmptyString(mediaItem.url));
+        if (firstImage?.url) return firstImage.url;
+        const firstThumbnail = mediaItems.find((mediaItem) => isNonEmptyString(mediaItem.thumbnail));
+        if (firstThumbnail?.thumbnail) return firstThumbnail.thumbnail;
+        return '';
     }, [item.mediaUrls, item.thumbnailUrl]);
 
-    const videoUrl = getVideoUrl(item);
+    const sourceVideoUrl = getVideoUrl(item);
+    const videoUrl = isNonEmptyString(resolvedVideoSource) ? resolvedVideoSource : sourceVideoUrl;
     const isCarousel = item.postType === 'carousel' && (item.mediaUrls?.length ?? 0) > 0;
-    const isVideo = !isCarousel && !!videoUrl;
-    // ✅ VIDEO FLAG: If disabled, never render video (only thumbnail)
-    const shouldRenderVideo = isVideo && isActive && !disableInlineVideo;
+    const isVideo = !isCarousel && !!sourceVideoUrl;
+    const effectiveVideoSourceUrl = playbackSource ?? videoUrl;
+    const isLocalVideoSource = Boolean(effectiveVideoSourceUrl && effectiveVideoSourceUrl.startsWith('file://'));
+    const bufferConfig = useMemo(
+        () => getBufferConfig(networkType, isLocalVideoSource),
+        [networkType, isLocalVideoSource]
+    );
+    const videoSource = useMemo(() => {
+        if (!effectiveVideoSourceUrl) return null;
+        return {
+            uri: effectiveVideoSourceUrl,
+            bufferConfig: {
+                ...bufferConfig,
+                cacheSizeMB: 64,
+            },
+            minLoadRetryCount: 5,
+        };
+    }, [effectiveVideoSourceUrl, bufferConfig]);
+    const shouldMountVideo = isVideo && (isActive || isPendingActive) && !disableInlineVideo && !isMeasurement;
+    const shouldPlayVideo = isVideo && isActive && !isPaused && !disableInlineVideo && !isMeasurement;
     const hasMedia = isCarousel || isVideo || Boolean(thumbnail);
     const hasThumbnail = Boolean(thumbnail);
+    const shouldGateVideoVisibility = !disableThumbnail && hasThumbnail;
+    const shouldShowBaseThumbnail = hasThumbnail && (!isVideo || !disableThumbnail);
     const aspectRatio = useMemo(() => {
         if (item.width && item.height && item.width > 0 && item.height > 0) {
             return item.width / item.height;
@@ -150,6 +205,131 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     const handleMore = useCallback(() => {
         onMore?.(item.id);
     }, [item.id, onMore]);
+
+    const revealVideoLayer = useCallback((reason: 'ready' | 'progress' | 'fallback') => {
+        if (!shouldGateVideoVisibility) {
+            firstFrameSeenRef.current = true;
+            clearReadyFallbackTimer();
+            setIsVideoVisible(true);
+            return;
+        }
+        if (firstFrameSeenRef.current) return;
+        firstFrameSeenRef.current = true;
+        clearReadyFallbackTimer();
+        setIsVideoVisible(true);
+        logVideo(LogCode.VIDEO_LOAD_SUCCESS, 'Infinite inline video first frame visible', {
+            videoId: item.id,
+            index,
+            reason,
+            sourceType: isLocalVideoSource ? 'file' : 'network',
+        });
+    }, [clearReadyFallbackTimer, index, isLocalVideoSource, item.id, shouldGateVideoVisibility]);
+
+    const handleVideoLoadStart = useCallback((_event: OnLoadStartData) => {
+        if (!shouldGateVideoVisibility) {
+            firstFrameSeenRef.current = true;
+            bufferingStateRef.current = false;
+            clearReadyFallbackTimer();
+            setIsVideoVisible(true);
+            logVideo(LogCode.VIDEO_LOAD_START, 'Infinite inline video load start (visibility gate bypassed)', {
+                videoId: item.id,
+                index,
+                sourceType: isLocalVideoSource ? 'file' : 'network',
+            });
+            return;
+        }
+        firstFrameSeenRef.current = false;
+        bufferingStateRef.current = false;
+        setIsVideoVisible(false);
+        clearReadyFallbackTimer();
+        readyFallbackTimerRef.current = setTimeout(() => {
+            revealVideoLayer('fallback');
+        }, FIRST_FRAME_FALLBACK_MS);
+        logVideo(LogCode.VIDEO_LOAD_START, 'Infinite inline video load start', {
+            videoId: item.id,
+            index,
+            sourceType: isLocalVideoSource ? 'file' : 'network',
+        });
+    }, [clearReadyFallbackTimer, index, isLocalVideoSource, item.id, revealVideoLayer, shouldGateVideoVisibility]);
+
+    const handleVideoReadyForDisplay = useCallback(() => {
+        revealVideoLayer('ready');
+    }, [revealVideoLayer]);
+
+    const handleVideoProgress = useCallback((event: OnProgressData) => {
+        if (!firstFrameSeenRef.current && event.currentTime >= 0) {
+            revealVideoLayer('progress');
+        }
+    }, [revealVideoLayer]);
+
+    const handleVideoBuffer = useCallback((event: OnBufferData) => {
+        if (event.isBuffering === bufferingStateRef.current) return;
+        bufferingStateRef.current = event.isBuffering;
+        logVideo(event.isBuffering ? LogCode.VIDEO_BUFFER_START : LogCode.VIDEO_BUFFER_END, 'Infinite inline video buffer state changed', {
+            videoId: item.id,
+            index,
+            isBuffering: event.isBuffering,
+        });
+    }, [index, item.id]);
+
+    const handleVideoError = useCallback((error: OnVideoErrorData) => {
+        clearReadyFallbackTimer();
+        firstFrameSeenRef.current = false;
+        setIsVideoVisible(false);
+        logVideo(LogCode.VIDEO_LOAD_ERROR, 'Infinite inline video load error', {
+            videoId: item.id,
+            index,
+            sourceType: isLocalVideoSource ? 'file' : 'network',
+            error,
+        });
+    }, [clearReadyFallbackTimer, index, isLocalVideoSource, item.id]);
+
+    useEffect(() => {
+        clearReadyFallbackTimer();
+        firstFrameSeenRef.current = !shouldGateVideoVisibility;
+        bufferingStateRef.current = false;
+        setIsVideoVisible(!shouldGateVideoVisibility);
+        setPlaybackSource(null);
+    }, [clearReadyFallbackTimer, item.id, shouldGateVideoVisibility]);
+
+    useEffect(() => () => {
+        clearReadyFallbackTimer();
+    }, [clearReadyFallbackTimer]);
+
+    useEffect(() => {
+        if (!shouldMountVideo) {
+            clearReadyFallbackTimer();
+            firstFrameSeenRef.current = !shouldGateVideoVisibility;
+            bufferingStateRef.current = false;
+            setIsVideoVisible(!shouldGateVideoVisibility);
+            setPlaybackSource(null);
+            return;
+        }
+
+        if (!shouldGateVideoVisibility) {
+            firstFrameSeenRef.current = true;
+            setIsVideoVisible(true);
+        }
+        setPlaybackSource((prev) => prev ?? (videoUrl ?? null));
+    }, [clearReadyFallbackTimer, shouldGateVideoVisibility, shouldMountVideo, videoUrl]);
+
+    useEffect(() => {
+        if (!shouldMountVideo) return;
+        if (!shouldGateVideoVisibility) {
+            firstFrameSeenRef.current = true;
+            bufferingStateRef.current = false;
+            clearReadyFallbackTimer();
+            setIsVideoVisible(true);
+            return;
+        }
+        firstFrameSeenRef.current = false;
+        bufferingStateRef.current = false;
+        setIsVideoVisible(false);
+        clearReadyFallbackTimer();
+        readyFallbackTimerRef.current = setTimeout(() => {
+            revealVideoLayer('fallback');
+        }, FIRST_FRAME_FALLBACK_MS);
+    }, [clearReadyFallbackTimer, revealVideoLayer, shouldGateVideoVisibility, shouldMountVideo]);
 
     // ✅ [PERF] Memoize dynamic styles to prevent object reference churn
     const effectiveAspectRatio = isCarousel ? CAROUSEL_ASPECT_RATIO : aspectRatio;
@@ -203,6 +383,10 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         styles.cardInner,
         { backgroundColor: cardBackground, borderColor: cardBorderColor }
     ], [cardBackground, cardBorderColor]);
+    const mediaPlaceholderStyle = useMemo(() => [
+        styles.mediaPlaceholder,
+        { backgroundColor: mixWithWhite(colors.background, isDarkTheme ? 0.08 : 0.16) },
+    ], [colors.background, isDarkTheme]);
 
     const descriptionValue = item.description?.trim() ?? '';
     const hasDescription = descriptionValue.length > 0;
@@ -286,29 +470,50 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                         style={mediaWrapperStyle}
                         onPress={handleOpen}
                     >
-                        {isVideo && videoUrl ? (
-                            <VideoPlayer
-                                source={{ uri: videoUrl }}
-                                style={styles.media}
-                                resizeMode="contain"
-                                repeat={true}
-                                paused={!isActive}
-                                muted={isMuted}
-                                playInBackground={false}
-                                playWhenInactive={false}
-                                progressUpdateInterval={1000}
-                                poster={!disableThumbnail ? thumbnail : undefined}
-                                posterResizeMode="cover"
-                                bufferConfig={{
-                                    minBufferMs: 500,
-                                    maxBufferMs: 2000,
-                                    bufferForPlaybackMs: 250,
-                                    bufferForPlaybackAfterRebufferMs: 500,
-                                }}
-                            />
-                        ) : hasThumbnail ? (
-                            <Image source={{ uri: thumbnail }} style={styles.media} contentFit="cover" />
-                        ) : null}
+                        <View style={styles.videoContainer}>
+                            {shouldShowBaseThumbnail ? (
+                                <Image
+                                    source={{ uri: thumbnail }}
+                                    style={styles.media}
+                                    contentFit="cover"
+                                    transition={0}
+                                    cachePolicy="memory-disk"
+                                />
+                            ) : (
+                                <View style={mediaPlaceholderStyle} />
+                            )}
+                            {shouldMountVideo && videoSource ? (
+                                <VideoPlayer
+                                    source={videoSource as any}
+                                    style={[
+                                        styles.media,
+                                        styles.videoOverlay,
+                                        (!isActive || (shouldGateVideoVisibility && !isVideoVisible)) && styles.videoHidden,
+                                    ]}
+                                    resizeMode="contain"
+                                    repeat={true}
+                                    paused={!shouldPlayVideo}
+                                    muted={isMuted}
+                                    playInBackground={false}
+                                    playWhenInactive={false}
+                                    progressUpdateInterval={100}
+                                    onLoadStart={handleVideoLoadStart}
+                                    onReadyForDisplay={handleVideoReadyForDisplay}
+                                    onProgress={handleVideoProgress}
+                                    onBuffer={handleVideoBuffer}
+                                    onError={handleVideoError}
+                                    hideShutterView={true}
+                                    shutterColor="transparent"
+                                    poster={!disableThumbnail && hasThumbnail ? thumbnail : undefined}
+                                    posterResizeMode="cover"
+                                    // @ts-ignore - deprecated prop but required for stable Android overlay rendering
+                                    useTextureView={true}
+                                    automaticallyWaitsToMinimizeStalling={false}
+                                    preferredForwardBufferDuration={4}
+                                    preventsDisplaySleepDuringVideoPlayback={false}
+                                />
+                            ) : null}
+                        </View>
 
                         {/* ✅ USER HEADER - Top-left overlay on media */}
                         {!disableUserHeader && (
@@ -439,7 +644,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     );
 
     return (
-        <Animated.View style={cardOuterStyle} layout={LinearTransition.duration(220)}>
+        <View style={cardOuterStyle}>
             <View style={cardInnerStyle}>
                 {isCarousel ? (
                     cardBody
@@ -449,7 +654,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                     </Pressable>
                 )}
             </View>
-        </Animated.View>
+        </View>
     );
 });
 
@@ -541,6 +746,17 @@ const styles = StyleSheet.create({
         width: '100%',
         height: '100%',
         backgroundColor: '#111',
+    },
+    videoContainer: {
+        width: '100%',
+        height: '100%',
+        backgroundColor: '#111',
+    },
+    videoOverlay: {
+        ...StyleSheet.absoluteFillObject,
+    },
+    videoHidden: {
+        opacity: 0,
     },
     mediaHeaderOverlay: {
         position: 'absolute',

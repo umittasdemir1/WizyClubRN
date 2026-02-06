@@ -193,8 +193,8 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
         try {
             setIsRefreshing(true);
             setError(null);
-            // Clear cache on refresh to resolve any persistence issues with same-named files
-            await VideoCacheService.clearCache();
+            // Keep video cache on feed refresh so revisiting recently watched videos
+            // can reopen from local storage instead of forcing network fetches.
 
             // Get fresh userId from store
             const freshUserId = useAuthStore.getState().user?.id || 'anon';
@@ -357,14 +357,21 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
         }
     }, [toggleSaveUseCase, user]);
 
-    // ✅ [PERF] Memoize synced videos to prevent new object references on every render
-    const syncedVideos = useMemo(() => videos.map(v => ({
-        ...v,
-        user: {
-            ...v.user,
-            isFollowing: followingMap[v.user.id] ?? v.user.isFollowing
+    // ✅ [PERF] Preserve object identity unless social state actually changed
+    const syncedVideos = useMemo(() => videos.map((video) => {
+        const syncedIsFollowing = followingMap[video.user.id];
+        if (syncedIsFollowing == null || syncedIsFollowing === video.user.isFollowing) {
+            return video;
         }
-    })), [videos, followingMap]);
+
+        return {
+            ...video,
+            user: {
+                ...video.user,
+                isFollowing: syncedIsFollowing,
+            },
+        };
+    }), [videos, followingMap]);
 
     const toggleFollow = useCallback(async (videoId: string) => {
         if (!user) {

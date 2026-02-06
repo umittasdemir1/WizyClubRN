@@ -1,9 +1,20 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, RefreshControl, ActivityIndicator } from 'react-native';
+import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
+import {
+    View,
+    Text,
+    Pressable,
+    RefreshControl,
+    ActivityIndicator,
+    Dimensions,
+    type NativeSyntheticEvent,
+    type NativeScrollEvent,
+} from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SystemBars } from 'react-native-edge-to-edge';
+import { Image as ExpoImage } from 'expo-image';
+import { useNetInfo, NetInfoStateType } from '@react-native-community/netinfo';
 import { useActiveVideoStore, useMuteControls } from '../../store/useActiveVideoStore';
 import { useThemeStore } from '../../store/useThemeStore';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -13,8 +24,12 @@ import { Video as VideoEntity } from '../../../domain/entities/Video';
 import { InfiniteFeedHeader, FeedTab } from './InfiniteFeedHeader';
 import { InfiniteFeedCard } from './InfiniteFeedCard';
 import { styles } from './InfiniteFeedManager.styles';
-import { FEED_FLAGS } from '../feed/hooks/useFeedConfig';
+import { FEED_FLAGS, FEED_CONFIG } from '../feed/hooks/useFeedConfig';
 import { useStoryViewer } from '../../hooks/useStoryViewer';
+import type { ViewToken } from 'react-native';
+import { FeedPrefetchService } from '../../../data/services/FeedPrefetchService';
+import { VideoCacheService } from '../../../data/services/VideoCacheService';
+import { LogCode, logCache, logPerf, logVideo } from '@/core/services/Logger';
 
 interface InfiniteFeedManagerProps {
     videos: VideoEntity[];
@@ -31,6 +46,28 @@ interface InfiniteFeedManagerProps {
     toggleShare: (id: string) => void;
     toggleShop: (id: string) => void;
 }
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+const ESTIMATED_CARD_HEIGHT = Math.round(SCREEN_HEIGHT * 0.82);
+const THUMBNAIL_PREFETCH_OFFSETS = [-2, -1, 1, 2, 3];
+
+const getPrefetchIndices = (activeIndex: number, videosLength: number): number[] => {
+    const indices = new Set<number>();
+    const ahead = FEED_CONFIG.PREFETCH_AHEAD_COUNT;
+    const behind = FEED_CONFIG.PREFETCH_BEHIND_COUNT;
+    const maxIndex = videosLength - 1;
+
+    for (let i = 1; i <= ahead; i += 1) {
+        const idx = activeIndex + i;
+        if (idx <= maxIndex) indices.add(idx);
+    }
+    for (let i = 1; i <= behind; i += 1) {
+        const idx = activeIndex - i;
+        if (idx >= 0) indices.add(idx);
+    }
+
+    return Array.from(indices);
+};
 
 
 export function InfiniteFeedManager({
@@ -50,6 +87,7 @@ export function InfiniteFeedManager({
 }: InfiniteFeedManagerProps) {
     const insets = useSafeAreaInsets();
     const router = useRouter();
+    const netInfo = useNetInfo();
     const isDark = useThemeStore((state) => state.isDark);
     const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
     const { isMuted, toggleMute } = useMuteControls();
@@ -58,10 +96,26 @@ export function InfiniteFeedManager({
 
     const [activeTab, setActiveTab] = useState<FeedTab>('Sana Özel');
     const [activeInlineId, setActiveInlineId] = useState<string | null>(null);
+    const [pendingInlineId, setPendingInlineId] = useState<string | null>(null);
+    const [activeInlineIndex, setActiveInlineIndex] = useState<number>(0);
+    const [pendingInlineIndex, setPendingInlineIndex] = useState<number>(0);
     const [isCarouselInteracting, setIsCarouselInteracting] = useState(false);
+    const [isFeedScrolling, setIsFeedScrolling] = useState(false);
+    const [resolvedVideoSources, setResolvedVideoSources] = useState<Record<string, string>>({});
+    const resolvedVideoSourcesRef = useRef<Record<string, string>>({});
+    const activeInlineIdRef = useRef<string | null>(null);
+    const activeInlineIndexRef = useRef<number>(0);
+    const pendingActiveIdRef = useRef<string | null>(null);
+    const pendingActiveIndexRef = useRef<number>(0);
+    const momentumStartedRef = useRef(false);
+    const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const scrollStartAtRef = useRef<number | null>(null);
+    const sourceResolveGenerationRef = useRef(0);
 
     const setCustomFeed = useActiveVideoStore((state) => state.setCustomFeed);
     const setActiveVideo = useActiveVideoStore((state) => state.setActiveVideo);
+    const isPaused = useActiveVideoStore((state) => state.isPaused);
+    const immediateActiveCommit = FEED_FLAGS.INF_ACTIVE_COMMIT_ON_VIEWABLE;
 
     useFocusEffect(
         useCallback(() => {
@@ -95,48 +149,347 @@ export function InfiniteFeedManager({
         }, []);
     }, [storyListData]);
 
+    const setResolvedSourceForId = useCallback((videoId: string, source: string | null) => {
+        setResolvedVideoSources((prev) => {
+            if (!source) {
+                if (!(videoId in prev)) return prev;
+                const next = { ...prev };
+                delete next[videoId];
+                return next;
+            }
+            if (prev[videoId] === source) return prev;
+            return { ...prev, [videoId]: source };
+        });
+    }, []);
+
+    useEffect(() => {
+        resolvedVideoSourcesRef.current = resolvedVideoSources;
+    }, [resolvedVideoSources]);
+
+    const clearSettleTimer = useCallback(() => {
+        if (!settleTimerRef.current) return;
+        clearTimeout(settleTimerRef.current);
+        settleTimerRef.current = null;
+    }, []);
+
+    const commitPendingActive = useCallback((reason: 'momentum-end' | 'drag-end-no-momentum' | 'viewable-immediate') => {
+        if (!videos.length) return;
+
+        const nextIndex = pendingActiveIndexRef.current;
+        if (nextIndex < 0 || nextIndex >= videos.length) return;
+
+        const nextId = pendingActiveIdRef.current;
+        const prevId = activeInlineIdRef.current;
+        const prevIndex = activeInlineIndexRef.current;
+
+        if (nextId === prevId && nextIndex === prevIndex) {
+            scrollStartAtRef.current = null;
+            return;
+        }
+
+        activeInlineIdRef.current = nextId;
+        activeInlineIndexRef.current = nextIndex;
+        setActiveInlineId(nextId);
+        setPendingInlineId(nextId);
+        setPendingInlineIndex(nextIndex);
+        setActiveInlineIndex(nextIndex);
+
+        const settleDurationMs = scrollStartAtRef.current ? Date.now() - scrollStartAtRef.current : null;
+        scrollStartAtRef.current = null;
+
+        logVideo(LogCode.VIDEO_PLAYBACK_START, 'Infinite feed active video committed on settle', {
+            reason,
+            previousIndex: prevIndex,
+            nextIndex,
+            nextId,
+        });
+        logPerf(LogCode.PERF_MEASURE_END, 'Infinite feed settle commit measured', {
+            reason,
+            settleDurationMs,
+            queueLength: FeedPrefetchService.getInstance().getQueueLength(),
+        });
+    }, [videos.length]);
+
+    useEffect(() => {
+        FeedPrefetchService.getInstance().setNetworkType((netInfo.type ?? null) as NetInfoStateType | null);
+    }, [netInfo.type]);
+
+    useEffect(() => {
+        const ids = new Set(videos.map((video) => video.id));
+        setResolvedVideoSources((prev) => {
+            let changed = false;
+            const next: Record<string, string> = {};
+            Object.entries(prev).forEach(([videoId, source]) => {
+                if (ids.has(videoId)) {
+                    next[videoId] = source;
+                } else {
+                    changed = true;
+                }
+            });
+            return changed ? next : prev;
+        });
+    }, [videos]);
+
+    useEffect(() => {
+        if (videos.length === 0) {
+            activeInlineIdRef.current = null;
+            activeInlineIndexRef.current = 0;
+            pendingActiveIdRef.current = null;
+            pendingActiveIndexRef.current = 0;
+            setActiveInlineId(null);
+            setPendingInlineId(null);
+            setPendingInlineIndex(0);
+            setActiveInlineIndex(0);
+            return;
+        }
+
+        const hasCurrentActive = Boolean(
+            activeInlineIdRef.current && videos.some((video) => video.id === activeInlineIdRef.current)
+        );
+        if (hasCurrentActive) {
+            pendingActiveIdRef.current = activeInlineIdRef.current;
+            pendingActiveIndexRef.current = activeInlineIndexRef.current;
+            setPendingInlineIndex(activeInlineIndexRef.current);
+            return;
+        }
+
+        const firstVideoId = videos[0]?.id ?? null;
+        activeInlineIdRef.current = firstVideoId;
+        activeInlineIndexRef.current = 0;
+        pendingActiveIdRef.current = firstVideoId;
+        pendingActiveIndexRef.current = 0;
+        setActiveInlineId(firstVideoId);
+        setPendingInlineId(firstVideoId);
+        setPendingInlineIndex(0);
+        setActiveInlineIndex(0);
+    }, [videos]);
+
+    useEffect(() => {
+        pendingActiveIdRef.current = activeInlineId;
+        setPendingInlineId(activeInlineId);
+        pendingActiveIndexRef.current = activeInlineIndex;
+        setPendingInlineIndex(activeInlineIndex);
+    }, [activeInlineId, activeInlineIndex]);
+
+    useEffect(() => () => {
+        clearSettleTimer();
+    }, [clearSettleTimer]);
+
+    useEffect(() => {
+        if (!videos.length || activeInlineIndex < 0 || activeInlineIndex >= videos.length) return;
+
+        const prefetchService = FeedPrefetchService.getInstance();
+        const activeVideo = videos[activeInlineIndex];
+        const activeVideoUrl = activeVideo ? getVideoUrl(activeVideo) : null;
+
+        if (activeVideoUrl) {
+            prefetchService.bumpPriority(activeVideoUrl, 0);
+            prefetchService.queueSingleVideo(activeVideoUrl, 0);
+            VideoCacheService.warmupCache(activeVideoUrl);
+
+            const generation = ++sourceResolveGenerationRef.current;
+            const resolveIfCurrent = (cachedPath: string | null) => {
+                if (sourceResolveGenerationRef.current !== generation) return;
+                if (!cachedPath) return;
+                setResolvedSourceForId(activeVideo.id, cachedPath);
+            };
+            const memoryCached = VideoCacheService.getMemoryCachedPath(activeVideoUrl);
+            if (memoryCached) {
+                setResolvedSourceForId(activeVideo.id, memoryCached);
+                logCache(LogCode.CACHE_HIT, 'Infinite active video served from memory cache', {
+                    videoId: activeVideo.id,
+                    index: activeInlineIndex,
+                });
+            } else {
+                const previousResolved = resolvedVideoSourcesRef.current[activeVideo.id] ?? null;
+                const hasResolvedFallback = Boolean(previousResolved);
+                logCache(LogCode.CACHE_MISS, 'Infinite active video cache miss, forcing cache now', {
+                    videoId: activeVideo.id,
+                    index: activeInlineIndex,
+                    hasResolvedFallback,
+                });
+                prefetchService.cacheVideoNow(activeVideoUrl)
+                    .then((cachedPath) => {
+                        if (cachedPath) {
+                            resolveIfCurrent(cachedPath);
+                            logCache(LogCode.CACHE_SET, 'Infinite active video cached immediately', {
+                                videoId: activeVideo.id,
+                                index: activeInlineIndex,
+                            });
+                            return;
+                        }
+                        return prefetchService.getCachedPath(activeVideoUrl).then((resolvedPath) => {
+                            if (resolvedPath) {
+                                logCache(LogCode.CACHE_HIT, 'Infinite active video resolved from disk cache', {
+                                    videoId: activeVideo.id,
+                                    index: activeInlineIndex,
+                                });
+                                resolveIfCurrent(resolvedPath);
+                                return;
+                            }
+                            if (!hasResolvedFallback) {
+                                setResolvedSourceForId(activeVideo.id, null);
+                            }
+                            logCache(LogCode.CACHE_MISS, 'Infinite active video still not cached after force-cache', {
+                                videoId: activeVideo.id,
+                                index: activeInlineIndex,
+                                hasResolvedFallback,
+                            });
+                        });
+                    })
+                    .catch((error) => {
+                        if (!hasResolvedFallback) {
+                            setResolvedSourceForId(activeVideo.id, null);
+                        }
+                        logCache(LogCode.CACHE_ERROR, 'Infinite active video force-cache failed', {
+                            videoId: activeVideo.id,
+                            index: activeInlineIndex,
+                            hasResolvedFallback,
+                            error,
+                        });
+                    });
+            }
+        }
+
+        THUMBNAIL_PREFETCH_OFFSETS.forEach((offset) => {
+            const video = videos[activeInlineIndex + offset];
+            if (!video?.thumbnailUrl) return;
+            ExpoImage.prefetch(video.thumbnailUrl);
+        });
+
+        const prefetchIndices = getPrefetchIndices(activeInlineIndex, videos.length).filter((idx) => {
+            const video = videos[idx];
+            return Boolean(video && video.postType !== 'carousel' && getVideoUrl(video));
+        });
+        if (prefetchIndices.length > 0) {
+            prefetchService.queueVideos(videos, prefetchIndices, activeInlineIndex);
+            logPerf(LogCode.PREFETCH_START, 'Infinite feed queued nearby videos for prefetch', {
+                activeInlineIndex,
+                prefetchIndices,
+            });
+            prefetchIndices.forEach((idx) => {
+                const url = getVideoUrl(videos[idx]);
+                if (url) {
+                    VideoCacheService.warmupCache(url);
+                }
+            });
+        }
+    }, [activeInlineIndex, videos, setResolvedSourceForId]);
+
 
     const handleCarouselTouchStart = useCallback(() => {
-        setIsCarouselInteracting(true);
+        setIsCarouselInteracting((prev) => (prev ? prev : true));
     }, []);
 
     const handleCarouselTouchEnd = useCallback(() => {
-        setIsCarouselInteracting(false);
+        setIsCarouselInteracting((prev) => (prev ? false : prev));
     }, []);
 
-    const renderItem = useCallback(({ item, index }: { item: VideoEntity; index: number }) => (
-        <InfiniteFeedCard
-            item={item}
-            index={index}
-            colors={themeColors}
-            isActive={item.id === activeInlineId}
-            isMuted={isMuted}
-            currentUserId={currentUserId}
-            onToggleMute={toggleMute}
-            onOpen={handleOpenVideo}
-            onLike={toggleLike}
-            onSave={toggleSave}
-            onFollow={toggleFollow}
-            onShare={toggleShare}
-            onShop={toggleShop}
-            onCarouselTouchStart={handleCarouselTouchStart}
-            onCarouselTouchEnd={handleCarouselTouchEnd}
-        />
-    ), [activeInlineId, currentUserId, handleCarouselTouchEnd, handleCarouselTouchStart, handleOpenVideo, isMuted, themeColors, toggleFollow, toggleLike, toggleSave, toggleShare, toggleShop]);
+    const shouldPauseForScroll = isFeedScrolling && !immediateActiveCommit;
 
-    // ✅ Video starts when 40% visible
+    const renderItem = useCallback(({ item, index, target }: { item: VideoEntity; index: number; target?: string }) => {
+        // Keep a small pre-mount window around pending target so UI is ready before playback switch.
+        // Playback itself still remains active-only.
+        // This mirrors Instagram/X behavior where chrome appears instantly and media follows.
+        const isPendingWindow = Math.abs(index - pendingInlineIndex) <= 1;
+
+        return (
+            <InfiniteFeedCard
+                item={item}
+                index={index}
+                colors={themeColors}
+                isActive={item.id === activeInlineId}
+                isPendingActive={item.id === pendingInlineId || isPendingWindow}
+                isMuted={isMuted}
+                isPaused={isPaused || shouldPauseForScroll}
+                currentUserId={currentUserId}
+                onToggleMute={toggleMute}
+                onOpen={handleOpenVideo}
+                onLike={toggleLike}
+                onSave={toggleSave}
+                onFollow={toggleFollow}
+                onShare={toggleShare}
+                onShop={toggleShop}
+                onCarouselTouchStart={handleCarouselTouchStart}
+                onCarouselTouchEnd={handleCarouselTouchEnd}
+                isMeasurement={target === 'Measurement'}
+                resolvedVideoSource={resolvedVideoSources[item.id] ?? null}
+                networkType={(netInfo.type ?? null) as NetInfoStateType | null}
+            />
+        );
+    }, [activeInlineId, currentUserId, handleCarouselTouchEnd, handleCarouselTouchStart, handleOpenVideo, isMuted, isPaused, netInfo.type, pendingInlineId, pendingInlineIndex, resolvedVideoSources, shouldPauseForScroll, themeColors, toggleFollow, toggleLike, toggleMute, toggleSave, toggleShare, toggleShop]);
+
+    // Active item changes when card visibility crosses threshold
     const viewabilityConfig = useRef({
-        itemVisiblePercentThreshold: 60,
+        itemVisiblePercentThreshold: 35,
         minimumViewTime: 100,
     }).current;
 
-    const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: Array<{ item: VideoEntity }> }) => {
-        const firstPlayable = viewableItems.find((viewable) => {
-            const video = viewable.item;
-            return video.postType !== 'carousel' && !!getVideoUrl(video);
+    const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken<VideoEntity>[] }) => {
+        const nextViewable = viewableItems
+            .filter((token) => token.isViewable && token.item && typeof token.index === 'number')
+            .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))[0];
+        if (!nextViewable) return;
+
+        const candidate = nextViewable?.item;
+        const nextIndex = typeof nextViewable?.index === 'number' ? nextViewable.index : null;
+        const hasPlayableSource = candidate?.postType === 'carousel' || !!getVideoUrl(candidate);
+        const nextId = hasPlayableSource ? (candidate?.id ?? null) : null;
+        const resolvedNextIndex = nextIndex ?? pendingActiveIndexRef.current;
+
+        if (nextId === pendingActiveIdRef.current && resolvedNextIndex === pendingActiveIndexRef.current) return;
+        pendingActiveIdRef.current = nextId;
+        pendingActiveIndexRef.current = resolvedNextIndex;
+        setPendingInlineId(nextId);
+        setPendingInlineIndex(resolvedNextIndex);
+        if (immediateActiveCommit) {
+            commitPendingActive('viewable-immediate');
+        }
+    }, [commitPendingActive, immediateActiveCommit]);
+
+    const handleScrollBeginDrag = useCallback(() => {
+        clearSettleTimer();
+        momentumStartedRef.current = false;
+        scrollStartAtRef.current = Date.now();
+        setIsFeedScrolling(true);
+        logPerf(LogCode.PERF_MEASURE_START, 'Infinite feed scroll begin', {
+            activeInlineIndex: activeInlineIndexRef.current,
         });
-        setActiveInlineId(firstPlayable?.item.id ?? null);
-    }).current;
+    }, [clearSettleTimer]);
+
+    const handleMomentumScrollBegin = useCallback(() => {
+        momentumStartedRef.current = true;
+        if (!scrollStartAtRef.current) {
+            scrollStartAtRef.current = Date.now();
+        }
+        setIsFeedScrolling(true);
+    }, []);
+
+    const handleMomentumScrollEnd = useCallback(() => {
+        clearSettleTimer();
+        momentumStartedRef.current = false;
+        setIsFeedScrolling(false);
+        commitPendingActive('momentum-end');
+    }, [clearSettleTimer, commitPendingActive]);
+
+    const handleScrollEndDrag = useCallback((_event: NativeSyntheticEvent<NativeScrollEvent>) => {
+        clearSettleTimer();
+        settleTimerRef.current = setTimeout(() => {
+            if (momentumStartedRef.current) return;
+            setIsFeedScrolling(false);
+            commitPendingActive('drag-end-no-momentum');
+        }, 32);
+    }, [clearSettleTimer, commitPendingActive]);
+
+    const flashListExtraData = useMemo(() => ({
+        activeInlineId,
+        pendingInlineId,
+        pendingInlineIndex,
+        isMuted,
+        isPaused,
+        isFeedScrolling,
+        immediateActiveCommit,
+    }), [activeInlineId, immediateActiveCommit, isFeedScrolling, isMuted, isPaused, pendingInlineId, pendingInlineIndex]);
 
     const listEmpty = (
         <View style={styles.emptyState}>
@@ -167,11 +520,15 @@ export function InfiniteFeedManager({
                 data={videos}
                 renderItem={renderItem}
                 keyExtractor={(item: VideoEntity) => item.id}
-                extraData={activeInlineId}
+                extraData={flashListExtraData}
                 viewabilityConfig={viewabilityConfig}
                 onViewableItemsChanged={onViewableItemsChanged}
-                estimatedItemSize={500}
-                removeClippedSubviews={true}
+                onScrollBeginDrag={handleScrollBeginDrag}
+                onScrollEndDrag={handleScrollEndDrag}
+                onMomentumScrollBegin={handleMomentumScrollBegin}
+                onMomentumScrollEnd={handleMomentumScrollEnd}
+                estimatedItemSize={ESTIMATED_CARD_HEIGHT}
+                removeClippedSubviews={false}
                 showsVerticalScrollIndicator={false}
                 scrollEnabled={!isCarouselInteracting}
                 ListHeaderComponent={!FEED_FLAGS.INF_DISABLE_HEADER_TABS ? (
