@@ -1,9 +1,9 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { View, StyleSheet, Dimensions, FlatList, Pressable, GestureResponderEvent, Text, ActivityIndicator } from 'react-native';
-import { Image as ExpoImage } from 'expo-image';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { shadowStyle } from '@/core/utils/shadow';
-import { FEED_FLAGS } from './hooks/useInfiniteFeedConfig';
+import { FEED_FLAGS } from './hooks/usePoolFeedConfig';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.heic', '.heif', '.avif'];
@@ -15,25 +15,14 @@ const isImageUrl = (url: string): boolean => {
     return IMAGE_EXTENSIONS.some((ext) => normalized.endsWith(ext));
 };
 
-const getStableMediaCacheKey = (url: string): string => {
-    const trimmed = url.trim();
-    if (!trimmed) return url;
-    return trimmed.split('#')[0].split('?')[0];
-};
-
 interface CarouselItem {
     url: string;
     thumbnail?: string;
-    width?: number;
-    height?: number;
-    cacheKey?: string;
-    thumbnailCacheKey?: string;
 }
 
-interface InfiniteCarouselLayerProps {
+interface CarouselLayerProps {
     mediaUrls: CarouselItem[];
     isCleanScreen?: boolean;
-    backgroundColor?: string;
     onDoubleTap?: () => void;
     onSingleTap?: () => void;
     onLongPress?: (event: GestureResponderEvent) => void;
@@ -45,10 +34,9 @@ interface InfiniteCarouselLayerProps {
 
 const DOUBLE_TAP_DELAY = 250;
 
-export function InfiniteCarouselLayer({
+export function PoolFeedCarouselLayer({
     mediaUrls,
     isCleanScreen = false,
-    backgroundColor = '#000',
     onDoubleTap,
     onSingleTap,
     onLongPress,
@@ -56,7 +44,7 @@ export function InfiniteCarouselLayer({
     onPressIn,
     onCarouselTouchStart,
     onCarouselTouchEnd,
-}: InfiniteCarouselLayerProps) {
+}: CarouselLayerProps) {
     const [activeIndex, setActiveIndex] = useState(0);
     const flatListRef = useRef<FlatList>(null);
     const tapCount = useRef(0);
@@ -73,35 +61,9 @@ export function InfiniteCarouselLayer({
 
     const lastActiveIndexRef = useRef(0);
     const normalizedItems = useMemo(
-        () => mediaUrls
-            .filter((item) => isImageUrl(item.url))
-            .map((item) => ({
-                ...item,
-                cacheKey: getStableMediaCacheKey(item.url),
-                thumbnailCacheKey: item.thumbnail ? getStableMediaCacheKey(item.thumbnail) : undefined,
-            })),
+        () => mediaUrls.filter((item) => isImageUrl(item.url)),
         [mediaUrls]
     );
-    const mediaIdentityKey = useMemo(
-        () => normalizedItems.map((item) => item.cacheKey ?? item.url).join('|'),
-        [normalizedItems]
-    );
-
-    useEffect(() => {
-        loadedIndicesRef.current.clear();
-        lastActiveIndexRef.current = 0;
-        setActiveIndex(0);
-        setActiveImageLoaded(false);
-        autoAdvanceStartIndexRef.current = null;
-        autoAdvanceHasAdvancedRef.current = false;
-        autoAdvanceHasLoopedRef.current = false;
-
-        if (normalizedItems.length > 0) {
-            requestAnimationFrame(() => {
-                flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
-            });
-        }
-    }, [mediaIdentityKey, normalizedItems.length]);
 
     const handleScroll = useCallback((event: any) => {
         if (normalizedItems.length === 0) return;
@@ -178,7 +140,7 @@ export function InfiniteCarouselLayer({
         targets.forEach((idx) => {
             const url = normalizedItems[idx]?.url;
             if (url) {
-                ExpoImage.prefetch(url);
+                Image.prefetch(url);
             }
         });
     }, [activeIndex, normalizedItems]);
@@ -255,11 +217,8 @@ export function InfiniteCarouselLayer({
     const isActiveImage = Boolean(activeItem);
     const activeImageIndex = isActiveImage ? activeIndex : -1;
 
-    const containerStyle = useMemo(() => [styles.container, { backgroundColor }], [backgroundColor]);
-    const loadingOverlayStyle = useMemo(() => [styles.loadingOverlay, { backgroundColor }], [backgroundColor]);
-
     return (
-        <View style={containerStyle}>
+        <View style={styles.container}>
             <FlatList
                 ref={flatListRef}
                 data={normalizedItems}
@@ -267,7 +226,6 @@ export function InfiniteCarouselLayer({
                     <CarouselMediaItem
                         item={item}
                         index={index}
-                        backgroundColor={backgroundColor}
                         onPress={handlePress}
                         onLongPress={onLongPress ? handleLongPress : undefined}
                         onPressOut={onPressOut}
@@ -275,7 +233,7 @@ export function InfiniteCarouselLayer({
                         onImageDone={handleImageDone}
                     />
                 )}
-                keyExtractor={(item, index) => `${item.cacheKey ?? item.url}-${index}`}
+                keyExtractor={(item, index) => `${item.url}-${index}`}
                 horizontal
                 pagingEnabled={false}
                 showsHorizontalScrollIndicator={false}
@@ -345,7 +303,7 @@ export function InfiniteCarouselLayer({
                 <View
                     style={[
                         styles.photoIndexBadge,
-                        { top: insets.top + 35 },
+                        { top: insets.top + 92 },
                     ]}
                     pointerEvents="none"
                 >
@@ -356,7 +314,7 @@ export function InfiniteCarouselLayer({
             )}
 
             {normalizedItems.length > 0 && !activeImageLoaded && (
-                <View style={loadingOverlayStyle} pointerEvents="none">
+                <View style={styles.loadingOverlay} pointerEvents="none">
                     <ActivityIndicator color="#FFFFFF" />
                 </View>
             )}
@@ -368,7 +326,6 @@ export function InfiniteCarouselLayer({
 interface CarouselItemProps {
     item: CarouselItem;
     index: number;
-    backgroundColor: string;
     onPress: (event: GestureResponderEvent) => void;
     onLongPress?: (event: GestureResponderEvent) => void;
     onPressOut?: () => void;
@@ -379,7 +336,6 @@ interface CarouselItemProps {
 function CarouselMediaItem({
     item,
     index,
-    backgroundColor,
     onPress,
     onLongPress,
     onPressOut,
@@ -389,22 +345,20 @@ function CarouselMediaItem({
     // Image-only carousel
     return (
         <Pressable
-            style={[styles.mediaContainer, { backgroundColor }]}
+            style={styles.mediaContainer}
             onPress={onPress}
             onLongPress={onLongPress}
             onPressOut={onPressOut}
             onPressIn={onPressIn}
             delayLongPress={300}
         >
-            <ExpoImage
-                source={{ uri: item.url, cacheKey: item.cacheKey }}
-                style={[styles.image, { backgroundColor }]}
-                contentFit="cover"
+            <Image
+                source={{ uri: item.url }}
+                style={styles.image}
+                contentFit="contain"
                 cachePolicy="memory-disk"
                 priority="high"
-                placeholder={(!FEED_FLAGS.INF_DISABLE_THUMBNAIL && item.thumbnail)
-                    ? { uri: item.thumbnail, cacheKey: item.thumbnailCacheKey ?? item.thumbnail }
-                    : undefined}
+                placeholder={(!FEED_FLAGS.POOL_DISABLE_THUMBNAIL && item.thumbnail) ? { uri: item.thumbnail } : undefined}
                 onLoad={() => onImageDone(index)}
                 onError={() => onImageDone(index)}
             />
@@ -415,12 +369,14 @@ function CarouselMediaItem({
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: '#000',
     },
     mediaContainer: {
         width: SCREEN_WIDTH,
         height: '100%',
         justifyContent: 'center',
         alignItems: 'center',
+        backgroundColor: '#000',
     },
     image: {
         width: '100%',
@@ -428,7 +384,7 @@ const styles = StyleSheet.create({
     },
     indicatorContainer: {
         position: 'absolute',
-        bottom: 10,
+        bottom: 140,
         flexDirection: 'row',
         left: 0,
         right: 0,
@@ -476,6 +432,7 @@ const styles = StyleSheet.create({
         ...StyleSheet.absoluteFillObject,
         justifyContent: 'center',
         alignItems: 'center',
+        backgroundColor: '#000',
         zIndex: 200,
     },
 });

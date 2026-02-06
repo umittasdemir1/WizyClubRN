@@ -3,6 +3,7 @@ import { VideoCacheService } from './VideoCacheService';
 import { isVideoCacheDisabled } from '../../core/utils/videoCacheToggle';
 import { NetInfoStateType } from '@react-native-community/netinfo';
 import { logCache, LogCode } from '@/core/services/Logger';
+import { getVideoUrl } from '../../core/utils/videoUrl';
 
 interface PrefetchItem {
   url: string;
@@ -23,6 +24,12 @@ class FeedPrefetchService {
 
   private getQueueKey(url: string): string {
     return VideoCacheService.getStableCacheKey(url) ?? url;
+  }
+
+  private normalizeUrl(url: string | null): string | null {
+    if (typeof url !== 'string') return null;
+    const trimmed = url.trim();
+    return trimmed.length > 0 ? trimmed : null;
   }
 
   static getInstance(): FeedPrefetchService {
@@ -59,8 +66,9 @@ class FeedPrefetchService {
 
     indices.forEach((index) => {
       const video = videos[index];
-      if (!video || typeof video.videoUrl !== 'string') return;
-      const queueKey = this.getQueueKey(video.videoUrl);
+      const videoUrl = this.normalizeUrl(getVideoUrl(video));
+      if (!videoUrl) return;
+      const queueKey = this.getQueueKey(videoUrl);
       if (this.queued.has(queueKey)) return;
       if (this.queue.length >= this.maxQueueSize) return;
 
@@ -80,7 +88,7 @@ class FeedPrefetchService {
         }
       }
 
-      this.queue.push({ url: video.videoUrl, cacheKey: queueKey, priority });
+      this.queue.push({ url: videoUrl, cacheKey: queueKey, priority });
       this.queued.add(queueKey);
     });
 
@@ -92,16 +100,18 @@ class FeedPrefetchService {
 
   async getCachedPath(url: string): Promise<string | null> {
     if (isVideoCacheDisabled()) return null;
-    if (typeof url !== 'string') return null;
-    const memoryCached = VideoCacheService.getMemoryCachedPath(url);
+    const normalizedUrl = this.normalizeUrl(url);
+    if (!normalizedUrl) return null;
+    const memoryCached = VideoCacheService.getMemoryCachedPath(normalizedUrl);
     if (memoryCached) return memoryCached;
-    return VideoCacheService.getCachedVideoPath(url);
+    return VideoCacheService.getCachedVideoPath(normalizedUrl);
   }
 
   async cacheVideoNow(url: string): Promise<string | null> {
     if (isVideoCacheDisabled()) return null;
-    if (typeof url !== 'string') return null;
-    return VideoCacheService.cacheVideo(url);
+    const normalizedUrl = this.normalizeUrl(url);
+    if (!normalizedUrl) return null;
+    return VideoCacheService.cacheVideo(normalizedUrl);
   }
 
   /**
@@ -109,12 +119,13 @@ class FeedPrefetchService {
    */
   queueSingleVideo(url: string, priority: number = 5) {
     if (isVideoCacheDisabled()) return;
-    if (typeof url !== 'string') return;
-    const queueKey = this.getQueueKey(url);
+    const normalizedUrl = this.normalizeUrl(url);
+    if (!normalizedUrl) return;
+    const queueKey = this.getQueueKey(normalizedUrl);
     if (this.queued.has(queueKey)) return;
     if (this.queue.length >= this.maxQueueSize) return;
 
-    this.queue.push({ url, cacheKey: queueKey, priority });
+    this.queue.push({ url: normalizedUrl, cacheKey: queueKey, priority });
     this.queued.add(queueKey);
 
     // Re-sort to maintain priority order
@@ -127,7 +138,9 @@ class FeedPrefetchService {
    * Bump priority of a URL if it's already in queue
    */
   bumpPriority(url: string, newPriority: number = 0) {
-    const queueKey = this.getQueueKey(url);
+    const normalizedUrl = this.normalizeUrl(url);
+    if (!normalizedUrl) return;
+    const queueKey = this.getQueueKey(normalizedUrl);
     const item = this.queue.find(i => i.cacheKey === queueKey);
     if (item && newPriority < item.priority) {
       item.priority = newPriority;

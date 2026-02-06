@@ -15,24 +15,27 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { SystemBars } from 'react-native-edge-to-edge';
 import { Image as ExpoImage } from 'expo-image';
 import { useNetInfo, NetInfoStateType } from '@react-native-community/netinfo';
-import { useActiveVideoStore, useMuteControls } from '../../store/useActiveVideoStore';
+import {
+    useInfiniteFeedActiveVideoStore,
+    useInfiniteFeedMuteControls,
+    useInfiniteFeedAuthStore,
+} from './hooks/useInfiniteFeedStores';
 import { useThemeStore } from '../../store/useThemeStore';
-import { useAuthStore } from '../../store/useAuthStore';
 import { DARK_COLORS, LIGHT_COLORS } from '../../../core/constants';
 import { getVideoUrl } from '../../../core/utils/videoUrl';
-import { Video as VideoEntity } from '../../../domain/entities/Video';
+import type { InfiniteFeedVideo } from './InfiniteFeedVideoTypes';
 import { InfiniteFeedHeader, FeedTab } from './InfiniteFeedHeader';
 import { InfiniteFeedCard } from './InfiniteFeedCard';
 import { styles } from './InfiniteFeedManager.styles';
-import { FEED_FLAGS, FEED_CONFIG } from '../feed/hooks/useFeedConfig';
-import { useStoryViewer } from '../../hooks/useStoryViewer';
+import { FEED_FLAGS, FEED_CONFIG } from './hooks/useInfiniteFeedConfig';
+import { useInfiniteStoryViewer } from '../../hooks/useInfiniteStoryViewer';
 import type { ViewToken } from 'react-native';
 import { FeedPrefetchService } from '../../../data/services/FeedPrefetchService';
 import { VideoCacheService } from '../../../data/services/VideoCacheService';
 import { LogCode, logCache, logPerf, logVideo } from '@/core/services/Logger';
 
 interface InfiniteFeedManagerProps {
-    videos: VideoEntity[];
+    videos: InfiniteFeedVideo[];
     isLoading: boolean;
     isRefreshing: boolean;
     isLoadingMore: boolean;
@@ -90,9 +93,9 @@ export function InfiniteFeedManager({
     const netInfo = useNetInfo();
     const isDark = useThemeStore((state) => state.isDark);
     const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
-    const { isMuted, toggleMute } = useMuteControls();
-    const currentUserId = useAuthStore((state) => state.user?.id);
-    const { stories: storyListData } = useStoryViewer();
+    const { isMuted, toggleMute } = useInfiniteFeedMuteControls();
+    const currentUserId = useInfiniteFeedAuthStore((state) => state.user?.id);
+    const { stories: storyListData } = useInfiniteStoryViewer();
 
     const [activeTab, setActiveTab] = useState<FeedTab>('Sana Özel');
     const [activeInlineId, setActiveInlineId] = useState<string | null>(null);
@@ -100,7 +103,7 @@ export function InfiniteFeedManager({
     const [activeInlineIndex, setActiveInlineIndex] = useState<number>(0);
     const [pendingInlineIndex, setPendingInlineIndex] = useState<number>(0);
     const [isCarouselInteracting, setIsCarouselInteracting] = useState(false);
-    const [isFeedScrolling, setIsFeedScrolling] = useState(false);
+    const isFeedScrollingRef = useRef(false);
     const [resolvedVideoSources, setResolvedVideoSources] = useState<Record<string, string>>({});
     const resolvedVideoSourcesRef = useRef<Record<string, string>>({});
     const activeInlineIdRef = useRef<string | null>(null);
@@ -112,9 +115,9 @@ export function InfiniteFeedManager({
     const scrollStartAtRef = useRef<number | null>(null);
     const sourceResolveGenerationRef = useRef(0);
 
-    const setCustomFeed = useActiveVideoStore((state) => state.setCustomFeed);
-    const setActiveVideo = useActiveVideoStore((state) => state.setActiveVideo);
-    const isPaused = useActiveVideoStore((state) => state.isPaused);
+    const setCustomFeed = useInfiniteFeedActiveVideoStore((state) => state.setCustomFeed);
+    const setActiveVideo = useInfiniteFeedActiveVideoStore((state) => state.setActiveVideo);
+    const isPaused = useInfiniteFeedActiveVideoStore((state) => state.isPaused);
     const immediateActiveCommit = FEED_FLAGS.INF_ACTIVE_COMMIT_ON_VIEWABLE;
 
     useFocusEffect(
@@ -162,9 +165,9 @@ export function InfiniteFeedManager({
         });
     }, []);
 
-    useEffect(() => {
-        resolvedVideoSourcesRef.current = resolvedVideoSources;
-    }, [resolvedVideoSources]);
+    // Sync ref inline so renderItem always reads the latest resolved sources
+    // without needing resolvedVideoSources in its dependency array.
+    resolvedVideoSourcesRef.current = resolvedVideoSources;
 
     const clearSettleTimer = useCallback(() => {
         if (!settleTimerRef.current) return;
@@ -367,13 +370,38 @@ export function InfiniteFeedManager({
                 activeInlineIndex,
                 prefetchIndices,
             });
-            prefetchIndices.forEach((idx) => {
-                const url = getVideoUrl(videos[idx]);
-                if (url) {
-                    VideoCacheService.warmupCache(url);
-                }
-            });
         }
+        const nextPlayableIndex = activeInlineIndex + 1;
+        prefetchIndices.forEach((idx) => {
+            const neighborVideo = videos[idx];
+            if (!neighborVideo) return;
+
+            const url = getVideoUrl(neighborVideo);
+            if (!url) return;
+
+            VideoCacheService.warmupCache(url);
+
+            const memoryCached = VideoCacheService.getMemoryCachedPath(url);
+            if (memoryCached) {
+                setResolvedSourceForId(neighborVideo.id, memoryCached);
+                return;
+            }
+
+            const hasResolvedSource = Boolean(resolvedVideoSourcesRef.current[neighborVideo.id]);
+            const shouldForceImmediateCache = idx === nextPlayableIndex && !hasResolvedSource;
+            const resolvePromise = shouldForceImmediateCache
+                ? prefetchService.cacheVideoNow(url).then((cachedPath) => cachedPath ?? prefetchService.getCachedPath(url))
+                : prefetchService.getCachedPath(url);
+
+            resolvePromise
+                .then((cachedPath) => {
+                    if (!cachedPath) return;
+                    setResolvedSourceForId(neighborVideo.id, cachedPath);
+                })
+                .catch(() => {
+                    // best effort: nearby cache resolve failures should not block playback
+                });
+        });
     }, [activeInlineIndex, videos, setResolvedSourceForId]);
 
 
@@ -385,13 +413,15 @@ export function InfiniteFeedManager({
         setIsCarouselInteracting((prev) => (prev ? false : prev));
     }, []);
 
-    const shouldPauseForScroll = isFeedScrolling && !immediateActiveCommit;
+    // Ref-based: no state update → no re-render on scroll start/end.
+    // With immediateActiveCommit=true this is always false.
+    const shouldPauseForScroll = isFeedScrollingRef.current && !immediateActiveCommit;
 
-    const renderItem = useCallback(({ item, index, target }: { item: VideoEntity; index: number; target?: string }) => {
+    const renderItem = useCallback(({ item, index, target }: { item: InfiniteFeedVideo; index: number; target?: string }) => {
         // Keep a small pre-mount window around pending target so UI is ready before playback switch.
         // Playback itself still remains active-only.
         // This mirrors Instagram/X behavior where chrome appears instantly and media follows.
-        const isPendingWindow = Math.abs(index - pendingInlineIndex) <= 1;
+        const isPendingWindow = Math.abs(index - pendingInlineIndex) <= 2;
 
         return (
             <InfiniteFeedCard
@@ -413,11 +443,11 @@ export function InfiniteFeedManager({
                 onCarouselTouchStart={handleCarouselTouchStart}
                 onCarouselTouchEnd={handleCarouselTouchEnd}
                 isMeasurement={target === 'Measurement'}
-                resolvedVideoSource={resolvedVideoSources[item.id] ?? null}
+                resolvedVideoSource={resolvedVideoSourcesRef.current[item.id] ?? null}
                 networkType={(netInfo.type ?? null) as NetInfoStateType | null}
             />
         );
-    }, [activeInlineId, currentUserId, handleCarouselTouchEnd, handleCarouselTouchStart, handleOpenVideo, isMuted, isPaused, netInfo.type, pendingInlineId, pendingInlineIndex, resolvedVideoSources, shouldPauseForScroll, themeColors, toggleFollow, toggleLike, toggleMute, toggleSave, toggleShare, toggleShop]);
+    }, [activeInlineId, currentUserId, handleCarouselTouchEnd, handleCarouselTouchStart, handleOpenVideo, isMuted, isPaused, netInfo.type, pendingInlineId, pendingInlineIndex, shouldPauseForScroll, themeColors, toggleFollow, toggleLike, toggleMute, toggleSave, toggleShare, toggleShop]);
 
     // Active item changes when card visibility crosses threshold
     const viewabilityConfig = useRef({
@@ -425,7 +455,7 @@ export function InfiniteFeedManager({
         minimumViewTime: 100,
     }).current;
 
-    const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken<VideoEntity>[] }) => {
+    const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken<InfiniteFeedVideo>[] }) => {
         const nextViewable = viewableItems
             .filter((token) => token.isViewable && token.item && typeof token.index === 'number')
             .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))[0];
@@ -451,7 +481,7 @@ export function InfiniteFeedManager({
         clearSettleTimer();
         momentumStartedRef.current = false;
         scrollStartAtRef.current = Date.now();
-        setIsFeedScrolling(true);
+        isFeedScrollingRef.current = true;
         logPerf(LogCode.PERF_MEASURE_START, 'Infinite feed scroll begin', {
             activeInlineIndex: activeInlineIndexRef.current,
         });
@@ -462,13 +492,13 @@ export function InfiniteFeedManager({
         if (!scrollStartAtRef.current) {
             scrollStartAtRef.current = Date.now();
         }
-        setIsFeedScrolling(true);
+        isFeedScrollingRef.current = true;
     }, []);
 
     const handleMomentumScrollEnd = useCallback(() => {
         clearSettleTimer();
         momentumStartedRef.current = false;
-        setIsFeedScrolling(false);
+        isFeedScrollingRef.current = false;
         commitPendingActive('momentum-end');
     }, [clearSettleTimer, commitPendingActive]);
 
@@ -476,10 +506,14 @@ export function InfiniteFeedManager({
         clearSettleTimer();
         settleTimerRef.current = setTimeout(() => {
             if (momentumStartedRef.current) return;
-            setIsFeedScrolling(false);
+            isFeedScrollingRef.current = false;
             commitPendingActive('drag-end-no-momentum');
         }, 32);
     }, [clearSettleTimer, commitPendingActive]);
+
+    // Only track the active video's resolved source so cache-resolve for
+    // non-visible videos doesn't trigger a full list re-render.
+    const activeResolvedSource = activeInlineId ? resolvedVideoSources[activeInlineId] : null;
 
     const flashListExtraData = useMemo(() => ({
         activeInlineId,
@@ -487,9 +521,9 @@ export function InfiniteFeedManager({
         pendingInlineIndex,
         isMuted,
         isPaused,
-        isFeedScrolling,
         immediateActiveCommit,
-    }), [activeInlineId, immediateActiveCommit, isFeedScrolling, isMuted, isPaused, pendingInlineId, pendingInlineIndex]);
+        activeResolvedSource,
+    }), [activeInlineId, activeResolvedSource, immediateActiveCommit, isMuted, isPaused, pendingInlineId, pendingInlineIndex]);
 
     const listEmpty = (
         <View style={styles.emptyState}>
@@ -519,7 +553,7 @@ export function InfiniteFeedManager({
             <FlashList
                 data={videos}
                 renderItem={renderItem}
-                keyExtractor={(item: VideoEntity) => item.id}
+                keyExtractor={(item: InfiniteFeedVideo) => item.id}
                 extraData={flashListExtraData}
                 viewabilityConfig={viewabilityConfig}
                 onViewableItemsChanged={onViewableItemsChanged}

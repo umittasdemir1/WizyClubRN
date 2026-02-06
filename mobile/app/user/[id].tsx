@@ -43,7 +43,7 @@ import { InteractionRepositoryImpl } from '../../src/data/repositories/Interacti
 import { ToggleFollowUseCase } from '../../src/domain/usecases/ToggleFollowUseCase';
 import { useSocialStore } from '../../src/presentation/store/useSocialStore';
 import { VerifiedBadge } from '../../src/presentation/components/shared/VerifiedBadge';
-import { isFeedVideoItem } from '../../src/presentation/components/feed/utils/FeedUtils';
+import { isFeedVideoItem } from '../../src/presentation/components/poolFeed/utils/PoolFeedUtils';
 import { logSocial, logError, logUI, LogCode } from '@/core/services/Logger';
 import { shadowStyle } from '@/core/utils/shadow';
 

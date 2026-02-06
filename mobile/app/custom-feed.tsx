@@ -1,4 +1,4 @@
-import { FeedManager } from '../src/presentation/components/feed/FeedManager';
+import { PoolFeedManager } from '../src/presentation/components/poolFeed/PoolFeedManager';
 import { useVideoFeed } from '../src/presentation/hooks/useVideoFeed';
 import { useActiveVideoStore } from '../src/presentation/store/useActiveVideoStore';
 import { Stack } from 'expo-router';
@@ -19,7 +19,7 @@ export default function CustomFeedScreen() {
     return (
         <>
             <Stack.Screen options={{ headerShown: false }} />
-            <FeedManager
+            <PoolFeedManager
                 videos={customFeed || []}
                 isLoading={false}
                 isRefreshing={isRefreshing}

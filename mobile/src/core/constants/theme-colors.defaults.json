@@ -7,7 +7,7 @@
       "mobile/app/search.tsx",
       "mobile/app/(tabs)/profile.tsx",
       "mobile/app/(tabs)/explore.tsx",
-      "mobile/src/presentation/components/feed/FeedManager.styles.ts",
+      "mobile/src/presentation/components/poolFeed/PoolFeedManager.styles.ts",
       "mobile/src/presentation/components/infiniteFeed/InfiniteFeedManager.tsx"
     ]
   },
@@ -19,8 +19,8 @@
       "mobile/src/presentation/components/story/StoryActions.tsx",
       "mobile/src/presentation/components/story/StoryPage.tsx",
       "mobile/src/presentation/components/story/StoryViewer.tsx",
-      "mobile/src/presentation/components/feed/FeedStatusViews.tsx",
-      "mobile/src/presentation/components/feed/FeedManager.styles.ts"
+      "mobile/src/presentation/components/poolFeed/PoolFeedStatusViews.tsx",
+      "mobile/src/presentation/components/poolFeed/PoolFeedManager.styles.ts"
     ]
   },
   "card": {

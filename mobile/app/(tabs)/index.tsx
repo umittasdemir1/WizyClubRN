@@ -1,6 +1,6 @@
-import { FeedManager } from '../../src/presentation/components/feed/FeedManager';
+import { PoolFeedManager } from '../../src/presentation/components/poolFeed/PoolFeedManager';
 import { InfiniteFeedManager } from '../../src/presentation/components/infiniteFeed/InfiniteFeedManager';
-import { FEED_FLAGS } from '../../src/presentation/components/feed/hooks/useFeedConfig';
+import { FEED_MODE_FLAGS } from '../../src/presentation/config/feedModeConfig';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import { useActiveVideoStore } from '../../src/presentation/store/useActiveVideoStore';
 import { useEffect, useRef } from 'react';
@@ -41,7 +41,7 @@ export default function HomeFeedScreen() {
         if (videos.length > 0) {
             logVideo(LogCode.VIDEO_FEED_READY, 'Home feed ready', {
                 videoCount: videos.length,
-                mode: FEED_FLAGS.USE_INFINITE_FEED ? 'infinite' : 'pool'
+                mode: FEED_MODE_FLAGS.USE_INFINITE_FEED ? 'infinite' : 'pool'
             });
         }
     }, [videos.length]);
@@ -69,7 +69,7 @@ export default function HomeFeedScreen() {
     }, [isFocused, setPaused, setScreenFocused]);
 
     // 🔀 Conditional render based on USE_INFINITE_FEED flag
-    if (FEED_FLAGS.USE_INFINITE_FEED) {
+    if (FEED_MODE_FLAGS.USE_INFINITE_FEED) {
         return (
             <InfiniteFeedManager
                 videos={videos}
@@ -91,7 +91,7 @@ export default function HomeFeedScreen() {
 
     // Pool-based TikTok feed (default when flag is false)
     return (
-        <FeedManager
+        <PoolFeedManager
             videos={videos}
             isLoading={isLoading}
             isRefreshing={isRefreshing}

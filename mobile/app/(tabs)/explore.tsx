@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import { useStoryViewer } from '../../src/presentation/hooks/useStoryViewer';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
-import { isDisabled } from '../../src/presentation/components/feed/hooks/useFeedConfig';
+import { isDisabled } from '../../src/presentation/components/poolFeed/hooks/usePoolFeedConfig';
 import Video from 'react-native-video';
 import { Image } from 'expo-image';
 import { VideoCacheService } from '../../src/data/services/VideoCacheService';

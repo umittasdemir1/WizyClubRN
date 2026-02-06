@@ -4,7 +4,7 @@ import { Plus } from 'lucide-react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { useUploadStore } from '../../store/useUploadStore';
 import { textShadowStyle } from '@/core/utils/shadow';
-import { ThemeColors } from './types';
+import { ThemeColors } from './InfiniteFeedTypes';
 import { InfiniteStoryBar } from './InfiniteStoryBar';
 
 export const FEED_TABS = ['Takipte', 'Sana Özel'] as const;

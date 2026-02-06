@@ -12,8 +12,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Heart, Send, Bookmark, ShoppingBag } from 'lucide-react-native';
 import { formatCount } from '../../../core/utils';
-import { ThemeColors } from './types';
-import { FEED_FLAGS } from '../feed/hooks/useFeedConfig';
+import { ThemeColors } from './InfiniteFeedTypes';
+import { FEED_FLAGS } from './hooks/useInfiniteFeedConfig';
 
 const ACTION_ICON_SIZE = 28;
 

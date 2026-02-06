@@ -9,8 +9,8 @@ import { Video as VideoEntity } from '../../../domain/entities/Video';
 import { InfiniteFeedActions } from './InfiniteFeedActions';
 import { InfiniteCarouselLayer } from './InfiniteCarouselLayer';
 import { VerifiedBadge } from '../shared/VerifiedBadge';
-import { ThemeColors } from './types';
-import { FEED_FLAGS } from '../feed/hooks/useFeedConfig';
+import { ThemeColors } from './InfiniteFeedTypes';
+import { FEED_FLAGS } from './hooks/useInfiniteFeedConfig';
 import { getBufferConfig } from '../../../core/utils/bufferConfig';
 import { shadowStyle } from '@/core/utils/shadow';
 import { LogCode, logVideo } from '@/core/services/Logger';
@@ -24,10 +24,12 @@ const WEEK = 7 * DAY;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
 const CAROUSEL_ASPECT_RATIO = 3 / 4;
-const FIRST_FRAME_FALLBACK_MS = 1200;
+const FIRST_FRAME_FALLBACK_MS = 600;
 
 const isNonEmptyString = (value: unknown): value is string =>
     typeof value === 'string' && value.trim().length > 0;
+
+const isLocalFilePath = (value: string): boolean => value.startsWith('file://');
 
 const mixWithWhite = (hex: string, amount: number) => {
     if (!hex.startsWith('#')) return hex;
@@ -144,7 +146,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     const isCarousel = item.postType === 'carousel' && (item.mediaUrls?.length ?? 0) > 0;
     const isVideo = !isCarousel && !!sourceVideoUrl;
     const effectiveVideoSourceUrl = playbackSource ?? videoUrl;
-    const isLocalVideoSource = Boolean(effectiveVideoSourceUrl && effectiveVideoSourceUrl.startsWith('file://'));
+    const isLocalVideoSource = Boolean(effectiveVideoSourceUrl && isLocalFilePath(effectiveVideoSourceUrl));
     const bufferConfig = useMemo(
         () => getBufferConfig(networkType, isLocalVideoSource),
         [networkType, isLocalVideoSource]
@@ -302,7 +304,8 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
             firstFrameSeenRef.current = !shouldGateVideoVisibility;
             bufferingStateRef.current = false;
             setIsVideoVisible(!shouldGateVideoVisibility);
-            setPlaybackSource(null);
+            // Keep playbackSource so re-mount can reuse the cached path instantly
+            // instead of re-resolving from network. Reset only happens on item.id change.
             return;
         }
 
@@ -310,7 +313,30 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
             firstFrameSeenRef.current = true;
             setIsVideoVisible(true);
         }
-        setPlaybackSource((prev) => prev ?? (videoUrl ?? null));
+        setPlaybackSource((prev) => {
+            if (!videoUrl) {
+                return prev ?? null;
+            }
+            if (!prev) {
+                return videoUrl;
+            }
+            if (prev === videoUrl) {
+                return prev;
+            }
+
+            const previousIsLocal = isLocalFilePath(prev);
+            const nextIsLocal = isLocalFilePath(videoUrl);
+
+            // Keep local source sticky; upgrade network source to local once cache resolves.
+            if (previousIsLocal && !nextIsLocal) {
+                return prev;
+            }
+            if (!previousIsLocal && nextIsLocal) {
+                return videoUrl;
+            }
+
+            return prev;
+        });
     }, [clearReadyFallbackTimer, shouldGateVideoVisibility, shouldMountVideo, videoUrl]);
 
     useEffect(() => {

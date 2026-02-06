@@ -9,8 +9,29 @@ const readline = require('readline');
  * terminal üzerinden kolayca açıp kapatmanızı sağlar.
  */
 
-// Yapılandırma dosyasının yolu (useFeedConfig.ts)
-const CONFIG_FILE = path.join(__dirname, '../mobile/src/presentation/components/feed/hooks/useFeedConfig.ts');
+// Bayrak kaynakları (yeni mimari + legacy fallback)
+const FLAG_SOURCES = [
+    {
+        name: 'mode',
+        file: path.join(__dirname, '../mobile/src/presentation/config/feedModeConfig.ts'),
+        objectName: 'FEED_MODE_FLAGS',
+    },
+    {
+        name: 'infinite',
+        file: path.join(__dirname, '../mobile/src/presentation/components/infiniteFeed/hooks/useInfiniteFeedConfig.ts'),
+        objectName: 'INFINITE_FEED_FLAGS',
+    },
+    {
+        name: 'pool',
+        file: path.join(__dirname, '../mobile/src/presentation/components/poolFeed/hooks/usePoolFeedConfig.ts'),
+        objectName: 'FEED_FLAGS',
+    },
+    {
+        name: 'legacy',
+        file: path.join(__dirname, '../mobile/src/presentation/components/feed/hooks/useFeedConfig.ts'),
+        objectName: 'FEED_FLAGS',
+    },
+];
 
 // Terminal renkleri
 const C = {
@@ -19,6 +40,7 @@ const C = {
     yellow: '\x1b[33m',
     blue: '\x1b[34m',
     cyan: '\x1b[36m',
+    underline: '\x1b[4m',
     bold: '\x1b[1m',
     reset: '\x1b[0m'
 };
@@ -52,6 +74,7 @@ const FLAG_DESCRIPTIONS = {
     INF_DISABLE_ACTION_ANIMATIONS: '[INF] Buton Animasyonları (Particle)',
     INF_DISABLE_HEADER_TABS: '[INF] Sekme Başlığı (Senin İçin / Takip)',
     INF_DISABLE_THUMBNAIL: '[INF] Thumbnail/Poster Gösterimi',
+    INF_ACTIVE_COMMIT_ON_VIEWABLE: '[INF] Aktif Kartı Anında Commit Et',
 
     // ═══════════════════════════════════════════════════════════════════════
     // POOL PLAYER FLAGS (Sadece USE_INFINITE_FEED=false iken geçerli)
@@ -83,32 +106,59 @@ const FLAG_DESCRIPTIONS = {
  * Mevcut bayrakları dosyadan okur
  */
 function readFlags() {
-    if (!fs.existsSync(CONFIG_FILE)) {
-        console.error(`${C.red}Hata: Dosya bulunamadı!${C.reset}`);
+    const flags = [];
+    const seenKeys = new Set();
+
+    FLAG_SOURCES.forEach((source) => {
+        if (!fs.existsSync(source.file)) return;
+
+        const content = fs.readFileSync(source.file, 'utf8');
+        const objectRegex = new RegExp(
+            `export\\s+const\\s+${source.objectName}\\s*=\\s*\\{([\\s\\S]*?)\\}\\s*as const;`
+        );
+        const match = content.match(objectRegex);
+        if (!match) return;
+
+        match[1]
+            .split('\n')
+            .map((line) => line.match(/^\s*(\w+):\s*(true|false),/))
+            .filter(Boolean)
+            .forEach((m) => {
+                const key = m[1];
+                if (seenKeys.has(key)) return;
+
+                seenKeys.add(key);
+                flags.push({
+                    key,
+                    isActive: m[2] === 'true',
+                    label: FLAG_DESCRIPTIONS[key] || key,
+                    file: source.file,
+                    sourceName: source.name,
+                });
+            });
+    });
+
+    if (flags.length === 0) {
+        console.error(`${C.red}Hata: Bayrak dosyaları bulunamadı veya parse edilemedi!${C.reset}`);
+        console.error(`${C.yellow}Kontrol edilen kaynaklar:${C.reset}`);
+        FLAG_SOURCES.forEach((source) => {
+            console.error(` - [${source.name}] ${source.file} (${source.objectName})`);
+        });
         process.exit(1);
     }
-    const content = fs.readFileSync(CONFIG_FILE, 'utf8');
-    const match = content.match(/export const FEED_FLAGS = \{([\s\S]*?)\} as const;/);
-    if (!match) return [];
 
-    return match[1].split('\n')
-        .map(line => line.match(/^\s*(\w+):\s*(true|false),/))
-        .filter(Boolean)
-        .map(m => ({
-            key: m[1],
-            isActive: m[2] === 'true',
-            label: FLAG_DESCRIPTIONS[m[1]] || m[1]
-        }));
+    return flags;
 }
 
 /**
  * Belirli bir bayrağı dosyada günceller
  */
-function writeFlag(key, value) {
-    let content = fs.readFileSync(CONFIG_FILE, 'utf8');
-    const regex = new RegExp(`(${key}:\\s*)(true|false)`, 'g');
+function writeFlag(flag, value) {
+    let content = fs.readFileSync(flag.file, 'utf8');
+    const regex = new RegExp(`(${flag.key}:\\s*)(true|false)`);
+    if (!regex.test(content)) return;
     content = content.replace(regex, `$1${value}`);
-    fs.writeFileSync(CONFIG_FILE, content, 'utf8');
+    fs.writeFileSync(flag.file, content, 'utf8');
 }
 
 /**
@@ -130,11 +180,11 @@ function showMenu() {
 
         flags.forEach((f, i) => {
             const cursor = i === index ? `${C.yellow}${C.bold} > ${C.reset}` : '   ';
-            // isActive=true means DISABLE flag is ON = feature is OFF
-            // isActive=false means DISABLE flag is OFF = feature is ON
-            const status = f.isActive
-                ? `${C.red}${C.bold}[KAPALI]${C.reset}`
-                : `${C.green}${C.bold}[AÇIK]${C.reset}`;
+            const isDisableFlag = f.key.includes('DISABLE');
+            const featureEnabled = isDisableFlag ? !f.isActive : f.isActive;
+            const status = featureEnabled
+                ? `${C.green}${C.bold}[AÇIK]${C.reset}`
+                : `${C.red}${C.bold}[KAPALI]${C.reset}`;
 
             console.log(`${cursor}${f.label.padEnd(45)} ${status}`);
         });
@@ -156,7 +206,7 @@ function showMenu() {
         if (key.name === 'down') index = (index + 1) % flags.length;
         if (key.name === 'space' || key.name === 'return') {
             flags[index].isActive = !flags[index].isActive;
-            writeFlag(flags[index].key, flags[index].isActive);
+            writeFlag(flags[index], flags[index].isActive);
         }
         draw();
     });
@@ -167,10 +217,14 @@ const args = process.argv.slice(2);
 if (args.length === 0) {
     showMenu();
 } else if (args[0] === 'hepsini-ac' || args[0] === 'on') {
-    readFlags().forEach(f => writeFlag(f.key, false));
+    readFlags()
+        .filter((flag) => flag.key.includes('DISABLE'))
+        .forEach((flag) => writeFlag(flag, false));
     console.log(`${C.green}Tüm özellikler aktif edildi.${C.reset}`);
 } else if (args[0] === 'hepsini-kapat' || args[0] === 'off') {
-    writeFlag('DISABLE_ALL_UI', true);
+    readFlags()
+        .filter((flag) => flag.key === 'DISABLE_ALL_UI' || flag.key === 'INF_DISABLE_ALL_UI')
+        .forEach((flag) => writeFlag(flag, true));
     console.log(`${C.red}Tüm görsel arayüz kapatıldı.${C.reset}`);
 } else {
     console.log(`Kullanım:\n  ui           : Menüyü açar\n  ui on        : Her şeyi açar\n  ui off       : Her şeyi kapatır`);

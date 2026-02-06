@@ -17,7 +17,7 @@ import { useSocialStore } from '../store/useSocialStore';
 import { useStartupStore, initStartupTimer } from '../store/useStartupStore';
 import { isVideoCacheDisabled } from '../../core/utils/videoCacheToggle';
 import { getVideoUrl } from '../../core/utils/videoUrl';
-import { FEED_CONFIG } from '../components/feed/hooks/useFeedConfig';
+import { FEED_DATA_CONFIG } from '../config/feedDataConfig';
 
 // Interfaces
 interface UseVideoFeedReturn {
@@ -97,7 +97,7 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
         const initialIndices = videos
             .map((video, index) => (isFeedVideoItem(video) ? index : null))
             .filter((index): index is number => index != null)
-            .slice(0, FEED_CONFIG.PREFETCH_AHEAD_COUNT);
+            .slice(0, FEED_DATA_CONFIG.PREFETCH_AHEAD_COUNT);
 
         if (initialIndices.length === 0) return;
 

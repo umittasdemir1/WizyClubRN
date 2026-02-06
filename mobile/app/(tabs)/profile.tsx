@@ -52,7 +52,7 @@ import { VerifiedBadge } from '../../src/presentation/components/shared/Verified
 import { ProfileSettingsOverlay } from '../../src/presentation/components/profile/ProfileSettingsOverlay';
 import { UserActivityRepositoryImpl } from '../../src/data/repositories/UserActivityRepositoryImpl';
 import { Video as VideoEntity } from '../../src/domain/entities/Video';
-import { isFeedVideoItem } from '../../src/presentation/components/feed/utils/FeedUtils';
+import { isFeedVideoItem } from '../../src/presentation/components/poolFeed/utils/PoolFeedUtils';
 import { logApi, logError, logUI, LogCode } from '@/core/services/Logger';
 import { shadowStyle } from '@/core/utils/shadow';
 

@@ -1,6 +1,6 @@
 import React, { memo, useMemo } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
-import { StoryAvatar } from '../feed/StoryAvatar';
+import { InfiniteStoryAvatar } from './InfiniteStoryAvatar';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useProfile } from '../../hooks/useProfile';
 
@@ -89,7 +89,7 @@ export const InfiniteStoryBar = memo(function InfiniteStoryBar({
                     decelerationRate="fast"
                 >
                     {sortedUsers.map((item) => (
-                        <StoryAvatar
+                        <InfiniteStoryAvatar
                             key={item.id}
                             userId={item.id}
                             username={item.username}
