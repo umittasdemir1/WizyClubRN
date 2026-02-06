@@ -5,7 +5,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { useProfile } from '../../hooks/useProfile';
 
 const BAR_HEIGHT = 110;
-const DEFAULT_AVATAR = 'https://ui-avatars.com/api/?name=Me&background=random&color=fff';
+const DEFAULT_AVATAR = ''; // Removed external UI-Avatars fallback
 
 interface StoryUser {
     id: string;
@@ -64,7 +64,7 @@ export const InfiniteStoryBar = memo(function InfiniteStoryBar({
             const selfInList = storyUsers.find(u => u.id === currentUserDisplay.id);
             const displayAvatar = currentUserDisplay.avatarUrl && currentUserDisplay.avatarUrl.trim() !== ''
                 ? currentUserDisplay.avatarUrl
-                : DEFAULT_AVATAR;
+                : '';
 
             users.unshift({
                 id: currentUserDisplay.id,

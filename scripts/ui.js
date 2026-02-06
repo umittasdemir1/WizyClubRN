@@ -75,6 +75,7 @@ const FLAG_DESCRIPTIONS = {
     INF_DISABLE_HEADER_TABS: '[INF] Sekme Başlığı (Senin İçin / Takip)',
     INF_DISABLE_THUMBNAIL: '[INF] Thumbnail/Poster Gösterimi',
     INF_ACTIVE_COMMIT_ON_VIEWABLE: '[INF] Aktif Kartı Anında Commit Et',
+    INF_DISABLE_CARD_STYLE: '[INF] Kart Görünümünü Kapat (Tam Ekran)',
 
     // ═══════════════════════════════════════════════════════════════════════
     // POOL PLAYER FLAGS (Sadece USE_INFINITE_FEED=false iken geçerli)

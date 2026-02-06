@@ -594,7 +594,7 @@ export function InfiniteFeedManager({
                 }
                 ListEmptyComponent={listEmpty}
                 contentContainerStyle={{
-                    paddingBottom: insets.bottom + 80,
+                    paddingBottom: 0,
                 }}
             />
             <View

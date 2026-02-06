@@ -1,8 +1,9 @@
 import { Image } from 'expo-image';
 import { StyleSheet, View } from 'react-native';
+import { User } from 'lucide-react-native';
 
 interface AvatarProps {
-    url: string;
+    url?: string;
     size?: number;
     hasBorder?: boolean;
     borderWidth?: number;
@@ -10,6 +11,7 @@ interface AvatarProps {
 
 export function Avatar({ url, size = 40, hasBorder = false, borderWidth = 2 }: AvatarProps) {
     const borderStyle = hasBorder ? [styles.border, { borderWidth }] : null;
+    const hasImage = url && url.trim() !== '';
 
     return (
         <View style={[
@@ -17,12 +19,14 @@ export function Avatar({ url, size = 40, hasBorder = false, borderWidth = 2 }: A
             { width: size, height: size, borderRadius: size / 2 },
             borderStyle
         ]}>
-            <Image
-                source={{ uri: url }}
-                style={{ width: '100%', height: '100%', borderRadius: size / 2 }}
-                contentFit="cover"
-                transition={200}
-            />
+            {hasImage && (
+                <Image
+                    source={{ uri: url }}
+                    style={{ width: '100%', height: '100%', borderRadius: size / 2 }}
+                    contentFit="cover"
+                    transition={200}
+                />
+            )}
         </View>
     );
 }
@@ -30,7 +34,12 @@ export function Avatar({ url, size = 40, hasBorder = false, borderWidth = 2 }: A
 const styles = StyleSheet.create({
     container: {
         overflow: 'hidden',
-        backgroundColor: '#333',
+        backgroundColor: 'transparent',
+    },
+    placeholder: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     border: {
         borderColor: 'white',

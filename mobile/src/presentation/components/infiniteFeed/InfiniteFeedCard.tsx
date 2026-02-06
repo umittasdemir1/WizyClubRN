@@ -120,6 +120,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     const disableActions = FEED_FLAGS.INF_DISABLE_ACTIONS || disableAllUI;
     const disableDescription = FEED_FLAGS.INF_DISABLE_DESCRIPTION || disableAllUI;
     const disableThumbnail = FEED_FLAGS.INF_DISABLE_THUMBNAIL;
+    const disableCardStyle = FEED_FLAGS.INF_DISABLE_CARD_STYLE;
 
     useEffect(() => {
         setIsDescriptionExpanded(false);
@@ -403,12 +404,18 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     }), [isDarkTheme]);
     const cardOuterStyle = useMemo(() => [
         styles.card,
-        cardShadowStyle,
-    ], [cardShadowStyle]);
+        disableCardStyle ? styles.cardEdgeToEdge : null,
+        disableCardStyle ? null : cardShadowStyle,
+    ], [cardShadowStyle, disableCardStyle]);
+
     const cardInnerStyle = useMemo(() => [
         styles.cardInner,
-        { backgroundColor: cardBackground, borderColor: cardBorderColor }
-    ], [cardBackground, cardBorderColor]);
+        disableCardStyle ? styles.cardInnerEdgeToEdge : null,
+        {
+            backgroundColor: disableCardStyle ? 'transparent' : cardBackground,
+            borderColor: disableCardStyle ? 'transparent' : cardBorderColor
+        }
+    ], [cardBackground, cardBorderColor, disableCardStyle]);
     const mediaPlaceholderStyle = useMemo(() => [
         styles.mediaPlaceholder,
         { backgroundColor: mixWithWhite(colors.background, isDarkTheme ? 0.08 : 0.16) },
@@ -690,12 +697,22 @@ const styles = StyleSheet.create({
         marginVertical: 6,
         borderRadius: 12,
     },
+    cardEdgeToEdge: {
+        marginHorizontal: 0,
+        marginVertical: 0,
+        borderRadius: 0,
+    },
     cardInner: {
         paddingTop: 0,
         paddingBottom: 12,
         borderRadius: 12,
         overflow: 'hidden',
         borderWidth: 1,
+    },
+    cardInnerEdgeToEdge: {
+        paddingBottom: 0,
+        borderRadius: 0,
+        borderWidth: 0,
     },
     cardContent: {
         paddingHorizontal: CARD_HORIZONTAL_PADDING,
@@ -757,6 +774,7 @@ const styles = StyleSheet.create({
     },
     timeHint: {
         marginTop: 6,
+        marginBottom: 12, // Will be overridden dynamically if needed
         fontSize: 13,
         color: 'rgba(255, 255, 255, 0.6)',
         fontWeight: '400',

@@ -24,6 +24,8 @@ export const INFINITE_FEED_FLAGS = {
     INF_DISABLE_THUMBNAIL: false,
     /** Commit active item immediately on viewability change (no settle wait) */
     INF_ACTIVE_COMMIT_ON_VIEWABLE: true,
+    /** Disable Card Style (Edge-to-Edge full width view) */
+    INF_DISABLE_CARD_STYLE: true,
 } as const;
 
 export const INFINITE_FEED_CONFIG = {
