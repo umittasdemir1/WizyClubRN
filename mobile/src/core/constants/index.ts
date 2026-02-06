@@ -1,4 +1,5 @@
 import { Dimensions } from 'react-native';
+import themeColorConfig from './theme-colors.config.json';
 
 // ===================================
 // 📐 SCREEN DIMENSIONS
@@ -10,47 +11,37 @@ export const SCREEN_HEIGHT = Dimensions.get('window').height;
 // 🎨 COLORS (Theme-Aware Sets)
 // ===================================
 
+type ThemeColorConfig = {
+    background: { light: string; dark: string };
+    videoBackground: { light: string; dark: string };
+    card: { light: string; dark: string };
+    black: { light: string; dark: string };
+    border: { light: string; dark: string };
+    textPrimary: { light: string; dark: string };
+    textSecondary: { light: string; dark: string };
+};
+
+const THEME_COLOR_CONFIG = themeColorConfig as ThemeColorConfig;
+
 export const LIGHT_COLORS = {
-    primary: '#FF3B30',
-    accent: '#7C3AED',
-    background: '#FFFFFF',
-    videoBackground: '#000000',
-    card: '#F2F2F7',
-    white: '#FFFFFF',
-    black: '#000000',
-    border: '#E5E5EA',
-    textPrimary: '#000000',
-    textSecondary: '#8E8E93',
-    textMuted: '#AEAEB2',
-    overlay: 'rgba(0, 0, 0, 0.3)',
-    success: '#34C759',
-    error: '#FF3B30',
-    warning: '#FF9500',
-    trackBackground: 'rgba(0, 0, 0, 0.1)',
-    trackBuffered: 'rgba(0, 0, 0, 0.2)',
-    trackProgress: '#000000',
-} as const;
+    background: THEME_COLOR_CONFIG.background.light,
+    videoBackground: THEME_COLOR_CONFIG.videoBackground.light,
+    card: THEME_COLOR_CONFIG.card.light,
+    black: THEME_COLOR_CONFIG.black.light,
+    border: THEME_COLOR_CONFIG.border.light,
+    textPrimary: THEME_COLOR_CONFIG.textPrimary.light,
+    textSecondary: THEME_COLOR_CONFIG.textSecondary.light,
+};
 
 export const DARK_COLORS = {
-    primary: '#FF3B30',
-    accent: '#7C3AED',
-    background: '#080A0F',       // Dark mode test background
-    videoBackground: '#080A0F',  // Match dark mode background
-    card: '#222222',             // Cards slightly lighter
-    white: '#FFFFFF',
-    black: '#000000',
-    border: '#333333',           // Visible borders
-    textPrimary: '#FFFFFF',
-    textSecondary: 'rgba(255, 255, 255, 0.6)',
-    textMuted: '#8E8E93',
-    overlay: 'rgba(0, 0, 0, 0.5)',
-    success: '#10B981',
-    error: '#FF6B6B',
-    warning: '#FFA500',
-    trackBackground: 'rgba(255, 255, 255, 0.2)',
-    trackBuffered: 'rgba(255, 255, 255, 0.4)',
-    trackProgress: '#FFFFFF',
-} as const;
+    background: THEME_COLOR_CONFIG.background.dark,
+    videoBackground: THEME_COLOR_CONFIG.videoBackground.dark,
+    card: THEME_COLOR_CONFIG.card.dark,
+    black: THEME_COLOR_CONFIG.black.dark,
+    border: THEME_COLOR_CONFIG.border.dark,
+    textPrimary: THEME_COLOR_CONFIG.textPrimary.dark,
+    textSecondary: THEME_COLOR_CONFIG.textSecondary.dark,
+};
 
 // Legacy export for backward compatibility, defaults to DARK
 export const COLORS = DARK_COLORS;

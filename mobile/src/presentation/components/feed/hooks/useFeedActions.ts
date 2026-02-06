@@ -156,7 +156,7 @@ export function useFeedActions(options: UseFeedActionsOptions): UseFeedActionsRe
     // Show Save Toast
     // ========================================================================
     const showSaveToast = useCallback((message: string) => {
-        if (isDisabled('DISABLE_ACTIONS')) return;
+        if (isDisabled('DISABLE_ACTION_BUTTONS')) return;
 
         setSaveToastMessage(message);
 
@@ -209,12 +209,12 @@ export function useFeedActions(options: UseFeedActionsOptions): UseFeedActionsRe
     // ========================================================================
 
     const handleToggleLike = useCallback(() => {
-        if (isDisabled('DISABLE_ACTIONS')) return;
+        if (isDisabled('DISABLE_ACTION_BUTTONS')) return;
         if (activeVideo) toggleLike(activeVideo.id);
     }, [activeVideo, toggleLike]);
 
     const handleToggleSave = useCallback(() => {
-        if (isDisabled('DISABLE_ACTIONS')) return;
+        if (isDisabled('DISABLE_ACTION_BUTTONS')) return;
         if (!activeVideo) return;
 
         const nextSaved = !activeVideo.isSaved;
@@ -224,7 +224,7 @@ export function useFeedActions(options: UseFeedActionsOptions): UseFeedActionsRe
     }, [activeVideo, toggleSave, showSaveToast]);
 
     const handleToggleShare = useCallback(async () => {
-        if (isDisabled('DISABLE_ACTIONS')) return;
+        if (isDisabled('DISABLE_ACTION_BUTTONS')) return;
         if (!activeVideo) return;
 
         const shareUrl = `wizyclub://video/${activeVideo.id}`;
@@ -251,12 +251,12 @@ export function useFeedActions(options: UseFeedActionsOptions): UseFeedActionsRe
     }, [activeVideo, activeVideoId, toggleShare, activeTimeRef, videoPlayerRef]);
 
     const handleToggleFollow = useCallback(() => {
-        if (isDisabled('DISABLE_ACTIONS')) return;
+        if (isDisabled('DISABLE_ACTION_BUTTONS')) return;
         if (activeVideo) toggleFollow(activeVideo.id);
     }, [activeVideo, toggleFollow]);
 
     const handleOpenShopping = useCallback(() => {
-        if (isDisabled('DISABLE_ACTIONS')) return;
+        if (isDisabled('DISABLE_ACTION_BUTTONS')) return;
 
         if (!activeVideo?.brandUrl) {
             Alert.alert('Link bulunamadı', 'Bu video için bir alışveriş linki yok.');
@@ -270,7 +270,7 @@ export function useFeedActions(options: UseFeedActionsOptions): UseFeedActionsRe
     }, [activeVideo, openInAppBrowser]);
 
     const handleOpenDescription = useCallback(() => {
-        if (isDisabled('DISABLE_OVERLAYS')) return;
+        if (isDisabled('DISABLE_ACTIVE_VIDEO_OVERLAY')) return;
 
         descriptionSheetRef.current?.snapToIndex(0);
         if (!useActiveVideoStore.getState().isPaused) togglePause();

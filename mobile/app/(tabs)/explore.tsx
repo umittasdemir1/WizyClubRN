@@ -316,7 +316,7 @@ export default function ExploreScreen() {
         const videoUrl = getVideoUrl(v) || '';
         const isCarousel = v.postType === 'carousel';
         const isVideo = !isCarousel && (hasVideoMedia || Boolean(videoUrl));
-        const mediaType = isCarousel ? 'carousel' : isVideo ? 'video' : 'photo';
+        const mediaType: 'carousel' | 'video' | 'photo' = isCarousel ? 'carousel' : isVideo ? 'video' : 'photo';
 
         return {
             id: v.id,

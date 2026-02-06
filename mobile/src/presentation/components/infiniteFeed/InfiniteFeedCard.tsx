@@ -151,11 +151,6 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         onMore?.(item.id);
     }, [item.id, onMore]);
 
-    const handleToggleDescription = useCallback(() => {
-        if (!canToggleDescription) return;
-        setIsDescriptionExpanded(prev => !prev);
-    }, [canToggleDescription]);
-
     // ✅ [PERF] Memoize dynamic styles to prevent object reference churn
     const effectiveAspectRatio = isCarousel ? CAROUSEL_ASPECT_RATIO : aspectRatio;
     const mediaWrapperStyle = useMemo(() => [
@@ -212,6 +207,10 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     const descriptionValue = item.description?.trim() ?? '';
     const hasDescription = descriptionValue.length > 0;
     const canToggleDescription = descriptionValue.length > DESCRIPTION_LIMIT;
+    const handleToggleDescription = useCallback(() => {
+        if (!canToggleDescription) return;
+        setIsDescriptionExpanded(prev => !prev);
+    }, [canToggleDescription]);
     const displayName = item.user?.username || item.user?.fullName || 'wizyclub';
     const truncatedDescription =
         isDescriptionExpanded || !canToggleDescription
@@ -515,7 +514,7 @@ const styles = StyleSheet.create({
         fontSize: 14,
         lineHeight: 20,
         marginTop: 10,
-        fontWeight: '350',
+        fontWeight: '300',
     },
     readMore: {
         fontSize: 14,

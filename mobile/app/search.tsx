@@ -112,6 +112,29 @@ export default function SearchScreen() {
         return videoIndices.filter((index) => visibleSet.has(index));
     }, [videoIndices, visibleIndices]);
 
+    const runProfileSearch = useCallback(
+        (value: string, options?: { force?: boolean }) => {
+            const trimmed = value.trim();
+            if (trimmed.length < MIN_QUERY_LENGTH) return;
+            if (!options?.force && trimmed === lastProfileQueryRef.current) return;
+            lastProfileQueryRef.current = trimmed;
+            search(trimmed);
+        },
+        [search]
+    );
+
+    const runPostSearch = useCallback(
+        (value: string, options?: { force?: boolean }) => {
+            const trimmed = value.trim();
+            if (trimmed.length < MIN_QUERY_LENGTH) return;
+            if (!options?.force && trimmed === lastPostQueryRef.current) return;
+            lastPostQueryRef.current = trimmed;
+            clearPosts();
+            searchPosts(trimmed);
+        },
+        [clearPosts, searchPosts]
+    );
+
     useFocusEffect(
         useCallback(() => {
             SystemBars.setStyle({
@@ -148,7 +171,7 @@ export default function SearchScreen() {
                     const cleaned: RecentItem[] = parsed
                         .map((item) => {
                             if (item && typeof item === 'object' && item.type === 'query' && typeof item.value === 'string') {
-                                return { type: 'query', value: item.value };
+                                return { type: 'query' as const, value: item.value };
                             }
                             if (item && typeof item === 'object' && item.type === 'user' && item.user && typeof item.user.id === 'string') {
                                 const user = item.user;
@@ -281,29 +304,6 @@ export default function SearchScreen() {
     const searchLabel = (committedQuery || query).trim();
     const searchingText = searchLabel ? `"${searchLabel}" aranıyor...` : 'Aranıyor...';
 
-    const runProfileSearch = useCallback(
-        (value: string, options?: { force?: boolean }) => {
-            const trimmed = value.trim();
-            if (trimmed.length < MIN_QUERY_LENGTH) return;
-            if (!options?.force && trimmed === lastProfileQueryRef.current) return;
-            lastProfileQueryRef.current = trimmed;
-            search(trimmed);
-        },
-        [search]
-    );
-
-    const runPostSearch = useCallback(
-        (value: string, options?: { force?: boolean }) => {
-            const trimmed = value.trim();
-            if (trimmed.length < MIN_QUERY_LENGTH) return;
-            if (!options?.force && trimmed === lastPostQueryRef.current) return;
-            lastPostQueryRef.current = trimmed;
-            clearPosts();
-            searchPosts(trimmed);
-        },
-        [clearPosts, searchPosts]
-    );
-
     const handleBack = () => {
         if (isCommittedSearch) {
             setIsCommittedSearch(false);
@@ -324,7 +324,7 @@ export default function SearchScreen() {
         };
         setRecentItems((prev) => {
             const filtered = prev.filter((item) => !(item.type === 'user' && item.user.id === user.id));
-            const next: RecentItem[] = [{ type: 'user', user: nextUser }, ...filtered].slice(0, MAX_RECENT);
+            const next: RecentItem[] = [{ type: 'user' as const, user: nextUser }, ...filtered].slice(0, MAX_RECENT);
             AsyncStorage.setItem(RECENT_KEY, JSON.stringify(next)).catch(() => { });
             return next;
         });
@@ -335,7 +335,7 @@ export default function SearchScreen() {
         if (!normalized) return;
         setRecentItems((prev) => {
             const filtered = prev.filter((item) => !(item.type === 'query' && item.value.toLowerCase() === normalized.toLowerCase()));
-            const next: RecentItem[] = [{ type: 'query', value: normalized }, ...filtered].slice(0, MAX_RECENT);
+            const next: RecentItem[] = [{ type: 'query' as const, value: normalized }, ...filtered].slice(0, MAX_RECENT);
             AsyncStorage.setItem(RECENT_KEY, JSON.stringify(next)).catch(() => { });
             return next;
         });

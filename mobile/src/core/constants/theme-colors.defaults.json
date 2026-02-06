@@ -1,0 +1,78 @@
+{
+  "background": {
+    "label": "Genel arka plan",
+    "light": "#FFFFFF",
+    "dark": "#080A0F",
+    "usage": [
+      "mobile/app/search.tsx",
+      "mobile/app/(tabs)/profile.tsx",
+      "mobile/app/(tabs)/explore.tsx",
+      "mobile/src/presentation/components/feed/FeedManager.styles.ts",
+      "mobile/src/presentation/components/infiniteFeed/InfiniteFeedManager.tsx"
+    ]
+  },
+  "videoBackground": {
+    "label": "Video sahne arka planı",
+    "light": "#000000",
+    "dark": "#080A0F",
+    "usage": [
+      "mobile/src/presentation/components/story/StoryActions.tsx",
+      "mobile/src/presentation/components/story/StoryPage.tsx",
+      "mobile/src/presentation/components/story/StoryViewer.tsx",
+      "mobile/src/presentation/components/feed/FeedStatusViews.tsx",
+      "mobile/src/presentation/components/feed/FeedManager.styles.ts"
+    ]
+  },
+  "card": {
+    "label": "Kart yüzeyi",
+    "light": "#F2F2F7",
+    "dark": "#222222",
+    "usage": [
+      "mobile/app/user/[id].tsx",
+      "mobile/app/(tabs)/profile.tsx",
+      "mobile/app/paywall/badge.tsx",
+      "mobile/src/presentation/components/infiniteFeed/InfiniteFeedCard.tsx"
+    ]
+  },
+  "black": {
+    "label": "Siyah yardımcı renk",
+    "light": "#000000",
+    "dark": "#000000",
+    "usage": [
+      "mobile/src/presentation/components/shared/InAppBrowserOverlay.tsx"
+    ]
+  },
+  "border": {
+    "label": "Sınır/çizgi rengi",
+    "light": "#E5E5EA",
+    "dark": "#333333",
+    "usage": [
+      "mobile/src/presentation/components/shared/InAppBrowserOverlay.tsx",
+      "mobile/src/presentation/components/profile/EditProfileSheet.tsx"
+    ]
+  },
+  "textPrimary": {
+    "label": "Birincil metin",
+    "light": "#000000",
+    "dark": "#FFFFFF",
+    "usage": [
+      "mobile/app/search.tsx",
+      "mobile/app/(tabs)/profile.tsx",
+      "mobile/app/(tabs)/notifications.tsx",
+      "mobile/src/presentation/components/infiniteFeed/InfiniteFeedManager.tsx",
+      "mobile/src/presentation/components/profile/EditProfileSheet.tsx"
+    ]
+  },
+  "textSecondary": {
+    "label": "İkincil metin",
+    "light": "#8E8E93",
+    "dark": "rgba(255, 255, 255, 0.6)",
+    "usage": [
+      "mobile/app/search.tsx",
+      "mobile/app/user/[id].tsx",
+      "mobile/app/paywall/badge.tsx",
+      "mobile/src/presentation/components/infiniteFeed/InfiniteFeedManager.tsx",
+      "mobile/src/presentation/components/profile/EditProfileSheet.tsx"
+    ]
+  }
+}

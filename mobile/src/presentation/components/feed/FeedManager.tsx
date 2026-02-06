@@ -318,9 +318,9 @@ export const FeedManager = ({
 
     return (
         <SwipeWrapper
-            onSwipeLeft={isDisabled('DISABLE_INTERACTIONS') ? undefined : handleSwipeLeft}
-            onSwipeRight={isDisabled('DISABLE_INTERACTIONS') ? undefined : () => !isCustomFeed && router.push('/upload')}
-            disabled={isCustomFeed || isDisabled('DISABLE_INTERACTIONS')}
+            onSwipeLeft={isDisabled('DISABLE_INTERACTION_HANDLING') ? undefined : handleSwipeLeft}
+            onSwipeRight={isDisabled('DISABLE_INTERACTION_HANDLING') ? undefined : () => !isCustomFeed && router.push('/upload')}
+            disabled={isCustomFeed || isDisabled('DISABLE_INTERACTION_HANDLING')}
         >
             <View style={styles.container}>
                 <VideoPlayerPool
@@ -374,7 +374,7 @@ export const FeedManager = ({
                     />
                 </View>
 
-                {!isDisabled('DISABLE_OVERLAYS') && (
+                {!isDisabled('DISABLE_ACTIVE_VIDEO_OVERLAY') && (
                     <FeedOverlays
                         ref={overlaysRef as any}
                         moreOptionsSheetRef={moreOptionsSheetRef}

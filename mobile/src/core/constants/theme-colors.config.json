@@ -1,0 +1,30 @@
+{
+  "background": {
+    "light": "#FFFFFF",
+    "dark": "#080A0F"
+  },
+  "videoBackground": {
+    "light": "#000000",
+    "dark": "#080A0F"
+  },
+  "card": {
+    "light": "#F2F2F7",
+    "dark": "#222222"
+  },
+  "black": {
+    "light": "#000000",
+    "dark": "#000000"
+  },
+  "border": {
+    "light": "#E5E5EA",
+    "dark": "#333333"
+  },
+  "textPrimary": {
+    "light": "#000000",
+    "dark": "#FFFFFF"
+  },
+  "textSecondary": {
+    "light": "#8E8E93",
+    "dark": "rgba(255, 255, 255, 0.6)"
+  }
+}
