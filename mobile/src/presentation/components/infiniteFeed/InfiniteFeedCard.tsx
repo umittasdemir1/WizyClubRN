@@ -24,12 +24,18 @@ const WEEK = 7 * DAY;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
 const CAROUSEL_ASPECT_RATIO = 3 / 4;
-const FIRST_FRAME_FALLBACK_MS = 600;
+const FIRST_FRAME_FALLBACK_MS = 120;
 
 const isNonEmptyString = (value: unknown): value is string =>
     typeof value === 'string' && value.trim().length > 0;
 
 const isLocalFilePath = (value: string): boolean => value.startsWith('file://');
+
+const getStableImageCacheKey = (value: string): string => {
+    const trimmed = value.trim();
+    if (!trimmed) return value;
+    return trimmed.split('#')[0].split('?')[0];
+};
 
 const mixWithWhite = (hex: string, amount: number) => {
     if (!hex.startsWith('#')) return hex;
@@ -65,6 +71,7 @@ interface InfiniteFeedCardProps {
     colors: ThemeColors;
     isActive: boolean;
     isPendingActive?: boolean;
+    allowDecodePrewarm?: boolean;
     isMuted: boolean;
     isPaused: boolean;
     currentUserId?: string;
@@ -89,6 +96,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     colors,
     isActive,
     isPendingActive = false,
+    allowDecodePrewarm = false,
     isMuted,
     isPaused,
     currentUserId,
@@ -109,6 +117,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
     const [playbackSource, setPlaybackSource] = useState<string | null>(null);
     const [isVideoVisible, setIsVideoVisible] = useState(false);
+    const [isDecodePrewarmDone, setIsDecodePrewarmDone] = useState(false);
     const firstFrameSeenRef = useRef(false);
     const bufferingStateRef = useRef(false);
     const readyFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -141,6 +150,18 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         if (firstThumbnail?.thumbnail) return firstThumbnail.thumbnail;
         return '';
     }, [item.mediaUrls, item.thumbnailUrl]);
+    const thumbnailCacheKey = useMemo(
+        () => (isNonEmptyString(thumbnail) ? getStableImageCacheKey(thumbnail) : undefined),
+        [thumbnail]
+    );
+    const avatarUrl = useMemo(
+        () => (isNonEmptyString(item.user?.avatarUrl) ? item.user.avatarUrl : ''),
+        [item.user?.avatarUrl]
+    );
+    const avatarCacheKey = useMemo(
+        () => (avatarUrl ? getStableImageCacheKey(avatarUrl) : undefined),
+        [avatarUrl]
+    );
 
     const sourceVideoUrl = getVideoUrl(item);
     const videoUrl = isNonEmptyString(resolvedVideoSource) ? resolvedVideoSource : sourceVideoUrl;
@@ -164,7 +185,17 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         };
     }, [effectiveVideoSourceUrl, bufferConfig]);
     const shouldMountVideo = isVideo && (isActive || isPendingActive) && !disableInlineVideo && !isMeasurement;
-    const shouldPlayVideo = isVideo && isActive && !isPaused && !disableInlineVideo && !isMeasurement;
+    const shouldDecodePrewarm =
+        allowDecodePrewarm &&
+        isVideo &&
+        isPendingActive &&
+        !isActive &&
+        !disableInlineVideo &&
+        !isMeasurement &&
+        !isDecodePrewarmDone;
+    const shouldPlayVideo = isVideo && !disableInlineVideo && !isMeasurement && (
+        (isActive && !isPaused) || shouldDecodePrewarm
+    );
     const hasMedia = isCarousel || isVideo || Boolean(thumbnail);
     const hasThumbnail = Boolean(thumbnail);
     const shouldGateVideoVisibility = !disableThumbnail && hasThumbnail;
@@ -214,19 +245,25 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
             firstFrameSeenRef.current = true;
             clearReadyFallbackTimer();
             setIsVideoVisible(true);
+            if (shouldDecodePrewarm) {
+                setIsDecodePrewarmDone(true);
+            }
             return;
         }
         if (firstFrameSeenRef.current) return;
         firstFrameSeenRef.current = true;
         clearReadyFallbackTimer();
         setIsVideoVisible(true);
+        if (shouldDecodePrewarm) {
+            setIsDecodePrewarmDone(true);
+        }
         logVideo(LogCode.VIDEO_LOAD_SUCCESS, 'Infinite inline video first frame visible', {
             videoId: item.id,
             index,
             reason,
             sourceType: isLocalVideoSource ? 'file' : 'network',
         });
-    }, [clearReadyFallbackTimer, index, isLocalVideoSource, item.id, shouldGateVideoVisibility]);
+    }, [clearReadyFallbackTimer, index, isLocalVideoSource, item.id, shouldDecodePrewarm, shouldGateVideoVisibility]);
 
     const handleVideoLoadStart = useCallback((_event: OnLoadStartData) => {
         if (!shouldGateVideoVisibility) {
@@ -288,12 +325,21 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     }, [clearReadyFallbackTimer, index, isLocalVideoSource, item.id]);
 
     useEffect(() => {
+        const initialShouldGate = !disableThumbnail && hasThumbnail;
         clearReadyFallbackTimer();
-        firstFrameSeenRef.current = !shouldGateVideoVisibility;
+        firstFrameSeenRef.current = !initialShouldGate;
         bufferingStateRef.current = false;
-        setIsVideoVisible(!shouldGateVideoVisibility);
+        setIsVideoVisible(!initialShouldGate);
+        setIsDecodePrewarmDone(false);
         setPlaybackSource(null);
-    }, [clearReadyFallbackTimer, item.id, shouldGateVideoVisibility]);
+    }, [clearReadyFallbackTimer, disableThumbnail, hasThumbnail, item.id]);
+
+    useEffect(() => {
+        // Reset only when the card is completely out of warm/active window.
+        if (!isPendingActive && !isActive) {
+            setIsDecodePrewarmDone(false);
+        }
+    }, [isActive, isPendingActive]);
 
     useEffect(() => () => {
         clearReadyFallbackTimer();
@@ -357,6 +403,14 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
             revealVideoLayer('fallback');
         }, FIRST_FRAME_FALLBACK_MS);
     }, [clearReadyFallbackTimer, revealVideoLayer, shouldGateVideoVisibility, shouldMountVideo]);
+
+    useEffect(() => {
+        if (!isVideo || !isActive || !isDecodePrewarmDone) return;
+        firstFrameSeenRef.current = true;
+        bufferingStateRef.current = false;
+        clearReadyFallbackTimer();
+        setIsVideoVisible(true);
+    }, [clearReadyFallbackTimer, isActive, isDecodePrewarmDone, isVideo]);
 
     // ✅ [PERF] Memoize dynamic styles to prevent object reference churn
     const effectiveAspectRatio = isCarousel ? CAROUSEL_ASPECT_RATIO : aspectRatio;
@@ -456,8 +510,14 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                         {!disableUserHeader && (
                             <View style={styles.mediaHeaderOverlay}>
                                 <View style={styles.userInfoRow}>
-                                    {item.user?.avatarUrl ? (
-                                        <Image source={{ uri: item.user.avatarUrl }} style={styles.avatar} contentFit="cover" />
+                                    {avatarUrl ? (
+                                        <Image
+                                            source={{ uri: avatarUrl, cacheKey: avatarCacheKey }}
+                                            style={styles.avatar}
+                                            contentFit="cover"
+                                            cachePolicy="memory-disk"
+                                            transition={0}
+                                        />
                                     ) : (
                                         <View style={[styles.avatar, { backgroundColor: colors.card }]} />
                                     )}
@@ -506,7 +566,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                         <View style={styles.videoContainer}>
                             {shouldShowBaseThumbnail ? (
                                 <Image
-                                    source={{ uri: thumbnail }}
+                                    source={{ uri: thumbnail, cacheKey: thumbnailCacheKey }}
                                     style={styles.media}
                                     contentFit="cover"
                                     transition={0}
@@ -526,7 +586,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                     resizeMode="contain"
                                     repeat={true}
                                     paused={!shouldPlayVideo}
-                                    muted={isMuted}
+                                    muted={isMuted || shouldDecodePrewarm}
                                     playInBackground={false}
                                     playWhenInactive={false}
                                     progressUpdateInterval={100}
@@ -552,8 +612,14 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                         {!disableUserHeader && (
                             <View style={styles.mediaHeaderOverlay}>
                                 <View style={styles.userInfoRow}>
-                                    {item.user?.avatarUrl ? (
-                                        <Image source={{ uri: item.user.avatarUrl }} style={styles.avatar} contentFit="cover" />
+                                    {avatarUrl ? (
+                                        <Image
+                                            source={{ uri: avatarUrl, cacheKey: avatarCacheKey }}
+                                            style={styles.avatar}
+                                            contentFit="cover"
+                                            cachePolicy="memory-disk"
+                                            transition={0}
+                                        />
                                     ) : (
                                         <View style={[styles.avatar, { backgroundColor: colors.card }]} />
                                     )}
@@ -605,9 +671,9 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                     hitSlop={10}
                                 >
                                     {isMuted ? (
-                                        <VolumeX size={16} color="#FFFFFF" strokeWidth={1.6} />
+                                        <VolumeX size={18} color="#FFFFFF" strokeWidth={1.6} />
                                     ) : (
-                                        <Volume2 size={16} color="#FFFFFF" strokeWidth={1.6} />
+                                        <Volume2 size={18} color="#FFFFFF" strokeWidth={1.6} />
                                     )}
                                 </Pressable>
                             </View>
@@ -841,17 +907,17 @@ const styles = StyleSheet.create({
         borderRadius: 15,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'rgba(0,0,0,0.35)',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.25)',
+        backgroundColor: 'rgba(0,0,0,0.50)',
+        borderWidth: 0,
+        borderColor: 'transparent',
     },
     followPill: {
-        backgroundColor: 'transparent',
+        backgroundColor: 'rgba(0,0,0,0.50)',
         paddingHorizontal: 12,
         paddingVertical: 5,
         borderRadius: 20,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.35)',
+        borderWidth: 0,
+        borderColor: 'transparent',
         alignSelf: 'center',
         marginRight: 0,
         shadowColor: 'transparent',
@@ -863,7 +929,7 @@ const styles = StyleSheet.create({
     followText: {
         color: 'white',
         fontSize: 15,
-        fontWeight: '600',
+        fontWeight: '400',
     },
     mediaPlaceholder: {
         width: '100%',

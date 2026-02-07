@@ -10,7 +10,7 @@ import Animated, {
     Extrapolation,
     SharedValue,
 } from 'react-native-reanimated';
-import { Heart, Send, Bookmark, ShoppingBag } from 'lucide-react-native';
+import { Heart, Send, Bookmark, PictureInPicture } from 'lucide-react-native';
 import { formatCount } from '../../../core/utils';
 import { ThemeColors } from './InfiniteFeedTypes';
 import { FEED_FLAGS } from './hooks/useInfiniteFeedConfig';
@@ -33,6 +33,7 @@ const PARTICLE_ANGLES = Array.from({ length: PARTICLE_COUNT }).map((_, i) => (Ma
 interface ActionButtonProps {
     icon: typeof Heart;
     count: number;
+    zeroText?: string;
     onPress?: () => void;
     colors: ThemeColors;
     active?: boolean;
@@ -82,6 +83,7 @@ const BurstParticle = React.memo(function BurstParticle({ angle, color, burst }:
 const ActionButton = React.memo(function ActionButton({
     icon: Icon,
     count,
+    zeroText,
     onPress,
     colors,
     active = false,
@@ -134,9 +136,15 @@ const ActionButton = React.memo(function ActionButton({
     const iconColor = localActive && activeColor ? activeColor : WHITE;
     const iconFill = localActive && activeColor ? activeColor : 'none';
     const strokeWidth = localActive ? 2 : 1.2;
+    const formattedCount = useMemo(() => formatCount(count), [count]);
+    const isZeroCount = formattedCount === '0';
 
     const countStyle = useMemo(() => [
         styles.actionCount,
+        { color: colors.textPrimary }
+    ], [colors.textPrimary]);
+    const zeroTextStyle = useMemo(() => [
+        styles.zeroText,
         { color: colors.textPrimary }
     ], [colors.textPrimary]);
 
@@ -167,7 +175,13 @@ const ActionButton = React.memo(function ActionButton({
                     strokeWidth={strokeWidth}
                 />
             </Animated.View>
-            <Text style={countStyle}>{formatCount(count)}</Text>
+            <View style={styles.countContainer}>
+                {isZeroCount && zeroText ? (
+                    <Text style={zeroTextStyle}>{zeroText}</Text>
+                ) : (
+                    <Text style={countStyle}>{formattedCount}</Text>
+                )}
+            </View>
         </Pressable>
     );
 });
@@ -212,6 +226,7 @@ export const InfiniteFeedActions = React.memo(function InfiniteFeedActions({
                 <ActionButton
                     icon={Heart}
                     count={likesCount}
+                    zeroText="Beğen"
                     colors={colors}
                     active={isLiked}
                     activeColor="#FF2146"
@@ -223,6 +238,7 @@ export const InfiniteFeedActions = React.memo(function InfiniteFeedActions({
                 <ActionButton
                     icon={Bookmark}
                     count={savesCount}
+                    zeroText="Kaydet"
                     colors={colors}
                     active={isSaved}
                     activeColor="#FFD700"
@@ -234,6 +250,7 @@ export const InfiniteFeedActions = React.memo(function InfiniteFeedActions({
                 <ActionButton
                     icon={Send}
                     count={sharesCount}
+                    zeroText="Gönder"
                     colors={colors}
                     onPress={onShare}
                     onLongPress={triggerShake}
@@ -242,8 +259,9 @@ export const InfiniteFeedActions = React.memo(function InfiniteFeedActions({
             </View>
             {showShop ? (
                 <ActionButton
-                    icon={ShoppingBag}
+                    icon={PictureInPicture}
                     count={shopsCount}
+                    zeroText="Göz At"
                     colors={colors}
                     onPress={onShop}
                     onLongPress={triggerShake}
@@ -292,5 +310,14 @@ const styles = StyleSheet.create({
     actionCount: {
         fontSize: 15,
         fontWeight: '600',
+    },
+    countContainer: {
+        minHeight: 18,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    zeroText: {
+        fontSize: 11,
+        fontWeight: '400',
     },
 });

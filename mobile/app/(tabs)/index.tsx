@@ -3,12 +3,14 @@ import { InfiniteFeedManager } from '../../src/presentation/components/infiniteF
 import { FEED_MODE_FLAGS } from '../../src/presentation/config/feedModeConfig';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import { useActiveVideoStore } from '../../src/presentation/store/useActiveVideoStore';
-import { useEffect, useRef } from 'react';
-import { useIsFocused } from '@react-navigation/native';
+import { useEffect, useRef, useState } from 'react';
+import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { logVideo, LogCode } from '@/core/services/Logger';
 
 export default function HomeFeedScreen() {
+    const navigation = useNavigation<any>();
     const isFocused = useIsFocused();
+    const [homeReselectTrigger, setHomeReselectTrigger] = useState(0);
     const isPaused = useActiveVideoStore((state) => state.isPaused);
     const setPaused = useActiveVideoStore((state) => state.setPaused);
     const setScreenFocused = useActiveVideoStore((state) => state.setScreenFocused);
@@ -68,6 +70,14 @@ export default function HomeFeedScreen() {
         prevFocused.current = isFocused;
     }, [isFocused, setPaused, setScreenFocused]);
 
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('tabPress', () => {
+            if (!isFocused) return;
+            setHomeReselectTrigger((prev) => prev + 1);
+        });
+        return unsubscribe;
+    }, [isFocused, navigation]);
+
     // 🔀 Conditional render based on USE_INFINITE_FEED flag
     if (FEED_MODE_FLAGS.USE_INFINITE_FEED) {
         return (
@@ -85,6 +95,7 @@ export default function HomeFeedScreen() {
                 toggleFollow={toggleFollow}
                 toggleShare={toggleShare}
                 toggleShop={toggleShop}
+                homeReselectTrigger={homeReselectTrigger}
             />
         );
     }
@@ -109,6 +120,7 @@ export default function HomeFeedScreen() {
             prependVideo={prependVideo}
             showStories={true}
             isCustomFeed={false}
+            homeReselectTrigger={homeReselectTrigger}
         />
     );
 }

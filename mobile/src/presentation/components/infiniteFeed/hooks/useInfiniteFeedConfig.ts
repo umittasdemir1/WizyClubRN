@@ -29,10 +29,16 @@ export const INFINITE_FEED_FLAGS = {
 } as const;
 
 export const INFINITE_FEED_CONFIG = {
-    /** Number of videos to prefetch ahead of current position */
-    PREFETCH_AHEAD_COUNT: 5,
+    /** Number of videos to prefetch ahead of current position (network/disk warmup) */
+    PREFETCH_AHEAD_COUNT: 10,
     /** Number of videos to prefetch behind current position */
-    PREFETCH_BEHIND_COUNT: 1,
+    PREFETCH_BEHIND_COUNT: 0,
+    /** Number of next videos to mount for decode pre-warm (paused at first frame) */
+    DECODE_PREWARM_AHEAD_COUNT: 5,
+    /** Number of nearest candidates allowed to actively decode-prewarm at once */
+    DECODE_PREWARM_PLAY_COUNT: 5,
+    /** Active playback starts when item visibility reaches this percent */
+    PLAY_VISIBILITY_THRESHOLD_PERCENT: 30,
 } as const;
 
 // Backward-compatible names for minimal migration churn in infinite components.

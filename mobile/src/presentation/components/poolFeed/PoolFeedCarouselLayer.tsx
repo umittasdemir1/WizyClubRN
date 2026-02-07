@@ -9,15 +9,41 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.heic', '.heif', '.avif'];
 const AUTO_ADVANCE_INTERVAL_MS = 5000;
 const AUTO_ADVANCE_RESUME_DELAY_MS = 1000;
+const MAX_CAROUSEL_LOADED_REGISTRY = 300;
+const carouselLoadedRegistry = new Map<string, Set<number>>();
 
 const isImageUrl = (url: string): boolean => {
     const normalized = url.split('?')[0].toLowerCase();
     return IMAGE_EXTENSIONS.some((ext) => normalized.endsWith(ext));
 };
 
+const getStableMediaCacheKey = (url: string): string => {
+    const trimmed = url.trim();
+    if (!trimmed) return url;
+    return trimmed.split('#')[0].split('?')[0];
+};
+
+const getRememberedLoadedIndices = (identityKey: string): Set<number> => {
+    const remembered = carouselLoadedRegistry.get(identityKey);
+    if (!remembered) return new Set<number>();
+    return new Set<number>(remembered);
+};
+
+const rememberLoadedIndex = (identityKey: string, index: number): void => {
+    if (!identityKey) return;
+    const current = carouselLoadedRegistry.get(identityKey) ?? new Set<number>();
+    current.add(index);
+    carouselLoadedRegistry.set(identityKey, current);
+    if (carouselLoadedRegistry.size <= MAX_CAROUSEL_LOADED_REGISTRY) return;
+    const oldestKey = carouselLoadedRegistry.keys().next().value;
+    if (oldestKey) carouselLoadedRegistry.delete(oldestKey);
+};
+
 interface CarouselItem {
     url: string;
     thumbnail?: string;
+    cacheKey?: string;
+    thumbnailCacheKey?: string;
 }
 
 interface CarouselLayerProps {
@@ -61,9 +87,34 @@ export function PoolFeedCarouselLayer({
 
     const lastActiveIndexRef = useRef(0);
     const normalizedItems = useMemo(
-        () => mediaUrls.filter((item) => isImageUrl(item.url)),
+        () => mediaUrls
+            .filter((item) => isImageUrl(item.url))
+            .map((item) => ({
+                ...item,
+                cacheKey: getStableMediaCacheKey(item.url),
+                thumbnailCacheKey: item.thumbnail ? getStableMediaCacheKey(item.thumbnail) : undefined,
+            })),
         [mediaUrls]
     );
+    const mediaIdentityKey = useMemo(
+        () => normalizedItems.map((item) => item.cacheKey ?? item.url).join('|'),
+        [normalizedItems]
+    );
+
+    useEffect(() => {
+        loadedIndicesRef.current = getRememberedLoadedIndices(mediaIdentityKey);
+        lastActiveIndexRef.current = 0;
+        setActiveIndex(0);
+        setActiveImageLoaded(loadedIndicesRef.current.has(0));
+        autoAdvanceStartIndexRef.current = null;
+        autoAdvanceHasAdvancedRef.current = false;
+        autoAdvanceHasLoopedRef.current = false;
+        if (normalizedItems.length > 0) {
+            requestAnimationFrame(() => {
+                flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+            });
+        }
+    }, [mediaIdentityKey, normalizedItems.length]);
 
     const handleScroll = useCallback((event: any) => {
         if (normalizedItems.length === 0) return;
@@ -194,10 +245,11 @@ export function PoolFeedCarouselLayer({
 
     const handleImageDone = useCallback((index: number) => {
         loadedIndicesRef.current.add(index);
+        rememberLoadedIndex(mediaIdentityKey, index);
         if (index === activeIndex) {
             setActiveImageLoaded(true);
         }
-    }, [activeIndex]);
+    }, [activeIndex, mediaIdentityKey]);
 
     const handleInteractionStart = useCallback(() => {
         isInteractingRef.current = true;
@@ -233,7 +285,7 @@ export function PoolFeedCarouselLayer({
                         onImageDone={handleImageDone}
                     />
                 )}
-                keyExtractor={(item, index) => `${item.url}-${index}`}
+                keyExtractor={(item, index) => `${item.cacheKey ?? item.url}-${index}`}
                 horizontal
                 pagingEnabled={false}
                 showsHorizontalScrollIndicator={false}
@@ -261,18 +313,6 @@ export function PoolFeedCarouselLayer({
                     onCarouselTouchEnd?.();
                 }}
                 onMomentumScrollEnd={(event) => {
-                    handleInteractionEnd();
-                    onCarouselTouchEnd?.();
-                }}
-                onTouchStart={(event) => {
-                    handleInteractionStart();
-                    onCarouselTouchStart?.();
-                }}
-                onTouchEnd={(event) => {
-                    handleInteractionEnd();
-                    onCarouselTouchEnd?.();
-                }}
-                onTouchCancel={(event) => {
                     handleInteractionEnd();
                     onCarouselTouchEnd?.();
                 }}
@@ -353,12 +393,15 @@ function CarouselMediaItem({
             delayLongPress={300}
         >
             <Image
-                source={{ uri: item.url }}
+                source={{ uri: item.url, cacheKey: item.cacheKey }}
                 style={styles.image}
                 contentFit="contain"
                 cachePolicy="memory-disk"
+                transition={0}
                 priority="high"
-                placeholder={(!FEED_FLAGS.POOL_DISABLE_THUMBNAIL && item.thumbnail) ? { uri: item.thumbnail } : undefined}
+                placeholder={(!FEED_FLAGS.POOL_DISABLE_THUMBNAIL && item.thumbnail)
+                    ? { uri: item.thumbnail, cacheKey: item.thumbnailCacheKey ?? item.thumbnail }
+                    : undefined}
                 onLoad={() => onImageDone(index)}
                 onError={() => onImageDone(index)}
             />

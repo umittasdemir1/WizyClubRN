@@ -46,33 +46,33 @@ export const FEED_FLAGS = {
     /** Master switch - Disables all visual UI layers (excluding video itself) */
     DISABLE_ALL_UI: false,
     /** Disable Pool feed action button animations */
-    POOL_DISABLE_ACTION_ANIMATIONS: true,
+    POOL_DISABLE_ACTION_ANIMATIONS: false,
     /** Disable Pool feed thumbnail/poster display */
     POOL_DISABLE_THUMBNAIL: false,
 
     // Active Video Overlay Granular Controls
     /** Disables the profile picture in metadata */
-    DISABLE_AVATAR: true,
+    DISABLE_AVATAR: false,
     /** Disables the user's full name/display name */
-    DISABLE_FULL_NAME: true,
+    DISABLE_FULL_NAME: false,
     /** Disables the @username handle */
-    DISABLE_USERNAME: true,
+    DISABLE_USERNAME: false,
     /** Disables the video description/caption */
-    DISABLE_DESCRIPTION: true,
+    DISABLE_DESCRIPTION: false,
     /** Disables the video progression seekbar */
-    DISABLE_SEEKBAR: true,
+    DISABLE_SEEKBAR: false,
     /** Disables action buttons (Like, Save, Share, Shop) */
-    DISABLE_ACTION_BUTTONS: true,
+    DISABLE_ACTION_BUTTONS: false,
     /** Disables the commercial/sponsored tag */
-    DISABLE_COMMERCIAL_TAG: true,
+    DISABLE_COMMERCIAL_TAG: false,
 
     // Global Overlays
     /** Master switch for the entire active video overlay layer */
-    DISABLE_ACTIVE_VIDEO_OVERLAY: true,
+    DISABLE_ACTIVE_VIDEO_OVERLAY: false,
     /** Disables the top navigation and status bar overlay */
-    DISABLE_HEADER_OVERLAY: true,
+    DISABLE_HEADER_OVERLAY: false,
     /** Disables the horizontal story carousel layer */
-    DISABLE_STORY_BAR: true,
+    DISABLE_STORY_BAR: false,
     /** Disables all bottom sheet components (More, Description, Shopping) */
     DISABLE_SHEETS: false,
     /** Disables all pop-up confirmation and info modals */

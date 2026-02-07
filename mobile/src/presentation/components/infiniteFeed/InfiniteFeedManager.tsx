@@ -48,11 +48,16 @@ interface InfiniteFeedManagerProps {
     toggleFollow: (id: string) => void;
     toggleShare: (id: string) => void;
     toggleShop: (id: string) => void;
+    homeReselectTrigger?: number;
 }
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const ESTIMATED_CARD_HEIGHT = Math.round(SCREEN_HEIGHT * 0.82);
 const THUMBNAIL_PREFETCH_OFFSETS = [-2, -1, 1, 2, 3];
+const FlashListAny = FlashList as any;
+const INFINITE_WINDOW_SIZE = 5;
+const INFINITE_MAX_RENDER_BATCH = 2;
+const INFINITE_DRAW_DISTANCE = ESTIMATED_CARD_HEIGHT * 1.5;
 
 const getPrefetchIndices = (activeIndex: number, videosLength: number): number[] => {
     const indices = new Set<number>();
@@ -87,6 +92,7 @@ export function InfiniteFeedManager({
     toggleFollow,
     toggleShare,
     toggleShop,
+    homeReselectTrigger = 0,
 }: InfiniteFeedManagerProps) {
     const insets = useSafeAreaInsets();
     const router = useRouter();
@@ -114,6 +120,10 @@ export function InfiniteFeedManager({
     const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const scrollStartAtRef = useRef<number | null>(null);
     const sourceResolveGenerationRef = useRef(0);
+    const scrollDirectionRef = useRef<'up' | 'down'>('down');
+    const lastScrollOffsetYRef = useRef(0);
+    const listRef = useRef<any>(null);
+    const lastHandledReselectRef = useRef(0);
 
     const setCustomFeed = useInfiniteFeedActiveVideoStore((state) => state.setCustomFeed);
     const setActiveVideo = useInfiniteFeedActiveVideoStore((state) => state.setActiveVideo);
@@ -279,6 +289,37 @@ export function InfiniteFeedManager({
     }, [clearSettleTimer]);
 
     useEffect(() => {
+        if (homeReselectTrigger <= 0) return;
+        if (homeReselectTrigger === lastHandledReselectRef.current) return;
+        lastHandledReselectRef.current = homeReselectTrigger;
+        if (videos.length === 0) return;
+
+        const firstVideoId = videos[0]?.id ?? null;
+        clearSettleTimer();
+        momentumStartedRef.current = false;
+        isFeedScrollingRef.current = false;
+        scrollStartAtRef.current = null;
+        scrollDirectionRef.current = 'down';
+        lastScrollOffsetYRef.current = 0;
+        activeInlineIdRef.current = firstVideoId;
+        activeInlineIndexRef.current = 0;
+        pendingActiveIdRef.current = firstVideoId;
+        pendingActiveIndexRef.current = 0;
+        setActiveTab('Sana Özel');
+        setActiveInlineId(firstVideoId);
+        setPendingInlineId(firstVideoId);
+        setPendingInlineIndex(0);
+        setActiveInlineIndex(0);
+        if (firstVideoId) {
+            setActiveVideo(firstVideoId, 0);
+        }
+
+        requestAnimationFrame(() => {
+            listRef.current?.scrollToOffset({ offset: 0, animated: true });
+        });
+    }, [homeReselectTrigger, videos, clearSettleTimer, setActiveVideo]);
+
+    useEffect(() => {
         if (!videos.length || activeInlineIndex < 0 || activeInlineIndex >= videos.length) return;
 
         const prefetchService = FeedPrefetchService.getInstance();
@@ -418,10 +459,17 @@ export function InfiniteFeedManager({
     const shouldPauseForScroll = isFeedScrollingRef.current && !immediateActiveCommit;
 
     const renderItem = useCallback(({ item, index, target }: { item: InfiniteFeedVideo; index: number; target?: string }) => {
-        // Keep a small pre-mount window around pending target so UI is ready before playback switch.
-        // Playback itself still remains active-only.
-        // This mirrors Instagram/X behavior where chrome appears instantly and media follows.
-        const isPendingWindow = Math.abs(index - pendingInlineIndex) <= 2;
+        // Decode pre-warm: keep current + next N items mounted (paused),
+        // then start playback only when the candidate crosses visibility threshold.
+        const prewarmRange = FEED_CONFIG.DECODE_PREWARM_AHEAD_COUNT;
+        const prewarmPlayRange = FEED_CONFIG.DECODE_PREWARM_PLAY_COUNT;
+        const prewarmDistance = scrollDirectionRef.current === 'up'
+            ? pendingInlineIndex - index
+            : index - pendingInlineIndex;
+        const isPendingWindow = scrollDirectionRef.current === 'up'
+            ? (index <= pendingInlineIndex && index >= pendingInlineIndex - prewarmRange)
+            : (index >= pendingInlineIndex && index <= pendingInlineIndex + prewarmRange);
+        const allowDecodePrewarm = prewarmDistance >= 1 && prewarmDistance <= prewarmPlayRange;
 
         return (
             <InfiniteFeedCard
@@ -430,6 +478,7 @@ export function InfiniteFeedManager({
                 colors={themeColors}
                 isActive={item.id === activeInlineId}
                 isPendingActive={item.id === pendingInlineId || isPendingWindow}
+                allowDecodePrewarm={allowDecodePrewarm}
                 isMuted={isMuted}
                 isPaused={isPaused || shouldPauseForScroll}
                 currentUserId={currentUserId}
@@ -451,14 +500,25 @@ export function InfiniteFeedManager({
 
     // Active item changes when card visibility crosses threshold
     const viewabilityConfig = useRef({
-        itemVisiblePercentThreshold: 35,
-        minimumViewTime: 100,
+        itemVisiblePercentThreshold: FEED_CONFIG.PLAY_VISIBILITY_THRESHOLD_PERCENT,
+        minimumViewTime: 0,
     }).current;
 
     const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken<InfiniteFeedVideo>[] }) => {
-        const nextViewable = viewableItems
-            .filter((token) => token.isViewable && token.item && typeof token.index === 'number')
-            .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))[0];
+        let minCandidate: ViewToken<InfiniteFeedVideo> | null = null;
+        let maxCandidate: ViewToken<InfiniteFeedVideo> | null = null;
+
+        for (const token of viewableItems) {
+            if (!token?.isViewable || !token.item || typeof token.index !== 'number') continue;
+            if (!minCandidate || token.index < (minCandidate.index ?? Number.POSITIVE_INFINITY)) {
+                minCandidate = token;
+            }
+            if (!maxCandidate || token.index > (maxCandidate.index ?? Number.NEGATIVE_INFINITY)) {
+                maxCandidate = token;
+            }
+        }
+
+        const nextViewable = scrollDirectionRef.current === 'up' ? minCandidate : maxCandidate;
         if (!nextViewable) return;
 
         const candidate = nextViewable?.item;
@@ -476,6 +536,17 @@ export function InfiniteFeedManager({
             commitPendingActive('viewable-immediate');
         }
     }, [commitPendingActive, immediateActiveCommit]);
+
+    const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+        const offsetY = event.nativeEvent.contentOffset.y ?? 0;
+        const diff = offsetY - lastScrollOffsetYRef.current;
+        if (diff > 1) {
+            scrollDirectionRef.current = 'down';
+        } else if (diff < -1) {
+            scrollDirectionRef.current = 'up';
+        }
+        lastScrollOffsetYRef.current = offsetY;
+    }, []);
 
     const handleScrollBeginDrag = useCallback(() => {
         clearSettleTimer();
@@ -550,7 +621,8 @@ export function InfiniteFeedManager({
 
     return (
         <View style={[styles.container, { backgroundColor: themeColors.background }]}>
-            <FlashList
+            <FlashListAny
+                ref={listRef}
                 data={videos}
                 renderItem={renderItem}
                 keyExtractor={(item: InfiniteFeedVideo) => item.id}
@@ -561,8 +633,13 @@ export function InfiniteFeedManager({
                 onScrollEndDrag={handleScrollEndDrag}
                 onMomentumScrollBegin={handleMomentumScrollBegin}
                 onMomentumScrollEnd={handleMomentumScrollEnd}
+                onScroll={handleScroll}
+                scrollEventThrottle={32}
                 estimatedItemSize={ESTIMATED_CARD_HEIGHT}
                 removeClippedSubviews={false}
+                maxToRenderPerBatch={INFINITE_MAX_RENDER_BATCH}
+                windowSize={INFINITE_WINDOW_SIZE}
+                drawDistance={INFINITE_DRAW_DISTANCE}
                 showsVerticalScrollIndicator={false}
                 scrollEnabled={!isCarouselInteracting}
                 ListHeaderComponent={!FEED_FLAGS.INF_DISABLE_HEADER_TABS ? (

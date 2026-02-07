@@ -9,6 +9,8 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.heic', '.heif', '.avif'];
 const AUTO_ADVANCE_INTERVAL_MS = 5000;
 const AUTO_ADVANCE_RESUME_DELAY_MS = 1000;
+const MAX_CAROUSEL_LOADED_REGISTRY = 300;
+const carouselLoadedRegistry = new Map<string, Set<number>>();
 
 const isImageUrl = (url: string): boolean => {
     const normalized = url.split('?')[0].toLowerCase();
@@ -19,6 +21,22 @@ const getStableMediaCacheKey = (url: string): string => {
     const trimmed = url.trim();
     if (!trimmed) return url;
     return trimmed.split('#')[0].split('?')[0];
+};
+
+const getRememberedLoadedIndices = (identityKey: string): Set<number> => {
+    const remembered = carouselLoadedRegistry.get(identityKey);
+    if (!remembered) return new Set<number>();
+    return new Set<number>(remembered);
+};
+
+const rememberLoadedIndex = (identityKey: string, index: number): void => {
+    if (!identityKey) return;
+    const current = carouselLoadedRegistry.get(identityKey) ?? new Set<number>();
+    current.add(index);
+    carouselLoadedRegistry.set(identityKey, current);
+    if (carouselLoadedRegistry.size <= MAX_CAROUSEL_LOADED_REGISTRY) return;
+    const oldestKey = carouselLoadedRegistry.keys().next().value;
+    if (oldestKey) carouselLoadedRegistry.delete(oldestKey);
 };
 
 interface CarouselItem {
@@ -88,10 +106,10 @@ export function InfiniteCarouselLayer({
     );
 
     useEffect(() => {
-        loadedIndicesRef.current.clear();
+        loadedIndicesRef.current = getRememberedLoadedIndices(mediaIdentityKey);
         lastActiveIndexRef.current = 0;
         setActiveIndex(0);
-        setActiveImageLoaded(false);
+        setActiveImageLoaded(loadedIndicesRef.current.has(0));
         autoAdvanceStartIndexRef.current = null;
         autoAdvanceHasAdvancedRef.current = false;
         autoAdvanceHasLoopedRef.current = false;
@@ -232,10 +250,11 @@ export function InfiniteCarouselLayer({
 
     const handleImageDone = useCallback((index: number) => {
         loadedIndicesRef.current.add(index);
+        rememberLoadedIndex(mediaIdentityKey, index);
         if (index === activeIndex) {
             setActiveImageLoaded(true);
         }
-    }, [activeIndex]);
+    }, [activeIndex, mediaIdentityKey]);
 
     const handleInteractionStart = useCallback(() => {
         isInteractingRef.current = true;
@@ -303,18 +322,6 @@ export function InfiniteCarouselLayer({
                     onCarouselTouchEnd?.();
                 }}
                 onMomentumScrollEnd={(event) => {
-                    handleInteractionEnd();
-                    onCarouselTouchEnd?.();
-                }}
-                onTouchStart={(event) => {
-                    handleInteractionStart();
-                    onCarouselTouchStart?.();
-                }}
-                onTouchEnd={(event) => {
-                    handleInteractionEnd();
-                    onCarouselTouchEnd?.();
-                }}
-                onTouchCancel={(event) => {
                     handleInteractionEnd();
                     onCarouselTouchEnd?.();
                 }}
@@ -401,6 +408,7 @@ function CarouselMediaItem({
                 style={[styles.image, { backgroundColor }]}
                 contentFit="cover"
                 cachePolicy="memory-disk"
+                transition={0}
                 priority="high"
                 placeholder={(!FEED_FLAGS.INF_DISABLE_THUMBNAIL && item.thumbnail)
                     ? { uri: item.thumbnail, cacheKey: item.thumbnailCacheKey ?? item.thumbnail }
@@ -462,15 +470,17 @@ const styles = StyleSheet.create({
     photoIndexBadge: {
         position: 'absolute',
         right: 16,
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 12,
-        backgroundColor: 'rgba(0, 0, 0, 0.55)',
+        paddingHorizontal: 12,
+        paddingVertical: 5,
+        borderRadius: 20,
+        backgroundColor: 'rgba(0,0,0,0.50)',
+        borderWidth: 0,
+        borderColor: 'transparent',
     },
     photoIndexText: {
         color: '#FFFFFF',
         fontSize: 13,
-        fontWeight: '700',
+        fontWeight: '400',
     },
     loadingOverlay: {
         ...StyleSheet.absoluteFillObject,

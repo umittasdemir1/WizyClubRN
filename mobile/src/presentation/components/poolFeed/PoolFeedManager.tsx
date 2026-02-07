@@ -68,6 +68,7 @@ interface PoolFeedManagerProps {
     prependVideo?: (video: PoolFeedVideo) => void;
     showStories?: boolean;
     isCustomFeed?: boolean;
+    homeReselectTrigger?: number;
 }
 
 // ============================================================================ 
@@ -91,6 +92,7 @@ export const PoolFeedManager = ({
     prependVideo,
     showStories = true,
     isCustomFeed = false,
+    homeReselectTrigger = 0,
 }: PoolFeedManagerProps) => {
     // Hooks & Store
     const insets = useSafeAreaInsets();
@@ -133,6 +135,7 @@ export const PoolFeedManager = ({
     const overlaysRef = useRef<PoolFeedOverlaysRef>(null);
     const descriptionSheetRef = useRef<any>(null);
     const moreOptionsSheetRef = useRef<any>(null);
+    const lastHandledReselectRef = useRef(0);
 
     // Derived State
     const [rateLabel, setRateLabel] = useState<string | null>(null);
@@ -207,6 +210,27 @@ export const PoolFeedManager = ({
         lastActiveIdRef, lastInternalIndex,
         resetPlayback: videoCallbacks.resetPlayback,
     });
+
+    useEffect(() => {
+        if (homeReselectTrigger <= 0) return;
+        if (homeReselectTrigger === lastHandledReselectRef.current) return;
+        lastHandledReselectRef.current = homeReselectTrigger;
+        if (videos.length === 0) return;
+
+        const firstVideo = videos[0];
+        if (!firstVideo) return;
+
+        setActiveTab('foryou');
+        setIsCarouselInteracting(false);
+        setCleanScreen(false);
+        lastInternalIndex.current = 0;
+        lastActiveIdRef.current = firstVideo.id;
+        setActiveVideo(firstVideo.id, 0);
+
+        requestAnimationFrame(() => {
+            listRef.current?.scrollToOffset({ offset: 0, animated: true });
+        });
+    }, [homeReselectTrigger, videos, setActiveVideo, setCleanScreen]);
 
     // ======================================================================== 
     // Callbacks & Render Helpers
@@ -350,7 +374,7 @@ export const PoolFeedManager = ({
                         estimatedItemSize={ITEM_HEIGHT}
                         overrideItemLayout={(layout) => layout.size = ITEM_HEIGHT}
                         keyExtractor={(item: PoolFeedVideo) => item.id}
-                        updateCellsBatchingPeriod={16}
+                        updateCellsBatchingPeriod={8}
                         snapToInterval={ITEM_HEIGHT}
                         snapToAlignment="start"
                         decelerationRate="fast"
@@ -367,12 +391,12 @@ export const PoolFeedManager = ({
                         onEndReachedThreshold={0.5}
                         ListFooterComponent={isLoadingMore ? <ActivityIndicator style={styles.footerLoader} color="#FFF" /> : null}
                         removeClippedSubviews={false}
-                        maxToRenderPerBatch={1}
-                        windowSize={3}
-                        drawDistance={ITEM_HEIGHT * 1.5}
+                        maxToRenderPerBatch={2}
+                        windowSize={5}
+                        drawDistance={ITEM_HEIGHT * 2}
                         scrollEnabled={!isCarouselInteracting}
                         onScroll={scrollApi.scrollHandler}
-                        scrollEventThrottle={16}
+                        scrollEventThrottle={32}
                         onMomentumScrollEnd={(e: any) => scrollApi.handleScrollEnd(e, videos.length, listRef)}
                     />
                 </View>

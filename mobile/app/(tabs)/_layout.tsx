@@ -8,10 +8,10 @@ import { COLORS, LIGHT_COLORS } from '../../src/core/constants';
 import { useEffect, useState } from 'react';
 import { MOCK_NOTIFICATIONS } from '../../src/data/mock/notifications';
 import { Image } from 'expo-image';
+import { Search } from 'lucide-react-native';
 
 // Import SVGs
 import HomeIcon from '../../assets/icons/home.svg';
-import ForYouIcon from '../../assets/icons/for_you.svg';
 import DealIcon from '../../assets/icons/deal.svg';
 import NotificationIcon from '../../assets/icons/notification.svg';
 import ProfileIcon from '../../assets/icons/profile.svg';
@@ -121,9 +121,9 @@ export default function TabLayout() {
             <Tabs.Screen
                 name="explore"
                 options={{
-                    tabBarIcon: ({ color }) => (
+                    tabBarIcon: ({ focused }) => (
                         <View style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}>
-                            <ForYouIcon width={28} height={28} color={color} />
+                            <Search size={28} color="#FFFFFF" strokeWidth={focused ? 2.8 : 2.2} />
                         </View>
                     ),
                 }}
