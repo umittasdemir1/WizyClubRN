@@ -581,6 +581,7 @@ export function InfiniteFeedManager({
             <InfiniteFeedCard
                 item={item}
                 index={index}
+                activeIndex={activeInlineIndexRef.current}
                 colors={colors}
                 isActive={item.id === activeInlineId}
                 isPendingActive={item.id === effectivePendingInlineId || isPendingWindow}

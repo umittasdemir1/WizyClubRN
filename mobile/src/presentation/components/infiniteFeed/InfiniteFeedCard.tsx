@@ -82,6 +82,7 @@ const formatRelativeTime = (value?: string) => {
 interface InfiniteFeedCardProps {
     item: VideoEntity;
     index: number;
+    activeIndex: number; // ✅ For calculating distance to reset video
     colors: ThemeColors;
     isActive: boolean;
     isPendingActive?: boolean;
@@ -107,6 +108,7 @@ interface InfiniteFeedCardProps {
 export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     item,
     index,
+    activeIndex,
     colors,
     isActive,
     isPendingActive = false,
@@ -214,7 +216,10 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
             minLoadRetryCount: 5,
         };
     }, [effectiveVideoSourceUrl, bufferConfig]);
-    const shouldMountVideo = isVideo && (isActive || isPendingActive || isInactivePauseWindow || wasActiveRef.current) && !disableInlineVideo && !isMeasurement;
+    // ✅ Distance-based mount: unmount when 3+ cards away to save resources
+    const distanceFromActive = Math.abs(index - activeIndex);
+    const isInMountRange = distanceFromActive <= 2;
+    const shouldMountVideo = isVideo && isInMountRange && !disableInlineVideo && !isMeasurement;
     const shouldDecodePrewarm =
         allowDecodePrewarm &&
         isVideo &&
@@ -226,9 +231,9 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     const shouldPlayVideo = isVideo && !disableInlineVideo && !isMeasurement && isActive && !isPaused;
     const hasMedia = isCarousel || isVideo || Boolean(thumbnail);
     const hasThumbnail = Boolean(thumbnail);
-    // ✅ Only gate video visibility on initial load (before first frame), NOT when scrolled away
-    // This keeps video visible at current frame when paused instead of showing thumbnail
-    const shouldGateVideoVisibility = !disableThumbnail && hasThumbnail && !isActive && !wasActiveRef.current;
+    // ✅ Only gate video visibility BEFORE first frame is seen
+    // Once video plays (firstFrameSeenRef=true), NEVER return to thumbnail
+    const shouldGateVideoVisibility = !disableThumbnail && hasThumbnail && !firstFrameSeenRef.current;
     const shouldShowBaseThumbnail = hasThumbnail && (!isVideo || !disableThumbnail);
     const aspectRatio = useMemo(() => {
         if (item.width && item.height && item.width > 0 && item.height > 0) {
@@ -478,10 +483,11 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     useEffect(() => {
         if (!shouldMountVideo) {
             clearReadyFallbackTimer();
-            firstFrameSeenRef.current = !shouldGateVideoVisibility;
-            setIsVideoVisible(!shouldGateVideoVisibility);
-            // Keep playbackSource so re-mount can reuse the cached path instantly
-            // instead of re-resolving from network. Reset only happens on item.id change.
+            // ✅ DON'T reset firstFrameSeenRef - once video plays, never show thumbnail
+            if (!firstFrameSeenRef.current) {
+                setIsVideoVisible(!shouldGateVideoVisibility);
+            }
+            // ✅ NO automatic state reset - video will restart from 0 on remount anyway
             return;
         }
 
@@ -529,12 +535,15 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
             setIsVideoVisible(true);
             return;
         }
-        firstFrameSeenRef.current = false;
-        setIsVideoVisible(false);
-        clearReadyFallbackTimer();
-        readyFallbackTimerRef.current = setTimeout(() => {
-            revealVideoLayer();
-        }, FIRST_FRAME_FALLBACK_MS);
+        // ✅ Only show thumbnail for INITIAL load (video never played)
+        // Once firstFrameSeenRef=true, NEVER reset it
+        if (!firstFrameSeenRef.current) {
+            setIsVideoVisible(false);
+            clearReadyFallbackTimer();
+            readyFallbackTimerRef.current = setTimeout(() => {
+                revealVideoLayer();
+            }, FIRST_FRAME_FALLBACK_MS);
+        }
     }, [clearReadyFallbackTimer, revealVideoLayer, shouldGateVideoVisibility, shouldMountVideo]);
 
     useEffect(() => {
@@ -556,22 +565,9 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
             inactiveSinceRef.current = Date.now();
             setIsInactivePauseWindow(true);
             clearInactivePauseTimer();
-
-            // ✅ 3-second threshold behavior:
-            // - If video played <3s: pause at current frame (do nothing, video stays as-is)
-            // - If video played >=3s: reset to first frame and pause
-            const playedSeconds = lastReportedProgressSecRef.current;
-            const SCROLL_RESET_THRESHOLD_SEC = 3;
-
-            if (playedSeconds >= SCROLL_RESET_THRESHOLD_SEC) {
-                // Video played 3+ seconds: reset to first frame immediately
-                completedLoopCountRef.current = 0;
-                setHasReachedLoopLimit(false);
-                lastReportedProgressSecRef.current = 0;
-                setVideoProgressSec(0);
-                videoRef.current?.seek?.(0);
-            }
-            // else: video played <3s, keep at current frame (no action needed)
+            // ✅ 3-second threshold: mark for reset later (when video goes out of view)
+            // Don't seek here - it causes visible jitter
+            // The reset will happen in shouldMountVideo=false effect
 
             // Set timeout to clean up pause window state after INACTIVE_RESUME_WINDOW_MS
             inactivePauseTimerRef.current = setTimeout(() => {
@@ -582,15 +578,21 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         }
 
         if (isActive && !wasActive) {
+            // ✅ Immediately mark video as seen when it becomes active
+            // This prevents thumbnail from showing on first scroll
+            firstFrameSeenRef.current = true;
+            setIsVideoVisible(true);
+
             const inactiveSince = inactiveSinceRef.current;
             const inactiveDurationMs = inactiveSince == null ? 0 : Date.now() - inactiveSince;
             clearInactivePauseTimer();
+            // ✅ State reset only - NO seek(0) to avoid visible jitter
+            // Video will start from 0 on next remount automatically
             if (inactiveSince != null && inactiveDurationMs >= INACTIVE_RESUME_WINDOW_MS) {
                 completedLoopCountRef.current = 0;
                 setHasReachedLoopLimit(false);
-                lastReportedProgressSecRef.current = 0;
-                setVideoProgressSec(0);
-                videoRef.current?.seek?.(0);
+                // Don't reset progress or seek - let video continue from current position
+                // or start fresh on next remount
             }
             inactiveSinceRef.current = null;
             setIsInactivePauseWindow(false);
