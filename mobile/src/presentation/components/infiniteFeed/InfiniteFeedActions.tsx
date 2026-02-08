@@ -10,7 +10,7 @@ import Animated, {
     Extrapolation,
     SharedValue,
 } from 'react-native-reanimated';
-import { Heart, Send, Bookmark, PictureInPicture } from 'lucide-react-native';
+import { Heart, Send, Bookmark, PictureInPicture, ShieldQuestion } from 'lucide-react-native';
 import { formatCount } from '../../../core/utils';
 import { ThemeColors } from './InfiniteFeedTypes';
 import { FEED_FLAGS } from './hooks/useInfiniteFeedConfig';
@@ -49,14 +49,16 @@ interface InfiniteFeedActionsProps {
     likesCount: number;
     savesCount: number;
     sharesCount: number;
-    shopsCount: number;
     isLiked: boolean;
     isSaved: boolean;
-    showShop: boolean;
+    showCommercialTag: boolean;
+    showShopIcon: boolean;
+    shopTagText?: string;
     onLike: () => void;
     onSave: () => void;
     onShare: () => void;
     onShop: () => void;
+    onCommercialInfoPress: () => void;
 }
 
 // ✅ [PERF] Memoized BurstParticle
@@ -138,6 +140,7 @@ const ActionButton = React.memo(function ActionButton({
     const strokeWidth = localActive ? 2 : 1.2;
     const formattedCount = useMemo(() => formatCount(count), [count]);
     const isZeroCount = formattedCount === '0';
+    const shouldShowCount = !isZeroCount || Boolean(zeroText);
 
     const countStyle = useMemo(() => [
         styles.actionCount,
@@ -152,7 +155,7 @@ const ActionButton = React.memo(function ActionButton({
         <Pressable
             onPress={handlePress}
             onLongPress={onLongPress}
-            style={styles.actionButton}
+            style={[styles.actionButton, isZeroCount && zeroText ? styles.actionButtonZeroState : null]}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
             <Animated.View style={[styles.iconWrapper, animatedStyle]}>
@@ -175,13 +178,15 @@ const ActionButton = React.memo(function ActionButton({
                     strokeWidth={strokeWidth}
                 />
             </Animated.View>
-            <View style={styles.countContainer}>
-                {isZeroCount && zeroText ? (
-                    <Text style={zeroTextStyle}>{zeroText}</Text>
-                ) : (
-                    <Text style={countStyle}>{formattedCount}</Text>
-                )}
-            </View>
+            {shouldShowCount ? (
+                <View style={[styles.countContainer, isZeroCount && zeroText ? styles.countContainerBelowIcon : null]}>
+                    {isZeroCount && zeroText ? (
+                        <Text style={zeroTextStyle}>{zeroText}</Text>
+                    ) : (
+                        <Text style={countStyle}>{formattedCount}</Text>
+                    )}
+                </View>
+            ) : null}
         </Pressable>
     );
 });
@@ -192,14 +197,16 @@ export const InfiniteFeedActions = React.memo(function InfiniteFeedActions({
     likesCount,
     savesCount,
     sharesCount,
-    shopsCount,
     isLiked,
     isSaved,
-    showShop,
+    showCommercialTag,
+    showShopIcon,
+    shopTagText,
     onLike,
     onSave,
     onShare,
     onShop,
+    onCommercialInfoPress,
 }: InfiniteFeedActionsProps) {
     const shake = useSharedValue(0);
 
@@ -226,7 +233,6 @@ export const InfiniteFeedActions = React.memo(function InfiniteFeedActions({
                 <ActionButton
                     icon={Heart}
                     count={likesCount}
-                    zeroText="Beğen"
                     colors={colors}
                     active={isLiked}
                     activeColor="#FF2146"
@@ -238,7 +244,6 @@ export const InfiniteFeedActions = React.memo(function InfiniteFeedActions({
                 <ActionButton
                     icon={Bookmark}
                     count={savesCount}
-                    zeroText="Kaydet"
                     colors={colors}
                     active={isSaved}
                     activeColor="#FFD700"
@@ -250,23 +255,35 @@ export const InfiniteFeedActions = React.memo(function InfiniteFeedActions({
                 <ActionButton
                     icon={Send}
                     count={sharesCount}
-                    zeroText="Gönder"
                     colors={colors}
                     onPress={onShare}
                     onLongPress={triggerShake}
                     canToggle={false}
                 />
             </View>
-            {showShop ? (
-                <ActionButton
-                    icon={PictureInPicture}
-                    count={shopsCount}
-                    zeroText="Göz At"
-                    colors={colors}
-                    onPress={onShop}
-                    onLongPress={triggerShake}
-                    canToggle={false}
-                />
+            {showCommercialTag ? (
+                <View style={styles.commercialShopTag}>
+                    <Pressable
+                        style={styles.commercialMainAction}
+                        onPress={onShop}
+                        onLongPress={triggerShake}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                        {showShopIcon ? (
+                            <PictureInPicture size={14} color="#000000" strokeWidth={1.8} />
+                        ) : null}
+                        <Text style={styles.commercialShopText} numberOfLines={1}>
+                            {shopTagText || 'İş Birliği'}
+                        </Text>
+                    </Pressable>
+                    <Pressable
+                        style={styles.commercialInfoButton}
+                        onPress={onCommercialInfoPress}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                        <ShieldQuestion size={14} color="#000000" strokeWidth={1.9} />
+                    </Pressable>
+                </View>
             ) : null}
         </Animated.View>
     );
@@ -275,19 +292,26 @@ export const InfiniteFeedActions = React.memo(function InfiniteFeedActions({
 const styles = StyleSheet.create({
     actionsRow: {
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         justifyContent: 'space-between',
         marginTop: 14,
     },
     leftActions: {
         flexDirection: 'row',
-        alignItems: 'center',
-        gap: 18,
+        alignItems: 'flex-start',
+        gap: 20,
     },
     actionButton: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
+        minHeight: ACTION_ICON_SIZE,
+        position: 'relative',
+    },
+    actionButtonZeroState: {
+        minHeight: ACTION_ICON_SIZE + 18,
+        justifyContent: 'flex-start',
+        alignItems: 'flex-start',
     },
     iconWrapper: {
         justifyContent: 'center',
@@ -316,8 +340,43 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
+    countContainerBelowIcon: {
+        position: 'absolute',
+        top: ACTION_ICON_SIZE + 2,
+        left: 0,
+        width: ACTION_ICON_SIZE,
+    },
     zeroText: {
         fontSize: 11,
         fontWeight: '400',
+    },
+    commercialShopTag: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        paddingLeft: 10,
+        paddingRight: 6,
+        minHeight: 30,
+        borderRadius: 16,
+        maxWidth: '66%',
+    },
+    commercialMainAction: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        flexShrink: 1,
+    },
+    commercialShopText: {
+        color: '#000000',
+        fontSize: 10,
+        fontWeight: '700',
+        flexShrink: 1,
+    },
+    commercialInfoButton: {
+        marginLeft: 8,
+        width: 20,
+        height: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
 });

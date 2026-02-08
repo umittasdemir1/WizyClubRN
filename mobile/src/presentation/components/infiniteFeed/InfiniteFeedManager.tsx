@@ -3,6 +3,7 @@ import {
     View,
     Text,
     Pressable,
+    Alert,
     RefreshControl,
     ActivityIndicator,
     Dimensions,
@@ -32,7 +33,8 @@ import { useInfiniteStoryViewer } from '../../hooks/useInfiniteStoryViewer';
 import type { ViewToken } from 'react-native';
 import { FeedPrefetchService } from '../../../data/services/FeedPrefetchService';
 import { VideoCacheService } from '../../../data/services/VideoCacheService';
-import { LogCode, logCache, logPerf, logVideo } from '@/core/services/Logger';
+import { useInAppBrowserStore } from '../../store/useInAppBrowserStore';
+import { PerformanceLogger } from '../../../core/services/PerformanceLogger';
 
 interface InfiniteFeedManagerProps {
     videos: InfiniteFeedVideo[];
@@ -57,7 +59,8 @@ const THUMBNAIL_PREFETCH_OFFSETS = [-2, -1, 1, 2, 3];
 const FlashListAny = FlashList as any;
 const INFINITE_WINDOW_SIZE = 5;
 const INFINITE_MAX_RENDER_BATCH = 2;
-const INFINITE_DRAW_DISTANCE = ESTIMATED_CARD_HEIGHT * 1.5;
+const INFINITE_DRAW_DISTANCE = ESTIMATED_CARD_HEIGHT * 2;
+const INFINITE_MINIMUM_VIEW_TIME_MS = 0;
 
 const getPrefetchIndices = (activeIndex: number, videosLength: number): number[] => {
     const indices = new Set<number>();
@@ -102,6 +105,8 @@ export function InfiniteFeedManager({
     const { isMuted, toggleMute } = useInfiniteFeedMuteControls();
     const currentUserId = useInfiniteFeedAuthStore((state) => state.user?.id);
     const { stories: storyListData } = useInfiniteStoryViewer();
+    const isInAppBrowserVisible = useInAppBrowserStore((state) => state.isVisible);
+    const openInAppBrowser = useInAppBrowserStore((state) => state.openUrl);
 
     const [activeTab, setActiveTab] = useState<FeedTab>('Sana Özel');
     const [activeInlineId, setActiveInlineId] = useState<string | null>(null);
@@ -109,6 +114,7 @@ export function InfiniteFeedManager({
     const [activeInlineIndex, setActiveInlineIndex] = useState<number>(0);
     const [pendingInlineIndex, setPendingInlineIndex] = useState<number>(0);
     const [isCarouselInteracting, setIsCarouselInteracting] = useState(false);
+    const [isFeedScrolling, setIsFeedScrolling] = useState(false);
     const isFeedScrollingRef = useRef(false);
     const [resolvedVideoSources, setResolvedVideoSources] = useState<Record<string, string>>({});
     const resolvedVideoSourcesRef = useRef<Record<string, string>>({});
@@ -127,7 +133,6 @@ export function InfiniteFeedManager({
 
     const setCustomFeed = useInfiniteFeedActiveVideoStore((state) => state.setCustomFeed);
     const setActiveVideo = useInfiniteFeedActiveVideoStore((state) => state.setActiveVideo);
-    const isPaused = useInfiniteFeedActiveVideoStore((state) => state.isPaused);
     const immediateActiveCommit = FEED_FLAGS.INF_ACTIVE_COMMIT_ON_VIEWABLE;
 
     useFocusEffect(
@@ -149,6 +154,23 @@ export function InfiniteFeedManager({
     const handleStoryAvatarPress = useCallback((userId: string) => {
         router.push(`/story/${userId}` as any);
     }, [router]);
+
+    const handleOpenShopping = useCallback((videoId: string) => {
+        const selectedVideo = videos.find((video) => video.id === videoId);
+        const brandUrl = selectedVideo?.brandUrl?.trim();
+
+        if (!brandUrl) {
+            Alert.alert('Link bulunamadı', 'Bu video için bir alışveriş linki yok.');
+            return;
+        }
+
+        const normalizedUrl = /^https?:\/\//i.test(brandUrl)
+            ? brandUrl
+            : `https://${brandUrl}`;
+
+        toggleShop(videoId);
+        openInAppBrowser(normalizedUrl);
+    }, [openInAppBrowser, toggleShop, videos]);
 
     const storyUsers = useMemo(() => {
         return storyListData.reduce((acc: any[], story) => {
@@ -192,6 +214,7 @@ export function InfiniteFeedManager({
         if (nextIndex < 0 || nextIndex >= videos.length) return;
 
         const nextId = pendingActiveIdRef.current;
+        if (!nextId) return;
         const prevId = activeInlineIdRef.current;
         const prevIndex = activeInlineIndexRef.current;
 
@@ -203,25 +226,13 @@ export function InfiniteFeedManager({
         activeInlineIdRef.current = nextId;
         activeInlineIndexRef.current = nextIndex;
         setActiveInlineId(nextId);
-        setPendingInlineId(nextId);
-        setPendingInlineIndex(nextIndex);
+        if (!immediateActiveCommit) {
+            setPendingInlineId(nextId);
+            setPendingInlineIndex(nextIndex);
+        }
         setActiveInlineIndex(nextIndex);
-
-        const settleDurationMs = scrollStartAtRef.current ? Date.now() - scrollStartAtRef.current : null;
         scrollStartAtRef.current = null;
-
-        logVideo(LogCode.VIDEO_PLAYBACK_START, 'Infinite feed active video committed on settle', {
-            reason,
-            previousIndex: prevIndex,
-            nextIndex,
-            nextId,
-        });
-        logPerf(LogCode.PERF_MEASURE_END, 'Infinite feed settle commit measured', {
-            reason,
-            settleDurationMs,
-            queueLength: FeedPrefetchService.getInstance().getQueueLength(),
-        });
-    }, [videos.length]);
+    }, [immediateActiveCommit, videos.length]);
 
     useEffect(() => {
         FeedPrefetchService.getInstance().setNetworkType((netInfo.type ?? null) as NetInfoStateType | null);
@@ -244,14 +255,43 @@ export function InfiniteFeedManager({
     }, [videos]);
 
     useEffect(() => {
+        if (!videos.length || activeInlineIndex < 0 || activeInlineIndex >= videos.length) {
+            return;
+        }
+
+        const activeVideoId = videos[activeInlineIndex]?.id ?? null;
+        const nextVideoId = videos[activeInlineIndex + 1]?.id ?? null;
+        const keepIds = new Set<string>();
+        if (activeVideoId) keepIds.add(activeVideoId);
+        if (nextVideoId) keepIds.add(nextVideoId);
+
+        setResolvedVideoSources((prev) => {
+            let changed = false;
+            const next: Record<string, string> = {};
+
+            Object.entries(prev).forEach(([videoId, source]) => {
+                if (keepIds.has(videoId)) {
+                    next[videoId] = source;
+                    return;
+                }
+                changed = true;
+            });
+
+            return changed ? next : prev;
+        });
+    }, [activeInlineIndex, videos]);
+
+    useEffect(() => {
         if (videos.length === 0) {
             activeInlineIdRef.current = null;
             activeInlineIndexRef.current = 0;
             pendingActiveIdRef.current = null;
             pendingActiveIndexRef.current = 0;
             setActiveInlineId(null);
-            setPendingInlineId(null);
-            setPendingInlineIndex(0);
+            if (!immediateActiveCommit) {
+                setPendingInlineId(null);
+                setPendingInlineIndex(0);
+            }
             setActiveInlineIndex(0);
             return;
         }
@@ -262,7 +302,10 @@ export function InfiniteFeedManager({
         if (hasCurrentActive) {
             pendingActiveIdRef.current = activeInlineIdRef.current;
             pendingActiveIndexRef.current = activeInlineIndexRef.current;
-            setPendingInlineIndex(activeInlineIndexRef.current);
+            if (!immediateActiveCommit) {
+                setPendingInlineId(activeInlineIdRef.current);
+                setPendingInlineIndex(activeInlineIndexRef.current);
+            }
             return;
         }
 
@@ -272,17 +315,21 @@ export function InfiniteFeedManager({
         pendingActiveIdRef.current = firstVideoId;
         pendingActiveIndexRef.current = 0;
         setActiveInlineId(firstVideoId);
-        setPendingInlineId(firstVideoId);
-        setPendingInlineIndex(0);
+        if (!immediateActiveCommit) {
+            setPendingInlineId(firstVideoId);
+            setPendingInlineIndex(0);
+        }
         setActiveInlineIndex(0);
-    }, [videos]);
+    }, [immediateActiveCommit, videos]);
 
     useEffect(() => {
         pendingActiveIdRef.current = activeInlineId;
-        setPendingInlineId(activeInlineId);
         pendingActiveIndexRef.current = activeInlineIndex;
-        setPendingInlineIndex(activeInlineIndex);
-    }, [activeInlineId, activeInlineIndex]);
+        if (!immediateActiveCommit) {
+            setPendingInlineId(activeInlineId);
+            setPendingInlineIndex(activeInlineIndex);
+        }
+    }, [activeInlineId, activeInlineIndex, immediateActiveCommit]);
 
     useEffect(() => () => {
         clearSettleTimer();
@@ -298,6 +345,7 @@ export function InfiniteFeedManager({
         clearSettleTimer();
         momentumStartedRef.current = false;
         isFeedScrollingRef.current = false;
+        setIsFeedScrolling(false);
         scrollStartAtRef.current = null;
         scrollDirectionRef.current = 'down';
         lastScrollOffsetYRef.current = 0;
@@ -307,8 +355,10 @@ export function InfiniteFeedManager({
         pendingActiveIndexRef.current = 0;
         setActiveTab('Sana Özel');
         setActiveInlineId(firstVideoId);
-        setPendingInlineId(firstVideoId);
-        setPendingInlineIndex(0);
+        if (!immediateActiveCommit) {
+            setPendingInlineId(firstVideoId);
+            setPendingInlineIndex(0);
+        }
         setActiveInlineIndex(0);
         if (firstVideoId) {
             setActiveVideo(firstVideoId, 0);
@@ -317,10 +367,18 @@ export function InfiniteFeedManager({
         requestAnimationFrame(() => {
             listRef.current?.scrollToOffset({ offset: 0, animated: true });
         });
-    }, [homeReselectTrigger, videos, clearSettleTimer, setActiveVideo]);
+    }, [homeReselectTrigger, immediateActiveCommit, videos, clearSettleTimer, setActiveVideo]);
 
     useEffect(() => {
         if (!videos.length || activeInlineIndex < 0 || activeInlineIndex >= videos.length) return;
+
+        if (isFeedScrolling) {
+            const nextVideo = videos[activeInlineIndex + 1];
+            if (nextVideo?.thumbnailUrl) {
+                ExpoImage.prefetch(nextVideo.thumbnailUrl);
+            }
+            return;
+        }
 
         const prefetchService = FeedPrefetchService.getInstance();
         const activeVideo = videos[activeInlineIndex];
@@ -340,57 +398,29 @@ export function InfiniteFeedManager({
             const memoryCached = VideoCacheService.getMemoryCachedPath(activeVideoUrl);
             if (memoryCached) {
                 setResolvedSourceForId(activeVideo.id, memoryCached);
-                logCache(LogCode.CACHE_HIT, 'Infinite active video served from memory cache', {
-                    videoId: activeVideo.id,
-                    index: activeInlineIndex,
-                });
             } else {
                 const previousResolved = resolvedVideoSourcesRef.current[activeVideo.id] ?? null;
                 const hasResolvedFallback = Boolean(previousResolved);
-                logCache(LogCode.CACHE_MISS, 'Infinite active video cache miss, forcing cache now', {
-                    videoId: activeVideo.id,
-                    index: activeInlineIndex,
-                    hasResolvedFallback,
-                });
                 prefetchService.cacheVideoNow(activeVideoUrl)
                     .then((cachedPath) => {
                         if (cachedPath) {
                             resolveIfCurrent(cachedPath);
-                            logCache(LogCode.CACHE_SET, 'Infinite active video cached immediately', {
-                                videoId: activeVideo.id,
-                                index: activeInlineIndex,
-                            });
                             return;
                         }
                         return prefetchService.getCachedPath(activeVideoUrl).then((resolvedPath) => {
                             if (resolvedPath) {
-                                logCache(LogCode.CACHE_HIT, 'Infinite active video resolved from disk cache', {
-                                    videoId: activeVideo.id,
-                                    index: activeInlineIndex,
-                                });
                                 resolveIfCurrent(resolvedPath);
                                 return;
                             }
                             if (!hasResolvedFallback) {
                                 setResolvedSourceForId(activeVideo.id, null);
                             }
-                            logCache(LogCode.CACHE_MISS, 'Infinite active video still not cached after force-cache', {
-                                videoId: activeVideo.id,
-                                index: activeInlineIndex,
-                                hasResolvedFallback,
-                            });
                         });
                     })
-                    .catch((error) => {
+                    .catch(() => {
                         if (!hasResolvedFallback) {
                             setResolvedSourceForId(activeVideo.id, null);
                         }
-                        logCache(LogCode.CACHE_ERROR, 'Infinite active video force-cache failed', {
-                            videoId: activeVideo.id,
-                            index: activeInlineIndex,
-                            hasResolvedFallback,
-                            error,
-                        });
                     });
             }
         }
@@ -407,12 +437,9 @@ export function InfiniteFeedManager({
         });
         if (prefetchIndices.length > 0) {
             prefetchService.queueVideos(videos, prefetchIndices, activeInlineIndex);
-            logPerf(LogCode.PREFETCH_START, 'Infinite feed queued nearby videos for prefetch', {
-                activeInlineIndex,
-                prefetchIndices,
-            });
         }
         const nextPlayableIndex = activeInlineIndex + 1;
+        const nextResolvedCandidateIndex = prefetchIndices.find((idx) => idx > activeInlineIndex) ?? null;
         prefetchIndices.forEach((idx) => {
             const neighborVideo = videos[idx];
             if (!neighborVideo) return;
@@ -421,10 +448,13 @@ export function InfiniteFeedManager({
             if (!url) return;
 
             VideoCacheService.warmupCache(url);
+            const shouldPublishResolvedSource = idx === nextResolvedCandidateIndex;
 
             const memoryCached = VideoCacheService.getMemoryCachedPath(url);
             if (memoryCached) {
-                setResolvedSourceForId(neighborVideo.id, memoryCached);
+                if (shouldPublishResolvedSource) {
+                    setResolvedSourceForId(neighborVideo.id, memoryCached);
+                }
                 return;
             }
 
@@ -436,14 +466,14 @@ export function InfiniteFeedManager({
 
             resolvePromise
                 .then((cachedPath) => {
-                    if (!cachedPath) return;
+                    if (!cachedPath || !shouldPublishResolvedSource) return;
                     setResolvedSourceForId(neighborVideo.id, cachedPath);
                 })
                 .catch(() => {
                     // best effort: nearby cache resolve failures should not block playback
                 });
         });
-    }, [activeInlineIndex, videos, setResolvedSourceForId]);
+    }, [activeInlineIndex, isFeedScrolling, videos, setResolvedSourceForId]);
 
 
     const handleCarouselTouchStart = useCallback(() => {
@@ -454,21 +484,55 @@ export function InfiniteFeedManager({
         setIsCarouselInteracting((prev) => (prev ? false : prev));
     }, []);
 
-    // Ref-based: no state update → no re-render on scroll start/end.
-    // With immediateActiveCommit=true this is always false.
-    const shouldPauseForScroll = isFeedScrollingRef.current && !immediateActiveCommit;
+    const cardActionHandlersRef = useRef({
+        onToggleMute: toggleMute,
+        onOpen: handleOpenVideo,
+        onLike: toggleLike,
+        onSave: toggleSave,
+        onFollow: toggleFollow,
+        onShare: toggleShare,
+        onShop: handleOpenShopping,
+        onCarouselTouchStart: handleCarouselTouchStart,
+        onCarouselTouchEnd: handleCarouselTouchEnd,
+    });
+
+    useEffect(() => {
+        cardActionHandlersRef.current = {
+            onToggleMute: toggleMute,
+            onOpen: handleOpenVideo,
+            onLike: toggleLike,
+            onSave: toggleSave,
+            onFollow: toggleFollow,
+            onShare: toggleShare,
+            onShop: handleOpenShopping,
+            onCarouselTouchStart: handleCarouselTouchStart,
+            onCarouselTouchEnd: handleCarouselTouchEnd,
+        };
+    }, [
+        toggleMute,
+        handleOpenVideo,
+        toggleLike,
+        toggleSave,
+        toggleFollow,
+        toggleShare,
+        handleOpenShopping,
+        handleCarouselTouchStart,
+        handleCarouselTouchEnd,
+    ]);
+
+    const effectivePendingInlineId = immediateActiveCommit ? activeInlineId : pendingInlineId;
+    const effectivePendingInlineIndex = immediateActiveCommit ? activeInlineIndex : pendingInlineIndex;
 
     const renderItem = useCallback(({ item, index, target }: { item: InfiniteFeedVideo; index: number; target?: string }) => {
-        // Decode pre-warm: keep current + next N items mounted (paused),
-        // then start playback only when the candidate crosses visibility threshold.
+        const handlers = cardActionHandlersRef.current;
         const prewarmRange = FEED_CONFIG.DECODE_PREWARM_AHEAD_COUNT;
         const prewarmPlayRange = FEED_CONFIG.DECODE_PREWARM_PLAY_COUNT;
         const prewarmDistance = scrollDirectionRef.current === 'up'
-            ? pendingInlineIndex - index
-            : index - pendingInlineIndex;
+            ? effectivePendingInlineIndex - index
+            : index - effectivePendingInlineIndex;
         const isPendingWindow = scrollDirectionRef.current === 'up'
-            ? (index <= pendingInlineIndex && index >= pendingInlineIndex - prewarmRange)
-            : (index >= pendingInlineIndex && index <= pendingInlineIndex + prewarmRange);
+            ? (index <= effectivePendingInlineIndex && index >= effectivePendingInlineIndex - prewarmRange)
+            : (index >= effectivePendingInlineIndex && index <= effectivePendingInlineIndex + prewarmRange);
         const allowDecodePrewarm = prewarmDistance >= 1 && prewarmDistance <= prewarmPlayRange;
 
         return (
@@ -477,64 +541,97 @@ export function InfiniteFeedManager({
                 index={index}
                 colors={themeColors}
                 isActive={item.id === activeInlineId}
-                isPendingActive={item.id === pendingInlineId || isPendingWindow}
+                isPendingActive={item.id === effectivePendingInlineId || isPendingWindow}
                 allowDecodePrewarm={allowDecodePrewarm}
                 isMuted={isMuted}
-                isPaused={isPaused || shouldPauseForScroll}
+                isPaused={isInAppBrowserVisible}
                 currentUserId={currentUserId}
-                onToggleMute={toggleMute}
-                onOpen={handleOpenVideo}
-                onLike={toggleLike}
-                onSave={toggleSave}
-                onFollow={toggleFollow}
-                onShare={toggleShare}
-                onShop={toggleShop}
-                onCarouselTouchStart={handleCarouselTouchStart}
-                onCarouselTouchEnd={handleCarouselTouchEnd}
+                onToggleMute={handlers.onToggleMute}
+                onOpen={handlers.onOpen}
+                onLike={handlers.onLike}
+                onSave={handlers.onSave}
+                onFollow={handlers.onFollow}
+                onShare={handlers.onShare}
+                onShop={handlers.onShop}
+                onCarouselTouchStart={handlers.onCarouselTouchStart}
+                onCarouselTouchEnd={handlers.onCarouselTouchEnd}
                 isMeasurement={target === 'Measurement'}
                 resolvedVideoSource={resolvedVideoSourcesRef.current[item.id] ?? null}
                 networkType={(netInfo.type ?? null) as NetInfoStateType | null}
             />
         );
-    }, [activeInlineId, currentUserId, handleCarouselTouchEnd, handleCarouselTouchStart, handleOpenVideo, isMuted, isPaused, netInfo.type, pendingInlineId, pendingInlineIndex, shouldPauseForScroll, themeColors, toggleFollow, toggleLike, toggleMute, toggleSave, toggleShare, toggleShop]);
+    }, [activeInlineId, currentUserId, effectivePendingInlineId, effectivePendingInlineIndex, isInAppBrowserVisible, isMuted, netInfo.type, themeColors]);
 
     // Active item changes when card visibility crosses threshold
     const viewabilityConfig = useRef({
         itemVisiblePercentThreshold: FEED_CONFIG.PLAY_VISIBILITY_THRESHOLD_PERCENT,
-        minimumViewTime: 0,
+        minimumViewTime: INFINITE_MINIMUM_VIEW_TIME_MS,
     }).current;
 
-    const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken<InfiniteFeedVideo>[] }) => {
-        let minCandidate: ViewToken<InfiniteFeedVideo> | null = null;
-        let maxCandidate: ViewToken<InfiniteFeedVideo> | null = null;
+    const onViewableItemsChanged = useCallback(({
+        viewableItems,
+    }: {
+        viewableItems: ViewToken<InfiniteFeedVideo>[];
+    }) => {
+        const visiblePlayableTokens = (viewableItems ?? []).filter((token) => {
+            if (!token?.isViewable || !token.item || typeof token.index !== 'number') return false;
+            return token.item.postType === 'carousel' || !!getVideoUrl(token.item);
+        });
 
-        for (const token of viewableItems) {
-            if (!token?.isViewable || !token.item || typeof token.index !== 'number') continue;
-            if (!minCandidate || token.index < (minCandidate.index ?? Number.POSITIVE_INFINITY)) {
-                minCandidate = token;
-            }
-            if (!maxCandidate || token.index > (maxCandidate.index ?? Number.NEGATIVE_INFINITY)) {
-                maxCandidate = token;
+        if (visiblePlayableTokens.length === 0) return;
+
+        const sortedVisible = [...visiblePlayableTokens].sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+        const currentActiveId = activeInlineIdRef.current;
+        const currentActiveIndex = activeInlineIndexRef.current;
+
+        let nextViewable = scrollDirectionRef.current === 'up'
+            ? sortedVisible[0]
+            : sortedVisible[sortedVisible.length - 1];
+
+        if (currentActiveId) {
+            const activeStillViewable = sortedVisible.some((token) => token.item?.id === currentActiveId);
+            if (activeStillViewable) return;
+
+            if (scrollDirectionRef.current === 'up') {
+                for (let i = sortedVisible.length - 1; i >= 0; i -= 1) {
+                    const token = sortedVisible[i];
+                    const tokenIndex = typeof token.index === 'number' ? token.index : null;
+                    if (tokenIndex == null) continue;
+                    if (tokenIndex < currentActiveIndex) {
+                        nextViewable = token;
+                        break;
+                    }
+                }
+            } else {
+                for (const token of sortedVisible) {
+                    const tokenIndex = typeof token.index === 'number' ? token.index : null;
+                    if (tokenIndex == null) continue;
+                    if (tokenIndex > currentActiveIndex) {
+                        nextViewable = token;
+                        break;
+                    }
+                }
             }
         }
-
-        const nextViewable = scrollDirectionRef.current === 'up' ? minCandidate : maxCandidate;
-        if (!nextViewable) return;
 
         const candidate = nextViewable?.item;
         const nextIndex = typeof nextViewable?.index === 'number' ? nextViewable.index : null;
-        const hasPlayableSource = candidate?.postType === 'carousel' || !!getVideoUrl(candidate);
-        const nextId = hasPlayableSource ? (candidate?.id ?? null) : null;
-        const resolvedNextIndex = nextIndex ?? pendingActiveIndexRef.current;
+        if (!candidate || !candidate.id || nextIndex == null) return;
 
-        if (nextId === pendingActiveIdRef.current && resolvedNextIndex === pendingActiveIndexRef.current) return;
-        pendingActiveIdRef.current = nextId;
-        pendingActiveIndexRef.current = resolvedNextIndex;
-        setPendingInlineId(nextId);
-        setPendingInlineIndex(resolvedNextIndex);
+        if (candidate.id === activeInlineIdRef.current && nextIndex === activeInlineIndexRef.current) return;
+        if (candidate.id === pendingActiveIdRef.current && nextIndex === pendingActiveIndexRef.current) return;
+        if (candidate.id !== activeInlineIdRef.current) {
+            PerformanceLogger.startTransition(candidate.id);
+        }
+        pendingActiveIdRef.current = candidate.id;
+        pendingActiveIndexRef.current = nextIndex;
         if (immediateActiveCommit) {
             commitPendingActive('viewable-immediate');
+            return;
         }
+
+        setPendingInlineId(candidate.id);
+        setPendingInlineIndex(nextIndex);
     }, [commitPendingActive, immediateActiveCommit]);
 
     const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -552,10 +649,10 @@ export function InfiniteFeedManager({
         clearSettleTimer();
         momentumStartedRef.current = false;
         scrollStartAtRef.current = Date.now();
-        isFeedScrollingRef.current = true;
-        logPerf(LogCode.PERF_MEASURE_START, 'Infinite feed scroll begin', {
-            activeInlineIndex: activeInlineIndexRef.current,
-        });
+        if (!isFeedScrollingRef.current) {
+            isFeedScrollingRef.current = true;
+            setIsFeedScrolling(true);
+        }
     }, [clearSettleTimer]);
 
     const handleMomentumScrollBegin = useCallback(() => {
@@ -563,13 +660,17 @@ export function InfiniteFeedManager({
         if (!scrollStartAtRef.current) {
             scrollStartAtRef.current = Date.now();
         }
-        isFeedScrollingRef.current = true;
+        if (!isFeedScrollingRef.current) {
+            isFeedScrollingRef.current = true;
+            setIsFeedScrolling(true);
+        }
     }, []);
 
     const handleMomentumScrollEnd = useCallback(() => {
         clearSettleTimer();
         momentumStartedRef.current = false;
         isFeedScrollingRef.current = false;
+        setIsFeedScrolling(false);
         commitPendingActive('momentum-end');
     }, [clearSettleTimer, commitPendingActive]);
 
@@ -578,6 +679,7 @@ export function InfiniteFeedManager({
         settleTimerRef.current = setTimeout(() => {
             if (momentumStartedRef.current) return;
             isFeedScrollingRef.current = false;
+            setIsFeedScrolling(false);
             commitPendingActive('drag-end-no-momentum');
         }, 32);
     }, [clearSettleTimer, commitPendingActive]);
@@ -588,13 +690,12 @@ export function InfiniteFeedManager({
 
     const flashListExtraData = useMemo(() => ({
         activeInlineId,
-        pendingInlineId,
-        pendingInlineIndex,
+        pendingInlineId: effectivePendingInlineId,
+        pendingInlineIndex: effectivePendingInlineIndex,
         isMuted,
-        isPaused,
         immediateActiveCommit,
         activeResolvedSource,
-    }), [activeInlineId, activeResolvedSource, immediateActiveCommit, isMuted, isPaused, pendingInlineId, pendingInlineIndex]);
+    }), [activeInlineId, activeResolvedSource, effectivePendingInlineId, effectivePendingInlineIndex, immediateActiveCommit, isMuted]);
 
     const listEmpty = (
         <View style={styles.emptyState}>
@@ -649,6 +750,7 @@ export function InfiniteFeedManager({
                         colors={themeColors}
                         insetTop={insets.top}
                         onUploadPress={() => router.push('/upload')}
+                        onNotificationPress={() => router.push('/notifications')}
                         storyUsers={storyUsers}
                         onStoryAvatarPress={handleStoryAvatarPress}
                     />

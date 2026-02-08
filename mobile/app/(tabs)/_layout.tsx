@@ -1,49 +1,24 @@
 import { Tabs } from 'expo-router';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import { useNotificationStore } from '../../src/presentation/store/useNotificationStore';
 import { useAuthStore } from '../../src/presentation/store/useAuthStore';
 import { COLORS, LIGHT_COLORS } from '../../src/core/constants';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { MOCK_NOTIFICATIONS } from '../../src/data/mock/notifications';
 import { Image } from 'expo-image';
-import { Search } from 'lucide-react-native';
+import { Search, SquarePlay } from 'lucide-react-native';
 
 // Import SVGs
 import HomeIcon from '../../assets/icons/home.svg';
 import DealIcon from '../../assets/icons/deal.svg';
-import NotificationIcon from '../../assets/icons/notification.svg';
 import ProfileIcon from '../../assets/icons/profile.svg';
 
-// Notification Icon with Badge
-function NotificationTabIcon({ color }: { color: string }) {
-    const unreadCount = useNotificationStore((state) => state.unreadCount);
-    const [showCount, setShowCount] = useState(true);
-
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            setShowCount(false);
-        }, 20000);
-        return () => clearTimeout(timer);
-    }, []);
-
-    const displayCount = unreadCount > 9 ? '9+' : unreadCount.toString();
-
-    return (
-        <View style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}>
-            <NotificationIcon width={28} height={28} color={color} />
-            {unreadCount > 0 && (
-                <View style={[
-                    styles.badge,
-                    !showCount && styles.badgeDot
-                ]}>
-                    {showCount && <Text style={styles.badgeText}>{displayCount}</Text>}
-                </View>
-            )}
-        </View>
-    );
-}
+const TAB_ICON_SIZE = 28;
+const TAB_ICON_ACTIVE_SIZE = 30;
+const DEAL_ICON_SIZE = 45;
+const DEAL_ICON_ACTIVE_SIZE = 47;
 
 // Profile Avatar Tab Icon
 function ProfileAvatarTabIcon({ color, focused }: { color: string; focused: boolean }) {
@@ -54,7 +29,11 @@ function ProfileAvatarTabIcon({ color, focused }: { color: string; focused: bool
     if (!avatarUrl) {
         return (
             <View style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}>
-                <ProfileIcon width={28} height={28} color={color} />
+                <ProfileIcon
+                    width={focused ? TAB_ICON_ACTIVE_SIZE : TAB_ICON_SIZE}
+                    height={focused ? TAB_ICON_ACTIVE_SIZE : TAB_ICON_SIZE}
+                    color={color}
+                />
             </View>
         );
     }
@@ -63,7 +42,9 @@ function ProfileAvatarTabIcon({ color, focused }: { color: string; focused: bool
         <View style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}>
             <View style={[
                 styles.avatarWrapper,
-                focused && styles.avatarWrapperActive
+                focused && styles.avatarWrapperActive,
+                focused && styles.avatarWrapperScaled,
+                focused && { borderColor: color },
             ]}>
                 <Image
                     source={{ uri: avatarUrl }}
@@ -80,6 +61,7 @@ export default function TabLayout() {
     const isDark = useThemeStore((state) => state.isDark);
     const insets = useSafeAreaInsets();
     const tabBarBackground = isDark ? COLORS.background : LIGHT_COLORS.background;
+    const tabIconColor = isDark ? '#FFFFFF' : '#000000';
     const setUnreadCount = useNotificationStore((state) => state.setUnreadCount);
 
     useEffect(() => {
@@ -103,17 +85,21 @@ export default function TabLayout() {
                     paddingBottom: insets.bottom + 2,
                     height: 50 + insets.bottom,
                 },
-                tabBarActiveTintColor: isDark ? 'white' : 'black',
-                tabBarInactiveTintColor: isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)',
+                tabBarActiveTintColor: tabIconColor,
+                tabBarInactiveTintColor: tabIconColor,
                 tabBarShowLabel: false,
             }}
         >
             <Tabs.Screen
                 name="index"
                 options={{
-                    tabBarIcon: ({ color }) => (
+                    tabBarIcon: ({ color, focused }) => (
                         <View style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}>
-                            <HomeIcon width={28} height={28} color={color} />
+                            <HomeIcon
+                                width={focused ? TAB_ICON_ACTIVE_SIZE : TAB_ICON_SIZE}
+                                height={focused ? TAB_ICON_ACTIVE_SIZE : TAB_ICON_SIZE}
+                                color={color}
+                            />
                         </View>
                     ),
                 }}
@@ -121,9 +107,13 @@ export default function TabLayout() {
             <Tabs.Screen
                 name="explore"
                 options={{
-                    tabBarIcon: ({ focused }) => (
+                    tabBarIcon: ({ color, focused }) => (
                         <View style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}>
-                            <Search size={28} color="#FFFFFF" strokeWidth={focused ? 2.8 : 2.2} />
+                            <Search
+                                size={focused ? TAB_ICON_ACTIVE_SIZE : TAB_ICON_SIZE}
+                                color={color}
+                                strokeWidth={focused ? 2.8 : 2.2}
+                            />
                         </View>
                     ),
                 }}
@@ -131,9 +121,13 @@ export default function TabLayout() {
             <Tabs.Screen
                 name="deals"
                 options={{
-                    tabBarIcon: ({ color }) => (
+                    tabBarIcon: ({ color, focused }) => (
                         <View style={{ width: 52, height: 52, justifyContent: 'center', alignItems: 'center', marginTop: -4 }}>
-                            <DealIcon width={45} height={45} color={color} />
+                            <DealIcon
+                                width={focused ? DEAL_ICON_ACTIVE_SIZE : DEAL_ICON_SIZE}
+                                height={focused ? DEAL_ICON_ACTIVE_SIZE : DEAL_ICON_SIZE}
+                                color={color}
+                            />
                         </View>
                     ),
                 }}
@@ -141,7 +135,20 @@ export default function TabLayout() {
             <Tabs.Screen
                 name="notifications"
                 options={{
-                    tabBarIcon: ({ color }) => <NotificationTabIcon color={color} />,
+                    tabBarButton: (props) => (
+                        <View
+                            pointerEvents="none"
+                            style={[props.style, styles.emptyTabSlot]}
+                            accessibilityElementsHidden
+                            importantForAccessibility="no-hide-descendants"
+                        >
+                            <SquarePlay
+                                size={TAB_ICON_SIZE}
+                                color={tabIconColor}
+                                strokeWidth={2.2}
+                            />
+                        </View>
+                    ),
                 }}
             />
             <Tabs.Screen
@@ -157,30 +164,9 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
-    badge: {
-        position: 'absolute',
-        top: 6,
-        right: 6,
-        minWidth: 16,
-        height: 16,
-        borderRadius: 8,
-        backgroundColor: '#FF3B30',
+    emptyTabSlot: {
         justifyContent: 'center',
         alignItems: 'center',
-        paddingHorizontal: 4,
-    },
-    badgeDot: {
-        minWidth: 6,
-        height: 6,
-        borderRadius: 3,
-        top: 10,
-        right: 12,
-        paddingHorizontal: 0,
-    },
-    badgeText: {
-        color: '#FFFFFF',
-        fontSize: 10,
-        fontWeight: '700',
     },
     avatarWrapper: {
         width: 32,
@@ -191,7 +177,9 @@ const styles = StyleSheet.create({
     },
     avatarWrapperActive: {
         borderWidth: 1,
-        borderColor: '#FFFFFF',
+    },
+    avatarWrapperScaled: {
+        transform: [{ scale: 1.08 }],
     },
     avatarImage: {
         width: 30,

@@ -2,7 +2,7 @@ import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react'
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { Volume2, VolumeX, MoreVertical } from 'lucide-react-native';
-import VideoPlayer, { type OnBufferData, type OnLoadStartData, type OnProgressData, type OnVideoErrorData } from 'react-native-video';
+import VideoPlayer, { type OnLoadData, type OnLoadStartData, type OnProgressData, type OnVideoErrorData } from 'react-native-video';
 import type { NetInfoStateType } from '@react-native-community/netinfo';
 import { getVideoUrl } from '../../../core/utils/videoUrl';
 import { Video as VideoEntity } from '../../../domain/entities/Video';
@@ -13,7 +13,7 @@ import { ThemeColors } from './InfiniteFeedTypes';
 import { FEED_FLAGS } from './hooks/useInfiniteFeedConfig';
 import { getBufferConfig } from '../../../core/utils/bufferConfig';
 import { shadowStyle } from '@/core/utils/shadow';
-import { LogCode, logVideo } from '@/core/services/Logger';
+import { PerformanceLogger } from '../../../core/services/PerformanceLogger';
 
 const DESCRIPTION_LIMIT = 70;
 const CARD_HORIZONTAL_PADDING = 16;
@@ -24,7 +24,14 @@ const WEEK = 7 * DAY;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
 const CAROUSEL_ASPECT_RATIO = 3 / 4;
-const FIRST_FRAME_FALLBACK_MS = 120;
+const FIRST_FRAME_FALLBACK_MS = 32;
+const SHORT_VIDEO_SECONDS_THRESHOLD = 15;
+const SHORT_VIDEO_MAX_PLAYS = 2;
+const LONG_VIDEO_MAX_PLAYS = 1;
+const END_GUARD_TOLERANCE_SEC = 1;
+const END_GUARD_MIN_DURATION_SEC = 3;
+const END_GUARD_MIN_PROGRESS_SEC = 1;
+const INACTIVE_RESUME_WINDOW_MS = 3000;
 
 const isNonEmptyString = (value: unknown): value is string =>
     typeof value === 'string' && value.trim().length > 0;
@@ -35,6 +42,13 @@ const getStableImageCacheKey = (value: string): string => {
     const trimmed = value.trim();
     if (!trimmed) return value;
     return trimmed.split('#')[0].split('?')[0];
+};
+
+const formatPlaybackClock = (seconds: number): string => {
+    const safeSeconds = Math.max(0, Math.floor(seconds));
+    const minutes = Math.floor(safeSeconds / 60);
+    const remainingSeconds = safeSeconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 };
 
 const mixWithWhite = (hex: string, amount: number) => {
@@ -118,9 +132,19 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     const [playbackSource, setPlaybackSource] = useState<string | null>(null);
     const [isVideoVisible, setIsVideoVisible] = useState(false);
     const [isDecodePrewarmDone, setIsDecodePrewarmDone] = useState(false);
+    const [isInactivePauseWindow, setIsInactivePauseWindow] = useState(false);
+    const [hasReachedLoopLimit, setHasReachedLoopLimit] = useState(false);
+    const [videoProgressSec, setVideoProgressSec] = useState(0);
+    const [videoDurationDisplaySec, setVideoDurationDisplaySec] = useState<number | null>(null);
+    const videoRef = useRef<any>(null);
     const firstFrameSeenRef = useRef(false);
-    const bufferingStateRef = useRef(false);
+    const videoDurationSecRef = useRef<number | null>(null);
+    const completedLoopCountRef = useRef(0);
+    const lastReportedProgressSecRef = useRef(-1);
+    const wasActiveRef = useRef(false);
     const readyFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const inactiveSinceRef = useRef<number | null>(null);
+    const inactivePauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // ✅ FLAG CONTROLS
     const disableAllUI = FEED_FLAGS.INF_DISABLE_ALL_UI;
@@ -139,6 +163,12 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         if (!readyFallbackTimerRef.current) return;
         clearTimeout(readyFallbackTimerRef.current);
         readyFallbackTimerRef.current = null;
+    }, []);
+
+    const clearInactivePauseTimer = useCallback(() => {
+        if (!inactivePauseTimerRef.current) return;
+        clearTimeout(inactivePauseTimerRef.current);
+        inactivePauseTimerRef.current = null;
     }, []);
 
     const thumbnail = useMemo(() => {
@@ -184,7 +214,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
             minLoadRetryCount: 5,
         };
     }, [effectiveVideoSourceUrl, bufferConfig]);
-    const shouldMountVideo = isVideo && (isActive || isPendingActive) && !disableInlineVideo && !isMeasurement;
+    const shouldMountVideo = isVideo && (isActive || isPendingActive || isInactivePauseWindow || wasActiveRef.current) && !disableInlineVideo && !isMeasurement;
     const shouldDecodePrewarm =
         allowDecodePrewarm &&
         isVideo &&
@@ -193,12 +223,10 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         !disableInlineVideo &&
         !isMeasurement &&
         !isDecodePrewarmDone;
-    const shouldPlayVideo = isVideo && !disableInlineVideo && !isMeasurement && (
-        (isActive && !isPaused) || shouldDecodePrewarm
-    );
+    const shouldPlayVideo = isVideo && !disableInlineVideo && !isMeasurement && isActive && !isPaused;
     const hasMedia = isCarousel || isVideo || Boolean(thumbnail);
     const hasThumbnail = Boolean(thumbnail);
-    const shouldGateVideoVisibility = !disableThumbnail && hasThumbnail;
+    const shouldGateVideoVisibility = !disableThumbnail && hasThumbnail && !isActive;
     const shouldShowBaseThumbnail = hasThumbnail && (!isVideo || !disableThumbnail);
     const aspectRatio = useMemo(() => {
         if (item.width && item.height && item.width > 0 && item.height > 0) {
@@ -236,11 +264,15 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         onShop(item.id);
     }, [item.id, onShop]);
 
+    const handleCommercialInfoPress = useCallback(() => {
+        // Placeholder callback for future commercial info flow.
+    }, []);
+
     const handleMore = useCallback(() => {
         onMore?.(item.id);
     }, [item.id, onMore]);
 
-    const revealVideoLayer = useCallback((reason: 'ready' | 'progress' | 'fallback') => {
+    const revealVideoLayer = useCallback(() => {
         if (!shouldGateVideoVisibility) {
             firstFrameSeenRef.current = true;
             clearReadyFallbackTimer();
@@ -257,82 +289,177 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         if (shouldDecodePrewarm) {
             setIsDecodePrewarmDone(true);
         }
-        logVideo(LogCode.VIDEO_LOAD_SUCCESS, 'Infinite inline video first frame visible', {
-            videoId: item.id,
-            index,
-            reason,
-            sourceType: isLocalVideoSource ? 'file' : 'network',
-        });
-    }, [clearReadyFallbackTimer, index, isLocalVideoSource, item.id, shouldDecodePrewarm, shouldGateVideoVisibility]);
+    }, [clearReadyFallbackTimer, shouldDecodePrewarm, shouldGateVideoVisibility]);
 
     const handleVideoLoadStart = useCallback((_event: OnLoadStartData) => {
         if (!shouldGateVideoVisibility) {
             firstFrameSeenRef.current = true;
-            bufferingStateRef.current = false;
             clearReadyFallbackTimer();
             setIsVideoVisible(true);
-            logVideo(LogCode.VIDEO_LOAD_START, 'Infinite inline video load start (visibility gate bypassed)', {
-                videoId: item.id,
-                index,
-                sourceType: isLocalVideoSource ? 'file' : 'network',
-            });
             return;
         }
         firstFrameSeenRef.current = false;
-        bufferingStateRef.current = false;
         setIsVideoVisible(false);
         clearReadyFallbackTimer();
         readyFallbackTimerRef.current = setTimeout(() => {
-            revealVideoLayer('fallback');
+            revealVideoLayer();
         }, FIRST_FRAME_FALLBACK_MS);
-        logVideo(LogCode.VIDEO_LOAD_START, 'Infinite inline video load start', {
-            videoId: item.id,
-            index,
-            sourceType: isLocalVideoSource ? 'file' : 'network',
-        });
-    }, [clearReadyFallbackTimer, index, isLocalVideoSource, item.id, revealVideoLayer, shouldGateVideoVisibility]);
+    }, [clearReadyFallbackTimer, revealVideoLayer, shouldGateVideoVisibility]);
 
     const handleVideoReadyForDisplay = useCallback(() => {
-        revealVideoLayer('ready');
-    }, [revealVideoLayer]);
+        revealVideoLayer();
+        if (!isVideo || !isActive) return;
+
+        const sourceType = effectiveVideoSourceUrl && isLocalFilePath(effectiveVideoSourceUrl)
+            ? 'disk-cache'
+            : 'network';
+
+        PerformanceLogger.endTransition(item.id, sourceType);
+        PerformanceLogger.markFirstVideoReady(item.id, {
+            feed: 'infinite',
+            feedIndex: index,
+        });
+    }, [effectiveVideoSourceUrl, index, isActive, isVideo, item.id, revealVideoLayer]);
+
+    const handleVideoLoad = useCallback((data: OnLoadData) => {
+        const duration = typeof data.duration === 'number' && data.duration > 0 ? data.duration : null;
+        videoDurationSecRef.current = duration;
+        setVideoDurationDisplaySec(duration);
+        lastReportedProgressSecRef.current = 0;
+        setVideoProgressSec(0);
+    }, []);
 
     const handleVideoProgress = useCallback((event: OnProgressData) => {
         if (!firstFrameSeenRef.current && event.currentTime >= 0) {
-            revealVideoLayer('progress');
+            revealVideoLayer();
         }
-    }, [revealVideoLayer]);
 
-    const handleVideoBuffer = useCallback((event: OnBufferData) => {
-        if (event.isBuffering === bufferingStateRef.current) return;
-        bufferingStateRef.current = event.isBuffering;
-        logVideo(event.isBuffering ? LogCode.VIDEO_BUFFER_START : LogCode.VIDEO_BUFFER_END, 'Infinite inline video buffer state changed', {
-            videoId: item.id,
-            index,
-            isBuffering: event.isBuffering,
-        });
-    }, [index, item.id]);
+        const progressData = event as OnProgressData & {
+            seekableDuration?: number;
+            playableDuration?: number;
+        };
+        const durationFromProgress = typeof progressData.seekableDuration === 'number' && progressData.seekableDuration > 0
+            ? progressData.seekableDuration
+            : typeof progressData.playableDuration === 'number' && progressData.playableDuration > 0
+                ? progressData.playableDuration
+                : null;
+        if (durationFromProgress != null) {
+            const normalizedDuration = Math.floor(durationFromProgress);
+            if (
+                videoDurationSecRef.current == null
+                || Math.floor(videoDurationSecRef.current) !== normalizedDuration
+            ) {
+                videoDurationSecRef.current = durationFromProgress;
+                setVideoDurationDisplaySec(durationFromProgress);
+            }
+        }
 
-    const handleVideoError = useCallback((error: OnVideoErrorData) => {
+        if (!isActive) return;
+        const durationSec = videoDurationSecRef.current;
+        const nextProgressSec = Math.max(
+            0,
+            Math.min(
+                Math.floor(event.currentTime),
+                durationSec != null ? Math.floor(durationSec) : Number.MAX_SAFE_INTEGER
+            )
+        );
+        if (nextProgressSec === lastReportedProgressSecRef.current) return;
+        lastReportedProgressSecRef.current = nextProgressSec;
+        setVideoProgressSec(nextProgressSec);
+    }, [isActive, revealVideoLayer]);
+
+    const handleVideoEnd = useCallback(() => {
+        if (!isVideo) return;
+
+        if (!isActive) {
+            if (shouldDecodePrewarm) {
+                videoRef.current?.seek?.(0);
+            }
+            return;
+        }
+
+        const endedAtSec = Math.max(0, lastReportedProgressSecRef.current);
+        const knownDurationSec = videoDurationSecRef.current != null
+            ? Math.max(0, Math.floor(videoDurationSecRef.current))
+            : null;
+        const hasReliableDuration = knownDurationSec != null && knownDurationSec >= END_GUARD_MIN_DURATION_SEC;
+        const nearEndThresholdSec = knownDurationSec != null
+            ? Math.max(0, knownDurationSec - END_GUARD_TOLERANCE_SEC)
+            : 0;
+
+        // Some Android decoder paths can emit premature onEnd while first frame is shown.
+        // Ignore those to avoid freezing playback at start.
+        if (
+            (!hasReliableDuration && endedAtSec < END_GUARD_MIN_PROGRESS_SEC)
+            || (hasReliableDuration && endedAtSec < nearEndThresholdSec)
+        ) {
+            return;
+        }
+
+        const maxPlays = videoDurationSecRef.current != null && videoDurationSecRef.current < SHORT_VIDEO_SECONDS_THRESHOLD
+            ? SHORT_VIDEO_MAX_PLAYS
+            : LONG_VIDEO_MAX_PLAYS;
+        // Count the play that has just finished. This keeps the rule intuitive:
+        // short (<15s) => total 2 plays, long (>=15s) => total 1 play.
+        const completedPlays = completedLoopCountRef.current + 1;
+        if (completedPlays < maxPlays) {
+            completedLoopCountRef.current = completedPlays;
+            lastReportedProgressSecRef.current = 0;
+            setVideoProgressSec(0);
+            videoRef.current?.seek?.(0);
+            return;
+        }
+
+        completedLoopCountRef.current = completedPlays;
+        const endedProgressSec = Math.max(0, Math.floor(videoDurationSecRef.current ?? 0));
+        lastReportedProgressSecRef.current = endedProgressSec;
+        setVideoProgressSec(endedProgressSec);
+        setHasReachedLoopLimit(true);
+    }, [isActive, isVideo, shouldDecodePrewarm]);
+
+    const handleReplay = useCallback(() => {
+        completedLoopCountRef.current = 0;
+        setHasReachedLoopLimit(false);
+        lastReportedProgressSecRef.current = 0;
+        setVideoProgressSec(0);
+        videoRef.current?.seek?.(0);
+    }, []);
+
+    const handleVideoError = useCallback((_error: OnVideoErrorData) => {
         clearReadyFallbackTimer();
-        firstFrameSeenRef.current = false;
-        setIsVideoVisible(false);
-        logVideo(LogCode.VIDEO_LOAD_ERROR, 'Infinite inline video load error', {
-            videoId: item.id,
-            index,
-            sourceType: isLocalVideoSource ? 'file' : 'network',
-            error,
-        });
-    }, [clearReadyFallbackTimer, index, isLocalVideoSource, item.id]);
+
+        const canFallbackToNetwork =
+            Boolean(sourceVideoUrl) &&
+            Boolean(effectiveVideoSourceUrl) &&
+            sourceVideoUrl !== effectiveVideoSourceUrl;
+
+        if (canFallbackToNetwork && sourceVideoUrl) {
+            setPlaybackSource(sourceVideoUrl);
+        }
+
+        if (isActive) {
+            PerformanceLogger.failTransition(item.id, 'video_error');
+        }
+    }, [clearReadyFallbackTimer, effectiveVideoSourceUrl, isActive, item.id, sourceVideoUrl]);
 
     useEffect(() => {
         const initialShouldGate = !disableThumbnail && hasThumbnail;
         clearReadyFallbackTimer();
+        clearInactivePauseTimer();
         firstFrameSeenRef.current = !initialShouldGate;
-        bufferingStateRef.current = false;
+        videoDurationSecRef.current = null;
+        completedLoopCountRef.current = 0;
+        lastReportedProgressSecRef.current = -1;
+        inactiveSinceRef.current = null;
+        setVideoProgressSec(0);
+        setVideoDurationDisplaySec(null);
+        setHasReachedLoopLimit(false);
+        setIsInactivePauseWindow(false);
+        wasActiveRef.current = isActive;
         setIsVideoVisible(!initialShouldGate);
         setIsDecodePrewarmDone(false);
         setPlaybackSource(null);
-    }, [clearReadyFallbackTimer, disableThumbnail, hasThumbnail, item.id]);
+    }, [clearInactivePauseTimer, clearReadyFallbackTimer, disableThumbnail, hasThumbnail, item.id]);
 
     useEffect(() => {
         // Reset only when the card is completely out of warm/active window.
@@ -343,13 +470,13 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
 
     useEffect(() => () => {
         clearReadyFallbackTimer();
-    }, [clearReadyFallbackTimer]);
+        clearInactivePauseTimer();
+    }, [clearInactivePauseTimer, clearReadyFallbackTimer]);
 
     useEffect(() => {
         if (!shouldMountVideo) {
             clearReadyFallbackTimer();
             firstFrameSeenRef.current = !shouldGateVideoVisibility;
-            bufferingStateRef.current = false;
             setIsVideoVisible(!shouldGateVideoVisibility);
             // Keep playbackSource so re-mount can reuse the cached path instantly
             // instead of re-resolving from network. Reset only happens on item.id change.
@@ -371,6 +498,12 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                 return prev;
             }
 
+            // Never swap source while active playback is running; source swap causes
+            // a visible restart/jitter on some Android decoder paths.
+            if (isActive) {
+                return prev;
+            }
+
             const previousIsLocal = isLocalFilePath(prev);
             const nextIsLocal = isLocalFilePath(videoUrl);
 
@@ -384,33 +517,72 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
 
             return prev;
         });
-    }, [clearReadyFallbackTimer, shouldGateVideoVisibility, shouldMountVideo, videoUrl]);
+    }, [clearReadyFallbackTimer, isActive, shouldGateVideoVisibility, shouldMountVideo, videoUrl]);
 
     useEffect(() => {
         if (!shouldMountVideo) return;
         if (!shouldGateVideoVisibility) {
             firstFrameSeenRef.current = true;
-            bufferingStateRef.current = false;
             clearReadyFallbackTimer();
             setIsVideoVisible(true);
             return;
         }
         firstFrameSeenRef.current = false;
-        bufferingStateRef.current = false;
         setIsVideoVisible(false);
         clearReadyFallbackTimer();
         readyFallbackTimerRef.current = setTimeout(() => {
-            revealVideoLayer('fallback');
+            revealVideoLayer();
         }, FIRST_FRAME_FALLBACK_MS);
     }, [clearReadyFallbackTimer, revealVideoLayer, shouldGateVideoVisibility, shouldMountVideo]);
 
     useEffect(() => {
         if (!isVideo || !isActive || !isDecodePrewarmDone) return;
         firstFrameSeenRef.current = true;
-        bufferingStateRef.current = false;
         clearReadyFallbackTimer();
         setIsVideoVisible(true);
     }, [clearReadyFallbackTimer, isActive, isDecodePrewarmDone, isVideo]);
+
+    useEffect(() => {
+        const wasActive = wasActiveRef.current;
+
+        if (!isVideo) {
+            wasActiveRef.current = isActive;
+            return;
+        }
+
+        if (!isActive && wasActive) {
+            inactiveSinceRef.current = Date.now();
+            setIsInactivePauseWindow(true);
+            clearInactivePauseTimer();
+            inactivePauseTimerRef.current = setTimeout(() => {
+                inactivePauseTimerRef.current = null;
+                if (wasActiveRef.current) return;
+                setIsInactivePauseWindow(false);
+                completedLoopCountRef.current = 0;
+                setHasReachedLoopLimit(false);
+                lastReportedProgressSecRef.current = 0;
+                setVideoProgressSec(0);
+                videoRef.current?.seek?.(0);
+            }, INACTIVE_RESUME_WINDOW_MS);
+        }
+
+        if (isActive && !wasActive) {
+            const inactiveSince = inactiveSinceRef.current;
+            const inactiveDurationMs = inactiveSince == null ? 0 : Date.now() - inactiveSince;
+            clearInactivePauseTimer();
+            if (inactiveSince != null && inactiveDurationMs >= INACTIVE_RESUME_WINDOW_MS) {
+                completedLoopCountRef.current = 0;
+                setHasReachedLoopLimit(false);
+                lastReportedProgressSecRef.current = 0;
+                setVideoProgressSec(0);
+                videoRef.current?.seek?.(0);
+            }
+            inactiveSinceRef.current = null;
+            setIsInactivePauseWindow(false);
+        }
+
+        wasActiveRef.current = isActive;
+    }, [clearInactivePauseTimer, isActive, isVideo]);
 
     // ✅ [PERF] Memoize dynamic styles to prevent object reference churn
     const effectiveAspectRatio = isCarousel ? CAROUSEL_ASPECT_RATIO : aspectRatio;
@@ -456,6 +628,29 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         opacity: isDarkTheme ? 0.35 : 0.18,
         elevation: 6,
     }), [isDarkTheme]);
+    const replayOverlayStyle = useMemo(() => [
+        styles.replayOverlay,
+        { backgroundColor: isDarkTheme ? 'rgba(20,20,20,0.36)' : 'rgba(0,0,0,0.24)' },
+    ], [isDarkTheme]);
+    const replayBadgeStyle = useMemo(() => [
+        styles.replayBadge,
+        {
+            backgroundColor: isDarkTheme ? 'rgba(32,32,34,0.94)' : 'rgba(255,255,255,0.94)',
+        },
+    ], [isDarkTheme]);
+    const replayBadgeTextStyle = useMemo(() => [
+        styles.replayBadgeText,
+        { color: isDarkTheme ? '#FFFFFF' : '#111111' },
+    ], [isDarkTheme]);
+    const videoTimeText = useMemo(() => {
+        if (videoDurationDisplaySec == null) return '';
+        return `${formatPlaybackClock(videoProgressSec)} | ${formatPlaybackClock(videoDurationDisplaySec)}`;
+    }, [videoDurationDisplaySec, videoProgressSec]);
+    const commercialTagText = useMemo(() => {
+        if (!item.isCommercial) return '';
+        const commercialTypeLabel = item.commercialType ? item.commercialType : 'İş Birliği';
+        return item.brandName ? `${commercialTypeLabel} | ${item.brandName}` : commercialTypeLabel;
+    }, [item.brandName, item.commercialType, item.isCommercial]);
     const cardOuterStyle = useMemo(() => [
         styles.card,
         disableCardStyle ? styles.cardEdgeToEdge : null,
@@ -563,7 +758,9 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                         style={mediaWrapperStyle}
                         onPress={handleOpen}
                     >
-                        <View style={styles.videoContainer}>
+                        <View
+                            style={styles.videoContainer}
+                        >
                             {shouldShowBaseThumbnail ? (
                                 <Image
                                     source={{ uri: thumbnail, cacheKey: thumbnailCacheKey }}
@@ -577,23 +774,24 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                             )}
                             {shouldMountVideo && videoSource ? (
                                 <VideoPlayer
+                                    ref={videoRef}
                                     source={videoSource as any}
                                     style={[
                                         styles.media,
                                         styles.videoOverlay,
-                                        (!isActive || (shouldGateVideoVisibility && !isVideoVisible)) && styles.videoHidden,
+                                        ((!isActive && shouldPlayVideo) || (shouldGateVideoVisibility && !isVideoVisible)) && styles.videoHidden,
                                     ]}
                                     resizeMode="contain"
                                     repeat={true}
                                     paused={!shouldPlayVideo}
-                                    muted={isMuted || shouldDecodePrewarm}
+                                    muted={isMuted}
                                     playInBackground={false}
                                     playWhenInactive={false}
-                                    progressUpdateInterval={100}
+                                    progressUpdateInterval={250}
                                     onLoadStart={handleVideoLoadStart}
+                                    onLoad={handleVideoLoad}
                                     onReadyForDisplay={handleVideoReadyForDisplay}
                                     onProgress={handleVideoProgress}
-                                    onBuffer={handleVideoBuffer}
                                     onError={handleVideoError}
                                     hideShutterView={true}
                                     shutterColor="transparent"
@@ -607,6 +805,21 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                 />
                             ) : null}
                         </View>
+
+                        {isVideo && isActive && hasReachedLoopLimit && (
+                            <View style={replayOverlayStyle}>
+                                <Pressable
+                                    style={replayBadgeStyle}
+                                    onPress={(event) => {
+                                        event.stopPropagation?.();
+                                        handleReplay();
+                                    }}
+                                    hitSlop={8}
+                                >
+                                    <Text style={replayBadgeTextStyle}>Tekrar izle</Text>
+                                </Pressable>
+                            </View>
+                        )}
 
                         {/* ✅ USER HEADER - Top-left overlay on media */}
                         {!disableUserHeader && (
@@ -678,6 +891,11 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                 </Pressable>
                             </View>
                         )}
+                        {isVideo && isActive && isVideoVisible && videoDurationDisplaySec != null && (
+                            <View style={styles.mediaLeftBottomTime} pointerEvents="none">
+                                <Text style={styles.videoTimeBadgeText}>{videoTimeText}</Text>
+                            </View>
+                        )}
                     </Pressable>
                 )
             ) : null}
@@ -690,14 +908,16 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                         likesCount={item.likesCount || 0}
                         savesCount={item.savesCount || 0}
                         sharesCount={item.sharesCount || 0}
-                        shopsCount={item.shopsCount || 0}
                         isLiked={item.isLiked}
                         isSaved={item.isSaved}
-                        showShop={!!item.brandUrl}
+                        showCommercialTag={item.isCommercial === true}
+                        showShopIcon={isNonEmptyString(item.brandUrl)}
+                        shopTagText={commercialTagText}
                         onLike={handleLike}
                         onSave={handleSave}
                         onShare={handleShare}
                         onShop={handleShop}
+                        onCommercialInfoPress={handleCommercialInfoPress}
                     />
                     {!showDescriptionBlock && showTimeHint && (
                         <Text style={styles.timeHint}>{relativeTime}</Text>
@@ -875,6 +1095,7 @@ const styles = StyleSheet.create({
         maxWidth: '65%',
         flexDirection: 'row',
         alignItems: 'center',
+        zIndex: 3,
     },
     mediaTopRightActions: {
         position: 'absolute',
@@ -882,6 +1103,7 @@ const styles = StyleSheet.create({
         right: 4,
         flexDirection: 'row',
         alignItems: 'center',
+        zIndex: 3,
     },
     moreButton: {
         width: 36,
@@ -897,9 +1119,14 @@ const styles = StyleSheet.create({
         position: 'absolute',
         right: 12,
         bottom: 12,
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: 10,
+        alignItems: 'flex-end',
+        zIndex: 3,
+    },
+    mediaLeftBottomTime: {
+        position: 'absolute',
+        left: 12,
+        bottom: 12,
+        zIndex: 3,
     },
     volumeButton: {
         width: 30,
@@ -935,5 +1162,28 @@ const styles = StyleSheet.create({
         width: '100%',
         height: '100%',
         backgroundColor: '#111',
+    },
+    replayOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1,
+    },
+    replayBadge: {
+        paddingHorizontal: 18,
+        paddingVertical: 10,
+        borderRadius: 999,
+    },
+    replayBadgeText: {
+        fontSize: 15,
+        fontWeight: '700',
+        letterSpacing: 0.2,
+    },
+    videoTimeBadgeText: {
+        color: '#FFFFFF',
+        fontSize: 13,
+        fontWeight: '400',
+        marginLeft: 0,
+        marginRight: 0,
     },
 });

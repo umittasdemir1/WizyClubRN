@@ -470,9 +470,9 @@ const styles = StyleSheet.create({
     photoIndexBadge: {
         position: 'absolute',
         right: 16,
-        paddingHorizontal: 12,
-        paddingVertical: 5,
-        borderRadius: 20,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 16,
         backgroundColor: 'rgba(0,0,0,0.50)',
         borderWidth: 0,
         borderColor: 'transparent',

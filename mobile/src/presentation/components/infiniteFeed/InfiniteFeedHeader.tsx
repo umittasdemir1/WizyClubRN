@@ -1,14 +1,17 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Plus } from 'lucide-react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { useUploadStore } from '../../store/useUploadStore';
+import { useNotificationStore } from '../../store/useNotificationStore';
 import { textShadowStyle } from '@/core/utils/shadow';
 import { ThemeColors } from './InfiniteFeedTypes';
 import { InfiniteStoryBar } from './InfiniteStoryBar';
+import NotificationIcon from '../../../../assets/icons/notification.svg';
 
 export const FEED_TABS = ['Takipte', 'Sana Özel'] as const;
 export type FeedTab = (typeof FEED_TABS)[number];
+const HEADER_ICON_SIZE = 28;
 
 interface InfiniteFeedHeaderProps {
     activeTab: FeedTab;
@@ -16,6 +19,7 @@ interface InfiniteFeedHeaderProps {
     colors: ThemeColors;
     insetTop: number;
     onUploadPress?: () => void;
+    onNotificationPress?: () => void;
     storyUsers: {
         id: string;
         username: string;
@@ -31,9 +35,21 @@ export function InfiniteFeedHeader({
     colors,
     insetTop,
     onUploadPress,
+    onNotificationPress,
     storyUsers,
     onStoryAvatarPress,
 }: InfiniteFeedHeaderProps) {
+    const unreadCount = useNotificationStore((state) => state.unreadCount);
+    const [showCount, setShowCount] = useState(true);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setShowCount(false);
+        }, 20000);
+        return () => clearTimeout(timer);
+    }, []);
+
+    const displayCount = unreadCount > 9 ? '9+' : unreadCount.toString();
     const headerTopPadding = insetTop + 12;
     const baseHeight = headerTopPadding + 10;
     const headerMinHeight = baseHeight * 3;
@@ -84,6 +100,21 @@ export function InfiniteFeedHeader({
                     ))}
                 </View>
             </View>
+            <View style={[styles.rightOverlay, { top: headerTopPadding - 10 }]} pointerEvents="box-none">
+                <Pressable
+                    style={styles.iconButton}
+                    onPress={onNotificationPress}
+                    hitSlop={12}
+                    disabled={!onNotificationPress}
+                >
+                    <NotificationIcon width={HEADER_ICON_SIZE} height={HEADER_ICON_SIZE} color={colors.textPrimary} />
+                    {unreadCount > 0 ? (
+                        <View style={[styles.notificationBadge, !showCount && styles.notificationBadgeDot]}>
+                            {showCount ? <Text style={styles.notificationBadgeText}>{displayCount}</Text> : null}
+                        </View>
+                    ) : null}
+                </Pressable>
+            </View>
             <InfiniteStoryBar
                 storyUsers={storyUsers}
                 onAvatarPress={onStoryAvatarPress}
@@ -105,7 +136,7 @@ function UploadButton({ onPress }: { onPress?: () => void }) {
             onPress={onPress}
             hitSlop={12}
         >
-            <Plus width={28} height={28} color="#FFFFFF" />
+            <Plus width={HEADER_ICON_SIZE} height={HEADER_ICON_SIZE} color="#FFFFFF" />
         </Pressable>
     );
 }
@@ -180,6 +211,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         top: 0,
     },
+    rightOverlay: {
+        position: 'absolute',
+        right: 8,
+        alignItems: 'center',
+        top: 0,
+    },
     tabContainer: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -210,5 +247,30 @@ const styles = StyleSheet.create({
     iconButton: {
         padding: 8,
         marginTop: -3,
+    },
+    notificationBadge: {
+        position: 'absolute',
+        top: 3,
+        right: 3,
+        minWidth: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: '#FF3B30',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 4,
+    },
+    notificationBadgeDot: {
+        minWidth: 6,
+        height: 6,
+        borderRadius: 3,
+        top: 7,
+        right: 7,
+        paddingHorizontal: 0,
+    },
+    notificationBadgeText: {
+        color: '#FFFFFF',
+        fontSize: 10,
+        fontWeight: '700',
     },
 });
