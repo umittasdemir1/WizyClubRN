@@ -109,10 +109,23 @@ export function InfiniteFeedManager({
     const openInAppBrowser = useInAppBrowserStore((state) => state.openUrl);
 
     const [activeTab, setActiveTab] = useState<FeedTab>('Sana Özel');
-    const [activeInlineId, setActiveInlineId] = useState<string | null>(null);
-    const [pendingInlineId, setPendingInlineId] = useState<string | null>(null);
-    const [activeInlineIndex, setActiveInlineIndex] = useState<number>(0);
-    const [pendingInlineIndex, setPendingInlineIndex] = useState<number>(0);
+
+    // ✅ [PERF] Batched state - 4 states → 1 (reduces 4 re-renders to 1)
+    interface FeedActiveState {
+        activeId: string | null;
+        pendingId: string | null;
+        activeIndex: number;
+        pendingIndex: number;
+    }
+    const [feedActiveState, setFeedActiveState] = useState<FeedActiveState>({
+        activeId: null,
+        pendingId: null,
+        activeIndex: 0,
+        pendingIndex: 0,
+    });
+    // Destructure for backward compatibility
+    const { activeId: activeInlineId, pendingId: pendingInlineId, activeIndex: activeInlineIndex, pendingIndex: pendingInlineIndex } = feedActiveState;
+
     const [isCarouselInteracting, setIsCarouselInteracting] = useState(false);
     const [isFeedScrolling, setIsFeedScrolling] = useState(false);
     const isFeedScrollingRef = useRef(false);
@@ -130,6 +143,13 @@ export function InfiniteFeedManager({
     const lastScrollOffsetYRef = useRef(0);
     const listRef = useRef<any>(null);
     const lastHandledReselectRef = useRef(0);
+
+    // ✅ [PERF] Refs for renderItem volatile values - prevents renderItem recreation
+    const themeColorsRef = useRef(themeColors);
+    const currentUserIdRef = useRef(currentUserId);
+    const isMutedRef = useRef(isMuted);
+    const isInAppBrowserVisibleRef = useRef(isInAppBrowserVisible);
+    const netInfoTypeRef = useRef(netInfo.type);
 
     const setCustomFeed = useInfiniteFeedActiveVideoStore((state) => state.setCustomFeed);
     const setActiveVideo = useInfiniteFeedActiveVideoStore((state) => state.setActiveVideo);
@@ -225,12 +245,13 @@ export function InfiniteFeedManager({
 
         activeInlineIdRef.current = nextId;
         activeInlineIndexRef.current = nextIndex;
-        setActiveInlineId(nextId);
-        if (!immediateActiveCommit) {
-            setPendingInlineId(nextId);
-            setPendingInlineIndex(nextIndex);
-        }
-        setActiveInlineIndex(nextIndex);
+        // ✅ [PERF] Single batched state update instead of 4 separate calls
+        setFeedActiveState({
+            activeId: nextId,
+            pendingId: immediateActiveCommit ? null : nextId,
+            activeIndex: nextIndex,
+            pendingIndex: immediateActiveCommit ? 0 : nextIndex,
+        });
         scrollStartAtRef.current = null;
     }, [immediateActiveCommit, videos.length]);
 
@@ -287,12 +308,13 @@ export function InfiniteFeedManager({
             activeInlineIndexRef.current = 0;
             pendingActiveIdRef.current = null;
             pendingActiveIndexRef.current = 0;
-            setActiveInlineId(null);
-            if (!immediateActiveCommit) {
-                setPendingInlineId(null);
-                setPendingInlineIndex(0);
-            }
-            setActiveInlineIndex(0);
+            // ✅ [PERF] Single batched reset
+            setFeedActiveState({
+                activeId: null,
+                pendingId: immediateActiveCommit ? null : null,
+                activeIndex: 0,
+                pendingIndex: immediateActiveCommit ? 0 : 0,
+            });
             return;
         }
 
@@ -303,8 +325,12 @@ export function InfiniteFeedManager({
             pendingActiveIdRef.current = activeInlineIdRef.current;
             pendingActiveIndexRef.current = activeInlineIndexRef.current;
             if (!immediateActiveCommit) {
-                setPendingInlineId(activeInlineIdRef.current);
-                setPendingInlineIndex(activeInlineIndexRef.current);
+                // ✅ [PERF] Only update pending fields in batched call
+                setFeedActiveState((prev) => ({
+                    ...prev,
+                    pendingId: activeInlineIdRef.current,
+                    pendingIndex: activeInlineIndexRef.current,
+                }));
             }
             return;
         }
@@ -314,21 +340,20 @@ export function InfiniteFeedManager({
         activeInlineIndexRef.current = 0;
         pendingActiveIdRef.current = firstVideoId;
         pendingActiveIndexRef.current = 0;
-        setActiveInlineId(firstVideoId);
-        if (!immediateActiveCommit) {
-            setPendingInlineId(firstVideoId);
-            setPendingInlineIndex(0);
-        }
-        setActiveInlineIndex(0);
+        // ✅ [PERF] Single batched init
+        setFeedActiveState({
+            activeId: firstVideoId,
+            pendingId: immediateActiveCommit ? null : firstVideoId,
+            activeIndex: 0,
+            pendingIndex: immediateActiveCommit ? 0 : 0,
+        });
     }, [immediateActiveCommit, videos]);
 
     useEffect(() => {
         pendingActiveIdRef.current = activeInlineId;
         pendingActiveIndexRef.current = activeInlineIndex;
-        if (!immediateActiveCommit) {
-            setPendingInlineId(activeInlineId);
-            setPendingInlineIndex(activeInlineIndex);
-        }
+        // Note: This effect syncs refs only when immediateActiveCommit is true.
+        // When immediateActiveCommit is false, pending updates happen via setFeedActiveState.
     }, [activeInlineId, activeInlineIndex, immediateActiveCommit]);
 
     useEffect(() => () => {
@@ -354,12 +379,13 @@ export function InfiniteFeedManager({
         pendingActiveIdRef.current = firstVideoId;
         pendingActiveIndexRef.current = 0;
         setActiveTab('Sana Özel');
-        setActiveInlineId(firstVideoId);
-        if (!immediateActiveCommit) {
-            setPendingInlineId(firstVideoId);
-            setPendingInlineIndex(0);
-        }
-        setActiveInlineIndex(0);
+        // ✅ [PERF] Single batched update for home reselect
+        setFeedActiveState({
+            activeId: firstVideoId,
+            pendingId: immediateActiveCommit ? null : firstVideoId,
+            activeIndex: 0,
+            pendingIndex: immediateActiveCommit ? 0 : 0,
+        });
         if (firstVideoId) {
             setActiveVideo(firstVideoId, 0);
         }
@@ -520,11 +546,27 @@ export function InfiniteFeedManager({
         handleCarouselTouchEnd,
     ]);
 
+    // ✅ [PERF] Sync volatile refs for renderItem (no re-render trigger)
+    useEffect(() => {
+        themeColorsRef.current = themeColors;
+        currentUserIdRef.current = currentUserId;
+        isMutedRef.current = isMuted;
+        isInAppBrowserVisibleRef.current = isInAppBrowserVisible;
+        netInfoTypeRef.current = netInfo.type;
+    });
+
     const effectivePendingInlineId = immediateActiveCommit ? activeInlineId : pendingInlineId;
     const effectivePendingInlineIndex = immediateActiveCommit ? activeInlineIndex : pendingInlineIndex;
 
+    // ✅ [PERF] Optimized renderItem - uses refs for volatile values (8 deps → 3 deps)
     const renderItem = useCallback(({ item, index, target }: { item: InfiniteFeedVideo; index: number; target?: string }) => {
         const handlers = cardActionHandlersRef.current;
+        const colors = themeColorsRef.current;
+        const userId = currentUserIdRef.current;
+        const muted = isMutedRef.current;
+        const browserVisible = isInAppBrowserVisibleRef.current;
+        const networkType = (netInfoTypeRef.current ?? null) as NetInfoStateType | null;
+
         const prewarmRange = FEED_CONFIG.DECODE_PREWARM_AHEAD_COUNT;
         const prewarmPlayRange = FEED_CONFIG.DECODE_PREWARM_PLAY_COUNT;
         const prewarmDistance = scrollDirectionRef.current === 'up'
@@ -539,13 +581,13 @@ export function InfiniteFeedManager({
             <InfiniteFeedCard
                 item={item}
                 index={index}
-                colors={themeColors}
+                colors={colors}
                 isActive={item.id === activeInlineId}
                 isPendingActive={item.id === effectivePendingInlineId || isPendingWindow}
                 allowDecodePrewarm={allowDecodePrewarm}
-                isMuted={isMuted}
-                isPaused={isInAppBrowserVisible}
-                currentUserId={currentUserId}
+                isMuted={muted}
+                isPaused={browserVisible}
+                currentUserId={userId}
                 onToggleMute={handlers.onToggleMute}
                 onOpen={handlers.onOpen}
                 onLike={handlers.onLike}
@@ -557,10 +599,10 @@ export function InfiniteFeedManager({
                 onCarouselTouchEnd={handlers.onCarouselTouchEnd}
                 isMeasurement={target === 'Measurement'}
                 resolvedVideoSource={resolvedVideoSourcesRef.current[item.id] ?? null}
-                networkType={(netInfo.type ?? null) as NetInfoStateType | null}
+                networkType={networkType}
             />
         );
-    }, [activeInlineId, currentUserId, effectivePendingInlineId, effectivePendingInlineIndex, isInAppBrowserVisible, isMuted, netInfo.type, themeColors]);
+    }, [activeInlineId, effectivePendingInlineId, effectivePendingInlineIndex]);
 
     // Active item changes when card visibility crosses threshold
     const viewabilityConfig = useRef({
@@ -629,9 +671,12 @@ export function InfiniteFeedManager({
             commitPendingActive('viewable-immediate');
             return;
         }
-
-        setPendingInlineId(candidate.id);
-        setPendingInlineIndex(nextIndex);
+        // ✅ [PERF] Batched pending update via single call
+        setFeedActiveState((prev) => ({
+            ...prev,
+            pendingId: candidate.id,
+            pendingIndex: nextIndex,
+        }));
     }, [commitPendingActive, immediateActiveCommit]);
 
     const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -737,7 +782,7 @@ export function InfiniteFeedManager({
                 onScroll={handleScroll}
                 scrollEventThrottle={32}
                 estimatedItemSize={ESTIMATED_CARD_HEIGHT}
-                removeClippedSubviews={false}
+                removeClippedSubviews={true}
                 maxToRenderPerBatch={INFINITE_MAX_RENDER_BATCH}
                 windowSize={INFINITE_WINDOW_SIZE}
                 drawDistance={INFINITE_DRAW_DISTANCE}

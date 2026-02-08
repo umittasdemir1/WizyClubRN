@@ -226,7 +226,9 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     const shouldPlayVideo = isVideo && !disableInlineVideo && !isMeasurement && isActive && !isPaused;
     const hasMedia = isCarousel || isVideo || Boolean(thumbnail);
     const hasThumbnail = Boolean(thumbnail);
-    const shouldGateVideoVisibility = !disableThumbnail && hasThumbnail && !isActive;
+    // ✅ Only gate video visibility on initial load (before first frame), NOT when scrolled away
+    // This keeps video visible at current frame when paused instead of showing thumbnail
+    const shouldGateVideoVisibility = !disableThumbnail && hasThumbnail && !isActive && !wasActiveRef.current;
     const shouldShowBaseThumbnail = hasThumbnail && (!isVideo || !disableThumbnail);
     const aspectRatio = useMemo(() => {
         if (item.width && item.height && item.width > 0 && item.height > 0) {
@@ -554,15 +556,28 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
             inactiveSinceRef.current = Date.now();
             setIsInactivePauseWindow(true);
             clearInactivePauseTimer();
-            inactivePauseTimerRef.current = setTimeout(() => {
-                inactivePauseTimerRef.current = null;
-                if (wasActiveRef.current) return;
-                setIsInactivePauseWindow(false);
+
+            // ✅ 3-second threshold behavior:
+            // - If video played <3s: pause at current frame (do nothing, video stays as-is)
+            // - If video played >=3s: reset to first frame and pause
+            const playedSeconds = lastReportedProgressSecRef.current;
+            const SCROLL_RESET_THRESHOLD_SEC = 3;
+
+            if (playedSeconds >= SCROLL_RESET_THRESHOLD_SEC) {
+                // Video played 3+ seconds: reset to first frame immediately
                 completedLoopCountRef.current = 0;
                 setHasReachedLoopLimit(false);
                 lastReportedProgressSecRef.current = 0;
                 setVideoProgressSec(0);
                 videoRef.current?.seek?.(0);
+            }
+            // else: video played <3s, keep at current frame (no action needed)
+
+            // Set timeout to clean up pause window state after INACTIVE_RESUME_WINDOW_MS
+            inactivePauseTimerRef.current = setTimeout(() => {
+                inactivePauseTimerRef.current = null;
+                if (wasActiveRef.current) return;
+                setIsInactivePauseWindow(false);
             }, INACTIVE_RESUME_WINDOW_MS);
         }
 
@@ -591,57 +606,42 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         { aspectRatio: effectiveAspectRatio }
     ], [effectiveAspectRatio]);
 
-    const fullNameStyle = useMemo(() => [
-        styles.fullName,
-        { color: colors.textPrimary }
-    ], [colors.textPrimary]);
-
-    const handleStyle = useMemo(() => [
-        styles.handle,
-        { color: colors.textSecondary }
-    ], [colors.textSecondary]);
-
-    const descriptionTextStyle = useMemo(() => [
-        styles.description,
-        { color: colors.textPrimary }
-    ], [colors.textPrimary]);
-
-    const readMoreTextStyle = useMemo(() => [
-        styles.readMore,
-        { color: colors.textSecondary }
-    ], [colors.textSecondary]);
-
-    const displayNameTextStyle = useMemo(() => [
-        styles.displayName,
-        { color: colors.textPrimary }
-    ], [colors.textPrimary]);
+    // ✅ [PERF] Consolidated theme styles - 12 useMemos → 1
     const isDarkTheme = colors.textPrimary.toLowerCase() === '#ffffff';
-    const cardBackground = useMemo(() => mixWithWhite(colors.background, 0.03), [colors.background]);
-    const cardBorderColor = useMemo(
-        () => (isDarkTheme ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'),
-        [isDarkTheme]
-    );
-    const cardShadowStyle = useMemo(() => shadowStyle({
-        color: '#000000',
-        offset: { width: 0, height: 6 },
-        radius: 14,
-        opacity: isDarkTheme ? 0.35 : 0.18,
-        elevation: 6,
-    }), [isDarkTheme]);
-    const replayOverlayStyle = useMemo(() => [
-        styles.replayOverlay,
-        { backgroundColor: isDarkTheme ? 'rgba(20,20,20,0.36)' : 'rgba(0,0,0,0.24)' },
-    ], [isDarkTheme]);
-    const replayBadgeStyle = useMemo(() => [
-        styles.replayBadge,
-        {
-            backgroundColor: isDarkTheme ? 'rgba(32,32,34,0.94)' : 'rgba(255,255,255,0.94)',
-        },
-    ], [isDarkTheme]);
-    const replayBadgeTextStyle = useMemo(() => [
-        styles.replayBadgeText,
-        { color: isDarkTheme ? '#FFFFFF' : '#111111' },
-    ], [isDarkTheme]);
+    const themedStyles = useMemo(() => {
+        const cardBg = mixWithWhite(colors.background, 0.03);
+        const borderClr = isDarkTheme ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+        const shadow = shadowStyle({
+            color: '#000000',
+            offset: { width: 0, height: 6 },
+            radius: 14,
+            opacity: isDarkTheme ? 0.35 : 0.18,
+            elevation: 6,
+        });
+        return {
+            fullName: [styles.fullName, { color: colors.textPrimary }],
+            handle: [styles.handle, { color: colors.textSecondary }],
+            description: [styles.description, { color: colors.textPrimary }],
+            readMore: [styles.readMore, { color: colors.textSecondary }],
+            displayName: [styles.displayName, { color: colors.textPrimary }],
+            replayOverlay: [styles.replayOverlay, { backgroundColor: isDarkTheme ? 'rgba(20,20,20,0.36)' : 'rgba(0,0,0,0.24)' }],
+            replayBadge: [styles.replayBadge, { backgroundColor: isDarkTheme ? 'rgba(32,32,34,0.94)' : 'rgba(255,255,255,0.94)' }],
+            replayBadgeText: [styles.replayBadgeText, { color: isDarkTheme ? '#FFFFFF' : '#111111' }],
+            cardOuter: [
+                styles.card,
+                disableCardStyle ? styles.cardEdgeToEdge : null,
+                disableCardStyle ? null : shadow,
+            ],
+            cardInner: [
+                styles.cardInner,
+                disableCardStyle ? styles.cardInnerEdgeToEdge : null,
+                { backgroundColor: disableCardStyle ? 'transparent' : cardBg, borderColor: disableCardStyle ? 'transparent' : borderClr },
+            ],
+            mediaPlaceholder: [styles.mediaPlaceholder, { backgroundColor: mixWithWhite(colors.background, isDarkTheme ? 0.08 : 0.16) }],
+        };
+    }, [colors.background, colors.textPrimary, colors.textSecondary, disableCardStyle, isDarkTheme]);
+
+    // ✅ [PERF] Only truly dynamic values stay as separate useMemos
     const videoTimeText = useMemo(() => {
         if (videoDurationDisplaySec == null) return '';
         return `${formatPlaybackClock(videoProgressSec)} | ${formatPlaybackClock(videoDurationDisplaySec)}`;
@@ -651,24 +651,6 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         const commercialTypeLabel = item.commercialType ? item.commercialType : 'İş Birliği';
         return item.brandName ? `${commercialTypeLabel} | ${item.brandName}` : commercialTypeLabel;
     }, [item.brandName, item.commercialType, item.isCommercial]);
-    const cardOuterStyle = useMemo(() => [
-        styles.card,
-        disableCardStyle ? styles.cardEdgeToEdge : null,
-        disableCardStyle ? null : cardShadowStyle,
-    ], [cardShadowStyle, disableCardStyle]);
-
-    const cardInnerStyle = useMemo(() => [
-        styles.cardInner,
-        disableCardStyle ? styles.cardInnerEdgeToEdge : null,
-        {
-            backgroundColor: disableCardStyle ? 'transparent' : cardBackground,
-            borderColor: disableCardStyle ? 'transparent' : cardBorderColor
-        }
-    ], [cardBackground, cardBorderColor, disableCardStyle]);
-    const mediaPlaceholderStyle = useMemo(() => [
-        styles.mediaPlaceholder,
-        { backgroundColor: mixWithWhite(colors.background, isDarkTheme ? 0.08 : 0.16) },
-    ], [colors.background, isDarkTheme]);
 
     const descriptionValue = item.description?.trim() ?? '';
     const hasDescription = descriptionValue.length > 0;
@@ -718,7 +700,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                     )}
                                     <View style={styles.headerText}>
                                         <View style={styles.nameRow}>
-                                            <Text style={fullNameStyle} numberOfLines={1}>
+                                            <Text style={themedStyles.fullName} numberOfLines={1}>
                                                 {item.user?.fullName || 'WizyClub User'}
                                             </Text>
                                             {item.user?.isVerified === true && (
@@ -727,7 +709,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                                 </View>
                                             )}
                                         </View>
-                                        <Text style={handleStyle} numberOfLines={1}>
+                                        <Text style={themedStyles.handle} numberOfLines={1}>
                                             @{item.user?.username || 'wizyclub'}
                                         </Text>
                                     </View>
@@ -770,7 +752,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                     cachePolicy="memory-disk"
                                 />
                             ) : (
-                                <View style={mediaPlaceholderStyle} />
+                                <View style={themedStyles.mediaPlaceholder} />
                             )}
                             {shouldMountVideo && videoSource ? (
                                 <VideoPlayer
@@ -782,7 +764,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                         ((!isActive && shouldPlayVideo) || (shouldGateVideoVisibility && !isVideoVisible)) && styles.videoHidden,
                                     ]}
                                     resizeMode="contain"
-                                    repeat={true}
+                                    repeat={false}
                                     paused={!shouldPlayVideo}
                                     muted={isMuted}
                                     playInBackground={false}
@@ -792,6 +774,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                     onLoad={handleVideoLoad}
                                     onReadyForDisplay={handleVideoReadyForDisplay}
                                     onProgress={handleVideoProgress}
+                                    onEnd={handleVideoEnd}
                                     onError={handleVideoError}
                                     hideShutterView={true}
                                     shutterColor="transparent"
@@ -807,16 +790,16 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                         </View>
 
                         {isVideo && isActive && hasReachedLoopLimit && (
-                            <View style={replayOverlayStyle}>
+                            <View style={themedStyles.replayOverlay}>
                                 <Pressable
-                                    style={replayBadgeStyle}
+                                    style={themedStyles.replayBadge}
                                     onPress={(event) => {
                                         event.stopPropagation?.();
                                         handleReplay();
                                     }}
                                     hitSlop={8}
                                 >
-                                    <Text style={replayBadgeTextStyle}>Tekrar izle</Text>
+                                    <Text style={themedStyles.replayBadgeText}>Tekrar izle</Text>
                                 </Pressable>
                             </View>
                         )}
@@ -838,7 +821,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                     )}
                                     <View style={styles.headerText}>
                                         <View style={styles.nameRow}>
-                                            <Text style={fullNameStyle} numberOfLines={1}>
+                                            <Text style={themedStyles.fullName} numberOfLines={1}>
                                                 {item.user?.fullName || 'WizyClub User'}
                                             </Text>
                                             {item.user?.isVerified === true && (
@@ -847,7 +830,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                                 </View>
                                             )}
                                         </View>
-                                        <Text style={handleStyle} numberOfLines={1}>
+                                        <Text style={themedStyles.handle} numberOfLines={1}>
                                             @{item.user?.username || 'wizyclub'}
                                         </Text>
                                     </View>
@@ -933,22 +916,22 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
             {/* ✅ DESCRIPTION - Controlled by INF_DISABLE_DESCRIPTION */}
             {showDescriptionBlock && (
                 <View style={styles.cardContent}>
-                    <Text style={descriptionTextStyle} onPress={handleToggleDescription}>
-                        <Text style={displayNameTextStyle}>{displayName}</Text>
+                    <Text style={themedStyles.description} onPress={handleToggleDescription}>
+                        <Text style={themedStyles.displayName}>{displayName}</Text>
                         {hasDescription ? (
                             <>
                                 {' '}
                                 {truncatedDescription}
                                 {!isDescriptionExpanded && canToggleDescription && (
                                     <Text
-                                        style={readMoreTextStyle}
+                                        style={themedStyles.readMore}
                                     >
                                         {'...daha fazla'}
                                     </Text>
                                 )}
                                 {isDescriptionExpanded && canToggleDescription && (
                                     <Text
-                                        style={readMoreTextStyle}
+                                        style={themedStyles.readMore}
                                     >
                                         {' daha az'}
                                     </Text>
@@ -963,8 +946,8 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     );
 
     return (
-        <View style={cardOuterStyle}>
-            <View style={cardInnerStyle}>
+        <View style={themedStyles.cardOuter}>
+            <View style={themedStyles.cardInner}>
                 {isCarousel ? (
                     cardBody
                 ) : (
