@@ -3,7 +3,7 @@ export default ({ config }) => {
 
     return {
         ...config,
-        name: IS_PREVIEW ? 'WizyClub (Prev)' : 'WizyClub',
+        name: IS_PREVIEW ? 'WizyClub Preview' : 'WizyClub',
         slug: 'wizyclup',
         ios: {
             ...config.ios,

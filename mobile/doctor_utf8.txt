@@ -1,0 +1,45 @@
+﻿Running 17 checks on your project...
+15/17 checks passed. 2 checks failed. Possible issues detected:
+Use the --verbose flag to see more details about passed checks.
+
+Ô£û Check for app config fields that may not be synced in a non-CNG project
+This project contains native project folders but also has native configuration properties in app.config.js, indicating it is configured to use Prebuild. When the android/ios folders are present, EAS Build will not sync the following properties: orientation, icon, scheme, userInterfaceStyle, ios, android, androidStatusBar, androidNavigationBar, plugins. 
+
+
+Ô£û Check that packages match versions required by installed Expo SDK
+
+­şöğ Patch version mismatches
+package            expected  found    
+expo               ~54.0.33  54.0.31  
+expo-font          ~14.0.11  14.0.10  
+expo-router        ~6.0.23   6.0.21   
+babel-preset-expo  ~54.0.10  54.0.9   
+
+Changelogs:
+- expo-font ÔåÆ https://github.com/expo/expo/blob/sdk-54/packages/expo-font/CHANGELOG.md
+- expo-router ÔåÆ https://github.com/expo/expo/blob/sdk-54/packages/expo-router/CHANGELOG.md
+
+4 packages out of date.
+Advice:
+Use 'npx expo install --check' to review and upgrade your dependencies.
+To ignore specific packages, add them to "expo.install.exclude" in package.json. Learn more: https://expo.fyi/dependency-validation
+
+node.exe : 2 checks failed
+, indicating possible issu
+es with the project.
+At line:1 char:1
++ & "C:\Program Files\node
+js/node.exe" "C:\Program F
+iles\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo        
+      : NotSpe    cified: 
+(2 check    s failed...th 
+th    e project.:Strin    
+g) [], RemoteExc    eption
+    + FullyQualified    Er
+rorId : Native    CommandE
+rror
+ 

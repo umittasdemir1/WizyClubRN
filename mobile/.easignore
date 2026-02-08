@@ -18,17 +18,23 @@ node_modules/
 
 # Exclude local logs and temporary files
 doctor_output*.txt
+doctor_full*.txt
+doctor_utf8*.txt
+doctor_final*.txt
 doctor_full.txt
-doctor_output_ascii.txt
-doctor_output_final.txt
-*.zip
-*.tar.gz
+doctor_output.txt
+*.log
 npm-debug.*
 yarn-error.*
 
-# Exclude native and generated folders
+# Exclude native and generated folders (EAS will regenerate if needed)
 android/
 ios/
 .expo/
 dist/
 web-build/
+node_modules/
+backend/
+backups/
+maintenance_scripts/
+r2-mcp/
