@@ -16,7 +16,7 @@ import {
     FlatList,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { Video, ResizeMode } from 'expo-av';
+import VideoPlayer from 'react-native-video';
 import { useUploadStore } from '../../store/useUploadStore';
 import { useDraftStore } from '../../store/useDraftStore';
 import { ChevronLeft, ChevronRight, Users, Tag, PlusCircle, X } from 'lucide-react-native';
@@ -373,14 +373,14 @@ export function UploadModal({ isVisible, onClose, initialAssets, uploadMode = 'v
                                                 </Text>
                                             </View>
                                             {item.type === 'video' ? (
-                                                <Video
+                                                <VideoPlayer
                                                     source={{ uri: item.uri }}
                                                     style={styles.previewImage}
-                                                    resizeMode={ResizeMode.COVER}
-                                                    shouldPlay={false}
-                                                    isLooping={false}
-                                                    isMuted={true}
-                                                    useNativeControls={false}
+                                                    resizeMode="cover"
+                                                    paused={true}
+                                                    repeat={false}
+                                                    muted={true}
+                                                    controls={false}
                                                 />
                                             ) : (
                                                 <Image

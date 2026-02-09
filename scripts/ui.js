@@ -68,6 +68,7 @@ const FLAG_DESCRIPTIONS = {
     // ═══════════════════════════════════════════════════════════════════════
     INF_DISABLE_ALL_UI: '[INF-MASTER] Tüm InfiniteFeed Arayüzü',
     INF_DISABLE_INLINE_VIDEO: '[INF] Video Oynatma (Sadece Thumbnail)',
+    INF_DISABLE_TIME_BADGE: '[INF] Video Zaman Rozeti (Süre)',
     INF_DISABLE_USER_HEADER: '[INF] Kullanıcı Başlığı (Avatar + İsim)',
     INF_DISABLE_ACTIONS: '[INF] Butonlar (Beğen, Kaydet, Paylaş)',
     INF_DISABLE_DESCRIPTION: '[INF] Açıklama Metni',

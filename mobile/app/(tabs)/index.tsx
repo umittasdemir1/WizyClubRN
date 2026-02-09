@@ -95,6 +95,8 @@ export default function HomeFeedScreen() {
                 toggleFollow={toggleFollow}
                 toggleShare={toggleShare}
                 toggleShop={toggleShop}
+                deleteVideo={deleteVideo}
+                prependVideo={prependVideo}
                 homeReselectTrigger={homeReselectTrigger}
             />
         );

@@ -1064,6 +1064,63 @@ function setUploadProgress(id, stage, percent) {
     console.log(`📊 [PROGRESS] ${id}: ${stage} - ${percent}%`);
 }
 
+function parseAspectRatioValue(value) {
+    if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+        return value;
+    }
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    if (trimmed.includes(':')) {
+        const [left, right] = trimmed.split(':');
+        const num = parseFloat(left);
+        const den = parseFloat(right);
+        if (Number.isFinite(num) && Number.isFinite(den) && den !== 0) {
+            return num / den;
+        }
+        return null;
+    }
+
+    const parsed = parseFloat(trimmed);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function parseRotationCandidate(value) {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string') {
+        const parsed = parseFloat(value.trim());
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+}
+
+function extractRotationFromStream(stream) {
+    if (!stream || typeof stream !== 'object') return 0;
+
+    const tagRotation = parseRotationCandidate(stream?.tags?.rotate);
+    if (tagRotation != null) return tagRotation;
+
+    const sideDataList = Array.isArray(stream?.side_data_list) ? stream.side_data_list : [];
+    for (const sideData of sideDataList) {
+        if (!sideData || typeof sideData !== 'object') continue;
+
+        const directRotation = parseRotationCandidate(sideData.rotation);
+        if (directRotation != null) return directRotation;
+
+        const displayMatrix = typeof sideData.displaymatrix === 'string' ? sideData.displaymatrix : '';
+        if (displayMatrix) {
+            const match = displayMatrix.match(/rotation of\s*(-?\d+(?:\.\d+)?)\s*degrees/i);
+            if (match) {
+                const parsed = parseFloat(match[1]);
+                if (Number.isFinite(parsed)) return parsed;
+            }
+        }
+    }
+
+    return 0;
+}
+
 function extractDimensionsFromProbe(metadata) {
     if (!metadata || !Array.isArray(metadata.streams)) {
         return { width: 0, height: 0 };
@@ -1073,11 +1130,56 @@ function extractDimensionsFromProbe(metadata) {
         metadata.streams.find(s => s.width && s.height);
     let width = stream?.width || 0;
     let height = stream?.height || 0;
-    const rotation = stream?.tags && stream.tags.rotate ? parseInt(stream.tags.rotate, 10) : 0;
-    if (Math.abs(rotation) === 90 || Math.abs(rotation) === 270) {
+
+    const rotation = extractRotationFromStream(stream);
+    const normalizedRotation = ((rotation % 360) + 360) % 360;
+    const isQuarterTurn = Math.abs(normalizedRotation - 90) < 1 || Math.abs(normalizedRotation - 270) < 1;
+
+    const displayAspectRatio = parseAspectRatioValue(stream?.display_aspect_ratio);
+    const shouldSwapByDisplayAspect =
+        displayAspectRatio != null &&
+        ((displayAspectRatio < 1 && width > height) || (displayAspectRatio > 1 && width < height));
+
+    if (isQuarterTurn || shouldSwapByDisplayAspect) {
         [width, height] = [height, width];
     }
     return { width, height };
+}
+
+function getOrientation(width, height) {
+    if (!width || !height) return 'unknown';
+    if (Math.abs(width - height) <= 1) return 'square';
+    return width > height ? 'landscape' : 'portrait';
+}
+
+function normalizeDimensionsWithReference(primary, reference) {
+    const primaryWidth = Number(primary?.width) || 0;
+    const primaryHeight = Number(primary?.height) || 0;
+    const referenceWidth = Number(reference?.width) || 0;
+    const referenceHeight = Number(reference?.height) || 0;
+
+    if (!primaryWidth || !primaryHeight) {
+        if (referenceWidth && referenceHeight) {
+            return { width: referenceWidth, height: referenceHeight };
+        }
+        return { width: primaryWidth, height: primaryHeight };
+    }
+
+    if (!referenceWidth || !referenceHeight) {
+        return { width: primaryWidth, height: primaryHeight };
+    }
+
+    const primaryOrientation = getOrientation(primaryWidth, primaryHeight);
+    const referenceOrientation = getOrientation(referenceWidth, referenceHeight);
+    const isOppositeOrientation =
+        (primaryOrientation === 'landscape' && referenceOrientation === 'portrait') ||
+        (primaryOrientation === 'portrait' && referenceOrientation === 'landscape');
+
+    if (isOppositeOrientation) {
+        return { width: primaryHeight, height: primaryWidth };
+    }
+
+    return { width: primaryWidth, height: primaryHeight };
 }
 
 function pickMostPortrait(current, candidate) {
@@ -1152,9 +1254,6 @@ app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
 
                 const { width, height } = extractDimensionsFromProbe(metadata);
                 const duration = parseFloat(metadata.format.duration || 0);
-                portraitBase = pickMostPortrait(portraitBase, { width, height });
-                const safeWidth = width || 1080;
-                const safeHeight = height || 1920;
 
                 const processedThumbPath = path.join(tempOutputDir, `thumb_${uniqueId}_${i}.jpg`);
                 await new Promise((resolve, reject) => {
@@ -1169,6 +1268,11 @@ app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
                         .on('end', resolve)
                         .on('error', reject);
                 });
+
+                const thumbDims = await safeProbeDimensions(processedThumbPath);
+                const normalizedSourceDims = normalizeDimensionsWithReference({ width, height }, thumbDims);
+                const safeWidth = normalizedSourceDims.width || thumbDims.width || width || 1080;
+                const safeHeight = normalizedSourceDims.height || thumbDims.height || height || 1920;
 
                 const thumbUrl = await uploadToR2(processedThumbPath, `${baseKey}/thumb.jpg`, 'image/jpeg');
                 if (i === 0) firstThumbUrl = thumbUrl;
@@ -1185,6 +1289,11 @@ app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
                 });
 
                 const videoUrl = await uploadToR2(optimizedPath, `${baseKey}/master.mp4`, 'video/mp4');
+                const optimizedDims = await safeProbeDimensions(optimizedPath);
+                const outputWidth = optimizedDims.width || safeWidth;
+                const outputHeight = optimizedDims.height || safeHeight;
+                portraitBase = pickMostPortrait(portraitBase, { width: outputWidth, height: outputHeight });
+                console.log(`   📐 [DIM][POST] source=${width}x${height}, thumb=${thumbDims.width}x${thumbDims.height}, normalized=${safeWidth}x${safeHeight}, output=${outputWidth}x${outputHeight}`);
 
                 let spriteUrl = '';
                 if (i === 0) {
@@ -1192,7 +1301,7 @@ app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
                     firstSpriteUrl = spriteUrl;
                 }
 
-                mediaUrls.push({ url: videoUrl, type: 'video', thumbnail: thumbUrl, sprite: spriteUrl, width: safeWidth, height: safeHeight });
+                mediaUrls.push({ url: videoUrl, type: 'video', thumbnail: thumbUrl, sprite: spriteUrl, width: outputWidth, height: outputHeight });
 
                 if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
                 if (fs.existsSync(processedThumbPath)) fs.unlinkSync(processedThumbPath);
@@ -1295,9 +1404,6 @@ app.post('/upload-story', upload.array('video', 10), async (req, res) => {
                 });
 
                 const { width, height } = extractDimensionsFromProbe(metadata);
-                portraitBase = pickMostPortrait(portraitBase, { width, height });
-                const safeWidth = width || 1080;
-                const safeHeight = height || 1920;
 
                 const videoKey = `${baseKey}/story.mp4`;
                 await uploadToR2(inputPath, videoKey, file.mimetype);
@@ -1319,6 +1425,12 @@ app.post('/upload-story', upload.array('video', 10), async (req, res) => {
 
                 const thumbKey = `${baseKey}/thumb.jpg`;
                 const thumbnailUrl = await uploadToR2(thumbPath, thumbKey, 'image/jpeg');
+                const thumbDims = await safeProbeDimensions(thumbPath);
+                const normalizedSourceDims = normalizeDimensionsWithReference({ width, height }, thumbDims);
+                const safeWidth = normalizedSourceDims.width || thumbDims.width || width || 1080;
+                const safeHeight = normalizedSourceDims.height || thumbDims.height || height || 1920;
+                portraitBase = pickMostPortrait(portraitBase, { width: safeWidth, height: safeHeight });
+                console.log(`   📐 [DIM][STORY] source=${width}x${height}, thumb=${thumbDims.width}x${thumbDims.height}, normalized=${safeWidth}x${safeHeight}`);
 
                 if (i === 0) {
                     firstThumbUrl = thumbnailUrl;
@@ -1372,6 +1484,71 @@ app.post('/upload-story', upload.array('video', 10), async (req, res) => {
         if (files) files.forEach(f => { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); });
     }
 });
+
+function parseMediaUrlsField(mediaUrlsField) {
+    if (Array.isArray(mediaUrlsField)) return mediaUrlsField;
+    if (typeof mediaUrlsField !== 'string') return [];
+
+    try {
+        const parsed = JSON.parse(mediaUrlsField);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return [];
+    }
+}
+
+function extractR2KeyFromValue(value) {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    try {
+        const parsed = new URL(trimmed);
+        return (parsed.pathname || '').replace(/^\/+/, '') || null;
+    } catch {
+        const withoutQuery = trimmed.split('?')[0].split('#')[0];
+        return withoutQuery.replace(/^\/+/, '') || null;
+    }
+}
+
+function deriveScopedR2Prefix(key) {
+    if (typeof key !== 'string' || key.length === 0) return null;
+
+    const segments = key.split('/').filter(Boolean);
+    if (segments.length < 2) return null;
+
+    // Legacy video layout: videos/<id>/...
+    if (segments[0] === 'videos') {
+        return `videos/${segments[1]}`;
+    }
+
+    // Current post layout: media/<userId>/(posts|videos)/<postId>/...
+    if (
+        segments[0] === 'media' &&
+        segments.length >= 4 &&
+        (segments[2] === 'posts' || segments[2] === 'videos')
+    ) {
+        return `media/${segments[1]}/${segments[2]}/${segments[3]}`;
+    }
+
+    return null;
+}
+
+function deriveLegacyVideoIdFromKey(key) {
+    if (typeof key !== 'string' || key.length === 0) return null;
+    const segments = key.split('/').filter(Boolean);
+    if (segments.length < 2) return null;
+
+    if (segments[0] === 'videos') {
+        return segments[1];
+    }
+
+    if (segments[0] === 'media' && segments.length >= 4 && segments[2] === 'videos') {
+        return segments[3];
+    }
+
+    return null;
+}
 
 
 // Endpoint: DELETE Video (Soft Delete by default)
@@ -1430,37 +1607,67 @@ app.delete('/videos/:id', async (req, res) => {
             // 1. Fetch Video Details (Already done above as 'video')
             // Using 'video' object which contains video_url, sprite_url, thumbnail_url since we selected '*'
 
-            // 2. R2 Cleanup - Support BOTH legacy and new URL formats
-            const videoUrl = video.video_url;
-            const pathsToClean = new Set();
+            // 2. R2 Cleanup - Covers legacy URLs + current media_urls carousel structure
+            const objectKeysToDelete = new Set();
+            const folderPrefixesToClean = new Set();
+            const legacyVideoIds = new Set();
 
-            // A. Add Video Folder (Main)
-            let videoFolder = null;
-            if (videoUrl.includes('/media/')) {
-                const match = videoUrl.match(/media\/.*\/videos\/[^\/]+/); // media/USER/videos/UUID
-                if (match) videoFolder = match[0];
-            } else if (videoUrl.includes('/videos/')) {
-                const match = videoUrl.match(/videos\/[^\/]+/); // videos/UUID
-                if (match) videoFolder = match[0];
-            }
-            if (videoFolder) pathsToClean.add(videoFolder);
+            const registerCleanupTarget = (value) => {
+                const key = extractR2KeyFromValue(value);
+                if (!key) return;
+                objectKeysToDelete.add(key);
 
-            // B. Add Sprite Folder (Often 'videos/UUID' even if main video is in 'media/')
-            if (video?.sprite_url) {
-                const spriteMatch = video.sprite_url.match(/videos\/[^\/]+/); // videos/UUID
-                if (spriteMatch) {
-                    pathsToClean.add(spriteMatch[0]);
-                    console.log(`   found separate sprite folder: ${spriteMatch[0]}`);
+                const prefix = deriveScopedR2Prefix(key);
+                if (prefix) {
+                    folderPrefixesToClean.add(prefix);
                 }
+
+                const legacyVideoId = deriveLegacyVideoIdFromKey(key);
+                if (legacyVideoId) {
+                    legacyVideoIds.add(legacyVideoId);
+                }
+            };
+
+            // Main URL fields
+            registerCleanupTarget(video.video_url);
+            registerCleanupTarget(video.thumbnail_url);
+            registerCleanupTarget(video.sprite_url);
+
+            // Carousel/media-specific URLs
+            const mediaUrls = parseMediaUrlsField(video.media_urls);
+            for (const mediaItem of mediaUrls) {
+                if (!mediaItem || typeof mediaItem !== 'object') continue;
+                registerCleanupTarget(mediaItem.url);
+                registerCleanupTarget(mediaItem.thumbnail);
+                registerCleanupTarget(mediaItem.sprite);
             }
 
-            // Execute Cleanup for all identified folders
-            for (const folder of pathsToClean) {
+            // Fallback cleanup candidates for thumbnails to handle legacy + mixed records
+            for (const folderPrefix of folderPrefixesToClean) {
+                objectKeysToDelete.add(`${folderPrefix}/thumb.jpg`);
+                objectKeysToDelete.add(`${folderPrefix}/thumb.jpeg`);
+                objectKeysToDelete.add(`${folderPrefix}/thumb.png`);
+                objectKeysToDelete.add(`${folderPrefix}/thumbnail.jpg`);
+                objectKeysToDelete.add(`${folderPrefix}/thumbnail.jpeg`);
+                objectKeysToDelete.add(`${folderPrefix}/thumbnail.png`);
+            }
+            for (const legacyVideoId of legacyVideoIds) {
+                objectKeysToDelete.add(`thumbs/${legacyVideoId}.jpg`);
+                objectKeysToDelete.add(`thumbs/${legacyVideoId}.jpeg`);
+                objectKeysToDelete.add(`thumbs/${legacyVideoId}.png`);
+                objectKeysToDelete.add(`thumbs/${legacyVideoId}.webp`);
+            }
+
+            console.log(`   🧹 R2 cleanup targets: ${objectKeysToDelete.size} key(s), ${folderPrefixesToClean.size} folder prefix(es)`);
+
+            // 2A. Prefix cleanup for scoped folders
+            for (const folderPrefix of folderPrefixesToClean) {
                 try {
-                    console.log(`   👉 [HARD] Cleaning R2 Folder: ${folder}`);
+                    const prefix = folderPrefix.endsWith('/') ? folderPrefix : `${folderPrefix}/`;
+                    console.log(`   👉 [HARD] Cleaning R2 Folder: ${prefix}`);
                     const listCmd = new ListObjectsV2Command({
                         Bucket: process.env.R2_BUCKET_NAME,
-                        Prefix: folder
+                        Prefix: prefix
                     });
                     const listRes = await r2.send(listCmd);
 
@@ -1472,12 +1679,30 @@ app.delete('/videos/:id', async (req, res) => {
                             }
                         };
                         await r2.send(new DeleteObjectsCommand(deleteParams));
-                        console.log(`   ✅ R2 Folder Deleted (${listRes.Contents.length} files) from: ${folder}`);
+                        console.log(`   ✅ R2 Folder Deleted (${listRes.Contents.length} files) from: ${prefix}`);
                     } else {
-                        console.log(`   ⚠️ No files found in R2 folder: ${folder}`);
+                        console.log(`   ⚠️ No files found in R2 folder: ${prefix}`);
                     }
                 } catch (r2Error) {
-                    console.error(`   ⚠️ R2 Cleanup Error for ${folder}:`, r2Error.message);
+                    console.error(`   ⚠️ R2 Cleanup Error for ${folderPrefix}:`, r2Error.message);
+                }
+            }
+
+            // 2B. Direct key cleanup (covers standalone keys like thumbs/<id>.jpg)
+            if (objectKeysToDelete.size > 0) {
+                try {
+                    const keys = Array.from(objectKeysToDelete).map((Key) => ({ Key }));
+                    const chunkSize = 1000;
+                    for (let i = 0; i < keys.length; i += chunkSize) {
+                        const chunk = keys.slice(i, i + chunkSize);
+                        await r2.send(new DeleteObjectsCommand({
+                            Bucket: process.env.R2_BUCKET_NAME,
+                            Delete: { Objects: chunk },
+                        }));
+                    }
+                    console.log(`   ✅ R2 Direct Key Cleanup Sent (${objectKeysToDelete.size} keys)`);
+                } catch (r2Error) {
+                    console.error('   ⚠️ R2 Direct Key Cleanup Error:', r2Error.message);
                 }
             }
 

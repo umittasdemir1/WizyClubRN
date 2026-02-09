@@ -21,12 +21,15 @@ import {
     useInfiniteFeedMuteControls,
     useInfiniteFeedAuthStore,
 } from './hooks/useInfiniteFeedStores';
+import BottomSheet from '@gorhom/bottom-sheet';
 import { useThemeStore } from '../../store/useThemeStore';
 import { DARK_COLORS, LIGHT_COLORS } from '../../../core/constants';
 import { getVideoUrl } from '../../../core/utils/videoUrl';
 import type { InfiniteFeedVideo } from './InfiniteFeedVideoTypes';
 import { InfiniteFeedHeader, FeedTab } from './InfiniteFeedHeader';
 import { InfiniteFeedCard } from './InfiniteFeedCard';
+import { InfiniteFeedMoreOptionsSheet } from './InfiniteFeedMoreOptionsSheet';
+import { InfiniteFeedDeleteConfirmationModal } from './InfiniteFeedDeleteConfirmationModal';
 import { styles } from './InfiniteFeedManager.styles';
 import { FEED_FLAGS, FEED_CONFIG } from './hooks/useInfiniteFeedConfig';
 import { useInfiniteStoryViewer } from '../../hooks/useInfiniteStoryViewer';
@@ -35,6 +38,8 @@ import { FeedPrefetchService } from '../../../data/services/FeedPrefetchService'
 import { VideoCacheService } from '../../../data/services/VideoCacheService';
 import { useInAppBrowserStore } from '../../store/useInAppBrowserStore';
 import { PerformanceLogger } from '../../../core/services/PerformanceLogger';
+import { useUploadStore } from '../../store/useUploadStore';
+import { supabase } from '../../../core/supabase';
 
 interface InfiniteFeedManagerProps {
     videos: InfiniteFeedVideo[];
@@ -50,6 +55,8 @@ interface InfiniteFeedManagerProps {
     toggleFollow: (id: string) => void;
     toggleShare: (id: string) => void;
     toggleShop: (id: string) => void;
+    deleteVideo: (id: string) => void | Promise<void>;
+    prependVideo?: (video: InfiniteFeedVideo) => void;
     homeReselectTrigger?: number;
 }
 
@@ -95,6 +102,8 @@ export function InfiniteFeedManager({
     toggleFollow,
     toggleShare,
     toggleShop,
+    deleteVideo,
+    prependVideo,
     homeReselectTrigger = 0,
 }: InfiniteFeedManagerProps) {
     const insets = useSafeAreaInsets();
@@ -107,8 +116,13 @@ export function InfiniteFeedManager({
     const { stories: storyListData } = useInfiniteStoryViewer();
     const isInAppBrowserVisible = useInAppBrowserStore((state) => state.isVisible);
     const openInAppBrowser = useInAppBrowserStore((state) => state.openUrl);
+    const uploadStatus = useUploadStore((state) => state.status);
+    const uploadedVideoId = useUploadStore((state) => state.uploadedVideoId);
+    const resetUpload = useUploadStore((state) => state.reset);
 
     const [activeTab, setActiveTab] = useState<FeedTab>('Sana Özel');
+    const [selectedMoreVideoId, setSelectedMoreVideoId] = useState<string | null>(null);
+    const [isMoreDeleteConfirmationVisible, setMoreDeleteConfirmationVisible] = useState(false);
 
     // ✅ [PERF] Batched state - 4 states → 1 (reduces 4 re-renders to 1)
     interface FeedActiveState {
@@ -142,6 +156,7 @@ export function InfiniteFeedManager({
     const scrollDirectionRef = useRef<'up' | 'down'>('down');
     const lastScrollOffsetYRef = useRef(0);
     const listRef = useRef<any>(null);
+    const moreOptionsSheetRef = useRef<BottomSheet>(null);
     const lastHandledReselectRef = useRef(0);
 
     // ✅ [PERF] Refs for renderItem volatile values - prevents renderItem recreation
@@ -171,6 +186,13 @@ export function InfiniteFeedManager({
         router.push('/custom-feed' as any);
     }, [videos, setCustomFeed, setActiveVideo, router]);
 
+    const handleOpenProfile = useCallback((userId: string) => {
+        if (!userId) return;
+        const isSelfProfile = !!currentUserId && userId === currentUserId;
+        const profileRoute = isSelfProfile ? '/profile' : `/user/${userId}`;
+        router.push(profileRoute as any);
+    }, [currentUserId, router]);
+
     const handleStoryAvatarPress = useCallback((userId: string) => {
         router.push(`/story/${userId}` as any);
     }, [router]);
@@ -191,6 +213,42 @@ export function InfiniteFeedManager({
         toggleShop(videoId);
         openInAppBrowser(normalizedUrl);
     }, [openInAppBrowser, toggleShop, videos]);
+
+    const handleOpenMoreOptions = useCallback((videoId: string) => {
+        const selectedVideo = videos.find((video) => video.id === videoId);
+        if (!selectedVideo) return;
+
+        setSelectedMoreVideoId(videoId);
+        moreOptionsSheetRef.current?.snapToIndex(0);
+    }, [videos]);
+
+    const handleMoreSheetDelete = useCallback(() => {
+        const selectedVideo = videos.find((video) => video.id === selectedMoreVideoId);
+        const isOwnVideo = !!currentUserId && selectedVideo?.user?.id === currentUserId;
+        if (!isOwnVideo) return;
+
+        moreOptionsSheetRef.current?.close();
+        setMoreDeleteConfirmationVisible(true);
+    }, [currentUserId, selectedMoreVideoId, videos]);
+
+    const handleCancelMoreDelete = useCallback(() => {
+        setMoreDeleteConfirmationVisible(false);
+    }, []);
+
+    const handleConfirmMoreDelete = useCallback(() => {
+        const targetId = selectedMoreVideoId;
+        if (targetId) {
+            void deleteVideo(targetId);
+        }
+        setMoreDeleteConfirmationVisible(false);
+        setSelectedMoreVideoId(null);
+    }, [deleteVideo, selectedMoreVideoId]);
+
+    const isOwnMoreOptionsVideo = useMemo(() => {
+        if (!selectedMoreVideoId || !currentUserId) return false;
+        const selectedVideo = videos.find((video) => video.id === selectedMoreVideoId);
+        return selectedVideo?.user?.id === currentUserId;
+    }, [currentUserId, selectedMoreVideoId, videos]);
 
     const storyUsers = useMemo(() => {
         return storyListData.reduce((acc: any[], story) => {
@@ -226,6 +284,139 @@ export function InfiniteFeedManager({
         clearTimeout(settleTimerRef.current);
         settleTimerRef.current = null;
     }, []);
+
+    const activateTopVideo = useCallback((videoId: string) => {
+        clearSettleTimer();
+        momentumStartedRef.current = false;
+        isFeedScrollingRef.current = false;
+        setIsFeedScrolling(false);
+        scrollStartAtRef.current = null;
+        scrollDirectionRef.current = 'down';
+        lastScrollOffsetYRef.current = 0;
+        activeInlineIdRef.current = videoId;
+        activeInlineIndexRef.current = 0;
+        pendingActiveIdRef.current = videoId;
+        pendingActiveIndexRef.current = 0;
+        setFeedActiveState({
+            activeId: videoId,
+            pendingId: immediateActiveCommit ? null : videoId,
+            activeIndex: 0,
+            pendingIndex: immediateActiveCommit ? 0 : 0,
+        });
+        setActiveVideo(videoId, 0);
+        listRef.current?.scrollToOffset({ offset: 0, animated: false });
+        requestAnimationFrame(() => {
+            listRef.current?.scrollToOffset({ offset: 0, animated: false });
+        });
+    }, [clearSettleTimer, immediateActiveCommit, setActiveVideo]);
+
+    useEffect(() => {
+        if (!uploadedVideoId || uploadStatus !== 'success' || !prependVideo) return;
+
+        let cancelled = false;
+
+        const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+        const fetchUploadedVideo = async () => {
+            for (let attempt = 0; attempt < 5; attempt += 1) {
+                const { data, error } = await supabase
+                    .from('videos')
+                    .select('*, profiles:user_id(*)')
+                    .eq('id', uploadedVideoId)
+                    .single();
+
+                if (data && !error) {
+                    return data as any;
+                }
+
+                if (attempt < 4) {
+                    await wait(120);
+                }
+            }
+
+            return null;
+        };
+
+        const handleUploadSuccess = async () => {
+            const videoData = await fetchUploadedVideo();
+            if (cancelled) return;
+
+            if (!videoData) {
+                await refreshFeed();
+                if (!cancelled) {
+                    activateTopVideo(uploadedVideoId);
+                    resetUpload();
+                }
+                return;
+            }
+
+            const profileData = Array.isArray(videoData.profiles) ? videoData.profiles[0] : videoData.profiles;
+
+            const uploadedVideo: InfiniteFeedVideo = {
+                id: videoData.id,
+                videoUrl: videoData.video_url,
+                thumbnailUrl: videoData.thumbnail_url,
+                description: videoData.description || '',
+                likesCount: videoData.likes_count || 0,
+                viewsCount: videoData.views_count || 0,
+                commentsCount: 0,
+                sharesCount: videoData.shares_count || 0,
+                shopsCount: videoData.shops_count || 0,
+                spriteUrl: videoData.sprite_url,
+                isLiked: false,
+                isSaved: false,
+                savesCount: videoData.saves_count || 0,
+                user: {
+                    id: profileData?.id || videoData.user_id,
+                    username: profileData?.username || 'unknown',
+                    fullName: profileData?.full_name || '',
+                    avatarUrl: profileData?.avatar_url || '',
+                    country: profileData?.country,
+                    age: profileData?.age,
+                    bio: profileData?.bio,
+                    website: profileData?.website,
+                    isVerified: profileData?.is_verified,
+                    shopEnabled: profileData?.shop_enabled,
+                    followersCount: profileData?.followers_count,
+                    followingCount: profileData?.following_count,
+                    postsCount: profileData?.posts_count,
+                    isFollowing: false,
+                    instagramUrl: profileData?.instagram_url,
+                    tiktokUrl: profileData?.tiktok_url,
+                    youtubeUrl: profileData?.youtube_url,
+                    xUrl: profileData?.x_url,
+                },
+                musicName: videoData.music_name || 'Original Audio',
+                musicAuthor: videoData.music_author || 'WizyClub',
+                width: videoData.width,
+                height: videoData.height,
+                isCommercial: videoData.is_commercial,
+                brandName: videoData.brand_name,
+                brandUrl: videoData.brand_url,
+                commercialType: videoData.commercial_type,
+                mediaUrls: videoData.media_urls,
+                postType: videoData.post_type,
+                createdAt: videoData.created_at,
+            };
+
+            prependVideo(uploadedVideo);
+            activateTopVideo(uploadedVideoId);
+            resetUpload();
+        };
+
+        void handleUploadSuccess();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [
+        activateTopVideo,
+        prependVideo,
+        refreshFeed,
+        resetUpload,
+        uploadedVideoId,
+        uploadStatus,
+    ]);
 
     const commitPendingActive = useCallback((reason: 'momentum-end' | 'drag-end-no-momentum' | 'viewable-immediate') => {
         if (!videos.length) return;
@@ -408,7 +599,9 @@ export function InfiniteFeedManager({
 
         const prefetchService = FeedPrefetchService.getInstance();
         const activeVideo = videos[activeInlineIndex];
-        const activeVideoUrl = activeVideo ? getVideoUrl(activeVideo) : null;
+        const activeVideoUrl = activeVideo && activeVideo.postType !== 'carousel'
+            ? getVideoUrl(activeVideo)
+            : null;
 
         if (activeVideoUrl) {
             prefetchService.bumpPriority(activeVideoUrl, 0);
@@ -513,6 +706,8 @@ export function InfiniteFeedManager({
     const cardActionHandlersRef = useRef({
         onToggleMute: toggleMute,
         onOpen: handleOpenVideo,
+        onOpenProfile: handleOpenProfile,
+        onMore: handleOpenMoreOptions,
         onLike: toggleLike,
         onSave: toggleSave,
         onFollow: toggleFollow,
@@ -526,6 +721,8 @@ export function InfiniteFeedManager({
         cardActionHandlersRef.current = {
             onToggleMute: toggleMute,
             onOpen: handleOpenVideo,
+            onOpenProfile: handleOpenProfile,
+            onMore: handleOpenMoreOptions,
             onLike: toggleLike,
             onSave: toggleSave,
             onFollow: toggleFollow,
@@ -537,6 +734,8 @@ export function InfiniteFeedManager({
     }, [
         toggleMute,
         handleOpenVideo,
+        handleOpenProfile,
+        handleOpenMoreOptions,
         toggleLike,
         toggleSave,
         toggleFollow,
@@ -591,6 +790,8 @@ export function InfiniteFeedManager({
                 currentUserId={userId}
                 onToggleMute={handlers.onToggleMute}
                 onOpen={handlers.onOpen}
+                onOpenProfile={handlers.onOpenProfile}
+                onMore={handlers.onMore}
                 onLike={handlers.onLike}
                 onSave={handlers.onSave}
                 onFollow={handlers.onFollow}
@@ -632,9 +833,6 @@ export function InfiniteFeedManager({
             : sortedVisible[sortedVisible.length - 1];
 
         if (currentActiveId) {
-            const activeStillViewable = sortedVisible.some((token) => token.item?.id === currentActiveId);
-            if (activeStillViewable) return;
-
             if (scrollDirectionRef.current === 'up') {
                 for (let i = sortedVisible.length - 1; i >= 0; i -= 1) {
                     const token = sortedVisible[i];
@@ -829,6 +1027,17 @@ export function InfiniteFeedManager({
                     { height: insets.top, backgroundColor: themeColors.background },
                 ]}
             />
+            <View style={styles.sheetsContainer} pointerEvents="box-none">
+                <InfiniteFeedMoreOptionsSheet
+                    ref={moreOptionsSheetRef}
+                    onDeletePress={isOwnMoreOptionsVideo ? handleMoreSheetDelete : undefined}
+                />
+                <InfiniteFeedDeleteConfirmationModal
+                    visible={isMoreDeleteConfirmationVisible}
+                    onCancel={handleCancelMoreDelete}
+                    onConfirm={handleConfirmMoreDelete}
+                />
+            </View>
         </View>
     );
 }

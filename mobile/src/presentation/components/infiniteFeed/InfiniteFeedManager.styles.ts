@@ -41,4 +41,8 @@ export const styles = StyleSheet.create({
         right: 0,
         zIndex: 20,
     },
+    sheetsContainer: {
+        ...StyleSheet.absoluteFillObject,
+        zIndex: 9999,
+    },
 });

@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, type GestureResponderEvent } from 'react-native';
 import { Image } from 'expo-image';
 import { Volume2, VolumeX, MoreVertical } from 'lucide-react-native';
 import VideoPlayer, { type OnLoadData, type OnLoadStartData, type OnProgressData, type OnVideoErrorData } from 'react-native-video';
@@ -14,6 +14,7 @@ import { FEED_FLAGS } from './hooks/useInfiniteFeedConfig';
 import { getBufferConfig } from '../../../core/utils/bufferConfig';
 import { shadowStyle } from '@/core/utils/shadow';
 import { PerformanceLogger } from '../../../core/services/PerformanceLogger';
+import { useBrightnessStore } from '../../store/useBrightnessStore';
 
 const DESCRIPTION_LIMIT = 70;
 const CARD_HORIZONTAL_PADDING = 16;
@@ -32,6 +33,9 @@ const END_GUARD_TOLERANCE_SEC = 1;
 const END_GUARD_MIN_DURATION_SEC = 3;
 const END_GUARD_MIN_PROGRESS_SEC = 1;
 const INACTIVE_RESUME_WINDOW_MS = 3000;
+const DEFAULT_VIDEO_ASPECT_RATIO = 9 / 16;
+const MIN_VALID_ASPECT_RATIO = 0.2;
+const MAX_VALID_ASPECT_RATIO = 5;
 
 const isNonEmptyString = (value: unknown): value is string =>
     typeof value === 'string' && value.trim().length > 0;
@@ -42,6 +46,21 @@ const getStableImageCacheKey = (value: string): string => {
     const trimmed = value.trim();
     if (!trimmed) return value;
     return trimmed.split('#')[0].split('?')[0];
+};
+
+const isValidAspectRatio = (value: number | null | undefined): value is number =>
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value >= MIN_VALID_ASPECT_RATIO &&
+    value <= MAX_VALID_ASPECT_RATIO;
+
+const getAspectRatioFromDimensions = (width: unknown, height: unknown): number | null => {
+    const numericWidth = Number(width);
+    const numericHeight = Number(height);
+    if (!Number.isFinite(numericWidth) || !Number.isFinite(numericHeight)) return null;
+    if (numericWidth <= 0 || numericHeight <= 0) return null;
+    const ratio = numericWidth / numericHeight;
+    return isValidAspectRatio(ratio) ? ratio : null;
 };
 
 const formatPlaybackClock = (seconds: number): string => {
@@ -92,6 +111,7 @@ interface InfiniteFeedCardProps {
     currentUserId?: string;
     onToggleMute: () => void;
     onOpen: (id: string, index: number) => void;
+    onOpenProfile: (userId: string) => void;
     onLike: (id: string) => void;
     onSave: (id: string) => void;
     onFollow: (id: string) => void;
@@ -101,6 +121,7 @@ interface InfiniteFeedCardProps {
     onCarouselTouchStart?: () => void;
     onCarouselTouchEnd?: () => void;
     isMeasurement?: boolean;
+    isCleanScreen?: boolean;
     resolvedVideoSource?: string | null;
     networkType?: NetInfoStateType | null;
 }
@@ -118,6 +139,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     currentUserId,
     onToggleMute,
     onOpen,
+    onOpenProfile,
     onLike,
     onSave,
     onFollow,
@@ -127,6 +149,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     onCarouselTouchStart,
     onCarouselTouchEnd,
     isMeasurement = false,
+    isCleanScreen = false,
     resolvedVideoSource = null,
     networkType = null,
 }: InfiniteFeedCardProps) {
@@ -138,6 +161,8 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     const [hasReachedLoopLimit, setHasReachedLoopLimit] = useState(false);
     const [videoProgressSec, setVideoProgressSec] = useState(0);
     const [videoDurationDisplaySec, setVideoDurationDisplaySec] = useState<number | null>(null);
+    const [thumbnailAspectRatio, setThumbnailAspectRatio] = useState<number | null>(null);
+    const [loadedVideoAspectRatio, setLoadedVideoAspectRatio] = useState<number | null>(null);
     const videoRef = useRef<any>(null);
     const firstFrameSeenRef = useRef(false);
     const videoDurationSecRef = useRef<number | null>(null);
@@ -151,14 +176,18 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     // ✅ FLAG CONTROLS
     const disableAllUI = FEED_FLAGS.INF_DISABLE_ALL_UI;
     const disableInlineVideo = FEED_FLAGS.INF_DISABLE_INLINE_VIDEO;
-    const disableUserHeader = FEED_FLAGS.INF_DISABLE_USER_HEADER || disableAllUI;
-    const disableActions = FEED_FLAGS.INF_DISABLE_ACTIONS || disableAllUI;
-    const disableDescription = FEED_FLAGS.INF_DISABLE_DESCRIPTION || disableAllUI;
+    const disableTimeBadge = FEED_FLAGS.INF_DISABLE_TIME_BADGE || disableAllUI || isCleanScreen;
+    const disableUserHeader = FEED_FLAGS.INF_DISABLE_USER_HEADER || disableAllUI || isCleanScreen;
+    const disableActions = FEED_FLAGS.INF_DISABLE_ACTIONS || disableAllUI || isCleanScreen;
+    const disableDescription = FEED_FLAGS.INF_DISABLE_DESCRIPTION || disableAllUI || isCleanScreen;
     const disableThumbnail = FEED_FLAGS.INF_DISABLE_THUMBNAIL;
     const disableCardStyle = FEED_FLAGS.INF_DISABLE_CARD_STYLE;
+    const brightness = useBrightnessStore((state) => state.brightness);
 
     useEffect(() => {
         setIsDescriptionExpanded(false);
+        setThumbnailAspectRatio(null);
+        setLoadedVideoAspectRatio(null);
     }, [item.id]);
 
     const clearReadyFallbackTimer = useCallback(() => {
@@ -235,17 +264,35 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     // Once video plays (firstFrameSeenRef=true), NEVER return to thumbnail
     const shouldGateVideoVisibility = !disableThumbnail && hasThumbnail && !firstFrameSeenRef.current;
     const shouldShowBaseThumbnail = hasThumbnail && (!isVideo || !disableThumbnail);
+    const mediaVideoAspectRatio = useMemo(() => {
+        const mediaItems = item.mediaUrls ?? [];
+        const firstVideoMedia = mediaItems.find((mediaItem) => mediaItem?.type === 'video');
+        if (!firstVideoMedia) return null;
+        return getAspectRatioFromDimensions(firstVideoMedia.width, firstVideoMedia.height);
+    }, [item.mediaUrls]);
+    const storedAspectRatio = useMemo(
+        () => getAspectRatioFromDimensions(item.width, item.height),
+        [item.width, item.height]
+    );
     const aspectRatio = useMemo(() => {
-        if (item.width && item.height && item.width > 0 && item.height > 0) {
-            return item.width / item.height;
-        }
-        return 1;
-    }, [item.width, item.height]);
+        if (isValidAspectRatio(thumbnailAspectRatio)) return thumbnailAspectRatio;
+        if (isValidAspectRatio(loadedVideoAspectRatio)) return loadedVideoAspectRatio;
+        if (isValidAspectRatio(mediaVideoAspectRatio)) return mediaVideoAspectRatio;
+        if (isValidAspectRatio(storedAspectRatio)) return storedAspectRatio;
+        return DEFAULT_VIDEO_ASPECT_RATIO;
+    }, [loadedVideoAspectRatio, mediaVideoAspectRatio, storedAspectRatio, thumbnailAspectRatio]);
 
     // ✅ [PERF] Stabilize callbacks to prevent InfiniteFeedActions re-renders
     const handleOpen = useCallback(() => {
         onOpen(item.id, index);
     }, [item.id, index, onOpen]);
+
+    const handleProfilePress = useCallback((event?: GestureResponderEvent) => {
+        event?.stopPropagation?.();
+        const userId = item.user?.id;
+        if (!userId) return;
+        onOpenProfile(userId);
+    }, [item.user?.id, onOpenProfile]);
 
     const handleLike = useCallback(() => {
         onLike(item.id);
@@ -262,6 +309,17 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     const handleToggleMute = useCallback(() => {
         onToggleMute();
     }, [onToggleMute]);
+
+    const handleMediaLoad = useCallback((event: { source?: { width?: unknown; height?: unknown } }) => {
+        const ratio = getAspectRatioFromDimensions(event?.source?.width, event?.source?.height);
+        if (!isValidAspectRatio(ratio)) return;
+        setThumbnailAspectRatio((prevRatio) => {
+            if (isValidAspectRatio(prevRatio) && Math.abs(prevRatio - ratio) < 0.001) {
+                return prevRatio;
+            }
+            return ratio;
+        });
+    }, []);
 
     const handleShare = useCallback(() => {
         onShare(item.id);
@@ -330,6 +388,28 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
 
     const handleVideoLoad = useCallback((data: OnLoadData) => {
         const duration = typeof data.duration === 'number' && data.duration > 0 ? data.duration : null;
+        const naturalSize = (data as OnLoadData & {
+            naturalSize?: { width?: unknown; height?: unknown; orientation?: unknown };
+        }).naturalSize;
+        const naturalRatio = getAspectRatioFromDimensions(naturalSize?.width, naturalSize?.height);
+        const orientationHint = typeof naturalSize?.orientation === 'string'
+            ? naturalSize.orientation.toLowerCase()
+            : '';
+        if (isValidAspectRatio(naturalRatio)) {
+            const normalizedNaturalRatio =
+                (orientationHint === 'portrait' && naturalRatio > 1) ||
+                    (orientationHint === 'landscape' && naturalRatio < 1)
+                    ? 1 / naturalRatio
+                    : naturalRatio;
+            if (isValidAspectRatio(normalizedNaturalRatio)) {
+                setLoadedVideoAspectRatio((prevRatio) => {
+                    if (isValidAspectRatio(prevRatio) && Math.abs(prevRatio - normalizedNaturalRatio) < 0.001) {
+                        return prevRatio;
+                    }
+                    return normalizedNaturalRatio;
+                });
+            }
+        }
         videoDurationSecRef.current = duration;
         setVideoDurationDisplaySec(duration);
         lastReportedProgressSecRef.current = 0;
@@ -668,7 +748,9 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
             : descriptionValue.substring(0, DESCRIPTION_LIMIT);
     const relativeTime = useMemo(() => formatRelativeTime(item.createdAt), [item.createdAt]);
     const showDescriptionBlock = !disableDescription && hasDescription;
-    const showTimeHint = relativeTime.length > 0;
+    const showTimeHint = !isCleanScreen && relativeTime.length > 0;
+    const brightnessOverlayOpacity = useMemo(() => (1 - brightness) * 0.75, [brightness]);
+    const shouldShowBrightnessOverlay = brightnessOverlayOpacity > 0;
 
     const showFollowButton = !item.user?.isFollowing && item.user?.id !== currentUserId;
 
@@ -685,35 +767,47 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                             onCarouselTouchStart={onCarouselTouchStart}
                             onCarouselTouchEnd={onCarouselTouchEnd}
                         />
+                        {shouldShowBrightnessOverlay && (
+                            <View
+                                pointerEvents="none"
+                                style={[styles.brightnessOverlay, { opacity: brightnessOverlayOpacity }]}
+                            />
+                        )}
                         {/* ✅ USER HEADER - Top-left overlay on media */}
                         {!disableUserHeader && (
                             <View style={styles.mediaHeaderOverlay}>
                                 <View style={styles.userInfoRow}>
-                                    {avatarUrl ? (
-                                        <Image
-                                            source={{ uri: avatarUrl, cacheKey: avatarCacheKey }}
-                                            style={styles.avatar}
-                                            contentFit="cover"
-                                            cachePolicy="memory-disk"
-                                            transition={0}
-                                        />
-                                    ) : (
-                                        <View style={[styles.avatar, { backgroundColor: colors.card }]} />
-                                    )}
+                                    <Pressable onPress={handleProfilePress} hitSlop={8}>
+                                        {avatarUrl ? (
+                                            <Image
+                                                source={{ uri: avatarUrl, cacheKey: avatarCacheKey }}
+                                                style={styles.avatar}
+                                                contentFit="cover"
+                                                cachePolicy="memory-disk"
+                                                transition={0}
+                                            />
+                                        ) : (
+                                            <View style={[styles.avatar, { backgroundColor: colors.card }]} />
+                                        )}
+                                    </Pressable>
                                     <View style={styles.headerText}>
                                         <View style={styles.nameRow}>
-                                            <Text style={themedStyles.fullName} numberOfLines={1}>
-                                                {item.user?.fullName || 'WizyClub User'}
-                                            </Text>
+                                            <Pressable onPress={handleProfilePress} hitSlop={8}>
+                                                <Text style={themedStyles.fullName} numberOfLines={1}>
+                                                    {item.user?.fullName || 'WizyClub User'}
+                                                </Text>
+                                            </Pressable>
                                             {item.user?.isVerified === true && (
                                                 <View style={styles.verifiedBadge}>
                                                     <VerifiedBadge size={16} />
                                                 </View>
                                             )}
                                         </View>
-                                        <Text style={themedStyles.handle} numberOfLines={1}>
-                                            @{item.user?.username || 'wizyclub'}
-                                        </Text>
+                                        <Pressable onPress={handleProfilePress} hitSlop={8}>
+                                            <Text style={themedStyles.handle} numberOfLines={1}>
+                                                @{item.user?.username || 'wizyclub'}
+                                            </Text>
+                                        </Pressable>
                                     </View>
                                 </View>
                             </View>
@@ -752,6 +846,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                     contentFit="cover"
                                     transition={0}
                                     cachePolicy="memory-disk"
+                                    onLoad={handleMediaLoad}
                                 />
                             ) : (
                                 <View style={themedStyles.mediaPlaceholder} />
@@ -790,6 +885,12 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                 />
                             ) : null}
                         </View>
+                        {shouldShowBrightnessOverlay && (
+                            <View
+                                pointerEvents="none"
+                                style={[styles.brightnessOverlay, { opacity: brightnessOverlayOpacity }]}
+                            />
+                        )}
 
                         {isVideo && isActive && hasReachedLoopLimit && (
                             <View style={themedStyles.replayOverlay}>
@@ -810,31 +911,37 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                         {!disableUserHeader && (
                             <View style={styles.mediaHeaderOverlay}>
                                 <View style={styles.userInfoRow}>
-                                    {avatarUrl ? (
-                                        <Image
-                                            source={{ uri: avatarUrl, cacheKey: avatarCacheKey }}
-                                            style={styles.avatar}
-                                            contentFit="cover"
-                                            cachePolicy="memory-disk"
-                                            transition={0}
-                                        />
-                                    ) : (
-                                        <View style={[styles.avatar, { backgroundColor: colors.card }]} />
-                                    )}
+                                    <Pressable onPress={handleProfilePress} hitSlop={8}>
+                                        {avatarUrl ? (
+                                            <Image
+                                                source={{ uri: avatarUrl, cacheKey: avatarCacheKey }}
+                                                style={styles.avatar}
+                                                contentFit="cover"
+                                                cachePolicy="memory-disk"
+                                                transition={0}
+                                            />
+                                        ) : (
+                                            <View style={[styles.avatar, { backgroundColor: colors.card }]} />
+                                        )}
+                                    </Pressable>
                                     <View style={styles.headerText}>
                                         <View style={styles.nameRow}>
-                                            <Text style={themedStyles.fullName} numberOfLines={1}>
-                                                {item.user?.fullName || 'WizyClub User'}
-                                            </Text>
+                                            <Pressable onPress={handleProfilePress} hitSlop={8}>
+                                                <Text style={themedStyles.fullName} numberOfLines={1}>
+                                                    {item.user?.fullName || 'WizyClub User'}
+                                                </Text>
+                                            </Pressable>
                                             {item.user?.isVerified === true && (
                                                 <View style={styles.verifiedBadge}>
                                                     <VerifiedBadge size={16} />
                                                 </View>
                                             )}
                                         </View>
-                                        <Text style={themedStyles.handle} numberOfLines={1}>
-                                            @{item.user?.username || 'wizyclub'}
-                                        </Text>
+                                        <Pressable onPress={handleProfilePress} hitSlop={8}>
+                                            <Text style={themedStyles.handle} numberOfLines={1}>
+                                                @{item.user?.username || 'wizyclub'}
+                                            </Text>
+                                        </Pressable>
                                     </View>
                                 </View>
                             </View>
@@ -858,7 +965,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                             </Pressable>
                         </View>
 
-                        {isVideo && (
+                        {isVideo && !isCleanScreen && (
                             <View style={styles.mediaRightBottomActions} pointerEvents="box-none">
                                 <Pressable
                                     style={styles.volumeButton}
@@ -876,7 +983,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                 </Pressable>
                             </View>
                         )}
-                        {isVideo && isActive && isVideoVisible && videoDurationDisplaySec != null && (
+                        {isVideo && isActive && isVideoVisible && videoDurationDisplaySec != null && !disableTimeBadge && (
                             <View style={styles.mediaLeftBottomTime} pointerEvents="none">
                                 <Text style={styles.videoTimeBadgeText}>{videoTimeText}</Text>
                             </View>
@@ -919,7 +1026,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
             {showDescriptionBlock && (
                 <View style={styles.cardContent}>
                     <Text style={themedStyles.description} onPress={handleToggleDescription}>
-                        <Text style={themedStyles.displayName}>{displayName}</Text>
+                        <Text style={themedStyles.displayName} onPress={handleProfilePress}>{displayName}</Text>
                         {hasDescription ? (
                             <>
                                 {' '}
@@ -1069,6 +1176,10 @@ const styles = StyleSheet.create({
     },
     videoOverlay: {
         ...StyleSheet.absoluteFillObject,
+    },
+    brightnessOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: '#000000',
     },
     videoHidden: {
         opacity: 0,

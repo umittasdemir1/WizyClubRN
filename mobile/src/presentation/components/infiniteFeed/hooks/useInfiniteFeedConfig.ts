@@ -10,6 +10,8 @@ export const INFINITE_FEED_FLAGS = {
     INF_DISABLE_ALL_UI: false,
     /** Disable video playback in feed (show only thumbnails) */
     INF_DISABLE_INLINE_VIDEO: false,
+    /** Disable in-video playback time badge (current/duration) */
+    INF_DISABLE_TIME_BADGE: true,
     /** Disable user header (avatar + name + handle) */
     INF_DISABLE_USER_HEADER: false,
     /** Disable action buttons row (like, save, share, shop) */

@@ -23,6 +23,35 @@ const USER_MAP: Record<string, { displayName: string; avatar: string }> = {
     '687c8079-e94c-42c2-9442-8a4a6b63dec6': { displayName: 'WizyClub', avatar: 'Wizy+Club' },
 };
 
+const LEGACY_R2_HOST = 'pub-426c6d2d3e914041a80d464249339e3c.r2.dev';
+const R2_PROXY_ORIGIN = 'https://wizy-r2-proxy.tasdemir-umit.workers.dev';
+
+function normalizeAssetUrl(url?: string | null): string {
+    if (!url || typeof url !== 'string') return '';
+    const trimmed = url.trim();
+    if (!trimmed) return '';
+
+    try {
+        const parsed = new URL(trimmed);
+        if (parsed.hostname === LEGACY_R2_HOST) {
+            return `${R2_PROXY_ORIGIN}${parsed.pathname}${parsed.search}${parsed.hash}`;
+        }
+        return trimmed;
+    } catch {
+        return trimmed;
+    }
+}
+
+function normalizeMediaUrls(mediaUrls?: any[]): any[] | undefined {
+    if (!Array.isArray(mediaUrls)) return mediaUrls;
+    return mediaUrls.map((media) => ({
+        ...media,
+        url: typeof media?.url === 'string' ? normalizeAssetUrl(media.url) : media?.url,
+        thumbnail: typeof media?.thumbnail === 'string' ? normalizeAssetUrl(media.thumbnail) : media?.thumbnail,
+        sprite: typeof media?.sprite === 'string' ? normalizeAssetUrl(media.sprite) : media?.sprite,
+    }));
+}
+
 // Generate user from user_id
 function getUserFromId(userId: string): User {
     const userInfo = USER_MAP[userId] || {
@@ -327,15 +356,15 @@ export class SupabaseVideoDataSource {
     private mapToVideo(dto: SupabaseVideo, interactions?: { isLiked: boolean; isSaved: boolean; isFollowing: boolean }): Video {
         return {
             id: dto.id,
-            videoUrl: dto.video_url,
-            thumbnailUrl: dto.thumbnail_url,
+            videoUrl: normalizeAssetUrl(dto.video_url),
+            thumbnailUrl: normalizeAssetUrl(dto.thumbnail_url),
             description: dto.description || '',
             likesCount: dto.likes_count || 0,
             viewsCount: dto.views_count || 0,
             commentsCount: 0,
             sharesCount: dto.shares_count || 0,
             shopsCount: dto.shops_count || 0,
-            spriteUrl: dto.sprite_url,
+            spriteUrl: normalizeAssetUrl(dto.sprite_url),
             createdAt: dto.created_at,
             isLiked: interactions?.isLiked || false,
             isSaved: interactions?.isSaved || false,
@@ -368,7 +397,7 @@ export class SupabaseVideoDataSource {
             brandName: dto.brand_name,
             brandUrl: dto.brand_url,
             commercialType: dto.commercial_type,
-            mediaUrls: dto.media_urls,
+            mediaUrls: normalizeMediaUrls(dto.media_urls),
             postType: dto.post_type,
         };
     }
@@ -376,8 +405,8 @@ export class SupabaseVideoDataSource {
     private mapToStory(dto: any, isViewed = false): Story {
         return {
             id: dto.id,
-            videoUrl: dto.video_url,
-            thumbnailUrl: dto.thumbnail_url,
+            videoUrl: normalizeAssetUrl(dto.video_url),
+            thumbnailUrl: normalizeAssetUrl(dto.thumbnail_url),
             createdAt: dto.created_at,
             expiresAt: dto.expires_at || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
             isViewed: isViewed,
@@ -403,7 +432,7 @@ export class SupabaseVideoDataSource {
             brandUrl: dto.brand_url,
             commercialType: dto.commercial_type,
             likesCount: dto.likes_count || 0,
-            mediaUrls: dto.media_urls,
+            mediaUrls: normalizeMediaUrls(dto.media_urls),
             postType: dto.post_type,
         };
     }

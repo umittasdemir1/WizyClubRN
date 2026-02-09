@@ -12,6 +12,7 @@ import NotificationIcon from '../../../../assets/icons/notification.svg';
 export const FEED_TABS = ['Takipte', 'Sana Özel'] as const;
 export type FeedTab = (typeof FEED_TABS)[number];
 const HEADER_ICON_SIZE = 28;
+const NOTIFICATION_ICON_SIZE = 24;
 
 interface InfiniteFeedHeaderProps {
     activeTab: FeedTab;
@@ -53,67 +54,86 @@ export function InfiniteFeedHeader({
     const headerTopPadding = insetTop + 12;
     const baseHeight = headerTopPadding + 10;
     const headerMinHeight = baseHeight * 3;
+    const leftTab = FEED_TABS[0];
+    const rightTab = FEED_TABS[1];
     return (
         <View
             style={[
                 styles.header,
                 {
-                    paddingTop: headerTopPadding - 10,
+                    paddingTop: 0,
                     minHeight: headerMinHeight,
                     borderBottomColor: colors.border,
                     backgroundColor: colors.background,
                 },
             ]}
         >
-            <View style={styles.leftColumn}>
-                <UploadButton onPress={onUploadPress} />
-                <UploadThumbnail />
-            </View>
-            <View style={[styles.centerOverlay, { top: headerTopPadding - 10 }]} pointerEvents="box-none">
-                <View style={styles.tabContainer}>
-                    {FEED_TABS.map((tab, index) => (
-                        <React.Fragment key={tab}>
+            <View style={[styles.topRow, { paddingTop: headerTopPadding - 10 }]}>
+                <View style={styles.leftTopSlot}>
+                    <UploadButton onPress={onUploadPress} />
+                </View>
+                <View style={styles.centerTopSlot} pointerEvents="box-none">
+                    <View style={styles.tabContainer}>
+                        <View style={styles.tabLeftHalf}>
                             <Pressable
-                                onPress={() => onTabChange(tab)}
+                                onPress={() => onTabChange(leftTab)}
                                 style={styles.tabButton}
                                 hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
                             >
                                 <Text
                                     style={[
                                         styles.tabText,
-                                        activeTab === tab && styles.tabTextActive,
-                                        { color: activeTab === tab ? colors.textPrimary : colors.textSecondary },
+                                        activeTab === leftTab && styles.tabTextActive,
+                                        { color: activeTab === leftTab ? colors.textPrimary : colors.textSecondary },
                                     ]}
                                 >
-                                    {tab}
+                                    {leftTab}
                                 </Text>
                             </Pressable>
-                            {index === 0 ? (
-                                <View
+                        </View>
+                        <View
+                            style={[
+                                styles.tabDivider,
+                                { backgroundColor: colors.textSecondary },
+                            ]}
+                        />
+                        <View style={styles.tabRightHalf}>
+                            <Pressable
+                                onPress={() => onTabChange(rightTab)}
+                                style={styles.tabButton}
+                                hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+                            >
+                                <Text
                                     style={[
-                                        styles.tabDivider,
-                                        { backgroundColor: colors.textSecondary },
+                                        styles.tabText,
+                                        activeTab === rightTab && styles.tabTextActive,
+                                        { color: activeTab === rightTab ? colors.textPrimary : colors.textSecondary },
                                     ]}
-                                />
-                            ) : null}
-                        </React.Fragment>
-                    ))}
+                                >
+                                    {rightTab}
+                                </Text>
+                            </Pressable>
+                        </View>
+                    </View>
+                </View>
+                <View style={styles.rightTopSlot} pointerEvents="box-none">
+                    <Pressable
+                        style={styles.iconButton}
+                        onPress={onNotificationPress}
+                        hitSlop={12}
+                        disabled={!onNotificationPress}
+                    >
+                        <NotificationIcon width={NOTIFICATION_ICON_SIZE} height={NOTIFICATION_ICON_SIZE} color={colors.textPrimary} />
+                        {unreadCount > 0 ? (
+                            <View style={[styles.notificationBadge, !showCount && styles.notificationBadgeDot]}>
+                                {showCount ? <Text style={styles.notificationBadgeText}>{displayCount}</Text> : null}
+                            </View>
+                        ) : null}
+                    </Pressable>
                 </View>
             </View>
-            <View style={[styles.rightOverlay, { top: headerTopPadding - 10 }]} pointerEvents="box-none">
-                <Pressable
-                    style={styles.iconButton}
-                    onPress={onNotificationPress}
-                    hitSlop={12}
-                    disabled={!onNotificationPress}
-                >
-                    <NotificationIcon width={HEADER_ICON_SIZE} height={HEADER_ICON_SIZE} color={colors.textPrimary} />
-                    {unreadCount > 0 ? (
-                        <View style={[styles.notificationBadge, !showCount && styles.notificationBadgeDot]}>
-                            {showCount ? <Text style={styles.notificationBadgeText}>{displayCount}</Text> : null}
-                        </View>
-                    ) : null}
-                </Pressable>
+            <View style={styles.leftBottomSlot}>
+                <UploadThumbnail />
             </View>
             <InfiniteStoryBar
                 storyUsers={storyUsers}
@@ -198,30 +218,46 @@ const styles = StyleSheet.create({
         alignItems: 'flex-start',
         position: 'relative',
     },
-    leftColumn: {
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: 8,
-        marginLeft: -10,
-    },
-    centerOverlay: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        alignItems: 'center',
-        top: 0,
-    },
-    rightOverlay: {
-        position: 'absolute',
-        right: 8,
-        alignItems: 'center',
-        top: 0,
-    },
-    tabContainer: {
+    topRow: {
+        width: '100%',
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
-        marginLeft: 18,
+    },
+    leftTopSlot: {
+        width: 52,
+        alignItems: 'flex-start',
+        justifyContent: 'center',
+    },
+    centerTopSlot: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    rightTopSlot: {
+        width: 52,
+        alignItems: 'flex-end',
+        justifyContent: 'center',
+    },
+    leftBottomSlot: {
+        width: 52,
+        alignItems: 'flex-start',
+        justifyContent: 'center',
+    },
+    tabContainer: {
+        width: '100%',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    tabLeftHalf: {
+        flex: 1,
+        alignItems: 'flex-end',
+        paddingRight: 8,
+    },
+    tabRightHalf: {
+        flex: 1,
+        alignItems: 'flex-start',
+        paddingLeft: 8,
     },
     tabButton: {
         flexDirection: 'row',
@@ -246,7 +282,7 @@ const styles = StyleSheet.create({
     },
     iconButton: {
         padding: 8,
-        marginTop: -3,
+        marginTop: 0,
     },
     notificationBadge: {
         position: 'absolute',
