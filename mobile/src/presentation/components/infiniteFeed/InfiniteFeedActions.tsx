@@ -332,8 +332,8 @@ const styles = StyleSheet.create({
         borderRadius: PARTICLE_SIZE / 2,
     },
     actionCount: {
-        fontSize: 15,
-        fontWeight: '600',
+        fontSize: 14,
+        fontWeight: '500',
     },
     countContainer: {
         minHeight: 18,
@@ -368,8 +368,8 @@ const styles = StyleSheet.create({
     },
     commercialShopText: {
         color: '#000000',
-        fontSize: 10,
-        fontWeight: '700',
+        fontSize: 12,
+        fontWeight: '500',
         flexShrink: 1,
     },
     commercialInfoButton: {

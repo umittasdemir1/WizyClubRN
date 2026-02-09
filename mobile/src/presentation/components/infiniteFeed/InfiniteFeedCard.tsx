@@ -14,7 +14,6 @@ import { FEED_FLAGS } from './hooks/useInfiniteFeedConfig';
 import { getBufferConfig } from '../../../core/utils/bufferConfig';
 import { shadowStyle } from '@/core/utils/shadow';
 import { PerformanceLogger } from '../../../core/services/PerformanceLogger';
-import { useBrightnessStore } from '../../store/useBrightnessStore';
 
 const DESCRIPTION_LIMIT = 70;
 const CARD_HORIZONTAL_PADDING = 16;
@@ -182,7 +181,6 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     const disableDescription = FEED_FLAGS.INF_DISABLE_DESCRIPTION || disableAllUI || isCleanScreen;
     const disableThumbnail = FEED_FLAGS.INF_DISABLE_THUMBNAIL;
     const disableCardStyle = FEED_FLAGS.INF_DISABLE_CARD_STYLE;
-    const brightness = useBrightnessStore((state) => state.brightness);
 
     useEffect(() => {
         setIsDescriptionExpanded(false);
@@ -749,8 +747,6 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     const relativeTime = useMemo(() => formatRelativeTime(item.createdAt), [item.createdAt]);
     const showDescriptionBlock = !disableDescription && hasDescription;
     const showTimeHint = !isCleanScreen && relativeTime.length > 0;
-    const brightnessOverlayOpacity = useMemo(() => (1 - brightness) * 0.75, [brightness]);
-    const shouldShowBrightnessOverlay = brightnessOverlayOpacity > 0;
 
     const showFollowButton = !item.user?.isFollowing && item.user?.id !== currentUserId;
 
@@ -767,12 +763,6 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                             onCarouselTouchStart={onCarouselTouchStart}
                             onCarouselTouchEnd={onCarouselTouchEnd}
                         />
-                        {shouldShowBrightnessOverlay && (
-                            <View
-                                pointerEvents="none"
-                                style={[styles.brightnessOverlay, { opacity: brightnessOverlayOpacity }]}
-                            />
-                        )}
                         {/* ✅ USER HEADER - Top-left overlay on media */}
                         {!disableUserHeader && (
                             <View style={styles.mediaHeaderOverlay}>
@@ -885,12 +875,6 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                 />
                             ) : null}
                         </View>
-                        {shouldShowBrightnessOverlay && (
-                            <View
-                                pointerEvents="none"
-                                style={[styles.brightnessOverlay, { opacity: brightnessOverlayOpacity }]}
-                            />
-                        )}
 
                         {isVideo && isActive && hasReachedLoopLimit && (
                             <View style={themedStyles.replayOverlay}>
@@ -1140,14 +1124,14 @@ const styles = StyleSheet.create({
         fontSize: 14,
         lineHeight: 20,
         marginTop: 10,
-        fontWeight: '300',
+        fontWeight: '400',
     },
     readMore: {
-        fontSize: 14,
-        fontWeight: '600',
+        fontSize: 15,
+        fontWeight: '500',
     },
     displayName: {
-        fontSize: 14,
+        fontSize: 15,
         fontWeight: '600',
     },
     timeHint: {
@@ -1176,10 +1160,6 @@ const styles = StyleSheet.create({
     },
     videoOverlay: {
         ...StyleSheet.absoluteFillObject,
-    },
-    brightnessOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: '#000000',
     },
     videoHidden: {
         opacity: 0,

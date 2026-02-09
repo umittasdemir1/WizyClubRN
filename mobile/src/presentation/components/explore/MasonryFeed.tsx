@@ -1,9 +1,8 @@
 import React from 'react';
 import { View, StyleSheet, Dimensions, Pressable } from 'react-native';
 import { Image } from 'expo-image';
-import { VideoTabIcon } from '../shared/VideoTabIcon';
-import { CarouselIcon } from '../shared/CarouselIcon';
-import { PhotoIcon } from '../shared/PhotoIcon';
+import CarouselMediaIcon from '../../../../assets/icons/carousel.svg';
+import VideoMediaIcon from '../../../../assets/icons/videos.svg';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const GAP = 2;
@@ -11,8 +10,8 @@ const PADDING = 0;
 const COLUMN_COUNT = 3;
 const COLUMN_WIDTH_PERCENT = `${100 / COLUMN_COUNT}%`;
 const ITEM_ASPECT_RATIO = 3 / 4;
-const ICON_SIZE = 28;
-const ICON_BG_SIZE = 34;
+const ICON_SIZE = 22;
+const ICON_BG_SIZE = 28;
 
 interface DiscoveryItem {
     id: string;
@@ -54,11 +53,9 @@ export function MasonryFeed({ data, onItemPress, onPreview, isDark = true }: Mas
                             <View style={styles.iconWrapper}>
                                 <View style={styles.iconBubble}>
                                     {item.mediaType === 'video' ? (
-                                        <VideoTabIcon size={ICON_SIZE} color="#FFFFFF" />
-                                    ) : item.mediaType === 'carousel' ? (
-                                        <CarouselIcon size={ICON_SIZE} color="#FFFFFF" />
+                                        <VideoMediaIcon width={ICON_SIZE} height={ICON_SIZE} />
                                     ) : (
-                                        <PhotoIcon size={ICON_SIZE} color="#FFFFFF" />
+                                        <CarouselMediaIcon width={ICON_SIZE} height={ICON_SIZE} />
                                     )}
                                 </View>
                             </View>

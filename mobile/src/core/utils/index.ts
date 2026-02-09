@@ -19,12 +19,36 @@ export const formatTime = (seconds: number): string => {
 // 🔢 NUMBER FORMATTING
 // ===================================
 export const formatCount = (count: number): string => {
-    if (count >= 1000000) {
-        return `${(count / 1000000).toFixed(1)}M`;
-    } else if (count >= 1000) {
-        return `${(count / 1000).toFixed(1)}K`;
+    if (!Number.isFinite(count)) return '0';
+
+    const normalizedCount = Math.max(0, Math.floor(count));
+    const hasFraction = (value: number): boolean => Math.abs(value - Math.trunc(value)) > Number.EPSILON;
+    const formatInteger = (value: number): string =>
+        new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 }).format(value);
+
+    if (normalizedCount <= 999) {
+        return formatInteger(normalizedCount);
     }
-    return count.toString();
+
+    if (normalizedCount <= 9999) {
+        return formatInteger(normalizedCount);
+    }
+
+    if (normalizedCount <= 999999) {
+        const inThousands = Math.floor((normalizedCount / 1000) * 10) / 10;
+        const formatted = new Intl.NumberFormat('tr-TR', {
+            minimumFractionDigits: hasFraction(inThousands) ? 1 : 0,
+            maximumFractionDigits: 1,
+        }).format(inThousands);
+        return `${formatted} bin`;
+    }
+
+    const inMillions = Math.floor((normalizedCount / 1000000) * 10) / 10;
+    const formatted = new Intl.NumberFormat('tr-TR', {
+        minimumFractionDigits: hasFraction(inMillions) ? 1 : 0,
+        maximumFractionDigits: 1,
+    }).format(inMillions);
+    return `${formatted} M`;
 };
 
 // ===================================

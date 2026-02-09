@@ -8,12 +8,13 @@ import { COLORS, LIGHT_COLORS } from '../../src/core/constants';
 import { useEffect } from 'react';
 import { MOCK_NOTIFICATIONS } from '../../src/data/mock/notifications';
 import { Image } from 'expo-image';
-import { Search, SquarePlay } from 'lucide-react-native';
+import { Search } from 'lucide-react-native';
 
 // Import SVGs
 import HomeIcon from '../../assets/icons/home.svg';
 import DealIcon from '../../assets/icons/deal.svg';
 import ProfileIcon from '../../assets/icons/profile.svg';
+import VideosTabSvgIcon from '../../assets/icons/videos.svg';
 
 const TAB_ICON_SIZE = 28;
 const TAB_ICON_ACTIVE_SIZE = 30;
@@ -142,11 +143,7 @@ export default function TabLayout() {
                             accessibilityElementsHidden
                             importantForAccessibility="no-hide-descendants"
                         >
-                            <SquarePlay
-                                size={TAB_ICON_SIZE}
-                                color={tabIconColor}
-                                strokeWidth={2.2}
-                            />
+                            <VideosTabSvgIcon width={TAB_ICON_SIZE} height={TAB_ICON_SIZE} color={tabIconColor} />
                         </View>
                     ),
                 }}

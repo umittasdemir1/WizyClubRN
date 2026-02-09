@@ -48,6 +48,7 @@ import { useActiveVideoStore } from '../../src/presentation/store/useActiveVideo
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
 import { LIGHT_COLORS, DARK_COLORS } from '../../src/core/constants';
 import { CONFIG } from '../../src/core/config';
+import VideosTabSvgIcon from '../../assets/icons/videos.svg';
 import { VerifiedBadge } from '../../src/presentation/components/shared/VerifiedBadge';
 import { ProfileSettingsOverlay } from '../../src/presentation/components/profile/ProfileSettingsOverlay';
 import { UserActivityRepositoryImpl } from '../../src/data/repositories/UserActivityRepositoryImpl';
@@ -68,9 +69,7 @@ const GridIcon = ({ color }: { color: string }) => (
 );
 
 const VideoIcon = ({ color }: { color: string }) => (
-  <Svg width="26" height="26" viewBox="0 -960 960 960" fill={color}>
-    <Path d="m480-420+240-160-240-160v320Zm28+220h224q-7+26-24+42t-44+20L228-85q-33+5-59.5-15.5T138-154L85-591q-4-33+16-59t53-30l46-6v80l-36+5+54+437+290-36Zm-148-80q-33+0-56.5-23.5T280-360v-440q0-33+23.5-56.5T360-880h440q33+0+56.5+23.5T880-800v440q0+33-23.5+56.5T800-280H360Zm0-80h440v-440H360v440Zm220-220ZM218-164Z" />
-  </Svg>
+  <VideosTabSvgIcon width={26} height={26} color={color} />
 );
 
 const TagsIcon = ({ color }: { color: string }) => (
@@ -700,9 +699,15 @@ export default function ProfileScreen() {
 
   const safeVideos = videos || [];
   const videoOnlyItems = safeVideos.filter(isFeedVideoItem);
-  const postsData = safeVideos.map((v: any) => ({ id: v.id, thumbnail: v.thumbnailUrl, views: v.likesCount?.toString() || '0', type: 'video' as const, videoUrl: v.videoUrl }));
-  const videosData = videoOnlyItems.map((v: any) => ({ id: v.id, thumbnail: v.thumbnailUrl, views: v.likesCount?.toString() || '0', videoUrl: v.videoUrl }));
-  const savedData = (savedVideosData || []).map((v: any) => ({ id: v.id, thumbnail: v.thumbnailUrl, views: v.likesCount?.toString() || '0', type: 'video' as const, videoUrl: v.videoUrl }));
+  const postsData = safeVideos.map((v: any) => ({
+    id: v.id,
+    thumbnail: v.thumbnailUrl,
+    views: v.viewsCount ?? 0,
+    type: isFeedVideoItem(v) ? ('video' as const) : (v.postType === 'carousel' ? ('carousel' as const) : ('photo' as const)),
+    videoUrl: v.videoUrl,
+  }));
+  const videosData = videoOnlyItems.map((v: any) => ({ id: v.id, thumbnail: v.thumbnailUrl, views: v.viewsCount ?? 0, videoUrl: v.videoUrl }));
+  const savedData = (savedVideosData || []).map((v: any) => ({ id: v.id, thumbnail: v.thumbnailUrl, views: v.viewsCount ?? 0, type: 'video' as const, videoUrl: v.videoUrl }));
   const tagsData: any[] = [];
   const tabBarHeight = useBottomTabBarHeight();
   const modalBackdropBottom = tabBarHeight;
@@ -765,7 +770,11 @@ export default function ProfileScreen() {
     return () => clearTimeout(timer);
   }, [isShopModalOpen]);
 
-  const showPreview = (item: any) => setPreviewItem(item);
+  const showPreview = (item: any) => {
+    if (item?.videoUrl) {
+      setPreviewItem(item);
+    }
+  };
   const hidePreview = () => setPreviewItem(null);
   const handleDraftsFolderPress = () => {
     router.push('/drafts' as any);
@@ -805,6 +814,8 @@ export default function ProfileScreen() {
           headerComponent={draftsHeader}
           gap={GRID_GAP}
           padding={GRID_PADDING}
+          showViewCount={false}
+          showMediaTypeIcon={true}
         />
       </View>
     ),
@@ -819,6 +830,7 @@ export default function ProfileScreen() {
           onPreviewEnd={hidePreview}
           gap={GRID_GAP}
           padding={GRID_PADDING}
+          useVideoSvgForViewCountIcon={true}
         />
       </View>
     ),
@@ -851,6 +863,7 @@ export default function ProfileScreen() {
           onPreviewEnd={hidePreview}
           gap={GRID_GAP}
           padding={GRID_PADDING}
+          useVideoSvgForViewCountIcon={true}
         />
         {savedData.length === 0 && (
           <View style={{ padding: 40, alignItems: 'center' }}>

@@ -2,6 +2,7 @@ import React, { memo, useState, useEffect, forwardRef, useImperativeHandle, useR
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { FEED_FLAGS } from './hooks/usePoolFeedConfig';
 import { textShadowStyle } from '@/core/utils/shadow';
+import { formatCount } from '../../../core/utils';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -317,13 +318,6 @@ export const PoolFeedActionButtons = memo(forwardRef<PoolFeedActionButtonsRef, A
         </View>
     );
 }));
-
-function formatCount(count: number): string {
-    if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
-    if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
-    let countNum = Number(count);
-    return isNaN(countNum) ? '0' : countNum.toString();
-}
 
 const styles = StyleSheet.create({
     container: {

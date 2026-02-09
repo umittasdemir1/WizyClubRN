@@ -34,6 +34,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import LikeIcon from '../../assets/icons/like.svg';
 import ShareIcon from '../../assets/icons/share.svg';
+import VideosTabSvgIcon from '../../assets/icons/videos.svg';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import { useProfile } from '../../src/presentation/hooks/useProfile';
 import { LIGHT_COLORS, DARK_COLORS } from '../../src/core/constants';
@@ -57,9 +58,7 @@ const GridIcon = ({ color }: { color: string }) => (
 );
 
 const VideoIcon = ({ color }: { color: string }) => (
-  <Svg width="26" height="26" viewBox="0 -960 960 960" fill={color}>
-    <Path d="m480-420+240-160-240-160v320Zm28+220h224q-7+26-24+42t-44+20L228-85q-33+5-59.5-15.5T138-154L85-591q-4-33+16-59t53-30l46-6v80l-36+5+54+437+290-36Zm-148-80q-33+0-56.5-23.5T280-360v-440q0-33+23.5-56.5T360-880h440q33+0+56.5+23.5T880-800v440q0+33-23.5+56.5T800-280H360Zm0-80h440v-440H360v440Zm220-220ZM218-164Z" />
-  </Svg>
+  <VideosTabSvgIcon width={26} height={26} color={color} />
 );
 
 const TagsIcon = ({ color }: { color: string }) => (
@@ -219,8 +218,14 @@ export default function UserProfileScreen() {
 
   const safeVideos = videos || [];
   const videoOnlyItems = safeVideos.filter(isFeedVideoItem);
-  const postsData = safeVideos.map(v => ({ id: v.id, thumbnail: v.thumbnailUrl, views: v.likesCount?.toString() || '0', type: 'video' as const, videoUrl: v.videoUrl }));
-  const videosData = videoOnlyItems.map(v => ({ id: v.id, thumbnail: v.thumbnailUrl, views: v.likesCount?.toString() || '0', videoUrl: v.videoUrl }));
+  const postsData = safeVideos.map(v => ({
+    id: v.id,
+    thumbnail: v.thumbnailUrl,
+    views: v.viewsCount ?? 0,
+    type: isFeedVideoItem(v) ? ('video' as const) : (v.postType === 'carousel' ? ('carousel' as const) : ('photo' as const)),
+    videoUrl: v.videoUrl,
+  }));
+  const videosData = videoOnlyItems.map(v => ({ id: v.id, thumbnail: v.thumbnailUrl, views: v.viewsCount ?? 0, videoUrl: v.videoUrl }));
   const tagsData: any[] = [];
 
   const pagerRef = useRef<React.ElementRef<typeof PagerView>>(null);
@@ -244,15 +249,29 @@ export default function UserProfileScreen() {
 
   const handleTabPress = (index: number) => { setActiveTab(index); pagerRef.current?.setPage(index); };
 
-  const showPreview = (item: any) => setPreviewItem(item);
+  const showPreview = (item: any) => {
+    if (item?.videoUrl) {
+      setPreviewItem(item);
+    }
+  };
   const hidePreview = () => setPreviewItem(null);
 
   const pagerPages = [
     <View key="0">
-      <MediaGrid items={postsData} isDark={isDark} aspectRatio={0.8} onPreview={showPreview} onPreviewEnd={hidePreview} gap={GRID_GAP} padding={GRID_PADDING} />
+      <MediaGrid
+        items={postsData}
+        isDark={isDark}
+        aspectRatio={0.8}
+        onPreview={showPreview}
+        onPreviewEnd={hidePreview}
+        gap={GRID_GAP}
+        padding={GRID_PADDING}
+        showViewCount={false}
+        showMediaTypeIcon={true}
+      />
     </View>,
     <View key="1">
-      <MediaGrid items={videosData.map((video) => ({ ...video, type: 'video' as const }))} isDark={isDark} aspectRatio={9 / 16} onPreview={showPreview} onPreviewEnd={hidePreview} gap={GRID_GAP} padding={GRID_PADDING} />
+      <MediaGrid items={videosData.map((video) => ({ ...video, type: 'video' as const }))} isDark={isDark} aspectRatio={9 / 16} onPreview={showPreview} onPreviewEnd={hidePreview} gap={GRID_GAP} padding={GRID_PADDING} useVideoSvgForViewCountIcon={true} />
     </View>,
     <View key="2">
       <MediaGrid items={tagsData} isDark={isDark} aspectRatio={0.8} onPreview={showPreview} onPreviewEnd={hidePreview} gap={GRID_GAP} padding={GRID_PADDING} />

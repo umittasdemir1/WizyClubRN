@@ -3,15 +3,19 @@ import { View, Text, StyleSheet, Pressable, Dimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { Eye, Play } from 'lucide-react-native';
 import { textShadowStyle } from '@/core/utils/shadow';
+import CarouselMediaIcon from '../../../../assets/icons/carousel.svg';
+import VideoMediaIcon from '../../../../assets/icons/videos.svg';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const COLUMN_COUNT = 3;
+const MEDIA_ICON_SIZE = 22;
+const MEDIA_ICON_BG_SIZE = 28;
 
 interface MediaGridItem {
   id: string;
   thumbnail: string;
   views?: string | number;
-  type?: 'image' | 'video';
+  type?: 'image' | 'photo' | 'carousel' | 'video';
 }
 
 interface MediaGridProps {
@@ -24,6 +28,9 @@ interface MediaGridProps {
   headerComponent?: React.ReactNode;
   gap?: number;
   padding?: number;
+  showViewCount?: boolean;
+  showMediaTypeIcon?: boolean;
+  useVideoSvgForViewCountIcon?: boolean;
 }
 
 export const MediaGrid: React.FC<MediaGridProps> = ({
@@ -36,16 +43,53 @@ export const MediaGrid: React.FC<MediaGridProps> = ({
   headerComponent,
   gap = 2,
   padding = 2,
+  showViewCount = true,
+  showMediaTypeIcon = false,
+  useVideoSvgForViewCountIcon = false,
 }) => {
   const bgColor = isDark ? '#1c1c1e' : '#f0f0f0';
   const itemWidth = Math.floor((SCREEN_WIDTH - (padding * 2) - (gap * 2)) / COLUMN_COUNT);
   const offset = headerComponent ? 1 : 0;
 
+  const toNumericViews = (views: string | number): number | null => {
+    if (typeof views === 'number') {
+      return Number.isFinite(views) && views >= 0 ? views : null;
+    }
+    const normalized = views.trim();
+    if (!/^\d+$/.test(normalized)) return null;
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const hasFraction = (value: number): boolean => Math.abs(value - Math.trunc(value)) > Number.EPSILON;
+
   const formatViews = (views: string | number): string => {
-    if (typeof views === 'string') return views;
-    if (views >= 1000000) return `${(views / 1000000).toFixed(1)}M`;
-    if (views >= 1000) return `${(views / 1000).toFixed(1)}k`;
-    return views.toString();
+    const numericViews = toNumericViews(views);
+    if (numericViews == null) return String(views);
+
+    if (numericViews <= 999) {
+      return new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 }).format(numericViews);
+    }
+
+    if (numericViews <= 9999) {
+      return new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 }).format(numericViews);
+    }
+
+    if (numericViews <= 999999) {
+      const inThousands = Math.floor((numericViews / 1000) * 10) / 10;
+      const formatted = new Intl.NumberFormat('tr-TR', {
+        minimumFractionDigits: hasFraction(inThousands) ? 1 : 0,
+        maximumFractionDigits: 1,
+      }).format(inThousands);
+      return `${formatted} bin`;
+    }
+
+    const inMillions = Math.floor((numericViews / 1000000) * 10) / 10;
+    const formatted = new Intl.NumberFormat('tr-TR', {
+      minimumFractionDigits: hasFraction(inMillions) ? 1 : 0,
+      maximumFractionDigits: 1,
+    }).format(inMillions);
+    return `${formatted} M`;
   };
 
   return (
@@ -71,10 +115,23 @@ export const MediaGrid: React.FC<MediaGridProps> = ({
             onPressOut={onPreviewEnd}
           >
             <Image source={{ uri: item.thumbnail }} style={styles.thumbnail} contentFit="cover" />
-            {item.views !== undefined && (
+            {showMediaTypeIcon && item.type ? (
+              <View style={styles.mediaTypeIconWrapper}>
+                <View style={styles.mediaTypeIconBubble}>
+                  {item.type === 'video' ? (
+                    <VideoMediaIcon width={MEDIA_ICON_SIZE} height={MEDIA_ICON_SIZE} />
+                  ) : (
+                    <CarouselMediaIcon width={MEDIA_ICON_SIZE} height={MEDIA_ICON_SIZE} />
+                  )}
+                </View>
+              </View>
+            ) : null}
+            {showViewCount && item.views !== undefined && (
               <View style={styles.stats}>
                 {item.type === 'image' ? (
                   <Eye size={12} color="#fff" />
+                ) : useVideoSvgForViewCountIcon ? (
+                  <VideoMediaIcon width={12} height={12} />
                 ) : (
                   <Play size={12} color="#fff" strokeWidth={2.5} />
                 )}
@@ -103,6 +160,23 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  mediaTypeIconWrapper: {
+    position: 'absolute',
+    right: 6,
+    top: 6,
+    width: MEDIA_ICON_BG_SIZE,
+    height: MEDIA_ICON_BG_SIZE,
+    borderRadius: 6,
+    zIndex: 2,
+  },
+  mediaTypeIconBubble: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
   stats: {
     position: 'absolute',
     bottom: 8,
@@ -114,8 +188,8 @@ const styles = StyleSheet.create({
   },
   viewsText: {
     color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
-    ...textShadowStyle('rgba(0, 0, 0, 0.5)', { width: 0, height: 2 }, 4),
+    fontSize: 12,
+    fontWeight: '400',
+    ...textShadowStyle('rgba(0, 0, 0, 0.35)', { width: 0, height: 1 }, 2),
   },
 });
