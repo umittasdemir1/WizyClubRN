@@ -1,4 +1,5 @@
 import { Video } from '../../domain/entities/Video';
+import { VideoFeedCursor, VideoFeedResult } from '../../domain/entities/VideoFeed';
 import { Story } from '../../domain/entities/Story';
 import { User } from '../../domain/entities/User';
 import { supabase } from '../../core/supabase';
@@ -112,55 +113,111 @@ interface SupabaseVideo {
 }
 
 export class SupabaseVideoDataSource {
-    async getVideos(page: number, limit: number, userId?: string, authorId?: string): Promise<Video[]> {
-        const offset = (page - 1) * limit;
-        logData(LogCode.DB_QUERY_START, 'Fetching videos', { page, offset, limit, userId, authorId });
+    async getVideos(limit: number, userId?: string, authorId?: string, cursor?: VideoFeedCursor | null): Promise<VideoFeedResult> {
+        const normalizedLimit = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 10;
+        logData(LogCode.DB_QUERY_START, 'Fetching videos with cursor pagination', {
+            limit: normalizedLimit,
+            userId,
+            authorId,
+            cursor,
+        });
 
         let query = supabase
             .from('videos')
             .select('*, profiles(*)')
             .is('deleted_at', null)
             .order('created_at', { ascending: false })
-            .range(offset, offset + limit - 1);
+            .order('id', { ascending: false })
+            .limit(normalizedLimit);
 
         if (authorId) {
             query = query.eq('user_id', authorId);
         }
 
-        const { data, error } = await query;
+        if (cursor?.createdAt && cursor?.id) {
+            const createdAtFilter = `"${cursor.createdAt.replace(/"/g, '\\"')}"`;
+            const idFilter = `"${cursor.id.replace(/"/g, '\\"')}"`;
+            query = query.or(`created_at.lt.${createdAtFilter},and(created_at.eq.${createdAtFilter},id.lt.${idFilter})`);
+        }
+
+        let { data, error } = await query;
+
+        if (error && cursor?.createdAt) {
+            logError(LogCode.DB_QUERY_ERROR, 'Cursor OR query failed, retrying with created_at fallback', error);
+
+            let fallbackQuery = supabase
+                .from('videos')
+                .select('*, profiles(*)')
+                .is('deleted_at', null)
+                .lt('created_at', cursor.createdAt)
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false })
+                .limit(normalizedLimit);
+
+            if (authorId) {
+                fallbackQuery = fallbackQuery.eq('user_id', authorId);
+            }
+
+            const fallbackResult = await fallbackQuery;
+            data = fallbackResult.data;
+            error = fallbackResult.error;
+        }
 
         if (error) {
             logError(LogCode.DB_QUERY_ERROR, 'Supabase videos fetch error', error);
-            return [];
+            return {
+                videos: [],
+                nextCursor: null,
+            };
         }
 
-        const videos = data as SupabaseVideo[];
-        if (!videos.length) return [];
+        const videos = (data as SupabaseVideo[] | null) || [];
+        if (!videos.length) {
+            return {
+                videos: [],
+                nextCursor: null,
+            };
+        }
+
+        let mappedVideos: Video[];
 
         // If no user, just map without personalization
         if (!userId) {
-            return videos.map(v => this.mapToVideo(v));
+            mappedVideos = videos.map(v => this.mapToVideo(v));
+        } else {
+            // Fetch interactions for these videos
+            const videoIds = videos.map(v => v.id);
+            const authorIds = [...new Set(videos.map(v => v.user_id))];
+
+            const [likes, saves, follows] = await Promise.all([
+                supabase.from('likes').select('video_id').eq('user_id', userId).in('video_id', videoIds),
+                supabase.from('saves').select('video_id').eq('user_id', userId).in('video_id', videoIds),
+                supabase.from('follows').select('following_id').eq('follower_id', userId).in('following_id', authorIds)
+            ]);
+
+            const likedVideoIds = new Set(likes.data?.map(l => l.video_id) || []);
+            const savedVideoIds = new Set(saves.data?.map(s => s.video_id) || []);
+            const followedUserIds = new Set(follows.data?.map(f => f.following_id) || []);
+
+            mappedVideos = videos.map(v => this.mapToVideo(v, {
+                isLiked: likedVideoIds.has(v.id),
+                isSaved: savedVideoIds.has(v.id),
+                isFollowing: followedUserIds.has(v.user_id)
+            }));
         }
 
-        // Fetch interactions for these videos
-        const videoIds = videos.map(v => v.id);
-        const authorIds = [...new Set(videos.map(v => v.user_id))];
+        const lastItem = videos[videos.length - 1];
+        const nextCursor = videos.length >= normalizedLimit
+            ? {
+                createdAt: lastItem.created_at,
+                id: lastItem.id,
+            }
+            : null;
 
-        const [likes, saves, follows] = await Promise.all([
-            supabase.from('likes').select('video_id').eq('user_id', userId).in('video_id', videoIds),
-            supabase.from('saves').select('video_id').eq('user_id', userId).in('video_id', videoIds),
-            supabase.from('follows').select('following_id').eq('follower_id', userId).in('following_id', authorIds)
-        ]);
-
-        const likedVideoIds = new Set(likes.data?.map(l => l.video_id) || []);
-        const savedVideoIds = new Set(saves.data?.map(s => s.video_id) || []);
-        const followedUserIds = new Set(follows.data?.map(f => f.following_id) || []);
-
-        return videos.map(v => this.mapToVideo(v, {
-            isLiked: likedVideoIds.has(v.id),
-            isSaved: savedVideoIds.has(v.id),
-            isFollowing: followedUserIds.has(v.user_id)
-        }));
+        return {
+            videos: mappedVideos,
+            nextCursor,
+        };
     }
 
     async searchVideos(query: string, limit: number = 20, userId?: string): Promise<Video[]> {

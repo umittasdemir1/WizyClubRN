@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   Animated as RNAnimated,
   Easing,
+  NativeScrollEvent,
 } from 'react-native';
 import PagerView from '../../src/presentation/components/shared/PagerView';
 import type { PagerViewOnPageSelectedEvent } from 'react-native-pager-view';
@@ -461,7 +462,7 @@ export default function ProfileScreen() {
     }
   }, [isFocused, loadAdminConfig, connectAdminSocket]);
 
-  const { videos, refreshFeed } = useVideoFeed(currentUserId);
+  const { videos, isLoadingMore, hasMore, refreshFeed, loadMore } = useVideoFeed(currentUserId, 50);
   const { videos: savedVideosData, refresh: refreshSavedVideos } = useSavedVideos(currentUserId);
 
   const { user: profileUser, isLoading, reload, updateProfile, uploadAvatar } = useProfile(currentUserId);
@@ -666,6 +667,18 @@ export default function ProfileScreen() {
   // PagerView States
   const pagerRef = useRef<React.ElementRef<typeof PagerView>>(null);
   const [activeTab, setActiveTab] = useState(0);
+
+  const maybeLoadMore = useCallback((nativeEvent: NativeScrollEvent) => {
+    if (isLoading || isLoadingMore || !hasMore) return;
+    if (activeTab !== 0 && activeTab !== 1) return;
+
+    const { contentOffset, contentSize, layoutMeasurement } = nativeEvent;
+    const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
+
+    if (distanceFromBottom <= 400) {
+      void loadMore();
+    }
+  }, [activeTab, hasMore, isLoading, isLoadingMore, loadMore]);
 
   // Current User as Domain Entity
   // Always provide a fallback to prevent null errors
@@ -1110,6 +1123,8 @@ export default function ProfileScreen() {
       <SwipeWrapper enableLeft={false} onSwipeRight={() => router.push('/notifications')} edgeOnly={true}>
         <Animated.ScrollView
           showsVerticalScrollIndicator={false}
+          scrollEventThrottle={16}
+          onScroll={(event) => maybeLoadMore(event.nativeEvent)}
           contentContainerStyle={{ paddingTop: insets.top + 60, flexGrow: isLoading ? 1 : 0 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={isDark ? "#fff" : "#000"} progressViewOffset={insets.top + 60} />}
         >
@@ -1228,6 +1243,11 @@ export default function ProfileScreen() {
           >
             {pagerPages}
           </PagerView>
+          {isLoadingMore && (
+            <View style={{ paddingVertical: 14 }}>
+              <ActivityIndicator size="small" color={isDark ? '#fff' : '#000'} />
+            </View>
+          )}
           <View style={{ height: 100 }} />
         </Animated.ScrollView>
       </SwipeWrapper>

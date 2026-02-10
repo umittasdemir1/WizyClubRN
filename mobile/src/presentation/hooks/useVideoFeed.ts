@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { Alert, Share } from 'react-native';
 import { Video } from '../../domain/entities/Video';
+import { VideoFeedCursor } from '../../domain/entities/VideoFeed';
 import { GetVideoFeedUseCase } from '../../domain/usecases/GetVideoFeedUseCase';
 import { ToggleLikeUseCase } from '../../domain/usecases/ToggleLikeUseCase';
 import { ToggleSaveUseCase } from '../../domain/usecases/ToggleSaveUseCase';
@@ -44,7 +45,7 @@ const isFeedVideoItem = (video: Video): boolean => {
     return Boolean(getVideoUrl(video));
 };
 
-export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
+export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseVideoFeedReturn {
     // Repository & UseCases (Memoized to prevent recreation)
     const videoRepository = useRef(new VideoRepositoryImpl()).current;
     const interactionRepository = useRef(new InteractionRepositoryImpl()).current;
@@ -60,7 +61,7 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [page, setPage] = useState(1);
+    const [cursor, setCursor] = useState<VideoFeedCursor | null>(null);
     const [hasMore, setHasMore] = useState(true);
 
     const isMounted = useRef(true);
@@ -151,6 +152,8 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
         };
     }, []);
 
+    const safePageSize = Number.isFinite(pageSize) && pageSize > 0 ? Math.floor(pageSize) : 10;
+
     const fetchFeed = useCallback(async () => {
         try {
             setIsLoading(true);
@@ -158,12 +161,13 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
 
             // Get fresh userId from store to avoid stale closure
             const freshUserId = useAuthStore.getState().user?.id || 'anon';
-            const fetchedVideos = await getVideoFeedUseCase.execute(1, 10, freshUserId, filterUserId);
+            const feedResult = await getVideoFeedUseCase.execute(safePageSize, freshUserId, filterUserId, null);
+            const fetchedVideos = feedResult.videos;
 
             if (isMounted.current) {
                 setVideos(fetchedVideos);
-                setPage(2);
-                setHasMore(fetchedVideos.length >= 10);
+                setCursor(feedResult.nextCursor);
+                setHasMore(Boolean(feedResult.nextCursor));
 
                 // Sync initial data to global store
                 fetchedVideos.forEach(v => {
@@ -185,7 +189,7 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
                 setIsLoading(false);
             }
         }
-    }, [getVideoFeedUseCase, filterUserId, syncSocialData]); // Removed currentUserId from dependencies
+    }, [getVideoFeedUseCase, filterUserId, safePageSize, syncSocialData]); // Removed currentUserId from dependencies
 
     const refreshFeed = useCallback(async () => {
         if (isRefreshing) return;
@@ -198,13 +202,13 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
 
             // Get fresh userId from store
             const freshUserId = useAuthStore.getState().user?.id || 'anon';
-            // Reset to page 1
-            const fetchedVideos = await getVideoFeedUseCase.execute(1, 10, freshUserId, filterUserId);
+            const feedResult = await getVideoFeedUseCase.execute(safePageSize, freshUserId, filterUserId, null);
+            const fetchedVideos = feedResult.videos;
 
             if (isMounted.current) {
                 setVideos(fetchedVideos);
-                setPage(2);
-                setHasMore(fetchedVideos.length >= 10);
+                setCursor(feedResult.nextCursor);
+                setHasMore(Boolean(feedResult.nextCursor));
 
                 // Sync to global store
                 fetchedVideos.forEach(v => {
@@ -226,23 +230,32 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
                 setIsRefreshing(false);
             }
         }
-    }, [isRefreshing, getVideoFeedUseCase, filterUserId, syncSocialData]); // Removed currentUserId
+    }, [isRefreshing, getVideoFeedUseCase, filterUserId, safePageSize, syncSocialData]); // Removed currentUserId
 
     const loadMore = useCallback(async () => {
-        if (isLoadingMore || !hasMore || isLoading) return;
+        if (isLoadingMore || !hasMore || isLoading || !cursor) return;
 
         try {
             setIsLoadingMore(true);
 
             // Get fresh userId from store
             const freshUserId = useAuthStore.getState().user?.id || 'anon';
-            const fetchedVideos = await getVideoFeedUseCase.execute(page, 10, freshUserId, filterUserId);
+            const feedResult = await getVideoFeedUseCase.execute(safePageSize, freshUserId, filterUserId, cursor);
+            const fetchedVideos = feedResult.videos;
+            const isCursorStuck =
+                feedResult.nextCursor?.createdAt === cursor.createdAt &&
+                feedResult.nextCursor?.id === cursor.id;
 
             if (isMounted.current) {
                 if (fetchedVideos.length > 0) {
-                    setVideos(prev => [...prev, ...fetchedVideos]);
-                    setPage(prev => prev + 1);
-                    setHasMore(fetchedVideos.length >= 10);
+                    setVideos(prev => {
+                        const existingIds = new Set(prev.map((video) => video.id));
+                        const uniqueVideos = fetchedVideos.filter((video) => !existingIds.has(video.id));
+                        if (!uniqueVideos.length) return prev;
+                        return [...prev, ...uniqueVideos];
+                    });
+                    setCursor(feedResult.nextCursor);
+                    setHasMore(Boolean(feedResult.nextCursor) && !isCursorStuck);
 
                     // Sync extra data to global store
                     fetchedVideos.forEach(v => {
@@ -254,7 +267,8 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
                         );
                     });
                 } else {
-                    setHasMore(false);
+                    setCursor(feedResult.nextCursor);
+                    setHasMore(Boolean(feedResult.nextCursor) && !isCursorStuck);
                 }
             }
         } catch (err) {
@@ -264,7 +278,7 @@ export function useVideoFeed(filterUserId?: string): UseVideoFeedReturn {
                 setIsLoadingMore(false);
             }
         }
-    }, [isLoadingMore, hasMore, isLoading, page, getVideoFeedUseCase, filterUserId, syncSocialData]); // Removed currentUserId
+    }, [cursor, isLoadingMore, hasMore, isLoading, getVideoFeedUseCase, filterUserId, safePageSize, syncSocialData]); // Removed currentUserId
 
     // Optimistic Update with Rollback
     const toggleLike = useCallback(async (videoId: string) => {

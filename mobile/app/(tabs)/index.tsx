@@ -3,19 +3,16 @@ import { InfiniteFeedManager } from '../../src/presentation/components/infiniteF
 import { FEED_MODE_FLAGS } from '../../src/presentation/config/feedModeConfig';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import { useActiveVideoStore } from '../../src/presentation/store/useActiveVideoStore';
-import { useEffect, useRef, useState } from 'react';
-import { useIsFocused, useNavigation } from '@react-navigation/native';
+import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect, useIsFocused, useNavigation } from '@react-navigation/native';
 import { logVideo, LogCode } from '@/core/services/Logger';
 
 export default function HomeFeedScreen() {
     const navigation = useNavigation<any>();
     const isFocused = useIsFocused();
     const [homeReselectTrigger, setHomeReselectTrigger] = useState(0);
-    const isPaused = useActiveVideoStore((state) => state.isPaused);
     const setPaused = useActiveVideoStore((state) => state.setPaused);
     const setScreenFocused = useActiveVideoStore((state) => state.setScreenFocused);
-    const wasPausedBeforeBlur = useRef(false);
-    const prevFocused = useRef(isFocused);
     const {
         videos: regularVideos,
         isLoading: isLoadingRegular,
@@ -49,26 +46,17 @@ export default function HomeFeedScreen() {
     }, [videos.length]);
 
     // Focus/blur handling
-    useEffect(() => {
-        if (prevFocused.current === isFocused) return;
-
-        if (!isFocused) {
-            const pausedNow = useActiveVideoStore.getState().isPaused;
-            wasPausedBeforeBlur.current = pausedNow;
-            if (!pausedNow) {
-                setPaused(true);
-            }
-            setScreenFocused(false);
-            prevFocused.current = isFocused;
-            return;
-        }
-
-        setScreenFocused(true);
-        if (!wasPausedBeforeBlur.current) {
+    useFocusEffect(
+        useCallback(() => {
+            setScreenFocused(true);
             setPaused(false);
-        }
-        prevFocused.current = isFocused;
-    }, [isFocused, setPaused, setScreenFocused]);
+
+            return () => {
+                setPaused(true);
+                setScreenFocused(false);
+            };
+        }, [setPaused, setScreenFocused])
+    );
 
     useEffect(() => {
         const unsubscribe = navigation.addListener('tabPress', () => {

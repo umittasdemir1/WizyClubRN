@@ -13,6 +13,7 @@ import {
 import { FlashList } from '@shopify/flash-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import { SystemBars } from 'react-native-edge-to-edge';
 import { Image as ExpoImage } from 'expo-image';
 import { useNetInfo, NetInfoStateType } from '@react-native-community/netinfo';
@@ -108,6 +109,7 @@ export function InfiniteFeedManager({
 }: InfiniteFeedManagerProps) {
     const insets = useSafeAreaInsets();
     const router = useRouter();
+    const isRouteFocused = useIsFocused();
     const netInfo = useNetInfo();
     const isDark = useThemeStore((state) => state.isDark);
     const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
@@ -119,6 +121,8 @@ export function InfiniteFeedManager({
     const uploadStatus = useUploadStore((state) => state.status);
     const uploadedVideoId = useUploadStore((state) => state.uploadedVideoId);
     const resetUpload = useUploadStore((state) => state.reset);
+    const globalIsPaused = useInfiniteFeedActiveVideoStore((state) => state.isPaused);
+    const isScreenFocused = useInfiniteFeedActiveVideoStore((state) => state.isScreenFocused);
 
     const [activeTab, setActiveTab] = useState<FeedTab>('Sana Özel');
     const [selectedMoreVideoId, setSelectedMoreVideoId] = useState<string | null>(null);
@@ -163,7 +167,6 @@ export function InfiniteFeedManager({
     const themeColorsRef = useRef(themeColors);
     const currentUserIdRef = useRef(currentUserId);
     const isMutedRef = useRef(isMuted);
-    const isInAppBrowserVisibleRef = useRef(isInAppBrowserVisible);
     const netInfoTypeRef = useRef(netInfo.type);
 
     const setCustomFeed = useInfiniteFeedActiveVideoStore((state) => state.setCustomFeed);
@@ -750,7 +753,6 @@ export function InfiniteFeedManager({
         themeColorsRef.current = themeColors;
         currentUserIdRef.current = currentUserId;
         isMutedRef.current = isMuted;
-        isInAppBrowserVisibleRef.current = isInAppBrowserVisible;
         netInfoTypeRef.current = netInfo.type;
     });
 
@@ -763,7 +765,8 @@ export function InfiniteFeedManager({
         const colors = themeColorsRef.current;
         const userId = currentUserIdRef.current;
         const muted = isMutedRef.current;
-        const browserVisible = isInAppBrowserVisibleRef.current;
+        const browserVisible = isInAppBrowserVisible;
+        const pausedByLifecycle = globalIsPaused || !isScreenFocused || !isRouteFocused;
         const networkType = (netInfoTypeRef.current ?? null) as NetInfoStateType | null;
 
         const prewarmRange = FEED_CONFIG.DECODE_PREWARM_AHEAD_COUNT;
@@ -786,7 +789,7 @@ export function InfiniteFeedManager({
                 isPendingActive={item.id === effectivePendingInlineId || isPendingWindow}
                 allowDecodePrewarm={allowDecodePrewarm}
                 isMuted={muted}
-                isPaused={browserVisible}
+                isPaused={browserVisible || pausedByLifecycle}
                 currentUserId={userId}
                 onToggleMute={handlers.onToggleMute}
                 onOpen={handlers.onOpen}
@@ -804,7 +807,7 @@ export function InfiniteFeedManager({
                 networkType={networkType}
             />
         );
-    }, [activeInlineId, effectivePendingInlineId, effectivePendingInlineIndex]);
+    }, [activeInlineId, effectivePendingInlineId, effectivePendingInlineIndex, globalIsPaused, isInAppBrowserVisible, isRouteFocused, isScreenFocused]);
 
     // Active item changes when card visibility crosses threshold
     const viewabilityConfig = useRef({
@@ -931,6 +934,7 @@ export function InfiniteFeedManager({
     // Only track the active video's resolved source so cache-resolve for
     // non-visible videos doesn't trigger a full list re-render.
     const activeResolvedSource = activeInlineId ? resolvedVideoSources[activeInlineId] : null;
+    const playbackPauseGate = isInAppBrowserVisible || globalIsPaused || !isScreenFocused || !isRouteFocused;
 
     const flashListExtraData = useMemo(() => ({
         activeInlineId,
@@ -939,7 +943,8 @@ export function InfiniteFeedManager({
         isMuted,
         immediateActiveCommit,
         activeResolvedSource,
-    }), [activeInlineId, activeResolvedSource, effectivePendingInlineId, effectivePendingInlineIndex, immediateActiveCommit, isMuted]);
+        playbackPauseGate,
+    }), [activeInlineId, activeResolvedSource, effectivePendingInlineId, effectivePendingInlineIndex, immediateActiveCommit, isMuted, playbackPauseGate]);
 
     const listEmpty = (
         <View style={styles.emptyState}>

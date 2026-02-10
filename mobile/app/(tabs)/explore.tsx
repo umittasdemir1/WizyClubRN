@@ -1,4 +1,4 @@
-import { View, StyleSheet, RefreshControl, Text, Pressable, Dimensions, Modal, ActivityIndicator, Animated } from 'react-native';
+import { View, StyleSheet, RefreshControl, Text, Pressable, Dimensions, Modal, ActivityIndicator, Animated, NativeScrollEvent } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { useCallback, useState, useEffect, useRef } from 'react';
@@ -197,7 +197,7 @@ export default function ExploreScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
     const isFocused = useIsFocused();
-    const { videos, isLoading, refreshFeed, toggleLike, toggleSave, toggleShare, toggleShop } = useVideoFeed();
+    const { videos, isLoading, isLoadingMore, hasMore, refreshFeed, loadMore, toggleLike, toggleSave, toggleShare, toggleShop } = useVideoFeed(undefined, 50);
     const isDark = useThemeStore((state) => state.isDark);
     const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
     const bgBody = themeColors.background;
@@ -223,6 +223,17 @@ export default function ExploreScreen() {
         await refreshFeed();
         setRefreshing(false);
     }, [refreshFeed]);
+
+    const maybeLoadMore = useCallback((nativeEvent: NativeScrollEvent) => {
+        if (isLoading || isLoadingMore || !hasMore) return;
+
+        const { contentOffset, contentSize, layoutMeasurement } = nativeEvent;
+        const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
+
+        if (distanceFromBottom <= 400) {
+            void loadMore();
+        }
+    }, [hasMore, isLoading, isLoadingMore, loadMore]);
 
     const headerOpacity = scrollY.interpolate({
         inputRange: [0, 24],
@@ -366,7 +377,12 @@ export default function ExploreScreen() {
                         scrollEventThrottle={16}
                         onScroll={Animated.event(
                             [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-                            { useNativeDriver: true }
+                            {
+                                useNativeDriver: true,
+                                listener: (event: { nativeEvent: NativeScrollEvent }) => {
+                                    maybeLoadMore(event.nativeEvent);
+                                },
+                            }
                         )}
                         refreshControl={
                             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={isDark ? "#fff" : "#000"} />
@@ -423,6 +439,11 @@ export default function ExploreScreen() {
                             onPreview={showPreview}
                             isDark={isDark}
                         />
+                        {isLoadingMore && (
+                            <View style={{ paddingVertical: 14 }}>
+                                <ActivityIndicator size="small" color={isDark ? '#fff' : '#000'} />
+                            </View>
+                        )}
                     </Animated.ScrollView>
                     <View
                         pointerEvents="none"

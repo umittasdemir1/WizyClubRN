@@ -1,10 +1,10 @@
-import { Video } from '../entities/Video';
+import { VideoFeedCursor, VideoFeedResult } from '../entities/VideoFeed';
 import { IVideoRepository } from '../repositories/IVideoRepository';
 
 export class GetVideoFeedUseCase {
     constructor(private videoRepository: IVideoRepository) { }
 
-    async execute(page: number = 1, limit: number = 10, userId?: string, authorId?: string): Promise<Video[]> {
-        return this.videoRepository.getFeed(page, limit, userId, authorId);
+    async execute(limit: number = 10, userId?: string, authorId?: string, cursor?: VideoFeedCursor | null): Promise<VideoFeedResult> {
+        return this.videoRepository.getFeed(limit, userId, authorId, cursor);
     }
 }

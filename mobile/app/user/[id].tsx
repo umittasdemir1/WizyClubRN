@@ -9,6 +9,7 @@ import {
   RefreshControl,
   Dimensions,
   ActivityIndicator,
+  NativeScrollEvent,
 } from 'react-native';
 import PagerView from '../../src/presentation/components/shared/PagerView';
 import type { PagerViewOnPageSelectedEvent } from 'react-native-pager-view';
@@ -170,7 +171,7 @@ export default function UserProfileScreen() {
   const currentUserId = authUser?.id;
 
   const userId = (typeof id === 'string' ? id : '') || '';
-  const { videos, refreshFeed } = useVideoFeed(userId);
+  const { videos, isLoadingMore, hasMore, refreshFeed, loadMore } = useVideoFeed(userId, 50);
   const [refreshing, setRefreshing] = useState(false);
   const { user: profileUser, isLoading, reload } = useProfile(userId, currentUserId);
 
@@ -230,6 +231,18 @@ export default function UserProfileScreen() {
 
   const pagerRef = useRef<React.ElementRef<typeof PagerView>>(null);
   const [activeTab, setActiveTab] = useState(0);
+
+  const maybeLoadMore = useCallback((nativeEvent: NativeScrollEvent) => {
+    if (isLoading || isLoadingMore || !hasMore) return;
+    if (activeTab !== 0 && activeTab !== 1) return;
+
+    const { contentOffset, contentSize, layoutMeasurement } = nativeEvent;
+    const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
+
+    if (distanceFromBottom <= 400) {
+      void loadMore();
+    }
+  }, [activeTab, hasMore, isLoading, isLoadingMore, loadMore]);
   const GRID_COLUMNS = 3;
   const GRID_GAP = 2;
   const GRID_PADDING = 2;
@@ -333,11 +346,13 @@ export default function UserProfileScreen() {
 
       <Animated.ScrollView
         onScroll={(event) => {
-          const shouldShow = event.nativeEvent.contentOffset.y > 40;
+          const nativeEvent = event.nativeEvent;
+          const shouldShow = nativeEvent.contentOffset.y > 40;
           if (headerAvatarVisibleRef.current !== shouldShow) {
             headerAvatarVisibleRef.current = shouldShow;
             setShowHeaderAvatar(shouldShow);
           }
+          maybeLoadMore(nativeEvent);
         }}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
@@ -450,6 +465,11 @@ export default function UserProfileScreen() {
         >
           {pagerPages}
         </PagerView>
+        {isLoadingMore && (
+          <View style={{ paddingVertical: 14 }}>
+            <ActivityIndicator size="small" color={isDark ? '#fff' : '#000'} />
+          </View>
+        )}
         <View style={{ height: 100 }} />
       </Animated.ScrollView>
 

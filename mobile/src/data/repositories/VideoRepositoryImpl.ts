@@ -1,7 +1,7 @@
 import { IVideoRepository } from '../../domain/repositories/IVideoRepository';
 import { Video } from '../../domain/entities/Video';
+import { VideoFeedCursor, VideoFeedResult } from '../../domain/entities/VideoFeed';
 import { SupabaseVideoDataSource } from '../datasources/SupabaseVideoDataSource';
-import { VideoMapper } from '../mappers/VideoMapper';
 
 export class VideoRepositoryImpl implements IVideoRepository {
     private dataSource: SupabaseVideoDataSource;
@@ -10,9 +10,9 @@ export class VideoRepositoryImpl implements IVideoRepository {
         this.dataSource = new SupabaseVideoDataSource();
     }
 
-    async getFeed(page: number, limit: number, userId?: string, authorId?: string): Promise<Video[]> {
+    async getFeed(limit: number, userId?: string, authorId?: string, cursor?: VideoFeedCursor | null): Promise<VideoFeedResult> {
         // Supabase data source already returns Video entities
-        return this.dataSource.getVideos(page, limit, userId, authorId);
+        return this.dataSource.getVideos(limit, userId, authorId, cursor);
     }
 
     async searchVideos(query: string, limit: number, userId?: string): Promise<Video[]> {
