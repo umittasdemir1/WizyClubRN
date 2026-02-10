@@ -348,7 +348,7 @@ export function InfiniteCarouselLayer({
             )}
 
             {/* Photo index indicator (images only) */}
-            {!isCleanScreen && isActiveImage && imageItems.length > 0 && activeImageIndex >= 0 && (
+            {!isCleanScreen && isActiveImage && imageItems.length > 1 && activeImageIndex >= 0 && (
                 <View
                     style={[
                         styles.photoIndexBadge,
