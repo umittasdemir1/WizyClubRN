@@ -1,16 +1,9 @@
 import { Redirect } from 'expo-router';
 import { useAuthStore } from '../src/presentation/store/useAuthStore';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
-import { useEffect } from 'react';
 
 export default function Index() {
-    const { user, isInitialized, isLoading, initialize } = useAuthStore();
-
-    useEffect(() => {
-        if (!isInitialized) {
-            initialize();
-        }
-    }, [isInitialized]);
+    const { user, isInitialized, isLoading } = useAuthStore();
 
     // Show loading while checking auth state
     if (!isInitialized || isLoading) {

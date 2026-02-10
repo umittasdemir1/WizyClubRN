@@ -615,40 +615,31 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
         });
     }, [syncVideoCountersFromServer]);
 
-    // 🔥 CRITICAL FIX: Only fetch once when auth is initialized
-    // This prevents triple-fetch on mount (when userId changes from undefined -> anon -> real ID)
-    useEffect(() => {
-        // Guard: Wait for auth to be initialized
-        if (!isInitialized) {
-            logAuth(LogCode.AUTH_SESSION_CHECK, 'Waiting for auth initialization');
-            return;
-        }
-
-        // Guard: Prevent duplicate initial fetch
-        if (hasInitialFetch.current) {
-            logSystem(LogCode.DEBUG_INFO, 'Initial fetch already done, skipping');
-            return;
-        }
-
-        // Mark as fetched BEFORE making the call (prevents race condition)
-        hasInitialFetch.current = true;
-        logData(LogCode.FETCH_START, 'Starting initial feed fetch', { userId: currentUserId });
-        fetchFeed();
-    }, [isInitialized]); // Only depend on isInitialized, NOT on fetchFeed or currentUserId
-
+    // ✅ [PERF] Unified fetch effect
+    // This handles both the initial load AND user changes (login/logout/switch)
     useEffect(() => {
         if (!isInitialized) return;
 
-        const freshUserId = useAuthStore.getState().user?.id || null;
-        if (!freshUserId) {
-            personalizedFeedUserIdRef.current = null;
-            return;
-        }
+        const freshUserId = useAuthStore.getState().user?.id || 'anon';
 
-        if (personalizedFeedUserIdRef.current === freshUserId) return;
-        personalizedFeedUserIdRef.current = freshUserId;
-        void refreshFeed();
-    }, [isInitialized, refreshFeed, user?.id]);
+        // If this is the first ever fetch OR the user has changed
+        if (!hasInitialFetch.current || personalizedFeedUserIdRef.current !== freshUserId) {
+            logData(LogCode.FETCH_START, 'Feed fetch triggered', {
+                isInitial: !hasInitialFetch.current,
+                userId: freshUserId
+            });
+
+            if (!hasInitialFetch.current) {
+                hasInitialFetch.current = true;
+                personalizedFeedUserIdRef.current = freshUserId;
+                void fetchFeed();
+            } else {
+                // Subsequent user changes
+                personalizedFeedUserIdRef.current = freshUserId;
+                void refreshFeed();
+            }
+        }
+    }, [isInitialized, user?.id, fetchFeed, refreshFeed]);
 
     return {
         videos: syncedVideos,

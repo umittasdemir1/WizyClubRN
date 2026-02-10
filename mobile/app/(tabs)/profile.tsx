@@ -107,7 +107,7 @@ const ShopFireworks = ({ triggerKey }: { triggerKey: number }) => {
           angle,
           distance: 90 + Math.random() * 80,
           size: 6 + Math.random() * 6,
-        delay: Math.floor(Math.random() * 2000),
+          delay: Math.floor(Math.random() * 2000),
           color: ['#F472B6', '#FB7185', '#F59E0B'][index % 3],
           centerX: center.x,
           centerY: center.y,
@@ -202,12 +202,7 @@ export default function ProfileScreen() {
   // Use authenticated user's ID, fallback to hardcoded for development
   const currentUserId = authUser?.id || '687c8079-e94c-42c2-9442-8a4a6b63dec6';
 
-  // Initialize auth on mount
-  useEffect(() => {
-    if (!isInitialized) {
-      initialize();
-    }
-  }, [isInitialized, initialize]);
+
 
   // Fetch drafts on mount
   useEffect(() => {
@@ -471,15 +466,23 @@ export default function ProfileScreen() {
   const setCustomFeed = useActiveVideoStore((state) => state.setCustomFeed);
   const setActiveVideo = useActiveVideoStore((state) => state.setActiveVideo);
 
+  const hasInitialSavedFetch = useRef(false);
+
   useFocusEffect(
     useCallback(() => {
       SystemBars.setStyle({
         statusBar: isDark ? 'light' : 'dark',
         navigationBar: isDark ? 'light' : 'dark',
       });
+
       const task = InteractionManager.runAfterInteractions(() => {
-        // Reload data after transition settles
-        refreshSavedVideos();
+        // Only refresh if it's not the first focus (hook already fetches on mount)
+        if (hasInitialSavedFetch.current) {
+          logUI(LogCode.UI_INTERACTION, 'Profile tab focused: Refreshing saved videos');
+          refreshSavedVideos();
+        } else {
+          hasInitialSavedFetch.current = true;
+        }
       });
       return () => {
         task.cancel();
