@@ -113,6 +113,7 @@ interface SupabaseVideo {
 }
 
 export class SupabaseVideoDataSource {
+    private static readonly DEFAULT_VIEW_COOLDOWN_MS = 30 * 60 * 1000;
     async getVideos(limit: number, userId?: string, authorId?: string, cursor?: VideoFeedCursor | null): Promise<VideoFeedResult> {
         const normalizedLimit = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 10;
         logData(LogCode.DB_QUERY_START, 'Fetching videos with cursor pagination', {
@@ -337,8 +338,37 @@ export class SupabaseVideoDataSource {
         }
     }
 
-    async recordVideoView(videoId: string, userId: string): Promise<void> {
-        if (!userId) return;
+    async recordVideoView(
+        videoId: string,
+        userId: string,
+        options?: { cooldownMs?: number }
+    ): Promise<'inserted' | 'cooldown' | 'error'> {
+        if (!userId || !videoId) return 'error';
+
+        const rawCooldownMs = options?.cooldownMs;
+        const cooldownMs = Number.isFinite(rawCooldownMs)
+            ? Math.max(0, Math.floor(rawCooldownMs as number))
+            : SupabaseVideoDataSource.DEFAULT_VIEW_COOLDOWN_MS;
+
+        const { data: recentViews, error: recentError } = await supabase
+            .from('video_views')
+            .select('viewed_at')
+            .eq('user_id', userId)
+            .eq('video_id', videoId)
+            .order('viewed_at', { ascending: false })
+            .limit(1);
+
+        if (recentError) {
+            logError(LogCode.DB_QUERY_ERROR, 'Error checking latest video view', { videoId, userId, error: recentError });
+        } else {
+            const latestViewedAt = recentViews?.[0]?.viewed_at;
+            if (typeof latestViewedAt === 'string') {
+                const latestTimestamp = new Date(latestViewedAt).getTime();
+                if (Number.isFinite(latestTimestamp) && Date.now() - latestTimestamp < cooldownMs) {
+                    return 'cooldown';
+                }
+            }
+        }
 
         const { error } = await supabase
             .from('video_views')
@@ -348,13 +378,26 @@ export class SupabaseVideoDataSource {
             });
 
         if (error) {
-            // Ignore unique violation (code 23505) if we had a unique constraint
-            // But for video_views, we might want multiple entries or just one.
-            // Based on the migration, we didn't add a UNIQUE constraint, so multiple views will be recorded.
             if (error.code !== '23505') {
                 logError(LogCode.DB_INSERT, 'Error recording video view', { videoId, userId, error });
             }
+            return 'error';
         }
+
+        const { error: incrementError } = await supabase.rpc('increment_video_counter', {
+            video_id: videoId,
+            counter_column: 'views_count',
+        });
+
+        if (incrementError) {
+            logError(LogCode.DB_UPDATE, 'Error incrementing views_count after video view insert', {
+                videoId,
+                userId,
+                error: incrementError,
+            });
+        }
+
+        return 'inserted';
     }
 
     async getVideoById(videoId: string): Promise<Video | null> {
@@ -386,24 +429,32 @@ export class SupabaseVideoDataSource {
         }
 
         const videos = data as SupabaseVideo[];
+        const videosById = new Map(videos.map((video) => [video.id, video] as const));
+        const orderedVideos = videoIds
+            .map((videoId) => videosById.get(videoId))
+            .filter((video): video is SupabaseVideo => Boolean(video));
+
+        if (!orderedVideos.length) return [];
 
         // If no user, just map without personalization
         if (!userId) {
-            return videos.map(v => this.mapToVideo(v));
+            return orderedVideos.map(v => this.mapToVideo(v));
         }
+
+        const orderedUserIds = Array.from(new Set(orderedVideos.map((video) => video.user_id)));
 
         // Fetch interactions for these videos
         const [likes, saves, follows] = await Promise.all([
             supabase.from('likes').select('video_id').eq('user_id', userId).in('video_id', videoIds),
             supabase.from('saves').select('video_id').eq('user_id', userId).in('video_id', videoIds),
-            supabase.from('follows').select('following_id').eq('follower_id', userId).in('following_id', videos.map(v => v.user_id))
+            supabase.from('follows').select('following_id').eq('follower_id', userId).in('following_id', orderedUserIds)
         ]);
 
         const likedVideoIds = new Set(likes.data?.map(l => l.video_id) || []);
         const savedVideoIds = new Set(saves.data?.map(s => s.video_id) || []);
         const followedUserIds = new Set(follows.data?.map(f => f.following_id) || []);
 
-        return videos.map(v => this.mapToVideo(v, {
+        return orderedVideos.map(v => this.mapToVideo(v, {
             isLiked: likedVideoIds.has(v.id),
             isSaved: savedVideoIds.has(v.id),
             isFollowing: followedUserIds.has(v.user_id)

@@ -7,6 +7,8 @@ import { ArrowLeft, Search, X, Clock } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import VideoPlayer from 'react-native-video';
+import CarouselMediaIcon from '../assets/icons/carousel.svg';
+import VideoMediaIcon from '../assets/icons/videos.svg';
 import { VideoCacheService } from '../src/data/services/VideoCacheService';
 import { useThemeStore } from '../src/presentation/store/useThemeStore';
 import { useAuthStore } from '../src/presentation/store/useAuthStore';
@@ -14,7 +16,6 @@ import { useProfileSearch } from '../src/presentation/hooks/useProfileSearch';
 import { useVideoSearch } from '../src/presentation/hooks/useVideoSearch';
 import { Avatar } from '../src/presentation/components/shared/Avatar';
 import { VerifiedBadge } from '../src/presentation/components/shared/VerifiedBadge';
-import { VideoTabIcon } from '../src/presentation/components/shared/VideoTabIcon';
 import { DARK_COLORS, LIGHT_COLORS } from '../src/core/constants';
 import { formatCount } from '../src/core/utils';
 import { getVideoUrl } from '../src/core/utils/videoUrl';
@@ -28,6 +29,8 @@ const RESULT_LIMIT = 30;
 const POST_LIMIT = 30;
 const SEARCH_DEBOUNCE_MS = 350;
 const POST_GRID_GAP = 2;
+const DISCOVERY_ICON_SIZE = 22;
+const DISCOVERY_ICON_BG_SIZE = 28;
 
 type RecentUser = Pick<User, 'id' | 'username' | 'fullName' | 'avatarUrl' | 'isVerified' | 'followersCount'>;
 type RecentItem = { type: 'query'; value: string } | { type: 'user'; user: RecentUser };
@@ -51,6 +54,16 @@ const resolvePostMedia = (post: VideoEntity) => {
         videoUrl,
         isVideo: Boolean(videoUrl),
     };
+};
+
+const resolvePostMediaType = (post: VideoEntity): 'carousel' | 'video' | 'photo' => {
+    const media = post.mediaUrls ?? [];
+    const hasVideoMedia = media.some((item) => item.type === 'video');
+    const fallbackVideoUrl = getVideoUrl(post);
+    const isCarousel = post.postType === 'carousel';
+    const isVideo = !isCarousel && (hasVideoMedia || Boolean(fallbackVideoUrl));
+
+    return isCarousel ? 'carousel' : isVideo ? 'video' : 'photo';
 };
 
 export default function SearchScreen() {
@@ -547,6 +560,7 @@ export default function SearchScreen() {
 
     const renderPostTile = (post: VideoEntity, index: number) => {
         const media = resolvePostMedia(post);
+        const mediaType = resolvePostMediaType(post);
         const isActiveVideo = media.isVideo && index === activePostIndex;
         const source = isActiveVideo && media.videoUrl ? (videoSources[post.id] ?? { uri: media.videoUrl }) : null;
         const isReady = readyVideoIds[post.id] === true;
@@ -594,10 +608,15 @@ export default function SearchScreen() {
                         />
                     ) : null}
                 </View>
-                {media.isVideo ? (
+                {mediaType !== 'photo' ? (
                     <View style={styles.postOverlay}>
-                        <VideoTabIcon color="#FFFFFF" size={24} />
-                        <Text style={styles.postOverlayText}>{formatCount(post.viewsCount ?? 0)}</Text>
+                        <View style={styles.postOverlayBubble}>
+                            {mediaType === 'video' ? (
+                                <VideoMediaIcon width={DISCOVERY_ICON_SIZE} height={DISCOVERY_ICON_SIZE} />
+                            ) : (
+                                <CarouselMediaIcon width={DISCOVERY_ICON_SIZE} height={DISCOVERY_ICON_SIZE} />
+                            )}
+                        </View>
                     </View>
                 ) : null}
             </View>
@@ -997,16 +1016,19 @@ const styles = StyleSheet.create({
     },
     postOverlay: {
         position: 'absolute',
-        left: 6,
-        bottom: 6,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
+        right: 6,
+        top: 6,
+        width: DISCOVERY_ICON_BG_SIZE,
+        height: DISCOVERY_ICON_BG_SIZE,
+        borderRadius: 6,
     },
-    postOverlayText: {
-        color: '#FFFFFF',
-        fontSize: 12,
-        fontWeight: '600',
+    postOverlayBubble: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 6,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'transparent',
     },
     emptyState: {
         alignItems: 'center',

@@ -22,6 +22,7 @@ import {
 import { useUploadStore } from '../../store/useUploadStore';
 import { useInAppBrowserStore } from '../../store/useInAppBrowserStore';
 import { usePoolStoryViewer } from '../../hooks/usePoolStoryViewer';
+import { useVideoViewTracking } from '../../hooks/useVideoViewTracking';
 import type { PoolFeedVideo } from './PoolFeedTypes';
 
 // Modular Hooks & Architecture
@@ -108,6 +109,7 @@ export const PoolFeedManager = ({
     const isSeeking = usePoolFeedActiveVideoStore((state) => state.isSeeking);
     const isPaused = usePoolFeedActiveVideoStore((state) => state.isPaused);
     const isAppActive = usePoolFeedActiveVideoStore((state) => state.isAppActive);
+    const isScreenFocused = usePoolFeedActiveVideoStore((state) => state.isScreenFocused);
     const ignoreAppState = usePoolFeedActiveVideoStore((state) => state.ignoreAppState);
     const isCleanScreen = usePoolFeedActiveVideoStore((state) => state.isCleanScreen);
     const playbackRate = usePoolFeedActiveVideoStore((state) => state.playbackRate);
@@ -145,6 +147,22 @@ export const PoolFeedManager = ({
     const activeVideo = useMemo(() => videos.find((v) => v.id === activeVideoId) || null, [videos, activeVideoId]);
     const isOwnActiveVideo = !!activeVideo && activeVideo.user?.id === user?.id;
     const isActivePlayable = useMemo(() => (activeVideo ? isFeedVideoItem(activeVideo) : false), [activeVideo]);
+
+    const isViewTrackingEnabled = Boolean(
+        activeVideo?.id &&
+        user?.id &&
+        activeTab === 'foryou' &&
+        isAppActive &&
+        isScreenFocused &&
+        !isPaused &&
+        !isInAppBrowserVisible
+    );
+
+    useVideoViewTracking({
+        videoId: activeVideo?.id,
+        userId: user?.id,
+        enabled: isViewTrackingEnabled,
+    });
 
     const resolvedActiveIndex = useMemo(() => {
         if (activeIndex >= 0) return activeIndex;

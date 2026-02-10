@@ -9,10 +9,24 @@ import { Video } from '../../../src/domain/entities/Video';
 import { useThemeStore } from '../../../src/presentation/store/useThemeStore';
 import { useAuthStore } from '../../../src/presentation/store/useAuthStore';
 import { useActiveVideoStore } from '../../../src/presentation/store/useActiveVideoStore';
+import { useVideoCounterStore } from '../../../src/presentation/store/useVideoCounterStore';
 import { LIGHT_COLORS, DARK_COLORS } from '../../../src/core/constants';
-import { logRepo, logError, LogCode } from '@/core/services/Logger';
+import { isFeedVideoItem } from '../../../src/presentation/components/poolFeed/utils/PoolFeedUtils';
+import { useResolvedVideoCounters } from '../../../src/presentation/hooks/useResolvedVideoCounters';
+import { logError, LogCode } from '@/core/services/Logger';
 
 const repository = new UserActivityRepositoryImpl();
+
+const resolveCounter = (video: Video, activityType: string): number => {
+    if (activityType === 'likes') return video.likesCount ?? 0;
+    if (activityType === 'saved') return video.savesCount ?? 0;
+    return video.viewsCount ?? 0;
+};
+
+const resolveMediaType = (video: Video): 'video' | 'carousel' | 'photo' => {
+    if (isFeedVideoItem(video)) return 'video';
+    return video.postType === 'carousel' ? 'carousel' : 'photo';
+};
 
 export default function ActivitiesScreen() {
     const { type } = useLocalSearchParams<{ type: string }>();
@@ -22,10 +36,12 @@ export default function ActivitiesScreen() {
     const { user } = useAuthStore();
     const setCustomFeed = useActiveVideoStore((state) => state.setCustomFeed);
     const setActiveVideo = useActiveVideoStore((state) => state.setActiveVideo);
+    const syncVideoCountersFromServer = useVideoCounterStore((state) => state.syncFromServer);
 
     const [videos, setVideos] = useState<Video[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const resolvedVideos = useResolvedVideoCounters(videos);
 
     const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
     const bgColor = themeColors.background;
@@ -35,6 +51,7 @@ export default function ActivitiesScreen() {
         switch (type) {
             case 'likes': return 'Beğenilerin';
             case 'saved': return 'Kaydedilenlerin';
+            case 'archived': return 'Arşivlenenler';
             case 'history': return 'İzleme Geçmişi';
             default: return 'Hareketler';
         }
@@ -52,6 +69,7 @@ export default function ActivitiesScreen() {
             } else if (type === 'history') {
                 data = await repository.getWatchHistory(user.id);
             }
+            syncVideoCountersFromServer(data);
             setVideos(data);
         } catch (error) {
             logError(LogCode.REPO_ERROR, 'Activities fetch error', { error, type, userId: user?.id });
@@ -59,7 +77,7 @@ export default function ActivitiesScreen() {
             setLoading(false);
             setRefreshing(false);
         }
-    }, [type, user?.id]);
+    }, [syncVideoCountersFromServer, type, user?.id]);
 
     useEffect(() => {
         fetchData();
@@ -71,7 +89,7 @@ export default function ActivitiesScreen() {
     };
 
     const handleVideoPress = (video: { id: string }, index: number) => {
-        setCustomFeed(videos);
+        setCustomFeed(resolvedVideos);
         setActiveVideo(video.id, index);
         router.push('/custom-feed' as any);
     };
@@ -95,7 +113,7 @@ export default function ActivitiesScreen() {
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={textColor} />
                 }
             >
-                {!loading && videos.length === 0 ? (
+                {!loading && resolvedVideos.length === 0 ? (
                     <View style={styles.emptyContainer}>
                         <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>
                             Henüz bir içerik bulunmuyor.
@@ -103,17 +121,18 @@ export default function ActivitiesScreen() {
                     </View>
                 ) : (
                     <MediaGrid
-                        items={videos.map((video) => ({
+                        items={resolvedVideos.map((video) => ({
                             id: video.id,
                             thumbnail: video.thumbnailUrl,
-                            views: video.likesCount || 0,
-                            type: 'video' as const,
+                            views: resolveCounter(video, type ?? ''),
+                            type: resolveMediaType(video),
                         }))}
                         isDark={isDark}
                         aspectRatio={0.8}
                         onPress={handleVideoPress}
                         gap={1}
                         padding={0}
+                        useMediaTypeSvgForViewCountIcon={true}
                     />
                 )}
             </ScrollView>

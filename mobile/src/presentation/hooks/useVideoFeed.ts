@@ -16,6 +16,8 @@ import { useActiveVideoStore } from '../store/useActiveVideoStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useSocialStore } from '../store/useSocialStore';
 import { useStartupStore, initStartupTimer } from '../store/useStartupStore';
+import { useVideoCounterStore } from '../store/useVideoCounterStore';
+import { useResolvedVideoCounters } from './useResolvedVideoCounters';
 import { isVideoCacheDisabled } from '../../core/utils/videoCacheToggle';
 import { getVideoUrl } from '../../core/utils/videoUrl';
 import { FEED_DATA_CONFIG } from '../config/feedDataConfig';
@@ -66,6 +68,9 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
 
     const isMounted = useRef(true);
     const hasInitialFetch = useRef(false); // Prevent multiple initial fetches
+    const pendingLikeVideoIdsRef = useRef<Set<string>>(new Set());
+    const pendingSaveVideoIdsRef = useRef<Set<string>>(new Set());
+    const personalizedFeedUserIdRef = useRef<string | null>(null);
 
     // Auth User
     const { user, isInitialized } = useAuthStore();
@@ -75,6 +80,8 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
     const followingMap = useSocialStore((state) => state.followingMap);
     const globalToggleFollow = useSocialStore((state) => state.toggleFollow);
     const syncSocialData = useSocialStore((state) => state.syncSocialData);
+    const syncVideoCountersFromServer = useVideoCounterStore((state) => state.syncFromServer);
+    const applyVideoCounterDelta = useVideoCounterStore((state) => state.applyLocalCounterDelta);
 
     // Initialize Cache
     useEffect(() => {
@@ -163,6 +170,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
             const freshUserId = useAuthStore.getState().user?.id || 'anon';
             const feedResult = await getVideoFeedUseCase.execute(safePageSize, freshUserId, filterUserId, null);
             const fetchedVideos = feedResult.videos;
+            syncVideoCountersFromServer(fetchedVideos);
 
             if (isMounted.current) {
                 setVideos(fetchedVideos);
@@ -189,7 +197,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
                 setIsLoading(false);
             }
         }
-    }, [getVideoFeedUseCase, filterUserId, safePageSize, syncSocialData]); // Removed currentUserId from dependencies
+    }, [getVideoFeedUseCase, filterUserId, safePageSize, syncSocialData, syncVideoCountersFromServer]); // Removed currentUserId from dependencies
 
     const refreshFeed = useCallback(async () => {
         if (isRefreshing) return;
@@ -204,6 +212,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
             const freshUserId = useAuthStore.getState().user?.id || 'anon';
             const feedResult = await getVideoFeedUseCase.execute(safePageSize, freshUserId, filterUserId, null);
             const fetchedVideos = feedResult.videos;
+            syncVideoCountersFromServer(fetchedVideos);
 
             if (isMounted.current) {
                 setVideos(fetchedVideos);
@@ -230,7 +239,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
                 setIsRefreshing(false);
             }
         }
-    }, [isRefreshing, getVideoFeedUseCase, filterUserId, safePageSize, syncSocialData]); // Removed currentUserId
+    }, [isRefreshing, getVideoFeedUseCase, filterUserId, safePageSize, syncSocialData, syncVideoCountersFromServer]); // Removed currentUserId
 
     const loadMore = useCallback(async () => {
         if (isLoadingMore || !hasMore || isLoading || !cursor) return;
@@ -242,6 +251,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
             const freshUserId = useAuthStore.getState().user?.id || 'anon';
             const feedResult = await getVideoFeedUseCase.execute(safePageSize, freshUserId, filterUserId, cursor);
             const fetchedVideos = feedResult.videos;
+            syncVideoCountersFromServer(fetchedVideos);
             const isCursorStuck =
                 feedResult.nextCursor?.createdAt === cursor.createdAt &&
                 feedResult.nextCursor?.id === cursor.id;
@@ -278,7 +288,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
                 setIsLoadingMore(false);
             }
         }
-    }, [cursor, isLoadingMore, hasMore, isLoading, getVideoFeedUseCase, filterUserId, safePageSize, syncSocialData]); // Removed currentUserId
+    }, [cursor, isLoadingMore, hasMore, isLoading, getVideoFeedUseCase, filterUserId, safePageSize, syncSocialData, syncVideoCountersFromServer]); // Removed currentUserId
 
     // Optimistic Update with Rollback
     const toggleLike = useCallback(async (videoId: string) => {
@@ -286,6 +296,18 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
             Alert.alert('Giriş Yapmalısınız', 'Bu işlemi yapmak için giriş yapmalısınız.');
             return;
         }
+        if (pendingLikeVideoIdsRef.current.has(videoId)) return;
+
+        const targetVideo = videos.find((video) => video.id === videoId);
+        if (!targetVideo) return;
+
+        pendingLikeVideoIdsRef.current.add(videoId);
+        const previousIsLiked = targetVideo.isLiked;
+        const previousLikesCount = Math.max(0, targetVideo.likesCount || 0);
+        const optimisticIsLiked = !previousIsLiked;
+        const likeDelta = optimisticIsLiked ? 1 : -1;
+        const optimisticLikesCount = Math.max(0, previousLikesCount + likeDelta);
+        applyVideoCounterDelta(videoId, 'likesCount', likeDelta);
 
         // Optimistic update
         setVideos((prevVideos) =>
@@ -293,10 +315,8 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
                 if (video.id === videoId) {
                     return {
                         ...video,
-                        isLiked: !video.isLiked,
-                        likesCount: video.isLiked
-                            ? video.likesCount - 1
-                            : video.likesCount + 1,
+                        isLiked: optimisticIsLiked,
+                        likesCount: optimisticLikesCount,
                     };
                 }
                 return video;
@@ -305,32 +325,64 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
 
         try {
             const freshUserId = useAuthStore.getState().user?.id || 'anon';
-            await toggleLikeUseCase.execute(videoId, freshUserId);
-        } catch (err) {
-            // Rollback on error
-            logError(LogCode.DB_UPDATE, 'Toggle like failed, reverting', err);
+            const serverIsLiked = await toggleLikeUseCase.execute(videoId, freshUserId);
+            const finalLikesCount = Math.max(0, previousLikesCount + (serverIsLiked ? 1 : -1));
+            const correctionDelta = finalLikesCount - optimisticLikesCount;
+
+            if (correctionDelta !== 0) {
+                applyVideoCounterDelta(videoId, 'likesCount', correctionDelta);
+            }
+
             setVideos((prevVideos) =>
                 prevVideos.map((video) => {
                     if (video.id === videoId) {
                         return {
                             ...video,
-                            isLiked: !video.isLiked,
-                            likesCount: video.isLiked
-                                ? video.likesCount - 1
-                                : video.likesCount + 1,
+                            isLiked: serverIsLiked,
+                            likesCount: finalLikesCount,
                         };
                     }
                     return video;
                 })
             );
+        } catch (err) {
+            // Rollback on error
+            logError(LogCode.DB_UPDATE, 'Toggle like failed, reverting', err);
+            applyVideoCounterDelta(videoId, 'likesCount', -likeDelta);
+            setVideos((prevVideos) =>
+                prevVideos.map((video) => {
+                    if (video.id === videoId) {
+                        return {
+                            ...video,
+                            isLiked: previousIsLiked,
+                            likesCount: previousLikesCount,
+                        };
+                    }
+                    return video;
+                })
+            );
+        } finally {
+            pendingLikeVideoIdsRef.current.delete(videoId);
         }
-    }, [toggleLikeUseCase, user]);
+    }, [applyVideoCounterDelta, toggleLikeUseCase, user, videos]);
 
     const toggleSave = useCallback(async (videoId: string) => {
         if (!user) {
             Alert.alert('Giriş Yapmalısınız', 'Bu işlemi yapmak için giriş yapmalısınız.');
             return;
         }
+        if (pendingSaveVideoIdsRef.current.has(videoId)) return;
+
+        const targetVideo = videos.find((video) => video.id === videoId);
+        if (!targetVideo) return;
+
+        pendingSaveVideoIdsRef.current.add(videoId);
+        const previousIsSaved = targetVideo.isSaved;
+        const previousSavesCount = Math.max(0, targetVideo.savesCount || 0);
+        const optimisticIsSaved = !previousIsSaved;
+        const saveDelta = optimisticIsSaved ? 1 : -1;
+        const optimisticSavesCount = Math.max(0, previousSavesCount + saveDelta);
+        applyVideoCounterDelta(videoId, 'savesCount', saveDelta);
 
         // Optimistic update
         setVideos((prevVideos) =>
@@ -338,10 +390,8 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
                 if (video.id === videoId) {
                     return {
                         ...video,
-                        isSaved: !video.isSaved,
-                        savesCount: video.isSaved
-                            ? video.savesCount - 1
-                            : video.savesCount + 1,
+                        isSaved: optimisticIsSaved,
+                        savesCount: optimisticSavesCount,
                     };
                 }
                 return video;
@@ -350,29 +400,51 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
 
         try {
             const freshUserId = useAuthStore.getState().user?.id || 'anon';
-            await toggleSaveUseCase.execute(videoId, freshUserId);
+            const serverIsSaved = await toggleSaveUseCase.execute(videoId, freshUserId);
+            const finalSavesCount = Math.max(0, previousSavesCount + (serverIsSaved ? 1 : -1));
+            const correctionDelta = finalSavesCount - optimisticSavesCount;
+
+            if (correctionDelta !== 0) {
+                applyVideoCounterDelta(videoId, 'savesCount', correctionDelta);
+            }
+
+            setVideos((prevVideos) =>
+                prevVideos.map((video) => {
+                    if (video.id === videoId) {
+                        return {
+                            ...video,
+                            isSaved: serverIsSaved,
+                            savesCount: finalSavesCount,
+                        };
+                    }
+                    return video;
+                })
+            );
         } catch (err) {
             logError(LogCode.DB_UPDATE, 'Toggle save failed, reverting', err);
+            applyVideoCounterDelta(videoId, 'savesCount', -saveDelta);
             // Rollback
             setVideos((prevVideos) =>
                 prevVideos.map((video) => {
                     if (video.id === videoId) {
                         return {
                             ...video,
-                            isSaved: !video.isSaved,
-                            savesCount: video.isSaved
-                                ? video.savesCount - 1
-                                : video.savesCount + 1,
+                            isSaved: previousIsSaved,
+                            savesCount: previousSavesCount,
                         };
                     }
                     return video;
                 })
             );
+        } finally {
+            pendingSaveVideoIdsRef.current.delete(videoId);
         }
-    }, [toggleSaveUseCase, user]);
+    }, [applyVideoCounterDelta, toggleSaveUseCase, user, videos]);
+
+    const counterResolvedVideos = useResolvedVideoCounters(videos);
 
     // ✅ [PERF] Preserve object identity unless social state actually changed
-    const syncedVideos = useMemo(() => videos.map((video) => {
+    const syncedVideos = useMemo(() => counterResolvedVideos.map((video) => {
         const syncedIsFollowing = followingMap[video.user.id];
         if (syncedIsFollowing == null || syncedIsFollowing === video.user.isFollowing) {
             return video;
@@ -385,7 +457,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
                 isFollowing: syncedIsFollowing,
             },
         };
-    }), [videos, followingMap]);
+    }), [counterResolvedVideos, followingMap]);
 
     const toggleFollow = useCallback(async (videoId: string) => {
         if (!user) {
@@ -408,6 +480,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
     }, [videos, globalToggleFollow, user]);
 
     const incrementShareCount = useCallback(async (videoId: string) => {
+        applyVideoCounterDelta(videoId, 'sharesCount', 1);
         setVideos((prevVideos) =>
             prevVideos.map((video) => {
                 if (video.id === videoId) {
@@ -432,7 +505,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
         } catch (error) {
             logError(LogCode.DB_UPDATE, 'Failed to sync share count', error);
         }
-    }, []);
+    }, [applyVideoCounterDelta]);
 
     const toggleShare = useCallback(async (videoId: string) => {
         const video = videos.find(v => v.id === videoId);
@@ -450,6 +523,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
     }, [videos, incrementShareCount]);
 
     const toggleShop = useCallback((videoId: string) => {
+        applyVideoCounterDelta(videoId, 'shopsCount', 1);
         setVideos((prevVideos) =>
             prevVideos.map((video) => {
                 if (video.id === videoId) {
@@ -461,7 +535,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
                 return video;
             })
         );
-    }, []);
+    }, [applyVideoCounterDelta]);
 
     const deleteVideo = useCallback(async (videoId: string) => {
         // 1. Get current state
@@ -529,6 +603,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
 
     // 🔥 Prepend a newly uploaded video to the top of the feed
     const prependVideo = useCallback((newVideo: Video) => {
+        syncVideoCountersFromServer([newVideo]);
         setVideos(current => {
             // Prevent duplicates
             if (current.some(v => v.id === newVideo.id)) {
@@ -538,7 +613,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
             logData(LogCode.REPO_SAVE, 'Prepending new video to feed', { videoId: newVideo.id });
             return [newVideo, ...current];
         });
-    }, []);
+    }, [syncVideoCountersFromServer]);
 
     // 🔥 CRITICAL FIX: Only fetch once when auth is initialized
     // This prevents triple-fetch on mount (when userId changes from undefined -> anon -> real ID)
@@ -560,6 +635,20 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
         logData(LogCode.FETCH_START, 'Starting initial feed fetch', { userId: currentUserId });
         fetchFeed();
     }, [isInitialized]); // Only depend on isInitialized, NOT on fetchFeed or currentUserId
+
+    useEffect(() => {
+        if (!isInitialized) return;
+
+        const freshUserId = useAuthStore.getState().user?.id || null;
+        if (!freshUserId) {
+            personalizedFeedUserIdRef.current = null;
+            return;
+        }
+
+        if (personalizedFeedUserIdRef.current === freshUserId) return;
+        personalizedFeedUserIdRef.current = freshUserId;
+        void refreshFeed();
+    }, [isInitialized, refreshFeed, user?.id]);
 
     return {
         videos: syncedVideos,

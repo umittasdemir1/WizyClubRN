@@ -3,6 +3,8 @@ import { Video } from '../../domain/entities/Video';
 import { GetSavedVideosUseCase } from '../../domain/usecases/GetSavedVideosUseCase';
 import { InteractionRepositoryImpl } from '../../data/repositories/InteractionRepositoryImpl';
 import { VideoRepositoryImpl } from '../../data/repositories/VideoRepositoryImpl';
+import { useResolvedVideoCounters } from './useResolvedVideoCounters';
+import { useVideoCounterStore } from '../store/useVideoCounterStore';
 import { logRepo, logError, LogCode } from '@/core/services/Logger';
 
 const interactionRepo = new InteractionRepositoryImpl();
@@ -13,6 +15,7 @@ export const useSavedVideos = (userId: string) => {
     const [videos, setVideos] = useState<Video[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const syncVideoCountersFromServer = useVideoCounterStore((state) => state.syncFromServer);
 
     const fetchSavedVideos = useCallback(async (silent = false) => {
         if (!userId) return;
@@ -20,6 +23,7 @@ export const useSavedVideos = (userId: string) => {
         if (!silent) setIsLoading(true);
         try {
             const data = await getSavedVideosUseCase.execute(userId);
+            syncVideoCountersFromServer(data);
             setVideos(data);
             setError(null);
         } catch (err) {
@@ -28,14 +32,16 @@ export const useSavedVideos = (userId: string) => {
         } finally {
             if (!silent) setIsLoading(false);
         }
-    }, [userId]);
+    }, [syncVideoCountersFromServer, userId]);
 
     useEffect(() => {
         fetchSavedVideos();
     }, [fetchSavedVideos]);
 
+    const resolvedVideos = useResolvedVideoCounters(videos);
+
     return {
-        videos,
+        videos: resolvedVideos,
         isLoading,
         error,
         refresh: () => fetchSavedVideos(true)

@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as NavigationBar from 'expo-navigation-bar';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import { useAuthStore } from '../../src/presentation/store/useAuthStore';
+import { useVideoCounterStore } from '../../src/presentation/store/useVideoCounterStore';
 import { useDraftStore } from '../../src/presentation/store/useDraftStore';
 import { useInAppBrowserStore } from '../../src/presentation/store/useInAppBrowserStore';
 import { ProfileStats } from '../../src/presentation/components/profile/ProfileStats';
@@ -196,6 +197,7 @@ export default function ProfileScreen() {
   const { drafts, fetchDrafts } = useDraftStore();
   const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
   const isFocused = useIsFocused();
+  const syncVideoCountersFromServer = useVideoCounterStore((state) => state.syncFromServer);
 
   // Use authenticated user's ID, fallback to hardcoded for development
   const currentUserId = authUser?.id || '687c8079-e94c-42c2-9442-8a4a6b63dec6';
@@ -1004,23 +1006,24 @@ export default function ProfileScreen() {
     setSettingsOpen(false);
   }, [settingsSection]);
 
-  const openActivityGrid = useCallback(async (type: 'likes' | 'saved' | 'history') => {
-    if (!currentUserId) return;
+  const openActivityGrid = useCallback(async (type: 'likes' | 'saved' | 'history' | 'archived') => {
+    if (type !== 'archived' && !currentUserId) return;
     setSettingsSection(type);
     setIsActivityLoading(true);
     setActivityVideos([]);
     try {
       let data: VideoEntity[] = [];
-      if (type === 'likes') data = await activityRepository.getLikedVideos(currentUserId);
-      else if (type === 'saved') data = await activityRepository.getSavedVideos(currentUserId);
-      else if (type === 'history') data = await activityRepository.getWatchHistory(currentUserId);
+      if (type === 'likes' && currentUserId) data = await activityRepository.getLikedVideos(currentUserId);
+      else if (type === 'saved' && currentUserId) data = await activityRepository.getSavedVideos(currentUserId);
+      else if (type === 'history' && currentUserId) data = await activityRepository.getWatchHistory(currentUserId);
+      syncVideoCountersFromServer(data);
       setActivityVideos(data);
     } catch (err) {
       logError(LogCode.REPO_ERROR, 'Profile activity fetch error', { error: err, type, userId: currentUserId });
     } finally {
       setIsActivityLoading(false);
     }
-  }, [currentUserId]);
+  }, [currentUserId, syncVideoCountersFromServer]);
 
   const openActionsMenu = useCallback(() => {
     setSettingsSection('actions');

@@ -45,6 +45,8 @@ import {
 import { MediaGrid } from '../shared/MediaGrid';
 import { DeletedContentMenu } from './DeletedContentSheet';
 import type { Theme } from '../../store/useThemeStore';
+import { isFeedVideoItem } from '../poolFeed/utils/PoolFeedUtils';
+import { useResolvedVideoCounters } from '../../hooks/useResolvedVideoCounters';
 
 type SettingsSection =
   | 'main'
@@ -109,7 +111,7 @@ type ProfileSettingsOverlayProps = {
   openAccountType: () => void;
   openInAppBrowser: () => void;
   openContentPreferences: () => void;
-  openActivityGrid: (type: 'likes' | 'saved' | 'history') => void;
+  openActivityGrid: (type: 'likes' | 'saved' | 'history' | 'archived') => void;
   browserHistoryOptions: Array<{ label: string; value: string }>;
   browserHistoryEnabled: boolean;
   setBrowserHistoryEnabled: (enabled: boolean) => void;
@@ -148,6 +150,17 @@ type ProfileSettingsOverlayProps = {
   accountSettingsNoticeSuffix: string;
   accountSettingsNoticeLinkIndex: number;
   accountSettingsNoticeLinkLabel: string;
+};
+
+const resolveActivityCount = (video: any, section: SettingsSection): number => {
+  if (section === 'likes') return video?.likesCount ?? 0;
+  if (section === 'saved') return video?.savesCount ?? 0;
+  return video?.viewsCount ?? 0;
+};
+
+const resolveActivityMediaType = (video: any): 'video' | 'carousel' | 'photo' => {
+  if (isFeedVideoItem(video)) return 'video';
+  return video?.postType === 'carousel' ? 'carousel' : 'photo';
 };
 
 export function ProfileSettingsOverlay({
@@ -235,6 +248,17 @@ export function ProfileSettingsOverlay({
   accountSettingsNoticeLinkIndex,
   accountSettingsNoticeLinkLabel,
 }: ProfileSettingsOverlayProps) {
+  const resolvedActivityVideos = useResolvedVideoCounters(activityVideos as any);
+  const isActivityGridSection = ['likes', 'saved', 'history', 'archived'].includes(settingsSection);
+  const activityGridItems = isActivityGridSection
+    ? resolvedActivityVideos.map((video: any) => ({
+        id: video.id,
+        thumbnail: video.thumbnailUrl,
+        views: resolveActivityCount(video, settingsSection),
+        type: resolveActivityMediaType(video),
+      }))
+    : [];
+
   const handleBadgeSignup = () => {
     closeSettings();
     router.push('/paywall/badge');
@@ -558,7 +582,7 @@ export function ProfileSettingsOverlay({
 
               <TouchableOpacity
                 style={[styles.settingsItem, { borderBottomColor: settingsItemBorderColor }]}
-                onPress={() => setSettingsSection('archived')}
+                onPress={() => openActivityGrid('archived')}
               >
                 <View style={styles.settingsInfo}>
                   <View style={styles.settingsLabelRow}>
@@ -1533,30 +1557,26 @@ export function ProfileSettingsOverlay({
                 <View style={{ padding: 40, alignItems: 'center' }}>
                   <ActivityIndicator color={textPrimary} />
                 </View>
-              ) : activityVideos.length === 0 && !['archived', 'notInterested'].includes(settingsSection) ? (
+              ) : isActivityGridSection && activityGridItems.length === 0 ? (
                 <View style={{ padding: 40, alignItems: 'center' }}>
                   <Text style={{ color: textSecondary }}>Gösterilecek içerik yok</Text>
                 </View>
               ) : (
                 <MediaGrid
-                  items={(['archived', 'notInterested'].includes(settingsSection) ? [] : activityVideos).map((video: any) => ({
-                    id: video.id,
-                    thumbnail: video.thumbnailUrl,
-                    views: video.likesCount || 0,
-                    type: 'video' as const,
-                  }))}
+                  items={activityGridItems}
                   isDark={isDark}
                   aspectRatio={0.8}
                   onPress={(video, index) => {
-                    setCustomFeed(activityVideos);
+                    setCustomFeed(resolvedActivityVideos);
                     setActiveVideo(video.id, index);
                     router.push('/custom-feed' as any);
                   }}
                   gap={1}
                   padding={0}
+                  useMediaTypeSvgForViewCountIcon={true}
                 />
               )}
-              {['archived', 'notInterested'].includes(settingsSection) && activityVideos.length === 0 && (
+              {settingsSection === 'notInterested' && (
                 <View style={{ padding: 40, alignItems: 'center' }}>
                   <Text style={{ color: textSecondary }}>Henüz içerik eklenmemiş</Text>
                 </View>

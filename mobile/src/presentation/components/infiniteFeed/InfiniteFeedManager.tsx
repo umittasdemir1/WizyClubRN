@@ -34,6 +34,7 @@ import { InfiniteFeedDeleteConfirmationModal } from './InfiniteFeedDeleteConfirm
 import { styles } from './InfiniteFeedManager.styles';
 import { FEED_FLAGS, FEED_CONFIG } from './hooks/useInfiniteFeedConfig';
 import { useInfiniteStoryViewer } from '../../hooks/useInfiniteStoryViewer';
+import { useVideoViewTracking } from '../../hooks/useVideoViewTracking';
 import type { ViewToken } from 'react-native';
 import { FeedPrefetchService } from '../../../data/services/FeedPrefetchService';
 import { VideoCacheService } from '../../../data/services/VideoCacheService';
@@ -143,6 +144,26 @@ export function InfiniteFeedManager({
     });
     // Destructure for backward compatibility
     const { activeId: activeInlineId, pendingId: pendingInlineId, activeIndex: activeInlineIndex, pendingIndex: pendingInlineIndex } = feedActiveState;
+
+    const trackedActiveVideo = useMemo(() => {
+        if (!activeInlineId) return null;
+        return videos.find((video) => video.id === activeInlineId) ?? null;
+    }, [activeInlineId, videos]);
+
+    const isViewTrackingEnabled = Boolean(
+        trackedActiveVideo?.id &&
+        currentUserId &&
+        !isInAppBrowserVisible &&
+        !globalIsPaused &&
+        isScreenFocused &&
+        isRouteFocused
+    );
+
+    useVideoViewTracking({
+        videoId: trackedActiveVideo?.id,
+        userId: currentUserId,
+        enabled: isViewTrackingEnabled,
+    });
 
     const [isCarouselInteracting, setIsCarouselInteracting] = useState(false);
     const [isFeedScrolling, setIsFeedScrolling] = useState(false);

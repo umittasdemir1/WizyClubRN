@@ -31,6 +31,7 @@ interface MediaGridProps {
   showViewCount?: boolean;
   showMediaTypeIcon?: boolean;
   useVideoSvgForViewCountIcon?: boolean;
+  useMediaTypeSvgForViewCountIcon?: boolean;
 }
 
 export const MediaGrid: React.FC<MediaGridProps> = ({
@@ -46,6 +47,7 @@ export const MediaGrid: React.FC<MediaGridProps> = ({
   showViewCount = true,
   showMediaTypeIcon = false,
   useVideoSvgForViewCountIcon = false,
+  useMediaTypeSvgForViewCountIcon = false,
 }) => {
   const bgColor = isDark ? '#1c1c1e' : '#f0f0f0';
   const itemWidth = Math.floor((SCREEN_WIDTH - (padding * 2) - (gap * 2)) / COLUMN_COUNT);
@@ -128,7 +130,13 @@ export const MediaGrid: React.FC<MediaGridProps> = ({
             ) : null}
             {showViewCount && item.views !== undefined && (
               <View style={styles.stats}>
-                {item.type === 'image' ? (
+                {useMediaTypeSvgForViewCountIcon ? (
+                  item.type === 'video' ? (
+                    <VideoMediaIcon width={12} height={12} />
+                  ) : (
+                    <CarouselMediaIcon width={12} height={12} />
+                  )
+                ) : item.type === 'image' ? (
                   <Eye size={12} color="#fff" />
                 ) : useVideoSvgForViewCountIcon ? (
                   <VideoMediaIcon width={12} height={12} />
