@@ -10,9 +10,9 @@ export class StoryRepositoryImpl implements IStoryRepository {
         this.dataSource = new SupabaseVideoDataSource();
     }
 
-    async getStories(): Promise<Story[]> {
+    async getStories(userId?: string): Promise<Story[]> {
         // Supabase data source already returns Story entities
-        return this.dataSource.getStories();
+        return this.dataSource.getStories(userId);
     }
 
     async markAsViewed(storyId: string): Promise<void> {

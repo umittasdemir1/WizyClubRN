@@ -21,7 +21,7 @@ import {
 } from './hooks/usePoolFeedStores';
 import { useUploadStore } from '../../store/useUploadStore';
 import { useInAppBrowserStore } from '../../store/useInAppBrowserStore';
-import { usePoolStoryViewer } from '../../hooks/usePoolStoryViewer';
+import { useStories } from '../../hooks/useStories';
 import { useVideoViewTracking } from '../../hooks/useVideoViewTracking';
 import type { PoolFeedVideo } from './PoolFeedTypes';
 
@@ -100,7 +100,7 @@ export const PoolFeedManager = ({
     const netInfo = useNetInfo();
     const router = useRouter();
     const { user } = usePoolFeedAuthStore();
-    const { stories: storyListData } = usePoolStoryViewer();
+    const { stories: storyListData } = useStories(undefined, 'pool');
     const { isMuted, toggleMute } = usePoolFeedMuteControls();
 
     // Active Video State (Zustand)

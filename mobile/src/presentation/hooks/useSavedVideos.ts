@@ -1,49 +1,51 @@
-import { useState, useCallback, useEffect } from 'react';
-import { Video } from '../../domain/entities/Video';
+import { useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { GetSavedVideosUseCase } from '../../domain/usecases/GetSavedVideosUseCase';
 import { InteractionRepositoryImpl } from '../../data/repositories/InteractionRepositoryImpl';
 import { VideoRepositoryImpl } from '../../data/repositories/VideoRepositoryImpl';
 import { useResolvedVideoCounters } from './useResolvedVideoCounters';
 import { useVideoCounterStore } from '../store/useVideoCounterStore';
-import { logRepo, logError, LogCode } from '@/core/services/Logger';
+import { logError, LogCode } from '@/core/services/Logger';
+import { QUERY_KEYS } from '../../core/query/queryClient';
 
 const interactionRepo = new InteractionRepositoryImpl();
 const videoRepo = new VideoRepositoryImpl();
 const getSavedVideosUseCase = new GetSavedVideosUseCase(interactionRepo, videoRepo);
 
 export const useSavedVideos = (userId: string) => {
-    const [videos, setVideos] = useState<Video[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
     const syncVideoCountersFromServer = useVideoCounterStore((state) => state.syncFromServer);
 
-    const fetchSavedVideos = useCallback(async (silent = false) => {
-        if (!userId) return;
-
-        if (!silent) setIsLoading(true);
-        try {
-            const data = await getSavedVideosUseCase.execute(userId);
-            syncVideoCountersFromServer(data);
-            setVideos(data);
-            setError(null);
-        } catch (err) {
-            logError(LogCode.REPO_ERROR, 'Error loading saved videos', { error: err, userId });
-            setError('Kaydedilen videolar yüklenirken bir hata oluştu');
-        } finally {
-            if (!silent) setIsLoading(false);
-        }
-    }, [syncVideoCountersFromServer, userId]);
-
-    useEffect(() => {
-        fetchSavedVideos();
-    }, [fetchSavedVideos]);
+    const {
+        data: videos = [],
+        isLoading,
+        error: queryError,
+        refetch
+    } = useQuery({
+        queryKey: QUERY_KEYS.SAVED_VIDEOS(userId),
+        queryFn: async () => {
+            if (!userId) return [];
+            try {
+                const data = await getSavedVideosUseCase.execute(userId);
+                // Sync to global store side-effect
+                syncVideoCountersFromServer(data);
+                return data;
+            } catch (err) {
+                logError(LogCode.REPO_ERROR, 'Error loading saved videos', { error: err, userId });
+                throw err;
+            }
+        },
+        enabled: Boolean(userId),
+        staleTime: 1000 * 60, // 1 minute
+    });
 
     const resolvedVideos = useResolvedVideoCounters(videos);
+
+    const refresh = useCallback(() => refetch(), [refetch]);
 
     return {
         videos: resolvedVideos,
         isLoading,
-        error,
-        refresh: () => fetchSavedVideos(true)
+        error: queryError ? 'Kaydedilen videolar yüklenirken bir hata oluştu' : null,
+        refresh
     };
 };

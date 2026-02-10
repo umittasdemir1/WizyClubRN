@@ -1,0 +1,3 @@
+﻿app/(tabs)/profile.tsx(1276,9): error TS2322: Type 'UseMutateAsyncFunction<User, Error, string, unknown>' is not assignable to type '(uri: string) => Promise<string | null>'.
+  Type 'Promise<User>' is not assignable to type 'Promise<string | null>'.
+    Type 'User' is not assignable to type 'string'.

@@ -21,6 +21,7 @@ import { useResolvedVideoCounters } from './useResolvedVideoCounters';
 import { isVideoCacheDisabled } from '../../core/utils/videoCacheToggle';
 import { getVideoUrl } from '../../core/utils/videoUrl';
 import { FEED_DATA_CONFIG } from '../config/feedDataConfig';
+import { queryClient, QUERY_KEYS } from '../../core/query/queryClient';
 
 // Interfaces
 interface UseVideoFeedReturn {
@@ -345,6 +346,9 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
                     return video;
                 })
             );
+
+            // Invalidate profile query to update like counts if cached
+            queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PROFILE(freshUserId) });
         } catch (err) {
             // Rollback on error
             logError(LogCode.DB_UPDATE, 'Toggle like failed, reverting', err);
@@ -420,6 +424,10 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
                     return video;
                 })
             );
+
+            // Invalidate saved videos and profile to reflect changes
+            queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SAVED_VIDEOS(freshUserId) });
+            queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PROFILE(freshUserId) });
         } catch (err) {
             logError(LogCode.DB_UPDATE, 'Toggle save failed, reverting', err);
             applyVideoCounterDelta(videoId, 'savesCount', -saveDelta);
@@ -474,6 +482,10 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
             const freshUserId = useAuthStore.getState().user?.id || 'anon';
             // Use global store for the action - it handles optimistic updates and counts
             await globalToggleFollow(userIdToFollow, freshUserId);
+
+            // Invalidate target user profile and current user profile (for following count)
+            queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PROFILE(userIdToFollow) });
+            queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PROFILE(freshUserId) });
         } catch (err) {
             // Error is handled in store
         }
@@ -593,6 +605,10 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
                 throw new Error(errText || 'Sunucu hatası');
             }
             logData(LogCode.DB_DELETE, 'Video deleted successfully', { videoId });
+
+            // Invalidate profile to update counts
+            const freshUserId = useAuthStore.getState().user?.id || 'anon';
+            queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PROFILE(freshUserId) });
         } catch (error: any) {
             logError(LogCode.DB_DELETE, 'Video delete failed, rolling back', error);
             // Rollback on failure
@@ -613,6 +629,10 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
             logData(LogCode.REPO_SAVE, 'Prepending new video to feed', { videoId: newVideo.id });
             return [newVideo, ...current];
         });
+
+        // Invalidate profile for upload count parity
+        const freshUserId = useAuthStore.getState().user?.id || 'anon';
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PROFILE(freshUserId) });
     }, [syncVideoCountersFromServer]);
 
     // ✅ [PERF] Unified fetch effect

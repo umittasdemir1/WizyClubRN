@@ -10,11 +10,14 @@ import Animated, {
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { PoolFeedStoryAvatar } from './PoolFeedStoryAvatar';
 import { useAuthStore } from '../../store/useAuthStore';
-import { useProfile } from '../../hooks/useProfile';
+import { useQuery } from '@tanstack/react-query';
+import { QUERY_KEYS } from '@/core/query/queryClient';
+import { ProfileRepositoryImpl } from '@/data/repositories/ProfileRepositoryImpl';
 import { logStory, LogCode } from '@/core/services/Logger';
 
 const BAR_HEIGHT = 110;
 const DEFAULT_AVATAR = 'https://ui-avatars.com/api/?name=Me&background=random&color=fff';
+const profileRepo = new ProfileRepositoryImpl();
 
 interface StoryUser {
     id: string;
@@ -40,10 +43,15 @@ export const PoolFeedStoryBar = memo(function PoolFeedStoryBar({
     const translateY = useSharedValue(-BAR_HEIGHT - insets.top);
     const opacity = useSharedValue(0);
     const [shouldRender, setShouldRender] = useState(false);
-    
-    // Auth and Profile Hooks
+
+    // Auth and Profile from prefetched cache (same key = no extra request)
     const { user: authUser } = useAuthStore();
-    const { user: profileUser } = useProfile(authUser?.id || '');
+    const { data: profileUser } = useQuery({
+        queryKey: QUERY_KEYS.PROFILE(authUser?.id || ''),
+        queryFn: () => profileRepo.getProfile(authUser?.id || ''),
+        enabled: Boolean(authUser?.id),
+        staleTime: 1000 * 60,
+    });
 
     const currentUserDisplay = useMemo(() => {
         if (profileUser) {
@@ -138,8 +146,8 @@ export const PoolFeedStoryBar = memo(function PoolFeedStoryBar({
         if (currentUserDisplay) {
             const selfInList = storyUsers.find(u => u.id === currentUserDisplay.id);
             // Use avatarUrl if available, otherwise use default
-            const displayAvatar = currentUserDisplay.avatarUrl && currentUserDisplay.avatarUrl.trim() !== '' 
-                ? currentUserDisplay.avatarUrl 
+            const displayAvatar = currentUserDisplay.avatarUrl && currentUserDisplay.avatarUrl.trim() !== ''
+                ? currentUserDisplay.avatarUrl
                 : DEFAULT_AVATAR;
 
             users.unshift({

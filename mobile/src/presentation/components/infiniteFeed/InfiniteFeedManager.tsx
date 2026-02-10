@@ -33,7 +33,7 @@ import { InfiniteFeedMoreOptionsSheet } from './InfiniteFeedMoreOptionsSheet';
 import { InfiniteFeedDeleteConfirmationModal } from './InfiniteFeedDeleteConfirmationModal';
 import { styles } from './InfiniteFeedManager.styles';
 import { FEED_FLAGS, FEED_CONFIG } from './hooks/useInfiniteFeedConfig';
-import { useInfiniteStoryViewer } from '../../hooks/useInfiniteStoryViewer';
+import { useStories } from '../../hooks/useStories';
 import { useVideoViewTracking } from '../../hooks/useVideoViewTracking';
 import type { ViewToken } from 'react-native';
 import { FeedPrefetchService } from '../../../data/services/FeedPrefetchService';
@@ -116,7 +116,7 @@ export function InfiniteFeedManager({
     const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
     const { isMuted, toggleMute } = useInfiniteFeedMuteControls();
     const currentUserId = useInfiniteFeedAuthStore((state) => state.user?.id);
-    const { stories: storyListData } = useInfiniteStoryViewer();
+    const { stories: storyListData } = useStories(undefined, 'infinite');
     const isInAppBrowserVisible = useInAppBrowserStore((state) => state.isVisible);
     const openInAppBrowser = useInAppBrowserStore((state) => state.openUrl);
     const uploadStatus = useUploadStore((state) => state.status);

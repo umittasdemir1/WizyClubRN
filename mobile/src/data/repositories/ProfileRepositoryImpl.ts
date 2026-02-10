@@ -26,6 +26,25 @@ export class ProfileRepositoryImpl implements IProfileRepository {
         }
     }
 
+    async getProfileLite(userId: string): Promise<User | null> {
+        try {
+            const data = await this.dataSource.getProfileLite(userId);
+            if (!data) return null;
+            return this.mapDtoToUser({
+                ...data,
+                is_following: false,
+                has_stories: false,
+                has_unseen_story: false,
+                followers_count: 0,
+                following_count: 0,
+                posts_count: 0
+            });
+        } catch (error: any) {
+            logError(LogCode.REPO_ERROR, 'Profile repository getProfileLite error', { error, userId });
+            return null;
+        }
+    }
+
     async searchProfiles(query: string, limit: number = 20, viewerId?: string): Promise<User[]> {
         try {
             const data = await this.dataSource.searchProfiles(query, limit, viewerId);

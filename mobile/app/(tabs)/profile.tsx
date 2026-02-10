@@ -211,7 +211,16 @@ export default function ProfileScreen() {
     }
   }, [currentUserId]);
 
+  const lastAdminConfigFetchRef = useRef<number>(0);
+  const ADMIN_CONFIG_THROTTLE_MS = 10000; // 10 seconds
+
   const loadAdminConfig = useCallback(async () => {
+    const now = Date.now();
+    if (now - lastAdminConfigFetchRef.current < ADMIN_CONFIG_THROTTLE_MS) {
+      return;
+    }
+    lastAdminConfigFetchRef.current = now;
+
     try {
       const response = await fetch(`${CONFIG.API_URL}/admin/config?ts=${Date.now()}`);
       if (!response.ok) return;
@@ -638,7 +647,7 @@ export default function ProfileScreen() {
     // Silent refresh - don't show skeleton, just update data
     await Promise.all([refreshFeed(), reload(true), refreshSavedVideos()]);
     setRefreshing(false);
-  }, [refreshFeed, reload]);
+  }, [refreshFeed, reload, refreshSavedVideos]);
 
   // Dynamic Theme Colors
   const bgBody = themeColors.background;

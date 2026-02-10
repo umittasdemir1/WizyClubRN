@@ -2,10 +2,13 @@ import React, { memo, useMemo } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { InfiniteStoryAvatar } from './InfiniteStoryAvatar';
 import { useAuthStore } from '../../store/useAuthStore';
-import { useProfile } from '../../hooks/useProfile';
+import { useQuery } from '@tanstack/react-query';
+import { QUERY_KEYS } from '@/core/query/queryClient';
+import { ProfileRepositoryImpl } from '@/data/repositories/ProfileRepositoryImpl';
 
 const BAR_HEIGHT = 110;
 const DEFAULT_AVATAR = ''; // Removed external UI-Avatars fallback
+const profileRepo = new ProfileRepositoryImpl();
 
 interface StoryUser {
     id: string;
@@ -26,7 +29,14 @@ export const InfiniteStoryBar = memo(function InfiniteStoryBar({
     backgroundColor,
 }: InfiniteStoryBarProps) {
     const { user: authUser } = useAuthStore();
-    const { user: profileUser } = useProfile(authUser?.id || '');
+    // Uses the SAME query key as the prefetch in _layout.tsx
+    // If already prefetched, returns cached data instantly (no network request)
+    const { data: profileUser } = useQuery({
+        queryKey: QUERY_KEYS.PROFILE(authUser?.id || ''),
+        queryFn: () => profileRepo.getProfile(authUser?.id || ''),
+        enabled: Boolean(authUser?.id),
+        staleTime: 1000 * 60, // matches prefetch staleTime
+    });
 
     const currentUserDisplay = useMemo(() => {
         if (profileUser) {

@@ -51,70 +51,42 @@ export class SupabaseProfileDataSource {
     }
 
     async getProfile(userId: string, viewerId?: string): Promise<any> {
-        const { data, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', userId)
-            .maybeSingle(); // Use maybeSingle instead of single to handle missing profiles gracefully
+        // Single RPC call replaces 4 sequential queries:
+        // 1. profiles.select(*) 2. follows.select(count) 3. stories.select(id) 4. story_views.select(count)
+        const { data, error } = await supabase.rpc('get_profile_full', {
+            p_user_id: userId,
+            p_viewer_id: viewerId || null,
+        });
 
         if (error) {
-            logError(LogCode.DB_QUERY_ERROR, 'Profile fetch error', { userId, error });
+            logError(LogCode.DB_QUERY_ERROR, 'Profile fetch error (RPC)', { userId, error });
             throw error;
         }
 
         if (!data) {
-            // Profile doesn't exist - return null instead of throwing
             return null;
         }
 
-        if (viewerId) {
-            const { count } = await supabase
-                .from('follows')
-                .select('*', { count: 'exact', head: true })
-                .eq('follower_id', viewerId)
-                .eq('following_id', userId);
+        logData(LogCode.DB_QUERY_SUCCESS, 'Profile fetched successfully (RPC)', {
+            username: data?.username,
+            hasStories: data?.has_stories,
+            hasUnseenStory: data?.has_unseen_story,
+        });
+        return data;
+    }
 
-            data.is_following = count ? count > 0 : false;
+    async getProfileLite(userId: string): Promise<any> {
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('id, username, full_name, avatar_url, is_verified')
+            .eq('id', userId)
+            .maybeSingle();
+
+        if (error) {
+            logError(LogCode.DB_QUERY_ERROR, 'Lite profile fetch error', { userId, error });
+            throw error;
         }
 
-        // Check for active stories
-        const now = new Date().toISOString();
-        // Check for active stories and if they are unseen
-        const { data: stories } = await supabase
-            .from('stories')
-            .select('id')
-            .eq('user_id', userId)
-            .gt('expires_at', now);
-
-        const storyIds = stories?.map(s => s.id) || [];
-        const hasStories = storyIds.length > 0;
-
-        let hasUnseenStory = false;
-
-        if (hasStories) {
-            // Check if ALL these stories are viewed by the viewer (or current user if viewerId not provided)
-            // If viewerId is provided use it, otherwise use current auth user
-            const checkerId = viewerId || (await supabase.auth.getUser()).data.user?.id;
-
-            if (checkerId) {
-                const { count: viewedCount } = await supabase
-                    .from('story_views')
-                    .select('*', { count: 'exact', head: true })
-                    .eq('user_id', checkerId)
-                    .in('story_id', storyIds);
-
-                // If viewed count is less than total story count, there are unseen stories
-                hasUnseenStory = (viewedCount || 0) < storyIds.length;
-            } else {
-                // If no user logged in, assume all are unseen
-                hasUnseenStory = true;
-            }
-        }
-
-        data.has_stories = hasStories;
-        data.has_unseen_story = hasUnseenStory;
-
-        logData(LogCode.DB_QUERY_SUCCESS, 'Profile fetched successfully', { username: data?.username, hasStories, hasUnseenStory });
         return data;
     }
 

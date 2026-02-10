@@ -1,40 +1,32 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { User } from '../../domain/entities';
 import { ProfileRepositoryImpl } from '../../data/repositories/ProfileRepositoryImpl';
 import { useSocialStore } from '../store/useSocialStore';
 import { logRepo, logError, LogCode } from '@/core/services/Logger';
+import { QUERY_KEYS } from '../../core/query/queryClient';
 
 const profileRepo = new ProfileRepositoryImpl();
 
 export const useProfile = (userId: string, viewerId?: string) => {
-    const [user, setUser] = useState<User | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
+    const queryClient = useQueryClient();
     const followingMap = useSocialStore((state) => state.followingMap);
     const followerCounts = useSocialStore((state) => state.followerCounts);
     const followingCounts = useSocialStore((state) => state.followingCounts);
     const syncSocialData = useSocialStore((state) => state.syncSocialData);
 
-    // Sync current user object with global store data
-    const syncedUser = user ? {
-        ...user,
-        isFollowing: followingMap[user.id] ?? user.isFollowing,
-        followersCount: followerCounts[user.id] ?? user.followersCount,
-        followingCount: followingCounts[user.id] ?? user.followingCount
-    } : null;
-
-    const loadProfile = useCallback(async (silentRefresh = false) => {
-        // Only show loading skeleton if no data exists (Instagram/TikTok behavior)
-        if (!silentRefresh) {
-            setIsLoading(true);
-        }
-
-        try {
+    const {
+        data: user,
+        isLoading,
+        error: queryError,
+        refetch
+    } = useQuery({
+        queryKey: QUERY_KEYS.PROFILE(userId),
+        queryFn: async () => {
+            if (!userId) return null;
             const profileData = await profileRepo.getProfile(userId, viewerId);
             if (profileData) {
-                setUser(profileData);
-                // Sync to global store
+                // Sync to global store side-effect
                 syncSocialData(
                     profileData.id,
                     profileData.isFollowing,
@@ -42,63 +34,65 @@ export const useProfile = (userId: string, viewerId?: string) => {
                     profileData.followingCount || 0
                 );
             }
-        } catch (err) {
-            setError('Profil yüklenirken bir hata oluştu.');
-            logError(LogCode.REPO_ERROR, 'Profile load error', { error: err, userId });
-        } finally {
-            if (!silentRefresh) {
-                setIsLoading(false);
-            }
-        }
-    }, [userId, viewerId, syncSocialData]);
+            return profileData;
+        },
+        enabled: Boolean(userId && userId.length > 0),
+    });
 
-    useEffect(() => {
-        // Only load if userId is valid (not a fallback or invalid ID)
-        if (userId && userId.length > 0) {
-            loadProfile();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [userId]); // Only load on mount/userId change
+    // Sync current user object with global store data
+    const syncedUser = useMemo(() => user ? {
+        ...user,
+        isFollowing: followingMap[user.id] ?? user.isFollowing,
+        followersCount: followerCounts[user.id] ?? user.followersCount,
+        followingCount: followingCounts[user.id] ?? user.followingCount
+    } : null, [user, followingMap, followerCounts, followingCounts]);
 
-    const updateProfile = useCallback(async (updates: Partial<User>) => {
-        try {
-            const updatedUser = await profileRepo.updateProfile(userId, updates);
-            setUser(updatedUser);
+    const updateMutation = useMutation({
+        mutationFn: (updates: Partial<User>) => profileRepo.updateProfile(userId, updates),
+        onSuccess: (updatedUser) => {
+            queryClient.setQueryData(QUERY_KEYS.PROFILE(userId), updatedUser);
             syncSocialData(
                 updatedUser.id,
                 updatedUser.isFollowing,
                 updatedUser.followersCount || 0,
                 updatedUser.followingCount || 0
             );
-            // Silent refresh to avoid full skeleton reload
-            await loadProfile(true);
-
-            return updatedUser;
-        } catch (err) {
+            // Also invalidate to ensure any other dependent queries (like lite) refresh
+            queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PROFILE(userId) });
+            queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PROFILE_LITE(userId) });
+        },
+        onError: (err) => {
             logError(LogCode.REPO_ERROR, 'Profile update error', { error: err, userId });
-            setError('Profil güncellenirken bir hata oluştu.');
-            throw err;
         }
-    }, [userId, loadProfile, syncSocialData]);
+    });
 
-    const uploadAvatar = useCallback(async (fileUri: string) => {
-        try {
+    const uploadAvatarMutation = useMutation({
+        mutationFn: async (fileUri: string) => {
             const avatarUrl = await profileRepo.uploadAvatar(userId, fileUri);
-            // Burada avatarUrl'i profile update ile de göndermek gerekebilir
-            await updateProfile({ avatarUrl });
-            return avatarUrl;
-        } catch (err) {
-            setError('Profil resmi yüklenirken bir hata oluştu.');
-            throw err;
+            return updateMutation.mutateAsync({ avatarUrl });
+        },
+        onError: (err) => {
+            logError(LogCode.REPO_ERROR, 'Avatar upload error', { error: err, userId });
         }
-    }, [userId, updateProfile]);
+    });
 
     return {
         user: syncedUser,
         isLoading,
-        error,
-        updateProfile,
-        uploadAvatar,
-        reload: loadProfile
+        error: queryError ? 'Profil yüklenirken bir hata oluştu.' : null,
+        updateProfile: updateMutation.mutateAsync,
+        uploadAvatar: uploadAvatarMutation.mutateAsync,
+        reload: (silentRefresh?: boolean) => refetch()
     };
+};
+
+export const useLightProfile = (userId: string) => {
+    const { data: user, isLoading } = useQuery({
+        queryKey: QUERY_KEYS.PROFILE_LITE(userId),
+        queryFn: () => profileRepo.getProfileLite(userId),
+        enabled: Boolean(userId),
+        staleTime: 1000 * 60 * 5, // Light profile can be stale for longer (5 mins)
+    });
+
+    return { user: user ?? null, isLoading };
 };

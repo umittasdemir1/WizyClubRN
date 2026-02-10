@@ -19,7 +19,7 @@ const profileRepo = new ProfileRepositoryImpl();
 interface EditProfileSheetProps {
   user: User;
   onUpdateProfile: (updates: Partial<User>) => Promise<any>;
-  onUploadAvatar: (uri: string) => Promise<string | null>;
+  onUploadAvatar: (uri: string) => Promise<User | any>;
   onUpdateCompleted?: () => void;
 }
 
@@ -119,8 +119,10 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
         // 1. Upload avatar if changed
         let avatarUrl = currentAvatar;
         if (currentAvatar !== user.avatarUrl && currentAvatar.startsWith('file://')) {
-          const uploadedUrl = await onUploadAvatar(currentAvatar);
-          if (uploadedUrl) avatarUrl = uploadedUrl;
+          const result = await onUploadAvatar(currentAvatar);
+          // uploadAvatar mutation returns User object; extract avatarUrl from it
+          if (result?.avatarUrl) avatarUrl = result.avatarUrl;
+          else if (typeof result === 'string') avatarUrl = result;
         }
 
         // 2. Build update object - only include username if it changed

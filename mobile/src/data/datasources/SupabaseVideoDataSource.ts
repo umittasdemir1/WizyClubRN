@@ -225,58 +225,19 @@ export class SupabaseVideoDataSource {
         const trimmed = query.trim();
         if (!trimmed) return [];
 
-        const normalized = trimmed.replace(/\s+/g, ' ').trim();
-        const term = normalized.startsWith('#') ? normalized.slice(1) : normalized;
-        const escaped = term.replace(/[%_]/g, '\\$&');
-        const ilikeTerm = `%${escaped}%`;
+        // Single RPC replaces 3-phase waterfall:
+        // 1. description ILIKE + profile ILIKE (parallel) 2. author videos lookup 3. getVideosByIds
+        const { data: searchResults, error: searchError } = await supabase.rpc('search_content', {
+            p_query: trimmed,
+            p_limit: limit,
+        });
 
-        const [
-            { data: descriptionData, error: descriptionError },
-            { data: profileData, error: profileError },
-        ] = await Promise.all([
-            supabase
-                .from('videos')
-                .select('id')
-                .is('deleted_at', null)
-                .ilike('description', ilikeTerm)
-                .order('created_at', { ascending: false })
-                .limit(limit),
-            supabase
-                .from('profiles')
-                .select('id')
-                .or(`username.ilike.${ilikeTerm},full_name.ilike.${ilikeTerm}`)
-                .limit(50),
-        ]);
-
-        if (descriptionError) {
-            logError(LogCode.DB_QUERY_ERROR, 'Search videos by description error', { query, error: descriptionError });
+        if (searchError) {
+            logError(LogCode.DB_QUERY_ERROR, 'Search content RPC error', { query, error: searchError });
+            return [];
         }
 
-        if (profileError) {
-            logError(LogCode.DB_QUERY_ERROR, 'Search profiles by name error', { query, error: profileError });
-        }
-
-        const descriptionIds = (descriptionData as Array<{ id: string }> | null)?.map((row) => row.id) || [];
-        const profileIds = (profileData as Array<{ id: string }> | null)?.map((row) => row.id) || [];
-
-        let authorIds: string[] = [];
-        if (profileIds.length > 0) {
-            const { data: authorData, error: authorError } = await supabase
-                .from('videos')
-                .select('id')
-                .is('deleted_at', null)
-                .in('user_id', profileIds)
-                .order('created_at', { ascending: false })
-                .limit(limit);
-
-            if (authorError) {
-                logError(LogCode.DB_QUERY_ERROR, 'Search videos by author error', { query, error: authorError });
-            }
-
-            authorIds = (authorData as Array<{ id: string }> | null)?.map((row) => row.id) || [];
-        }
-
-        const ids = Array.from(new Set([...descriptionIds, ...authorIds])).slice(0, limit);
+        const ids = (searchResults as Array<{ video_id: string }> | null)?.map(r => r.video_id) || [];
         if (!ids.length) return [];
 
         // Search grid doesn't need like/save/follow state; skip extra queries for speed.
@@ -286,38 +247,34 @@ export class SupabaseVideoDataSource {
         return ids.map((id) => videoMap.get(id)).filter(Boolean) as Video[];
     }
 
-    async getStories(): Promise<Story[]> {
+    async getStories(userId?: string): Promise<Story[]> {
         const now = new Date().toISOString();
-        const { data: { user } } = await supabase.auth.getUser();
 
-        let query = supabase
-            .from('stories')
-            .select('*, profiles(*)')
-            .gt('expires_at', now) // Only show unexpired stories
-            .order('created_at', { ascending: false })
-            .limit(50);
+        // Parallel fetch: stories + story_views (removed auth.getUser() call - userId passed as param)
+        const [storiesResult, viewsResult] = await Promise.all([
+            supabase
+                .from('stories')
+                .select('*, profiles(*)')
+                .gt('expires_at', now)
+                .order('created_at', { ascending: false })
+                .limit(50),
+            userId
+                ? supabase.from('story_views').select('story_id').eq('user_id', userId)
+                : Promise.resolve({ data: null }),
+        ]);
 
-        const { data, error } = await query;
-
-        if (error) {
-            logError(LogCode.DB_QUERY_ERROR, 'Supabase stories fetch error', error);
+        if (storiesResult.error) {
+            logError(LogCode.DB_QUERY_ERROR, 'Supabase stories fetch error', storiesResult.error);
             return [];
         }
 
-        let viewedStoryIds = new Set<string>();
-        if (user) {
-            const { data: views } = await supabase
-                .from('story_views')
-                .select('story_id')
-                .eq('user_id', user.id);
-
-            if (views) {
-                views.forEach(v => viewedStoryIds.add(v.story_id));
-            }
+        const viewedStoryIds = new Set<string>();
+        if (viewsResult.data) {
+            (viewsResult.data as Array<{ story_id: string }>).forEach(v => viewedStoryIds.add(v.story_id));
         }
 
-        logData(LogCode.DB_QUERY_SUCCESS, 'Stories fetched successfully', { count: data?.length || 0 });
-        return (data as any[]).map(dto => this.mapToStory(dto, viewedStoryIds.has(dto.id)));
+        logData(LogCode.DB_QUERY_SUCCESS, 'Stories fetched successfully', { count: storiesResult.data?.length || 0 });
+        return (storiesResult.data as any[]).map(dto => this.mapToStory(dto, viewedStoryIds.has(dto.id)));
     }
 
     async markStoryAsViewed(storyId: string, userId: string): Promise<void> {
@@ -350,54 +307,20 @@ export class SupabaseVideoDataSource {
             ? Math.max(0, Math.floor(rawCooldownMs as number))
             : SupabaseVideoDataSource.DEFAULT_VIEW_COOLDOWN_MS;
 
-        const { data: recentViews, error: recentError } = await supabase
-            .from('video_views')
-            .select('viewed_at')
-            .eq('user_id', userId)
-            .eq('video_id', videoId)
-            .order('viewed_at', { ascending: false })
-            .limit(1);
-
-        if (recentError) {
-            logError(LogCode.DB_QUERY_ERROR, 'Error checking latest video view', { videoId, userId, error: recentError });
-        } else {
-            const latestViewedAt = recentViews?.[0]?.viewed_at;
-            if (typeof latestViewedAt === 'string') {
-                const latestTimestamp = new Date(latestViewedAt).getTime();
-                if (Number.isFinite(latestTimestamp) && Date.now() - latestTimestamp < cooldownMs) {
-                    return 'cooldown';
-                }
-            }
-        }
-
-        const { error } = await supabase
-            .from('video_views')
-            .insert({
-                user_id: userId,
-                video_id: videoId
-            });
+        // Single RPC call replaces 3 sequential queries:
+        // 1. video_views.select(cooldown) 2. video_views.insert 3. rpc(increment_video_counter)
+        const { data, error } = await supabase.rpc('record_video_view_v2', {
+            p_user_id: userId,
+            p_video_id: videoId,
+            p_cooldown_ms: cooldownMs,
+        });
 
         if (error) {
-            if (error.code !== '23505') {
-                logError(LogCode.DB_INSERT, 'Error recording video view', { videoId, userId, error });
-            }
+            logError(LogCode.DB_INSERT, 'Error recording video view (RPC)', { videoId, userId, error });
             return 'error';
         }
 
-        const { error: incrementError } = await supabase.rpc('increment_video_counter', {
-            video_id: videoId,
-            counter_column: 'views_count',
-        });
-
-        if (incrementError) {
-            logError(LogCode.DB_UPDATE, 'Error incrementing views_count after video view insert', {
-                videoId,
-                userId,
-                error: incrementError,
-            });
-        }
-
-        return 'inserted';
+        return (data as 'inserted' | 'cooldown' | 'error') || 'error';
     }
 
     async getVideoById(videoId: string): Promise<Video | null> {

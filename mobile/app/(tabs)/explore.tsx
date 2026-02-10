@@ -4,7 +4,7 @@ import { useIsFocused } from '@react-navigation/native';
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
-import { useStoryViewer } from '../../src/presentation/hooks/useStoryViewer';
+import { useStories } from '../../src/presentation/hooks/useStories';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import { isDisabled } from '../../src/presentation/components/poolFeed/hooks/usePoolFeedConfig';
 import Video from 'react-native-video';
@@ -300,10 +300,10 @@ export default function ExploreScreen() {
         .filter((item): item is NonNullable<typeof item> => item != null)
         .slice(0, 5);
 
-    const { stories: storyListData } = useStoryViewer();
+    const { stories: storyListData } = useStories();
 
     const storyCreatorsMap = new Map();
-    storyListData.forEach(story => {
+    (storyListData as any[]).forEach((story: any) => {
         const existing = storyCreatorsMap.get(story.user.id);
         if (!existing) {
             storyCreatorsMap.set(story.user.id, {
