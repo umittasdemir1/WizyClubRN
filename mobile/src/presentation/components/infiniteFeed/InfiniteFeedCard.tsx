@@ -14,6 +14,7 @@ import { FEED_FLAGS } from './hooks/useInfiniteFeedConfig';
 import { getBufferConfig } from '../../../core/utils/bufferConfig';
 import { shadowStyle } from '@/core/utils/shadow';
 import { PerformanceLogger } from '../../../core/services/PerformanceLogger';
+import VideosIcon from '../../../../assets/icons/videos.svg';
 
 const DESCRIPTION_LIMIT = 70;
 const CARD_HORIZONTAL_PADDING = 16;
@@ -510,6 +511,10 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         videoRef.current?.seek?.(0);
     }, []);
 
+    const handleWatchMoreClipsPress = useCallback((event?: GestureResponderEvent) => {
+        event?.stopPropagation?.();
+    }, []);
+
     const handleVideoError = useCallback((_error: OnVideoErrorData) => {
         clearReadyFallbackTimer();
 
@@ -704,9 +709,10 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
             description: [styles.description, { color: colors.textPrimary }],
             readMore: [styles.readMore, { color: colors.textSecondary }],
             displayName: [styles.displayName, { color: colors.textPrimary }],
-            replayOverlay: [styles.replayOverlay, { backgroundColor: isDarkTheme ? 'rgba(20,20,20,0.36)' : 'rgba(0,0,0,0.24)' }],
-            replayBadge: [styles.replayBadge, { backgroundColor: isDarkTheme ? 'rgba(32,32,34,0.94)' : 'rgba(255,255,255,0.94)' }],
+            replayBadge: [styles.replayBadge, { backgroundColor: 'transparent' }],
             replayBadgeText: [styles.replayBadgeText, { color: isDarkTheme ? '#FFFFFF' : '#111111' }],
+            replayMoreButton: [styles.replayMoreButton, { backgroundColor: '#080A0F' }],
+            replayMoreText: [styles.replayMoreText, { color: '#FFFFFF' }],
             cardOuter: [
                 styles.card,
                 disableCardStyle ? styles.cardEdgeToEdge : null,
@@ -877,22 +883,29 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                 style={styles.mediaTapLayer}
                                 onPress={handleOpen}
                             />
+                            {isVideo && isActive && hasReachedLoopLimit && (
+                                <View style={styles.replayButtonsContainer}>
+                                    <Pressable
+                                        style={themedStyles.replayMoreButton}
+                                        onPress={handleWatchMoreClipsPress}
+                                        hitSlop={8}
+                                    >
+                                        <VideosIcon width={18} height={18} />
+                                        <Text style={themedStyles.replayMoreText}>Daha fazla Clips izle</Text>
+                                    </Pressable>
+                                    <Pressable
+                                        style={themedStyles.replayBadge}
+                                        onPress={(event) => {
+                                            event.stopPropagation?.();
+                                            handleReplay();
+                                        }}
+                                        hitSlop={8}
+                                    >
+                                        <Text style={themedStyles.replayBadgeText}>Tekrar izle</Text>
+                                    </Pressable>
+                                </View>
+                            )}
                         </View>
-
-                        {isVideo && isActive && hasReachedLoopLimit && (
-                            <View style={themedStyles.replayOverlay}>
-                                <Pressable
-                                    style={themedStyles.replayBadge}
-                                    onPress={(event) => {
-                                        event.stopPropagation?.();
-                                        handleReplay();
-                                    }}
-                                    hitSlop={8}
-                                >
-                                    <Text style={themedStyles.replayBadgeText}>Tekrar izle</Text>
-                                </Pressable>
-                            </View>
-                        )}
 
                         {/* ✅ USER HEADER - Top-left overlay on media */}
                         {!disableUserHeader && (
@@ -1152,7 +1165,7 @@ const styles = StyleSheet.create({
     },
     mediaTapLayer: {
         ...StyleSheet.absoluteFillObject,
-        zIndex: 2,
+        zIndex: 1,
     },
     videoContainer: {
         width: '100%',
@@ -1240,11 +1253,29 @@ const styles = StyleSheet.create({
         height: '100%',
         backgroundColor: '#111',
     },
-    replayOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        justifyContent: 'center',
+    replayButtonsContainer: {
+        position: 'absolute',
+        top: '50%',
+        left: 0,
+        right: 0,
         alignItems: 'center',
-        zIndex: 1,
+        transform: [{ translateY: -28 }],
+        zIndex: 2,
+        elevation: 2,
+    },
+    replayMoreButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 4,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 999,
+    },
+    replayMoreText: {
+        fontSize: 15,
+        fontWeight: '600',
+        letterSpacing: 0.2,
     },
     replayBadge: {
         paddingHorizontal: 18,
