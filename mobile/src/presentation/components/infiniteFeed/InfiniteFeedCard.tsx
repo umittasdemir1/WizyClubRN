@@ -824,7 +824,6 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                 ) : (
                     <Pressable
                         style={mediaWrapperStyle}
-                        onPress={handleOpen}
                     >
                         <View
                             style={styles.videoContainer}
@@ -874,6 +873,10 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                     preventsDisplaySleepDuringVideoPlayback={false}
                                 />
                             ) : null}
+                            <Pressable
+                                style={styles.mediaTapLayer}
+                                onPress={handleOpen}
+                            />
                         </View>
 
                         {isVideo && isActive && hasReachedLoopLimit && (
@@ -1041,13 +1044,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     return (
         <View style={themedStyles.cardOuter}>
             <View style={themedStyles.cardInner}>
-                {isCarousel ? (
-                    cardBody
-                ) : (
-                    <Pressable onPress={handleOpen}>
-                        {cardBody}
-                    </Pressable>
-                )}
+                {cardBody}
             </View>
         </View>
     );
@@ -1152,6 +1149,10 @@ const styles = StyleSheet.create({
         width: '100%',
         height: '100%',
         backgroundColor: '#111',
+    },
+    mediaTapLayer: {
+        ...StyleSheet.absoluteFillObject,
+        zIndex: 2,
     },
     videoContainer: {
         width: '100%',

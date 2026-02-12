@@ -68,7 +68,6 @@ interface PoolFeedManagerProps {
     deleteVideo: (id: string) => void;
     prependVideo?: (video: PoolFeedVideo) => void;
     showStories?: boolean;
-    isCustomFeed?: boolean;
     homeReselectTrigger?: number;
 }
 
@@ -92,7 +91,6 @@ export const PoolFeedManager = ({
     deleteVideo,
     prependVideo,
     showStories = true,
-    isCustomFeed = false,
     homeReselectTrigger = 0,
 }: PoolFeedManagerProps) => {
     // Hooks & Store
@@ -101,7 +99,7 @@ export const PoolFeedManager = ({
     const router = useRouter();
     const { user } = usePoolFeedAuthStore();
     const { stories: storyListData } = useStories(undefined, 'pool');
-    const { isMuted, toggleMute } = usePoolFeedMuteControls();
+    const { isMuted } = usePoolFeedMuteControls();
 
     // Active Video State (Zustand)
     const activeVideoId = usePoolFeedActiveVideoStore((state) => state.activeVideoId);
@@ -114,7 +112,9 @@ export const PoolFeedManager = ({
     const isCleanScreen = usePoolFeedActiveVideoStore((state) => state.isCleanScreen);
     const playbackRate = usePoolFeedActiveVideoStore((state) => state.playbackRate);
     const viewingMode = usePoolFeedActiveVideoStore((state) => state.viewingMode);
+    const pendingOpenVideo = usePoolFeedActiveVideoStore((state) => state.pendingOpenVideo);
     const setActiveVideo = usePoolFeedActiveVideoStore((state) => state.setActiveVideo);
+    const clearPendingOpenVideo = usePoolFeedActiveVideoStore((state) => state.clearPendingOpenVideo);
     const togglePause = usePoolFeedActiveVideoStore((state) => state.togglePause);
     const setPaused = usePoolFeedActiveVideoStore((state) => state.setPaused);
     const setScreenFocused = usePoolFeedActiveVideoStore((state) => state.setScreenFocused);
@@ -165,9 +165,12 @@ export const PoolFeedManager = ({
     });
 
     const resolvedActiveIndex = useMemo(() => {
-        if (activeIndex >= 0) return activeIndex;
-        if (!activeVideoId) return -1;
-        return videos.findIndex((video) => video.id === activeVideoId);
+        if (activeVideoId) {
+            const matchedIndex = videos.findIndex((video) => video.id === activeVideoId);
+            if (matchedIndex >= 0) return matchedIndex;
+        }
+        if (activeIndex >= 0 && activeIndex < videos.length) return activeIndex;
+        return -1;
     }, [activeIndex, activeVideoId, videos]);
 
     const storyUsers = useMemo(() => {
@@ -182,8 +185,6 @@ export const PoolFeedManager = ({
         }, []);
     }, [storyListData]);
 
-    const hasUnseenStories = storyUsers.some((u: any) => u.hasUnseenStory);
-
     // ======================================================================== 
     // Modular Hooks Orchestration
     // ======================================================================== 
@@ -196,18 +197,17 @@ export const PoolFeedManager = ({
     });
 
     const videoCallbacks = usePoolFeedVideoCallbacks({
-        videosRef, activeIndex, activeVideoId, viewingMode, togglePause,
-        setCleanScreen, videoPlayerRef, listRef,
+        videosRef,
+        activeIndex: resolvedActiveIndex,
+        activeVideoId,
+        viewingMode,
+        listRef,
     });
 
     const interactionApi = usePoolFeedInteractions({
         videosRef, toggleLike, togglePause, activeTab, setActiveTab,
         playbackRate, setRateLabel, videoPlayerRef, moreOptionsSheetRef,
-        isVideoFinished: videoCallbacks.isVideoFinished,
-        setIsVideoFinished: videoCallbacks.setIsVideoFinished,
         setIsCarouselInteracting,
-        loopCountRef: videoCallbacks.loopCountRef,
-        lastLoopTimeRef: videoCallbacks.lastLoopTimeRef,
     });
 
     const actionApi = usePoolFeedActions({
@@ -215,19 +215,79 @@ export const PoolFeedManager = ({
         toggleShare, deleteVideo, togglePause, openInAppBrowser,
         setCleanScreen, isCleanScreen, descriptionSheetRef, moreOptionsSheetRef,
         videoPlayerRef, activeTimeRef: videoCallbacks.activeTimeRef,
-        setIsVideoFinished: videoCallbacks.setIsVideoFinished,
-        loopCountRef: videoCallbacks.loopCountRef,
         insetTop: insets.top,
     });
 
     usePoolFeedLifecycleSync({
-        videos, videosRef, activeVideoId, activeIndex, isPaused, isAppActive,
+        videos, videosRef, activeVideoId, activeIndex: resolvedActiveIndex, isPaused, isAppActive,
         ignoreAppState, isInAppBrowserVisible, netInfo, uploadedVideoId,
         uploadStatus, resetUpload, prependVideo, setActiveVideo, togglePause,
-        setPaused, setScreenFocused, setActiveTab, listRef, isCustomFeed,
+        setPaused, setScreenFocused, setActiveTab, listRef,
         lastActiveIdRef, lastInternalIndex,
         resetPlayback: videoCallbacks.resetPlayback,
     });
+
+    // Keep store index aligned with activeVideoId across feeds.
+    // If the clicked video is not in the current page yet, inject handoff payload and play it immediately.
+    useEffect(() => {
+        if (!activeVideoId) return;
+
+        const isPendingHandoff = pendingOpenVideo?.id === activeVideoId;
+        const enforceAutoplayNow = () => {
+            setScreenFocused(true);
+            setPaused(false);
+            requestAnimationFrame(() => setPaused(false));
+            setTimeout(() => setPaused(false), 120);
+        };
+
+        const matchedIndex = videos.findIndex((video) => video.id === activeVideoId);
+        if (matchedIndex >= 0) {
+            if (isPendingHandoff) {
+                enforceAutoplayNow();
+                clearPendingOpenVideo();
+                lastInternalIndex.current = matchedIndex;
+                lastActiveIdRef.current = activeVideoId;
+                setActiveVideo(activeVideoId, matchedIndex);
+                requestAnimationFrame(() => {
+                    listRef.current?.scrollToOffset({ offset: matchedIndex * ITEM_HEIGHT, animated: false });
+                    setPaused(false);
+                });
+                return;
+            }
+
+            if (matchedIndex === activeIndex) return;
+            lastInternalIndex.current = matchedIndex;
+            lastActiveIdRef.current = activeVideoId;
+            setActiveVideo(activeVideoId, matchedIndex);
+            requestAnimationFrame(() => {
+                listRef.current?.scrollToOffset({ offset: matchedIndex * ITEM_HEIGHT, animated: false });
+            });
+            return;
+        }
+
+        if (!prependVideo || !isPendingHandoff || !pendingOpenVideo) return;
+
+        enforceAutoplayNow();
+        prependVideo(pendingOpenVideo);
+        clearPendingOpenVideo();
+        lastInternalIndex.current = 0;
+        lastActiveIdRef.current = activeVideoId;
+        setActiveVideo(activeVideoId, 0);
+        requestAnimationFrame(() => {
+            listRef.current?.scrollToOffset({ offset: 0, animated: false });
+            setPaused(false);
+        });
+    }, [
+        activeIndex,
+        activeVideoId,
+        clearPendingOpenVideo,
+        pendingOpenVideo,
+        prependVideo,
+        setPaused,
+        setScreenFocused,
+        setActiveVideo,
+        videos,
+    ]);
 
     useEffect(() => {
         if (homeReselectTrigger <= 0) return;
@@ -255,9 +315,9 @@ export const PoolFeedManager = ({
     // ======================================================================== 
 
     const handleSwipeLeft = useCallback(() => {
-        if (isCustomFeed || !activeVideo?.user?.id) return;
+        if (!activeVideo?.user?.id) return;
         router.push(isOwnActiveVideo ? '/profile' : `/user/${activeVideo.user.id}` as any);
-    }, [activeVideo?.user?.id, isOwnActiveVideo, isCustomFeed, router]);
+    }, [activeVideo?.user?.id, isOwnActiveVideo, router]);
 
     // Memoize overlay props to prevent unnecessary re-renders
     const saveToastProps = useMemo(() => ({
@@ -279,36 +339,31 @@ export const PoolFeedManager = ({
         retryCount: videoCallbacks.retryCount,
         rateLabel,
         tapIndicator: interactionApi.tapIndicator,
-        isFinished: videoCallbacks.isVideoFinished,
         currentTimeSV: videoCallbacks.currentTimeSV,
         durationSV: videoCallbacks.durationSV,
-    }), [isPaused, videoCallbacks.hasVideoError, videoCallbacks.retryCount, rateLabel, interactionApi.tapIndicator, videoCallbacks.isVideoFinished, videoCallbacks.currentTimeSV, videoCallbacks.durationSV]);
+    }), [isPaused, videoCallbacks.hasVideoError, videoCallbacks.retryCount, rateLabel, interactionApi.tapIndicator, videoCallbacks.currentTimeSV, videoCallbacks.durationSV]);
 
     const overlayActions = useMemo(() => ({
-        onToggleMute: toggleMute,
-        onStoryPress: () => setActiveTab('stories'),
+        onBack: () => router.navigate('/' as any),
         onUploadPress: () => router.push('/upload'),
-        onTabChange: setActiveTab,
         onStoryAvatarPress: (userId: string) => router.push(`/story/${userId}` as any),
         onCloseStoryBar: () => setActiveTab('foryou'),
         onCleanScreen: actionApi.handleCleanScreen,
         onSheetDelete: actionApi.handleSheetDelete,
         onFollowPress: actionApi.handleToggleFollow,
         onDescriptionChange: (index: number) => index > 0 && !isPaused && togglePause(),
-        onBack: () => router.back(),
         onLike: actionApi.handleToggleLike,
         onSave: actionApi.handleToggleSave,
         onShare: actionApi.handleToggleShare,
         onShop: actionApi.handleOpenShopping,
         onDescription: actionApi.handleOpenDescription,
-        onRestart: interactionApi.handleFeedTap,
         onActionPressIn: interactionApi.handleActionPressIn,
         onActionPressOut: interactionApi.handleActionPressOut,
         playbackController: {
             seekTo: actionApi.seekTo,
             retryActive: actionApi.retryActive
         }
-    }), [toggleMute, router, actionApi, interactionApi, isPaused, togglePause]);
+    }), [router, actionApi, interactionApi, isPaused, togglePause]);
 
     const overlayItems = useMemo(() => {
         if (!videos.length || resolvedActiveIndex < 0) return [];
@@ -352,11 +407,9 @@ export const PoolFeedManager = ({
             <PoolFeedStatusViews
                 isLoading={isLoading} isRefreshing={isRefreshing} error={error}
                 videosCount={videos.length} refreshFeed={refreshFeed}
-                isCleanScreen={isCleanScreen} isMuted={isMuted} toggleMute={toggleMute}
-                setActiveTab={setActiveTab} activeTab={activeTab}
-                hasUnseenStories={hasUnseenStories} isCustomFeed={isCustomFeed}
+                isCleanScreen={isCleanScreen}
+                onBack={() => router.navigate('/' as any)}
                 onUploadPress={() => router.push('/upload')}
-                onBack={() => router.back()}
             />
         );
     }
@@ -364,13 +417,13 @@ export const PoolFeedManager = ({
     return (
         <SwipeWrapper
             onSwipeLeft={isDisabled('DISABLE_INTERACTION_HANDLING') ? undefined : handleSwipeLeft}
-            onSwipeRight={isDisabled('DISABLE_INTERACTION_HANDLING') ? undefined : () => !isCustomFeed && router.push('/upload')}
-            disabled={isCustomFeed || isDisabled('DISABLE_INTERACTION_HANDLING')}
+            onSwipeRight={isDisabled('DISABLE_INTERACTION_HANDLING') ? undefined : () => router.push('/upload')}
+            disabled={isDisabled('DISABLE_INTERACTION_HANDLING')}
         >
             <View style={styles.container}>
                 <PoolFeedVideoPlayerPool
                     ref={videoPlayerRef}
-                    videos={videos} activeIndex={activeIndex}
+                    videos={videos} activeIndex={resolvedActiveIndex}
                     isMuted={isMuted} isPaused={isPaused} playbackRate={playbackRate}
                     onPlaybackRateChange={setPlaybackRate}
                     onVideoLoaded={videoCallbacks.handleVideoLoaded}
@@ -428,9 +481,8 @@ export const PoolFeedManager = ({
                         currentUserId={user?.id || null}
                         isOwnActiveVideo={isOwnActiveVideo}
                         isCleanScreen={isCleanScreen} isSeeking={isSeeking}
-                        isMuted={isMuted} activeTab={activeTab}
-                        hasUnseenStories={hasUnseenStories}
-                        showStories={showStories} isCustomFeed={isCustomFeed}
+                        activeTab={activeTab}
+                        showStories={showStories}
                         storyUsers={storyUsers} uiOpacityStyle={uiOpacityStyle}
                         overlayItems={overlayItems}
                         activeIndex={resolvedActiveIndex} isPlayable={isActivePlayable}

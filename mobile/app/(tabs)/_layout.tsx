@@ -134,16 +134,18 @@ export default function TabLayout() {
                 }}
             />
             <Tabs.Screen
-                name="notifications"
+                name="videos"
                 options={{
-                    tabBarButton: (props) => (
+                    lazy: false,
+                    tabBarIcon: ({ color, focused }) => (
                         <View
-                            pointerEvents="none"
-                            style={[props.style, styles.emptyTabSlot]}
-                            accessibilityElementsHidden
-                            importantForAccessibility="no-hide-descendants"
+                            style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}
                         >
-                            <VideosTabSvgIcon width={TAB_ICON_SIZE} height={TAB_ICON_SIZE} color={tabIconColor} />
+                            <VideosTabSvgIcon
+                                width={focused ? TAB_ICON_ACTIVE_SIZE : TAB_ICON_SIZE}
+                                height={focused ? TAB_ICON_ACTIVE_SIZE : TAB_ICON_SIZE}
+                                color={color}
+                            />
                         </View>
                     ),
                 }}
@@ -161,10 +163,6 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
-    emptyTabSlot: {
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
     avatarWrapper: {
         width: 32,
         height: 32,

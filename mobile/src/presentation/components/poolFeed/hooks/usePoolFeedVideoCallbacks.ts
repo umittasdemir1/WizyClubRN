@@ -4,7 +4,7 @@
  * Handles all events from the video player pool:
  * - onLoad
  * - onProgress (UI sync, auto-advance)
- * - onEnd (looping, finish state)
+ * - onEnd (continuous replay)
  * - onError
  *
  * @module presentation/components/feed/hooks/usePoolFeedVideoCallbacks
@@ -13,8 +13,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { SharedValue, useSharedValue } from 'react-native-reanimated';
 import { FEED_CONFIG, ITEM_HEIGHT } from './usePoolFeedConfig';
-import { useActiveVideoStore } from '../../../store/useActiveVideoStore';
-
 import { Video } from '../../../../domain/entities/Video';
 
 export interface UseFeedVideoCallbacksOptions {
@@ -24,15 +22,9 @@ export interface UseFeedVideoCallbacksOptions {
     activeIndex: number;
     /** Current active video ID */
     activeVideoId: string | null;
-    /** Current viewing mode ('full', 'fast', 'minimal') */
-    viewingMode: string;
-    /** Toggle pause function from store */
-    togglePause: () => void;
-    /** Set clean screen function */
-    setCleanScreen: (value: boolean) => void;
-    /** Video player pool ref for retry/seek */
-    videoPlayerRef: React.MutableRefObject<any>;
-    /** FlashList ref for auto-advance */
+    /** Current viewing mode */
+    viewingMode: 'off' | 'fast' | 'full';
+    /** FlashList ref for mode-based auto-advance */
     listRef: React.MutableRefObject<any>;
 }
 
@@ -51,10 +43,6 @@ export interface UseFeedVideoCallbacksReturn {
     currentTimeSV: SharedValue<number>;
     /** SharedValue for video duration */
     durationSV: SharedValue<number>;
-    /** Is video finished state */
-    isVideoFinished: boolean;
-    /** Set video finished state */
-    setIsVideoFinished: (value: boolean) => void;
     /** Has video error state */
     hasVideoError: boolean;
     /** Set video error state */
@@ -66,8 +54,6 @@ export interface UseFeedVideoCallbacksReturn {
     /** Reset playback state for new video */
     resetPlayback: () => void;
     /** Refs for interaction sync */
-    loopCountRef: React.MutableRefObject<number>;
-    lastLoopTimeRef: React.MutableRefObject<number>;
     activeTimeRef: React.MutableRefObject<number>;
 }
 
@@ -77,9 +63,6 @@ export function usePoolFeedVideoCallbacks(options: UseFeedVideoCallbacksOptions)
         activeIndex,
         activeVideoId,
         viewingMode,
-        togglePause,
-        setCleanScreen,
-        videoPlayerRef,
         listRef,
     } = options;
 
@@ -88,7 +71,6 @@ export function usePoolFeedVideoCallbacks(options: UseFeedVideoCallbacksOptions)
     // ========================================================================
     const currentTimeSV = useSharedValue(0);
     const durationSV = useSharedValue(0);
-    const [isVideoFinished, setIsVideoFinished] = useState(false);
     const [hasVideoError, setHasVideoError] = useState(false);
     const [retryCount, setRetryCount] = useState(0);
 
@@ -97,8 +79,6 @@ export function usePoolFeedVideoCallbacks(options: UseFeedVideoCallbacksOptions)
     // ========================================================================
     const activeDurationRef = useRef(0);
     const activeTimeRef = useRef(0);
-    const loopCountRef = useRef(0);
-    const lastLoopTimeRef = useRef(Date.now());
     const autoAdvanceGuardRef = useRef<string | null>(null);
 
     // ========================================================================
@@ -130,11 +110,11 @@ export function usePoolFeedVideoCallbacks(options: UseFeedVideoCallbacksOptions)
         currentTimeSV.value = currentTime;
         activeTimeRef.current = currentTime;
 
-        // Auto-advance logic for 'fast' mode
+        // Hızlı mod: uzun videolarda belirli eşikte bir sonraki videoya geç
         if (viewingMode !== 'fast') return;
         if (!activeVideoId) return;
-        if (duration > 0 && duration <= 10) return;
-        if (currentTime < 10) return;
+        if (duration > 0 && duration <= FEED_CONFIG.FAST_MODE_AUTO_ADVANCE_THRESHOLD) return;
+        if (currentTime < FEED_CONFIG.FAST_MODE_AUTO_ADVANCE_THRESHOLD) return;
         if (autoAdvanceGuardRef.current === activeVideoId) return;
 
         autoAdvanceGuardRef.current = activeVideoId;
@@ -149,32 +129,11 @@ export function usePoolFeedVideoCallbacks(options: UseFeedVideoCallbacksOptions)
 
     const handleVideoEnd = useCallback((index: number) => {
         if (index !== activeIndex) return;
-
-        const now = Date.now();
-        if (now - lastLoopTimeRef.current < FEED_CONFIG.LOOP_DEBOUNCE_MS) {
-            return;
-        }
-        lastLoopTimeRef.current = now;
-
-        loopCountRef.current += 1;
-
-        if (loopCountRef.current < FEED_CONFIG.MAX_VIDEO_LOOPS) {
-            videoPlayerRef.current?.seekTo(0);
-            const isPausedNow = useActiveVideoStore.getState().isPaused;
-            if (isPausedNow) {
-                togglePause();
-            }
-            return;
-        }
-
-        // Finish state
-        setIsVideoFinished(true);
-        setCleanScreen(false);
-
-        // Auto-advance logic for 'full' and 'fast' (short videos)
+        // repeat=true ile video akışı kesintisiz döner.
+        // İzleme modu açıkken eski davranış korunur: uygun modda bir sonraki videoya geç.
         const shouldAdvance =
             viewingMode === 'full' ||
-            (viewingMode === 'fast' && activeDurationRef.current > 0 && activeDurationRef.current <= 10);
+            (viewingMode === 'fast' && activeDurationRef.current > 0 && activeDurationRef.current <= FEED_CONFIG.FAST_MODE_AUTO_ADVANCE_THRESHOLD);
 
         if (shouldAdvance) {
             const nextIndex = Math.min(activeIndex + 1, videosRef.current.length - 1);
@@ -185,7 +144,7 @@ export function usePoolFeedVideoCallbacks(options: UseFeedVideoCallbacksOptions)
                 });
             }
         }
-    }, [activeIndex, viewingMode, videoPlayerRef, listRef, videosRef, togglePause, setCleanScreen]);
+    }, [activeIndex, listRef, videosRef, viewingMode]);
 
     const handleRemoveVideo = useCallback((index: number) => {
         if (index === activeIndex) {
@@ -195,14 +154,11 @@ export function usePoolFeedVideoCallbacks(options: UseFeedVideoCallbacksOptions)
 
     const resetPlayback = useCallback(() => {
         setHasVideoError(false);
-        setIsVideoFinished(false);
         setRetryCount(0);
         currentTimeSV.value = 0;
         durationSV.value = 0;
-        activeTimeRef.current = 0;
         activeDurationRef.current = 0;
-        loopCountRef.current = 0;
-        lastLoopTimeRef.current = Date.now();
+        activeTimeRef.current = 0;
         autoAdvanceGuardRef.current = null;
     }, [currentTimeSV, durationSV]);
 
@@ -214,15 +170,11 @@ export function usePoolFeedVideoCallbacks(options: UseFeedVideoCallbacksOptions)
         handleRemoveVideo,
         currentTimeSV,
         durationSV,
-        isVideoFinished,
-        setIsVideoFinished,
         hasVideoError,
         setHasVideoError,
         retryCount,
         setRetryCount,
         resetPlayback,
-        loopCountRef,
-        lastLoopTimeRef,
         activeTimeRef,
     };
 }

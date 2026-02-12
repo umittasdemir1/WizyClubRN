@@ -109,7 +109,6 @@ export default function HomeFeedScreen() {
             deleteVideo={deleteVideo}
             prependVideo={prependVideo}
             showStories={true}
-            isCustomFeed={false}
             homeReselectTrigger={homeReselectTrigger}
         />
     );

@@ -14,7 +14,6 @@ import { useCallback, useRef, useState, useMemo } from 'react';
 import { SCREEN_WIDTH, isDisabled } from './usePoolFeedConfig';
 import { Video } from '../../../../domain/entities/Video';
 import { useActiveVideoStore } from '../../../store/useActiveVideoStore';
-import { LogCode, logUI } from '../../../../core/services/Logger';
 
 // ============================================================================
 // Types
@@ -31,10 +30,6 @@ export interface UseFeedInteractionsOptions {
     activeTab: 'stories' | 'foryou';
     /** Set active tab */
     setActiveTab: (tab: 'stories' | 'foryou') => void;
-    /** Is video finished state */
-    isVideoFinished: boolean;
-    /** Set video finished state */
-    setIsVideoFinished: (value: boolean) => void;
     /** Set carousel interacting state */
     setIsCarouselInteracting: (value: boolean) => void;
     /** Current playback rate */
@@ -45,10 +40,6 @@ export interface UseFeedInteractionsOptions {
     videoPlayerRef: React.MutableRefObject<any>;
     /** More options sheet ref */
     moreOptionsSheetRef: React.MutableRefObject<any>;
-    /** Loop count ref */
-    loopCountRef: React.MutableRefObject<number>;
-    /** Last loop time ref */
-    lastLoopTimeRef: React.MutableRefObject<number>;
 }
 
 export interface UseFeedInteractionsReturn {
@@ -101,23 +92,16 @@ export function usePoolFeedInteractions(options: UseFeedInteractionsOptions): Us
         togglePause,
         activeTab,
         setActiveTab,
-        isVideoFinished,
-        setIsVideoFinished,
         setIsCarouselInteracting,
         playbackRate,
         setRateLabel,
         videoPlayerRef,
         moreOptionsSheetRef,
-        loopCountRef,
-        lastLoopTimeRef,
     } = options;
 
     // ========================================================================
     // Refs for stable callbacks
     // ========================================================================
-    const isVideoFinishedRef = useRef(isVideoFinished);
-    isVideoFinishedRef.current = isVideoFinished;
-
     const activeTabRef = useRef(activeTab);
     activeTabRef.current = activeTab;
 
@@ -172,23 +156,6 @@ export function usePoolFeedInteractions(options: UseFeedInteractionsOptions): Us
         // Block taps right after double-tap
         if (Date.now() < doubleTapBlockUntilRef.current) return;
 
-        // Handle restart when video is finished
-        if (isVideoFinishedRef.current) {
-            if (__DEV__) {
-                logUI(LogCode.INTERACTION_TAP, 'Manual restart triggered');
-            }
-            isVideoFinishedRef.current = false;
-            setIsVideoFinished(false);
-            loopCountRef.current = 0;
-            lastLoopTimeRef.current = Date.now();
-            videoPlayerRef.current?.seekTo(0);
-            const isPausedNow = useActiveVideoStore.getState().isPaused;
-            if (isPausedNow) {
-                togglePause();
-            }
-            return;
-        }
-
         // Handle story tab tap
         if (activeTabRef.current === 'stories') {
             setActiveTab('foryou');
@@ -205,10 +172,6 @@ export function usePoolFeedInteractions(options: UseFeedInteractionsOptions): Us
         togglePause,
         showTapIndicator,
         setActiveTab,
-        setIsVideoFinished,
-        videoPlayerRef,
-        loopCountRef,
-        lastLoopTimeRef,
     ]);
 
     // ========================================================================

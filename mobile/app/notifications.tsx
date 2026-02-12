@@ -3,15 +3,15 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState, useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ShoppingBag, User, Heart, Bell } from 'lucide-react-native';
-import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
-import { useThemeStore } from '../../src/presentation/store/useThemeStore';
-import { useNotificationStore } from '../../src/presentation/store/useNotificationStore';
-import { COLORS } from '../../src/core/constants';
-import { TrendingHeader } from '../../src/presentation/components/explore/TrendingHeader';
+import { SwipeWrapper } from '../src/presentation/components/shared/SwipeWrapper';
+import { useThemeStore } from '../src/presentation/store/useThemeStore';
+import { useNotificationStore } from '../src/presentation/store/useNotificationStore';
+import { COLORS } from '../src/core/constants';
+import { TrendingHeader } from '../src/presentation/components/explore/TrendingHeader';
 import { SystemBars } from 'react-native-edge-to-edge';
 import * as Notifications from 'expo-notifications';
 
-import { MOCK_NOTIFICATIONS, Notification } from '../../src/data/mock/notifications';
+import { MOCK_NOTIFICATIONS, Notification } from '../src/data/mock/notifications';
 
 export default function NotificationsScreen() {
     const insets = useSafeAreaInsets();

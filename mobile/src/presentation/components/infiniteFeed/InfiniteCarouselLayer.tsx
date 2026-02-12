@@ -141,6 +141,11 @@ export function InfiniteCarouselLayer({
     }, []);
 
     const handlePress = useCallback((_event: GestureResponderEvent) => {
+        if (!onDoubleTap) {
+            onSingleTap?.();
+            return;
+        }
+
         tapCount.current += 1;
         if (tapCount.current === 1) {
             tapTimer.current = setTimeout(() => {

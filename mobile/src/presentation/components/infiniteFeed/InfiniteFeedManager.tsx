@@ -7,13 +7,14 @@ import {
     RefreshControl,
     ActivityIndicator,
     Dimensions,
+    unstable_batchedUpdates,
     type NativeSyntheticEvent,
     type NativeScrollEvent,
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useIsFocused } from '@react-navigation/native';
+import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { SystemBars } from 'react-native-edge-to-edge';
 import { Image as ExpoImage } from 'expo-image';
 import { useNetInfo, NetInfoStateType } from '@react-native-community/netinfo';
@@ -110,6 +111,7 @@ export function InfiniteFeedManager({
 }: InfiniteFeedManagerProps) {
     const insets = useSafeAreaInsets();
     const router = useRouter();
+    const navigation = useNavigation<any>();
     const isRouteFocused = useIsFocused();
     const netInfo = useNetInfo();
     const isDark = useThemeStore((state) => state.isDark);
@@ -128,6 +130,7 @@ export function InfiniteFeedManager({
     const [activeTab, setActiveTab] = useState<FeedTab>('Sana Özel');
     const [selectedMoreVideoId, setSelectedMoreVideoId] = useState<string | null>(null);
     const [isMoreDeleteConfirmationVisible, setMoreDeleteConfirmationVisible] = useState(false);
+    const [isMoreSheetOpen, setIsMoreSheetOpen] = useState(false);
 
     // ✅ [PERF] Batched state - 4 states → 1 (reduces 4 re-renders to 1)
     interface FeedActiveState {
@@ -190,8 +193,11 @@ export function InfiniteFeedManager({
     const isMutedRef = useRef(isMuted);
     const netInfoTypeRef = useRef(netInfo.type);
 
-    const setCustomFeed = useInfiniteFeedActiveVideoStore((state) => state.setCustomFeed);
     const setActiveVideo = useInfiniteFeedActiveVideoStore((state) => state.setActiveVideo);
+    const setPendingOpenVideo = useInfiniteFeedActiveVideoStore((state) => state.setPendingOpenVideo);
+    const setPaused = useInfiniteFeedActiveVideoStore((state) => state.setPaused);
+    const setScreenFocused = useInfiniteFeedActiveVideoStore((state) => state.setScreenFocused);
+    const openVideoLockRef = useRef<{ id: string; ts: number } | null>(null);
     const immediateActiveCommit = FEED_FLAGS.INF_ACTIVE_COMMIT_ON_VIEWABLE;
 
     useFocusEffect(
@@ -205,10 +211,25 @@ export function InfiniteFeedManager({
     );
 
     const handleOpenVideo = useCallback((id: string, index: number) => {
-        setCustomFeed(videos);
-        setActiveVideo(id, index);
-        router.push('/custom-feed' as any);
-    }, [videos, setCustomFeed, setActiveVideo, router]);
+        const now = Date.now();
+        const lock = openVideoLockRef.current;
+        if (lock && lock.id === id && now - lock.ts < 400) return;
+        openVideoLockRef.current = { id, ts: now };
+
+        const selectedVideo = videos[index] ?? videos.find((video) => video.id === id) ?? null;
+        unstable_batchedUpdates(() => {
+            setPendingOpenVideo(selectedVideo);
+            setActiveVideo(id, index);
+            setScreenFocused(true);
+            setPaused(false);
+        });
+        const parentNav = navigation.getParent?.();
+        if (parentNav && typeof parentNav.jumpTo === 'function') {
+            parentNav.jumpTo('videos');
+            return;
+        }
+        router.navigate('/videos' as any);
+    }, [videos, setPendingOpenVideo, setActiveVideo, setScreenFocused, setPaused, navigation, router]);
 
     const handleOpenProfile = useCallback((userId: string) => {
         if (!userId) return;
@@ -243,6 +264,7 @@ export function InfiniteFeedManager({
         if (!selectedVideo) return;
 
         setSelectedMoreVideoId(videoId);
+        setIsMoreSheetOpen(true);
         moreOptionsSheetRef.current?.snapToIndex(0);
     }, [videos]);
 
@@ -1053,10 +1075,20 @@ export function InfiniteFeedManager({
                     { height: insets.top, backgroundColor: themeColors.background },
                 ]}
             />
-            <View style={styles.sheetsContainer} pointerEvents="box-none">
+            <View
+                style={styles.sheetsContainer}
+                pointerEvents={isMoreSheetOpen || isMoreDeleteConfirmationVisible ? 'box-none' : 'none'}
+            >
+                {isMoreSheetOpen && !isMoreDeleteConfirmationVisible ? (
+                    <Pressable
+                        style={styles.sheetDismissOverlay}
+                        onPress={() => moreOptionsSheetRef.current?.close()}
+                    />
+                ) : null}
                 <InfiniteFeedMoreOptionsSheet
                     ref={moreOptionsSheetRef}
                     onDeletePress={isOwnMoreOptionsVideo ? handleMoreSheetDelete : undefined}
+                    onSheetStateChange={setIsMoreSheetOpen}
                 />
                 <InfiniteFeedDeleteConfirmationModal
                     visible={isMoreDeleteConfirmationVisible}

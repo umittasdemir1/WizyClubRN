@@ -10,10 +10,11 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface InfiniteFeedMoreOptionsSheetProps {
     onDeletePress?: () => void;
+    onSheetStateChange?: (isOpen: boolean) => void;
 }
 
 export const InfiniteFeedMoreOptionsSheet = forwardRef<BottomSheet, InfiniteFeedMoreOptionsSheetProps>(
-    ({ onDeletePress }, ref) => {
+    ({ onDeletePress, onSheetStateChange }, ref) => {
         const { isDark } = useThemeStore();
         const insets = useSafeAreaInsets();
 
@@ -37,6 +38,9 @@ export const InfiniteFeedMoreOptionsSheet = forwardRef<BottomSheet, InfiniteFeed
                 ref.current.snapToIndex(0);
             }
         }, [ref]);
+        const handleChange = useCallback((index: number) => {
+            onSheetStateChange?.(index >= 0);
+        }, [onSheetStateChange]);
 
         return (
             <BottomSheet
@@ -44,6 +48,7 @@ export const InfiniteFeedMoreOptionsSheet = forwardRef<BottomSheet, InfiniteFeed
                 index={-1}
                 snapPoints={snapPoints}
                 onAnimate={handleAnimate}
+                onChange={handleChange}
                 enablePanDownToClose={true}
                 enableContentPanningGesture={false}
                 enableHandlePanningGesture={true}

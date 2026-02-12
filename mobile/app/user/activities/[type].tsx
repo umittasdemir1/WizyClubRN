@@ -34,7 +34,6 @@ export default function ActivitiesScreen() {
     const insets = useSafeAreaInsets();
     const { isDark } = useThemeStore();
     const { user } = useAuthStore();
-    const setCustomFeed = useActiveVideoStore((state) => state.setCustomFeed);
     const setActiveVideo = useActiveVideoStore((state) => state.setActiveVideo);
     const syncVideoCountersFromServer = useVideoCounterStore((state) => state.syncFromServer);
 
@@ -89,9 +88,8 @@ export default function ActivitiesScreen() {
     };
 
     const handleVideoPress = (video: { id: string }, index: number) => {
-        setCustomFeed(resolvedVideos);
         setActiveVideo(video.id, index);
-        router.push('/custom-feed' as any);
+        router.navigate('/videos' as any);
     };
 
     return (

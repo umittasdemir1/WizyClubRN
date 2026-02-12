@@ -251,7 +251,7 @@ export default function ExploreScreen() {
         if (index !== -1) {
             setActiveVideo(id, index);
         }
-        router.push('/');
+        router.push('/videos');
     };
 
     const handleStoryPress = (id: string) => {

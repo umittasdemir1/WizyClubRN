@@ -143,7 +143,6 @@ type ProfileSettingsOverlayProps = {
   activityVideos: any[];
   isActivityLoading: boolean;
   isDark: boolean;
-  setCustomFeed: (videos: any[]) => void;
   setActiveVideo: (id: string, index: number) => void;
   authUser: { created_at?: string; email?: string; id?: string } | null;
   accountSettingsNoticePrefix: string;
@@ -240,7 +239,6 @@ export function ProfileSettingsOverlay({
   activityVideos,
   isActivityLoading,
   isDark,
-  setCustomFeed,
   setActiveVideo,
   authUser,
   accountSettingsNoticePrefix,
@@ -1567,9 +1565,8 @@ export function ProfileSettingsOverlay({
                   isDark={isDark}
                   aspectRatio={0.8}
                   onPress={(video, index) => {
-                    setCustomFeed(resolvedActivityVideos);
                     setActiveVideo(video.id, index);
-                    router.push('/custom-feed' as any);
+                    router.push('/videos' as any);
                   }}
                   gap={1}
                   padding={0}

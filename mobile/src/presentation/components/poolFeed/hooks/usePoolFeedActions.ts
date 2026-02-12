@@ -52,10 +52,6 @@ export interface UseFeedActionsOptions {
     videoPlayerRef: React.MutableRefObject<any>;
     /** Active time ref */
     activeTimeRef: React.MutableRefObject<number>;
-    /** Set video finished state */
-    setIsVideoFinished: (value: boolean) => void;
-    /** Loop count ref */
-    loopCountRef: React.MutableRefObject<number>;
     /** Inset top for toast positioning */
     insetTop: number;
 }
@@ -132,8 +128,6 @@ export function usePoolFeedActions(options: UseFeedActionsOptions): UseFeedActio
         moreOptionsSheetRef,
         videoPlayerRef,
         activeTimeRef,
-        setIsVideoFinished,
-        loopCountRef,
         insetTop,
     } = options;
 
@@ -308,10 +302,8 @@ export function usePoolFeedActions(options: UseFeedActionsOptions): UseFeedActio
     // ========================================================================
 
     const seekTo = useCallback((time: number) => {
-        setIsVideoFinished(false);
-        loopCountRef.current = 0;
         videoPlayerRef.current?.seekTo(time);
-    }, [videoPlayerRef, setIsVideoFinished, loopCountRef]);
+    }, [videoPlayerRef]);
 
     const retryActive = useCallback(() => {
         videoPlayerRef.current?.retryActive();

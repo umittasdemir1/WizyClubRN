@@ -46,7 +46,7 @@ export const FEED_FLAGS = {
     /** Master switch - Disables all visual UI layers (excluding video itself) */
     DISABLE_ALL_UI: false,
     /** Disable Pool feed action button animations */
-    POOL_DISABLE_ACTION_ANIMATIONS: false,
+    POOL_DISABLE_ACTION_ANIMATIONS: true,
     /** Disable Pool feed thumbnail/poster display */
     POOL_DISABLE_THUMBNAIL: false,
 
@@ -129,12 +129,6 @@ export const ITEM_HEIGHT = SCREEN_HEIGHT;
  * Centralized to allow easy tuning and testing.
  */
 export const FEED_CONFIG = {
-    /** Maximum times a video will loop before showing finish state */
-    MAX_VIDEO_LOOPS: 2,
-
-    /** Debounce time for loop detection (prevents double-counting) */
-    LOOP_DEBOUNCE_MS: 1000,
-
     /** Debounce time after scroll ends before processing taps */
     SCROLL_END_DEBOUNCE_MS: 150,
 
@@ -163,7 +157,7 @@ export const FEED_CONFIG = {
     MAX_RETRIES: 3,
 
     /** Delay before recycling slots after scroll ends (ms) */
-    RECYCLE_DELAY_MS: 100,
+    RECYCLE_DELAY_MS: 0,
 
     /** Delay before retrying a failed video (ms) */
     RETRY_DELAY_MS: 300,

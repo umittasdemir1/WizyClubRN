@@ -153,6 +153,13 @@ const PlayerSlotRenderer = memo(function PlayerSlotRenderer({
     // Check if this slot is ready to display
     const slotReady = slot.isReadyForDisplay || slot.isLoaded;
 
+    const shouldShowPoster =
+        !isActiveSlot &&
+        !slot.isReadyForDisplay &&
+        !slot.isLoaded &&
+        !!slot.thumbnailUrl &&
+        !FEED_FLAGS.POOL_DISABLE_THUMBNAIL;
+
     // Show slot if:
     // 1. It's the active slot (even if not ready, so poster can render)
     // 2. It's the last active slot AND current active is not ready (seamless transition)
@@ -215,7 +222,7 @@ const PlayerSlotRenderer = memo(function PlayerSlotRenderer({
                 muted={isMuted}
                 rate={playbackRate}
                 selectedAudioTrack={isMuted ? { type: SelectedTrackType.DISABLED } : undefined}
-                repeat={false}
+                repeat={true}
                 onLoad={onLoad}
                 onError={onError}
                 onProgress={onProgress}
@@ -238,7 +245,7 @@ const PlayerSlotRenderer = memo(function PlayerSlotRenderer({
 
             {/* ✅ Poster Image Overlay - Shows until video is ready for display */}
             {/* Prevents black screen flashes during fast scroll */}
-            {!slot.isReadyForDisplay && slot.thumbnailUrl && !FEED_FLAGS.POOL_DISABLE_THUMBNAIL && (
+            {shouldShowPoster && (
                 <PosterImage
                     source={{ uri: slot.thumbnailUrl }}
                     style={[
@@ -624,6 +631,9 @@ export const PoolFeedVideoPlayerPool = memo(forwardRef<PoolFeedVideoPlayerPoolRe
             newSlots[slotIndex] = {
                 ...newSlots[slotIndex],
                 isLoaded: true,
+                // Some Android devices may never emit onReadyForDisplay reliably.
+                // Treat onLoad as ready to prevent poster from sticking on top.
+                isReadyForDisplay: true,
                 hasError: false,
                 // ✅ Reset retry count on successful load
                 retryCount: 0,

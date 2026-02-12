@@ -55,16 +55,10 @@ export interface PoolFeedOverlaysProps {
     isCleanScreen: boolean;
     /** Is seeking */
     isSeeking: boolean;
-    /** Is muted */
-    isMuted: boolean;
     /** Active tab */
     activeTab: 'stories' | 'foryou';
-    /** Has unseen stories */
-    hasUnseenStories: boolean;
     /** Show stories flag */
     showStories: boolean;
-    /** Is custom feed */
-    isCustomFeed: boolean;
     /** Story users */
     storyUsers: any[];
     /** UI opacity style */
@@ -98,17 +92,14 @@ export interface PoolFeedOverlaysProps {
     };
     /** Action handlers */
     actions: {
-        onToggleMute: () => void;
-        onStoryPress: () => void;
+        onBack: () => void;
         onUploadPress: () => void;
-        onTabChange: (tab: 'stories' | 'foryou') => void;
         onStoryAvatarPress: (userId: string) => void;
         onCloseStoryBar: () => void;
         onCleanScreen: () => void;
         onSheetDelete: () => void;
         onFollowPress: () => void;
         onDescriptionChange: (index: number) => void;
-        onBack: () => void;
         onLike: () => void;
         onSave: () => void;
         onShare: () => void;
@@ -116,7 +107,6 @@ export interface PoolFeedOverlaysProps {
         onDescription: () => void;
         onActionPressIn: () => void;
         onActionPressOut: () => void;
-        onRestart: () => void;
         playbackController: {
             seekTo: (time: number) => void;
             retryActive: () => void;
@@ -129,7 +119,6 @@ export interface PoolFeedOverlaysProps {
         retryCount: number;
         rateLabel: string | null;
         tapIndicator: 'play' | 'pause' | null;
-        isFinished: boolean;
         currentTimeSV: SharedValue<number>;
         durationSV: SharedValue<number>;
     };
@@ -151,11 +140,8 @@ export const PoolFeedOverlays = forwardRef<PoolFeedOverlaysRef, PoolFeedOverlays
             isOwnActiveVideo,
             isCleanScreen,
             isSeeking,
-            isMuted,
             activeTab,
-            hasUnseenStories,
             showStories,
-            isCustomFeed,
             storyUsers,
             uiOpacityStyle,
             saveToast,
@@ -210,14 +196,13 @@ export const PoolFeedOverlays = forwardRef<PoolFeedOverlaysRef, PoolFeedOverlays
         ), [overlayTargets, props.currentUserId]);
 
         const activeVideoPlayback = useMemo(() => ({
-            isFinished: playback.isFinished,
             hasError: playback.hasError,
             retryCount: playback.retryCount,
             isCleanScreen: isCleanScreen,
             isSeeking: isSeeking,
             tapIndicator: playback.tapIndicator,
             rateLabel: playback.rateLabel,
-        }), [playback.isFinished, playback.hasError, playback.retryCount, isCleanScreen, isSeeking, playback.tapIndicator, playback.rateLabel]);
+        }), [playback.hasError, playback.retryCount, isCleanScreen, isSeeking, playback.tapIndicator, playback.rateLabel]);
 
         const activeVideoTimeline = useMemo(() => ({
             currentTimeSV: playback.currentTimeSV,
@@ -233,11 +218,10 @@ export const PoolFeedOverlays = forwardRef<PoolFeedOverlaysRef, PoolFeedOverlays
             onToggleFollow: actions.onFollowPress,
             onOpenShopping: actions.onShop,
             onOpenDescription: actions.onDescription,
-            onRestart: actions.onRestart,
             playbackController: actions.playbackController,
             onActionPressIn: actions.onActionPressIn,
             onActionPressOut: actions.onActionPressOut,
-        }), [actions.onLike, actions.onSave, actions.onShare, actions.onFollowPress, actions.onShop, actions.onDescription, actions.onRestart, actions.playbackController, actions.onActionPressIn, actions.onActionPressOut]);
+        }), [actions.onLike, actions.onSave, actions.onShare, actions.onFollowPress, actions.onShop, actions.onDescription, actions.playbackController, actions.onActionPressIn, actions.onActionPressOut]);
 
         return (
             <>
@@ -271,16 +255,10 @@ export const PoolFeedOverlays = forwardRef<PoolFeedOverlaysRef, PoolFeedOverlays
                         pointerEvents={isSeeking ? 'none' : 'box-none'}
                     >
                         <PoolFeedHeaderOverlay
-                            isMuted={isMuted}
-                            onToggleMute={actions.onToggleMute}
-                            onStoryPress={actions.onStoryPress}
-                            onUploadPress={actions.onUploadPress}
-                            activeTab={activeTab}
-                            onTabChange={actions.onTabChange}
-                            showBrightnessButton={false}
-                            hasUnseenStories={hasUnseenStories}
-                            showBack={isCustomFeed}
                             onBack={actions.onBack}
+                            onUploadPress={actions.onUploadPress}
+                            showBrightnessButton={false}
+                            showBack={false}
                         />
                     </Animated.View>
                 )}

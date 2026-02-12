@@ -472,7 +472,6 @@ export default function ProfileScreen() {
   const { videos: savedVideosData, refresh: refreshSavedVideos } = useSavedVideos(currentUserId);
 
   const { user: profileUser, isLoading, reload, updateProfile, uploadAvatar } = useProfile(currentUserId);
-  const setCustomFeed = useActiveVideoStore((state) => state.setCustomFeed);
   const setActiveVideo = useActiveVideoStore((state) => state.setActiveVideo);
 
   const hasInitialSavedFetch = useRef(false);
@@ -808,15 +807,13 @@ export default function ProfileScreen() {
   };
 
   const handleVideoPress = (video: any, index: number) => {
-    setCustomFeed(safeVideos);
     setActiveVideo(video.id, index);
-    router.push('/custom-feed');
+    router.navigate('/videos' as any);
   };
 
   const handleSavedPress = (video: any, index: number) => {
-    setCustomFeed(savedVideosData);
     setActiveVideo(video.id, index);
-    router.push('/custom-feed');
+    router.navigate('/videos' as any);
   };
 
   const draftsHeader = (
@@ -1468,7 +1465,6 @@ export default function ProfileScreen() {
         activityVideos={activityVideos}
         isActivityLoading={isActivityLoading}
         isDark={isDark}
-        setCustomFeed={setCustomFeed}
         setActiveVideo={setActiveVideo}
         authUser={authUser}
         accountSettingsNoticePrefix={accountSettingsNoticePrefix}

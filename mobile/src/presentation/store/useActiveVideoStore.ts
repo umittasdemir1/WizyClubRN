@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { AppState, AppStateStatus } from 'react-native';
 import { useEffect, useRef } from 'react';
 import { logVideo, LogCode } from '@/core/services/Logger';
+import type { Video } from '../../domain/entities/Video';
 // ===================================
 // 🎬 GLOBAL ACTIVE VIDEO STORE
 // ===================================
@@ -31,8 +32,8 @@ export interface ActiveVideoState {
     playbackRate: number;
     // İzleme modu
     viewingMode: 'off' | 'fast' | 'full';
-    // Özel feed (Grid'den gelince)
-    customFeed: any[] | null;
+    // Cross-feed handoff için bekleyen video payload
+    pendingOpenVideo: Video | null;
 
     // Actions
     setActiveVideo: (id: string | null, index: number) => void;
@@ -47,7 +48,8 @@ export interface ActiveVideoState {
     setCleanScreen: (clean: boolean) => void;
     setPlaybackRate: (rate: number) => void;
     setViewingMode: (mode: 'off' | 'fast' | 'full') => void;
-    setCustomFeed: (videos: any[] | null) => void;
+    setPendingOpenVideo: (video: Video | null) => void;
+    clearPendingOpenVideo: () => void;
 }
 
 export const useActiveVideoStore = create<ActiveVideoState>((set, get) => ({
@@ -62,7 +64,7 @@ export const useActiveVideoStore = create<ActiveVideoState>((set, get) => ({
     isCleanScreen: false,
     playbackRate: 1.0,
     viewingMode: 'off',
-    customFeed: null,
+    pendingOpenVideo: null,
 
     setActiveVideo: (id, index) => {
         set({
@@ -94,8 +96,8 @@ export const useActiveVideoStore = create<ActiveVideoState>((set, get) => ({
     },
 
     setViewingMode: (mode) => set({ viewingMode: mode }),
-
-    setCustomFeed: (videos) => set({ customFeed: videos }),
+    setPendingOpenVideo: (video) => set({ pendingOpenVideo: video }),
+    clearPendingOpenVideo: () => set({ pendingOpenVideo: null }),
 }));
 
 // ===================================

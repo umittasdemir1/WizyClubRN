@@ -1,11 +1,10 @@
-import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SystemBars } from 'react-native-edge-to-edge';
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
-import { Search } from 'lucide-react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { COLORS } from '../../src/core/constants';
 import { TrendingHeader } from '../../src/presentation/components/explore/TrendingHeader';
@@ -23,6 +22,7 @@ export default function DealsScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
     const [refreshing, setRefreshing] = useState(false);
+    const scrollY = useRef(new Animated.Value(0)).current;
 
     const isDark = useThemeStore((state) => state.isDark);
     const bgBody = isDark ? COLORS.background : '#FFFFFF';
@@ -43,6 +43,21 @@ export default function DealsScreen() {
         await new Promise((resolve) => setTimeout(resolve, 1000));
         setRefreshing(false);
     }, []);
+
+    const headerOpacity = scrollY.interpolate({
+        inputRange: [0, 24],
+        outputRange: [1, 0],
+        extrapolate: 'clamp',
+    });
+    const headerTranslateY = scrollY.interpolate({
+        inputRange: [0, 24],
+        outputRange: [0, -24],
+        extrapolate: 'clamp',
+    });
+
+    const handleSearchPress = () => {
+        router.push('/search');
+    };
 
     // Mock Data
     const adBanners = [
@@ -90,16 +105,14 @@ export default function DealsScreen() {
             onSwipeRight={() => router.push('/explore')}
         >
             <View style={[styles.container, { backgroundColor: bgBody }]}>
-                {/* Unified Header */}
-                <TrendingHeader
-                    title="Fırsatlar"
-                    isDark={isDark}
-                    showSearch={false}
-                />
-
-                <ScrollView
+                <Animated.ScrollView
                     showsVerticalScrollIndicator={false}
-                    contentContainerStyle={styles.scrollContent}
+                    contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
+                    scrollEventThrottle={16}
+                    onScroll={Animated.event(
+                        [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+                        { useNativeDriver: true }
+                    )}
                     refreshControl={
                         <RefreshControl
                             refreshing={refreshing}
@@ -107,113 +120,129 @@ export default function DealsScreen() {
                             tintColor={isDark ? '#fff' : '#000'}
                         />
                     }
-                >
-                    {/* Ad Banner Carousel */}
-                    <HeroBannerCarousel banners={adBanners} />
+                    >
+                    <Animated.View style={{ opacity: headerOpacity, transform: [{ translateY: headerTranslateY }] }}>
+                        <TrendingHeader
+                            title="Fırsatlar"
+                            isDark={isDark}
+                            showSearch={true}
+                            onSearchPress={handleSearchPress}
+                        />
+                    </Animated.View>
 
-                    {/* Categories */}
-                    <View style={styles.section}>
-                        <View style={styles.sectionHeader}>
-                            <Text style={[styles.sectionTitle, { color: textColor }]}>Kategoriler</Text>
-                            <View style={styles.progressDots}>
-                                <View style={[styles.progressDot, styles.progressDotActive]} />
-                                <View style={[styles.progressDot, styles.progressDotInactive]} />
+                    <View style={styles.scrollContent}>
+                        {/* Ad Banner Carousel */}
+                        <HeroBannerCarousel banners={adBanners} />
+
+                        {/* Categories */}
+                        <View style={styles.section}>
+                            <View style={styles.sectionHeader}>
+                                <Text style={[styles.sectionTitle, { color: textColor }]}>Kategoriler</Text>
+                                <View style={styles.progressDots}>
+                                    <View style={[styles.progressDot, styles.progressDotActive]} />
+                                    <View style={[styles.progressDot, styles.progressDotInactive]} />
+                                </View>
+                            </View>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+                                {categories.map((cat) => (
+                                    <CategoryCard
+                                        key={cat.id}
+                                        title={cat.title}
+                                        icon={cat.icon}
+                                        iconType={cat.iconType as any}
+                                        backgroundColor={cat.backgroundColor}
+                                        isDark={isDark}
+                                    />
+                                ))}
+                            </ScrollView>
+                        </View>
+
+                        {/* Featured Brands */}
+                        <View style={styles.section}>
+                            <Text style={[styles.sectionTitle, { color: textColor }]}>Öne Çıkan Markalar</Text>
+                            <View style={styles.brandsRow}>
+                                {brands.map((brand) => (
+                                    <BrandAvatar
+                                        key={brand.id}
+                                        brandName={brand.name}
+                                        discount={brand.discount}
+                                        backgroundColor={brand.backgroundColor}
+                                        iconUrl={brand.iconUrl}
+                                    />
+                                ))}
                             </View>
                         </View>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
-                            {categories.map((cat) => (
-                                <CategoryCard
-                                    key={cat.id}
-                                    title={cat.title}
-                                    icon={cat.icon}
-                                    iconType={cat.iconType as any}
-                                    backgroundColor={cat.backgroundColor}
+
+                        {/* Trending Deals */}
+                        <View style={styles.section}>
+                            <Text style={[styles.sectionTitle, { color: textColor }]}>Trend Fırsatlar</Text>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+                                {trendingDeals.map((deal) => (
+                                    <View key={deal.id} style={{ marginRight: 12 }}>
+                                        <TicketCard
+                                            brandName={deal.brand}
+                                            discount={deal.discount}
+                                            backgroundColor={deal.bg}
+                                            accentColor={deal.accent}
+                                        />
+                                    </View>
+                                ))}
+                            </ScrollView>
+                        </View>
+
+                        {/* Coupons */}
+                        <View style={styles.section}>
+                            <Text style={[styles.sectionTitle, { color: textColor }]}>Kuponlar</Text>
+                            <StackedCouponCards coupons={stackedCoupons} />
+                            <View style={styles.dotsIndicator}>
+                                <View style={[styles.indicatorDot, styles.indicatorDotActive]} />
+                                <View style={[styles.indicatorDot, styles.indicatorDotInactive]} />
+                                <View style={[styles.indicatorDot, styles.indicatorDotInactive]} />
+                            </View>
+                        </View>
+
+                        {/* Popular Now */}
+                        <View style={styles.section}>
+                            <Text style={[styles.sectionTitle, { color: textColor }]}>Popüler Olanlar</Text>
+                            {popularDeals.map((deal) => (
+                                <PopularDealCard
+                                    key={deal.id}
+                                    icon={deal.icon}
+                                    brandName={deal.brand}
+                                    value={deal.value}
+                                    description={deal.desc}
+                                    expiryDay={deal.day}
+                                    expiryMonth={deal.month}
                                     isDark={isDark}
                                 />
                             ))}
-                        </ScrollView>
-                    </View>
-
-                    {/* Featured Brands */}
-                    <View style={styles.section}>
-                        <Text style={[styles.sectionTitle, { color: textColor }]}>Öne Çıkan Markalar</Text>
-                        <View style={styles.brandsRow}>
-                            {brands.map((brand) => (
-                                <BrandAvatar
-                                    key={brand.id}
-                                    brandName={brand.name}
-                                    discount={brand.discount}
-                                    backgroundColor={brand.backgroundColor}
-                                    iconUrl={brand.iconUrl}
-                                />
-                            ))}
                         </View>
-                    </View>
 
-                    {/* Trending Deals */}
-                    <View style={styles.section}>
-                        <Text style={[styles.sectionTitle, { color: textColor }]}>Trend Fırsatlar</Text>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
-                            {trendingDeals.map((deal) => (
-                                <View key={deal.id} style={{ marginRight: 12 }}>
-                                    <TicketCard
-                                        brandName={deal.brand}
-                                        discount={deal.discount}
-                                        backgroundColor={deal.bg}
-                                        accentColor={deal.accent}
-                                    />
-                                </View>
-                            ))}
-                        </ScrollView>
-                    </View>
-
-                    {/* Coupons */}
-                    <View style={styles.section}>
-                        <Text style={[styles.sectionTitle, { color: textColor }]}>Kuponlar</Text>
-                        <StackedCouponCards coupons={stackedCoupons} />
-                        <View style={styles.dotsIndicator}>
-                            <View style={[styles.indicatorDot, styles.indicatorDotActive]} />
-                            <View style={[styles.indicatorDot, styles.indicatorDotInactive]} />
-                            <View style={[styles.indicatorDot, styles.indicatorDotInactive]} />
-                        </View>
-                    </View>
-
-                    {/* Popular Now */}
-                    <View style={styles.section}>
-                        <Text style={[styles.sectionTitle, { color: textColor }]}>Popüler Olanlar</Text>
-                        {popularDeals.map((deal) => (
-                            <PopularDealCard
-                                key={deal.id}
-                                icon={deal.icon}
-                                brandName={deal.brand}
-                                value={deal.value}
-                                description={deal.desc}
-                                expiryDay={deal.day}
-                                expiryMonth={deal.month}
-                                isDark={isDark}
+                        {/* Promo Banners */}
+                        <View style={styles.section}>
+                            <PromoBanner
+                                title="Bebek\nÜrünleri"
+                                subtitle="UP TO 50% OFF"
+                                imageUrl="https://lh3.googleusercontent.com/aida-public/AB6AXuBa7RyWjSsLrX0erTuhvaQnGnskrpQGjaSmCJ-l4uAPTMLaXoIKdxY6aW_gF9Z_SwYrurrRbrk6O-0QWhIkQAHuVZcPC43Q6kT-Ar3s_wuifi3x95z7lxjcqWBIRZxtsMlYtJDtXi1beKL96pDk2odw05loc_EeBey4BuV17i0hx3AG4KSedPuQc3ensEPfqJS4Y_IJoiGTgHT6Is1wzera-FwPJKWG9_UJOSQTckKvRxDAVbCtZ0STX9ozlMUCnBsShlJdXo-Ifw"
+                                backgroundColor="#e68a7c"
+                                imagePosition="right"
                             />
-                        ))}
+                            <PromoBanner
+                                title="Elektronik"
+                                imageUrl="https://lh3.googleusercontent.com/aida-public/AB6AXuCRmV11Igi8mucWeAL4cH23lJFXUrP76_JgSmHEcn8_eG9lT35ds1aOcMwJnd-VSDnvNQRTYDiIGsIPGqYKBT7EI_avxIV-8QOO5Y-fz6hIG-DccCV_fZ1ozUvVGBVEa8S---g2hhUNKXhcFaG60Jh0psR033gS0lU6BoD96YJT53I3AspB1SJWeC9b7W4pnifJ3erxV6WJdd_rjfzeMc6ob2iEbhrbWtcXp9cK0Ny6HOwGUB8ae7jWAMqdV4eI4vZNosfqP7bNog"
+                                backgroundColor="#3b6672"
+                                imagePosition="left"
+                            />
+                        </View>
                     </View>
-
-                    {/* Promo Banners */}
-                    <View style={styles.section}>
-                        <PromoBanner
-                            title="Bebek\nÜrünleri"
-                            subtitle="UP TO 50% OFF"
-                            imageUrl="https://lh3.googleusercontent.com/aida-public/AB6AXuBa7RyWjSsLrX0erTuhvaQnGnskrpQGjaSmCJ-l4uAPTMLaXoIKdxY6aW_gF9Z_SwYrurrRbrk6O-0QWhIkQAHuVZcPC43Q6kT-Ar3s_wuifi3x95z7lxjcqWBIRZxtsMlYtJDtXi1beKL96pDk2odw05loc_EeBey4BuV17i0hx3AG4KSedPuQc3ensEPfqJS4Y_IJoiGTgHT6Is1wzera-FwPJKWG9_UJOSQTckKvRxDAVbCtZ0STX9ozlMUCnBsShlJdXo-Ifw"
-                            backgroundColor="#e68a7c"
-                            imagePosition="right"
-                        />
-                        <PromoBanner
-                            title="Elektronik"
-                            imageUrl="https://lh3.googleusercontent.com/aida-public/AB6AXuCRmV11Igi8mucWeAL4cH23lJFXUrP76_JgSmHEcn8_eG9lT35ds1aOcMwJnd-VSDnvNQRTYDiIGsIPGqYKBT7EI_avxIV-8QOO5Y-fz6hIG-DccCV_fZ1ozUvVGBVEa8S---g2hhUNKXhcFaG60Jh0psR033gS0lU6BoD96YJT53I3AspB1SJWeC9b7W4pnifJ3erxV6WJdd_rjfzeMc6ob2iEbhrbWtcXp9cK0Ny6HOwGUB8ae7jWAMqdV4eI4vZNosfqP7bNog"
-                            backgroundColor="#3b6672"
-                            imagePosition="left"
-                        />
-                    </View>
-
-                    <View style={{ height: insets.bottom + 80 }} />
-                </ScrollView>
+                </Animated.ScrollView>
+                <View
+                    pointerEvents="none"
+                    style={[
+                        styles.statusBarOverlay,
+                        { height: insets.top, backgroundColor: bgBody },
+                    ]}
+                />
             </View>
         </SwipeWrapper>
     );
@@ -226,6 +255,13 @@ const styles = StyleSheet.create({
     // Removed old header styles
     scrollContent: {
         paddingHorizontal: 16,
+    },
+    statusBarOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 20,
     },
     section: {
         marginBottom: 24,

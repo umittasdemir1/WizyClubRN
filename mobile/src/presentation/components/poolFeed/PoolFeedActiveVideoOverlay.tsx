@@ -34,7 +34,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Pause, Repeat1, RefreshCcw, AlertCircle } from 'lucide-react-native';
+import { Pause, RefreshCcw, AlertCircle } from 'lucide-react-native';
 import { isDisabled } from './hooks/usePoolFeedConfig';
 
 import { Video } from '../../../domain/entities/Video';
@@ -59,7 +59,6 @@ interface ActiveVideoOverlayData {
 }
 
 interface ActiveVideoOverlayPlayback {
-    isFinished: boolean;
     hasError: boolean;
     retryCount: number;
     isCleanScreen: boolean;
@@ -82,7 +81,6 @@ interface ActiveVideoOverlayActions {
     onToggleFollow: () => void;
     onOpenShopping: () => void;
     onOpenDescription: () => void;
-    onRestart: () => void;
     playbackController: Pick<PoolFeedVideoPlayerPoolRef, 'seekTo' | 'retryActive'>;
     onActionPressIn?: () => void;
     onActionPressOut?: () => void;
@@ -107,7 +105,6 @@ export const PoolFeedActiveVideoOverlay = memo(function PoolFeedActiveVideoOverl
 }: ActiveVideoOverlayProps) {
     const { video, currentUserId, activeIndex, isPlayable } = data;
     const {
-        isFinished,
         hasError,
         retryCount,
         isCleanScreen,
@@ -123,7 +120,6 @@ export const PoolFeedActiveVideoOverlay = memo(function PoolFeedActiveVideoOverl
         onToggleFollow,
         onOpenShopping,
         onOpenDescription,
-        onRestart,
         playbackController,
         onActionPressIn,
         onActionPressOut,
@@ -149,8 +145,6 @@ export const PoolFeedActiveVideoOverlay = memo(function PoolFeedActiveVideoOverl
     const profileRoute = isSelfProfile ? '/profile' : `/user/${video.user.id}`;
     const showUiOverlays = !isCleanScreen;
     const showTapIndicator = !!tapIndicator && !hasError;
-    const showReplayIcon = isFinished && !hasError && !showTapIndicator;
-    const showPlayPauseIcon = showTapIndicator || showReplayIcon;
     const showSeekBar = isPlayable;
 
     // ========================================================================
@@ -221,15 +215,11 @@ export const PoolFeedActiveVideoOverlay = memo(function PoolFeedActiveVideoOverl
                     </View>
                 )}
 
-                {/* Play/Pause/Replay Icons */}
-                {showUiOverlays && showPlayPauseIcon && (
+                {/* Play/Pause Icons */}
+                {showUiOverlays && showTapIndicator && (
                     <View style={styles.iconContainer} pointerEvents="box-none">
                         <View style={styles.iconBackground}>
-                            {showReplayIcon ? (
-                                <Pressable onPress={onRestart}>
-                                    <Repeat1 size={44} color="#FFFFFF" strokeWidth={1.2} />
-                                </Pressable>
-                            ) : tapIndicator === 'pause' ? (
+                            {tapIndicator === 'pause' ? (
                                 <Pause size={44} color="#FFFFFF" fill="#FFFFFF" strokeWidth={0} />
                             ) : (
                                 <PlayIcon width={44} height={44} color="#FFFFFF" style={{ marginLeft: 5 }} />

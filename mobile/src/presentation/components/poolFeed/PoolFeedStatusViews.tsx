@@ -12,14 +12,8 @@ interface PoolFeedStatusViewsProps {
     videosCount: number;
     refreshFeed: () => void;
     isCleanScreen: boolean;
-    isMuted: boolean;
-    toggleMute: () => void;
-    setActiveTab: (tab: 'stories' | 'foryou') => void;
-    activeTab: 'stories' | 'foryou';
-    hasUnseenStories: boolean;
-    isCustomFeed: boolean;
-    onUploadPress: () => void;
     onBack: () => void;
+    onUploadPress: () => void;
 }
 
 export const PoolFeedStatusViews: React.FC<PoolFeedStatusViewsProps> = ({
@@ -29,14 +23,8 @@ export const PoolFeedStatusViews: React.FC<PoolFeedStatusViewsProps> = ({
     videosCount,
     refreshFeed,
     isCleanScreen,
-    isMuted,
-    toggleMute,
-    setActiveTab,
-    activeTab,
-    hasUnseenStories,
-    isCustomFeed,
-    onUploadPress,
     onBack,
+    onUploadPress,
 }) => {
     if (isLoading && videosCount === 0) {
         return (
@@ -75,16 +63,10 @@ export const PoolFeedStatusViews: React.FC<PoolFeedStatusViewsProps> = ({
                 {!isCleanScreen && (
                     <Animated.View style={[StyleSheet.absoluteFill, { zIndex: 50 }]} pointerEvents="box-none">
                         <PoolFeedHeaderOverlay
-                            isMuted={isMuted}
-                            onToggleMute={toggleMute}
-                            onStoryPress={() => setActiveTab('stories')}
-                            onUploadPress={onUploadPress}
-                            activeTab={activeTab}
-                            onTabChange={setActiveTab}
-                            showBrightnessButton={false}
-                            hasUnseenStories={hasUnseenStories}
-                            showBack={isCustomFeed}
                             onBack={onBack}
+                            onUploadPress={onUploadPress}
+                            showBrightnessButton={false}
+                            showBack={false}
                         />
                     </Animated.View>
                 )}

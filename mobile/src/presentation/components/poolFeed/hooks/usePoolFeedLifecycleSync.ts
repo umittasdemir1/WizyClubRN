@@ -27,7 +27,6 @@ interface LifecycleSyncOptions {
     setActiveTab: (tab: 'stories' | 'foryou') => void;
     listRef: React.RefObject<any>;
     resetPlayback: () => void;
-    isCustomFeed: boolean;
     lastActiveIdRef: React.MutableRefObject<string | null>;
     lastInternalIndex: React.MutableRefObject<number>;
 }
@@ -54,7 +53,6 @@ export function usePoolFeedLifecycleSync(options: LifecycleSyncOptions) {
         setActiveTab,
         listRef,
         resetPlayback,
-        isCustomFeed,
         lastActiveIdRef,
         lastInternalIndex,
     } = options;
@@ -158,10 +156,12 @@ export function usePoolFeedLifecycleSync(options: LifecycleSyncOptions) {
 
     // 8. Sync scroll index
     useEffect(() => {
-        if (videos.length > 0 && activeIndex !== lastInternalIndex.current) {
-            listRef.current?.scrollToIndex({ index: activeIndex, animated: false });
-            lastInternalIndex.current = activeIndex;
-        }
+        if (videos.length === 0) return;
+        if (activeIndex < 0 || activeIndex >= videos.length) return;
+        if (activeIndex === lastInternalIndex.current) return;
+
+        listRef.current?.scrollToIndex({ index: activeIndex, animated: false });
+        lastInternalIndex.current = activeIndex;
     }, [activeIndex, videos.length]);
 
     // 9. Reset playback on video change
@@ -171,7 +171,7 @@ export function usePoolFeedLifecycleSync(options: LifecycleSyncOptions) {
 
     // 10. Handle upload success
     useEffect(() => {
-        if (uploadedVideoId && uploadStatus === 'success' && prependVideo && !isCustomFeed) {
+        if (uploadedVideoId && uploadStatus === 'success' && prependVideo) {
             const handleUploadSuccess = async () => {
                 const { supabase } = require('../../../../core/supabase');
                 const { data: videoData } = await supabase
@@ -218,5 +218,5 @@ export function usePoolFeedLifecycleSync(options: LifecycleSyncOptions) {
             };
             handleUploadSuccess();
         }
-    }, [uploadedVideoId, uploadStatus, prependVideo, isCustomFeed, setActiveVideo, resetUpload]);
+    }, [uploadedVideoId, uploadStatus, prependVideo, setActiveVideo, resetUpload]);
 }
