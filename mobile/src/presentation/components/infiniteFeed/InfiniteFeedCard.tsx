@@ -117,6 +117,7 @@ interface InfiniteFeedCardProps {
     onFollow: (id: string) => void;
     onShare: (id: string) => void;
     onShop: (id: string) => void;
+    onWatchMoreClips?: () => void;
     onMore?: (id: string) => void;
     onCarouselTouchStart?: () => void;
     onCarouselTouchEnd?: () => void;
@@ -145,6 +146,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     onFollow,
     onShare,
     onShop,
+    onWatchMoreClips,
     onMore,
     onCarouselTouchStart,
     onCarouselTouchEnd,
@@ -513,7 +515,8 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
 
     const handleWatchMoreClipsPress = useCallback((event?: GestureResponderEvent) => {
         event?.stopPropagation?.();
-    }, []);
+        onWatchMoreClips?.();
+    }, [onWatchMoreClips]);
 
     const handleVideoError = useCallback((_error: OnVideoErrorData) => {
         clearReadyFallbackTimer();
@@ -886,13 +889,23 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                             {isVideo && isActive && hasReachedLoopLimit && (
                                 <View style={styles.replayButtonsContainer}>
                                     <Pressable
-                                        style={themedStyles.replayMoreButton}
-                                        onPress={handleWatchMoreClipsPress}
-                                        hitSlop={8}
-                                    >
-                                        <VideosIcon width={18} height={18} />
-                                        <Text style={themedStyles.replayMoreText}>Daha fazla Clips izle</Text>
-                                    </Pressable>
+                                    style={themedStyles.replayMoreButton}
+                                    onPress={handleWatchMoreClipsPress}
+                                    hitSlop={8}
+                                >
+                                    <VideosIcon width={18} height={18} />
+                                    <View style={styles.replayMoreLabelRow}>
+                                        <Text style={themedStyles.replayMoreText}>Daha fazla </Text>
+                                        <Text style={styles.replayRainbowWord}>
+                                            <Text style={styles.rainbowC}>C</Text>
+                                            <Text style={styles.rainbowL}>l</Text>
+                                            <Text style={styles.rainbowI}>i</Text>
+                                            <Text style={styles.rainbowP}>p</Text>
+                                            <Text style={styles.rainbowS}>s</Text>
+                                        </Text>
+                                        <Text style={themedStyles.replayMoreText}> izle</Text>
+                                    </View>
+                                </Pressable>
                                     <Pressable
                                         style={themedStyles.replayBadge}
                                         onPress={(event) => {
@@ -1277,6 +1290,20 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         letterSpacing: 0.2,
     },
+    replayMoreLabelRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    replayRainbowWord: {
+        fontSize: 15,
+        fontWeight: '700',
+        letterSpacing: 0.2,
+    },
+    rainbowC: { color: '#FF3D00' },
+    rainbowL: { color: '#FF9100' },
+    rainbowI: { color: '#00C853' },
+    rainbowP: { color: '#00B0FF' },
+    rainbowS: { color: '#7C4DFF' },
     replayBadge: {
         paddingHorizontal: 18,
         paddingVertical: 10,

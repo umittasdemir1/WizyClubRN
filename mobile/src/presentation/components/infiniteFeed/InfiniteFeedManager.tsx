@@ -231,6 +231,15 @@ export function InfiniteFeedManager({
         router.navigate('/videos' as any);
     }, [videos, setPendingOpenVideo, setActiveVideo, setScreenFocused, setPaused, navigation, router]);
 
+    const handleOpenVideosTab = useCallback(() => {
+        const parentNav = navigation.getParent?.();
+        if (parentNav && typeof parentNav.jumpTo === 'function') {
+            parentNav.jumpTo('videos');
+            return;
+        }
+        router.navigate('/videos' as any);
+    }, [navigation, router]);
+
     const handleOpenProfile = useCallback((userId: string) => {
         if (!userId) return;
         const isSelfProfile = !!currentUserId && userId === currentUserId;
@@ -759,6 +768,7 @@ export function InfiniteFeedManager({
         onFollow: toggleFollow,
         onShare: toggleShare,
         onShop: handleOpenShopping,
+        onWatchMoreClips: handleOpenVideosTab,
         onCarouselTouchStart: handleCarouselTouchStart,
         onCarouselTouchEnd: handleCarouselTouchEnd,
     });
@@ -774,6 +784,7 @@ export function InfiniteFeedManager({
             onFollow: toggleFollow,
             onShare: toggleShare,
             onShop: handleOpenShopping,
+            onWatchMoreClips: handleOpenVideosTab,
             onCarouselTouchStart: handleCarouselTouchStart,
             onCarouselTouchEnd: handleCarouselTouchEnd,
         };
@@ -787,6 +798,7 @@ export function InfiniteFeedManager({
         toggleFollow,
         toggleShare,
         handleOpenShopping,
+        handleOpenVideosTab,
         handleCarouselTouchStart,
         handleCarouselTouchEnd,
     ]);
@@ -843,6 +855,7 @@ export function InfiniteFeedManager({
                 onFollow={handlers.onFollow}
                 onShare={handlers.onShare}
                 onShop={handlers.onShop}
+                onWatchMoreClips={handlers.onWatchMoreClips}
                 onCarouselTouchStart={handlers.onCarouselTouchStart}
                 onCarouselTouchEnd={handlers.onCarouselTouchEnd}
                 isMeasurement={target === 'Measurement'}
