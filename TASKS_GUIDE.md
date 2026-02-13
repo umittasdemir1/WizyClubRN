@@ -42,7 +42,10 @@ bash scripts/setup-ui-alias.sh
 
 ## 4) Dikkat Edilecekler
 
-- `mobile/.env` her ortamda ayarlanmali (ozellikle iste ngrok URL).
+- `mobile/.env` task ile otomatik olusturulur/guncellenir:
+  - `EV` seciminde: `scripts/sync-mobile-env.sh home`
+  - `IS` seciminde: `scripts/sync-mobile-env.sh work` (ngrok 4040 API)
+- Istersen kalici degerler icin `mobile/.env.home` ve `mobile/.env.work` kullanabilirsin.
 - Bazen `./ngrok` calismayabilir ya da guncelleme gerekebilir.
 - Task gorunmuyorsa:
   - Workspace root'un `~/WizyClubRN` oldugundan emin ol

@@ -44,7 +44,7 @@ export const FEED_FLAGS = {
     // ═══════════════════════════════════════════════════════════════════════
     // --- UI LAYER FLAGS (Pure Visual Overlays) ---
     /** Master switch - Disables all visual UI layers (excluding video itself) */
-    DISABLE_ALL_UI: false,
+    DISABLE_ALL_UI: true,
     /** Disable Pool feed action button animations */
     POOL_DISABLE_ACTION_ANIMATIONS: true,
     /** Disable Pool feed thumbnail/poster display */

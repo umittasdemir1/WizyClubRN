@@ -11,8 +11,113 @@ const path = require('path');
 const os = require('os'); // For temp directory in story uploads
 const swaggerUi = require('swagger-ui-express');
 const yaml = require('js-yaml');
-const http = require('http');
-const { WebSocketServer } = require('ws');
+
+const LOG_COLORS_ENABLED = process.stdout.isTTY && process.env.NO_COLOR !== '1';
+const ANSI = {
+    reset: '\x1b[0m',
+    bold: '\x1b[1m',
+    dim: '\x1b[2m',
+    red: '\x1b[31m',
+    green: '\x1b[32m',
+    yellow: '\x1b[33m',
+    blue: '\x1b[34m',
+    magenta: '\x1b[35m',
+    cyan: '\x1b[36m',
+    gray: '\x1b[90m',
+};
+
+function style(text, ...tokens) {
+    if (!LOG_COLORS_ENABLED || tokens.length === 0) return String(text);
+    const prefix = tokens.map((token) => ANSI[token] || '').join('');
+    return `${prefix}${text}${ANSI.reset}`;
+}
+
+function toLogValue(value) {
+    if (value == null) return String(value);
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        return String(value);
+    }
+    try {
+        return JSON.stringify(value);
+    } catch {
+        return '[unserializable]';
+    }
+}
+
+function formatMeta(meta) {
+    if (meta == null) return '';
+    if (typeof meta === 'string') return meta;
+    if (meta instanceof Error) return meta.message;
+    if (typeof meta !== 'object') return String(meta);
+
+    return Object.entries(meta)
+        .filter(([, value]) => value !== undefined)
+        .map(([key, value]) => `${key}=${toLogValue(value)}`)
+        .join(' ');
+}
+
+const LEVEL_STYLE = {
+    INFO: ['blue', 'bold'],
+    OK: ['green', 'bold'],
+    WARN: ['yellow', 'bold'],
+    ERR: ['red', 'bold'],
+    BOOT: ['magenta', 'bold'],
+};
+
+function logLine(level, scope, message, meta) {
+    const ts = style(new Date().toISOString(), 'dim');
+    const levelLabel = style(level.padEnd(4), ...(LEVEL_STYLE[level] || ['cyan', 'bold']));
+    const scopeLabel = scope ? style(`[${scope}]`, 'cyan') : '';
+    const metaText = formatMeta(meta);
+    const line = `${ts} ${levelLabel} ${scopeLabel} ${message}${metaText ? ` | ${metaText}` : ''}`;
+
+    if (level === 'ERR') {
+        console.error(line);
+        return;
+    }
+    console.log(line);
+}
+
+function logBanner(title, lines = []) {
+    const border = style('='.repeat(86), 'gray');
+    console.log(`\n${border}`);
+    console.log(style(title, 'bold', 'cyan'));
+    for (const line of lines) {
+        console.log(`${style(' -', 'dim')} ${line}`);
+    }
+    console.log(`${border}\n`);
+}
+
+function formatMethod(method) {
+    const normalized = (method || 'GET').toUpperCase();
+    const palette = {
+        GET: 'cyan',
+        POST: 'green',
+        PUT: 'yellow',
+        PATCH: 'yellow',
+        DELETE: 'red',
+    };
+    return style(normalized.padEnd(6), palette[normalized] || 'blue', 'bold');
+}
+
+function formatStatus(statusCode) {
+    const code = Number(statusCode) || 0;
+    let tone = 'red';
+    if (code >= 200 && code < 300) tone = 'green';
+    else if (code >= 300 && code < 400) tone = 'cyan';
+    else if (code >= 400 && code < 500) tone = 'yellow';
+    return style(String(code).padStart(3), tone, 'bold');
+}
+
+function getPrimaryIpv4Address() {
+    const interfaces = os.networkInterfaces();
+    for (const iface of Object.values(interfaces)) {
+        if (!iface) continue;
+        const match = iface.find((entry) => entry.family === 'IPv4' && !entry.internal);
+        if (match?.address) return match.address;
+    }
+    return null;
+}
 
 const app = express();
 app.use(cors());
@@ -20,22 +125,29 @@ app.use(express.json());
 
 // Request logging middleware
 app.use((req, res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    const startedAt = process.hrtime.bigint();
+    res.on('finish', () => {
+        const durationMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+        const ts = style(new Date().toISOString(), 'dim');
+        const duration = style(`${durationMs.toFixed(1)}ms`, 'dim');
+        const route = req.originalUrl || req.url;
+        console.log(`${ts} ${formatMethod(req.method)} ${route} ${formatStatus(res.statusCode)} ${duration}`);
+    });
     next();
 });
 
 // Set FFmpeg and FFprobe paths explicitly using static binaries
 const ffmpegStatic = require('ffmpeg-static');
 const ffprobeStatic = require('@ffprobe-installer/ffprobe').path;
-console.log('✅ FFmpeg path:', ffmpegStatic);
-console.log('✅ FFprobe path:', ffprobeStatic);
+logLine('OK', 'BOOT', 'FFmpeg binary loaded', { path: ffmpegStatic });
+logLine('OK', 'BOOT', 'FFprobe binary loaded', { path: ffprobeStatic });
 ffmpeg.setFfmpegPath(ffmpegStatic);
 ffmpeg.setFfprobePath(ffprobeStatic);
 
 // Multer: Temporary uploads
 const upload = multer({ dest: 'temp_uploads/' });
 
-console.log('4. Initializing R2 Client...');
+logLine('BOOT', 'INIT', 'Initializing R2 client');
 const r2 = new S3Client({
     region: 'auto',
     endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
@@ -45,7 +157,7 @@ const r2 = new S3Client({
     },
 });
 
-console.log('5. Initializing Supabase Client...');
+logLine('BOOT', 'INIT', 'Initializing Supabase client');
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
 // Swagger / OpenAPI docs (local)
@@ -53,980 +165,7 @@ const openApiPath = path.join(__dirname, 'docs', 'openapi.yaml');
 const openApiSpec = yaml.load(fs.readFileSync(openApiPath, 'utf8'));
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
 
-const ADMIN_CONFIG_PATH = path.join(__dirname, 'admin-config.json');
-let adminWss = null;
-const DEFAULT_ADMIN_CONFIG = {
-    version: 1,
-    updatedAt: null,
-    items: [
-        {
-            key: 'profile.settings.title.text',
-            label: 'Başlık metni',
-            description: 'Profil ayarlar menüsü başlığı metni',
-            type: 'text',
-            value: 'Ayarlar ve kişisel araçlar',
-            group: 'Profil > Ayarlar',
-        },
-        {
-            key: 'profile.settings.title.color',
-            label: 'Renk',
-            description: 'Başlık metin rengi',
-            type: 'color',
-            value: 'auto',
-            group: 'Profil > Ayarlar',
-        },
-        {
-            key: 'profile.settings.title.fontSize',
-            label: 'Font boyutu',
-            description: 'Başlık font boyutu',
-            type: 'number',
-            value: 24,
-            min: 12,
-            max: 48,
-            step: 1,
-            group: 'Profil > Ayarlar',
-        },
-        {
-            key: 'profile.settings.title.fontWeight',
-            label: 'Font ağırlığı',
-            description: 'Başlık font ağırlığı',
-            type: 'select',
-            value: '600',
-            options: ['300', '400', '500', '600', '700', '800'],
-            group: 'Profil > Ayarlar',
-        },
-        {
-            key: 'profile.settings.title.fontStyle',
-            label: 'Font stili',
-            description: 'Başlık font stili',
-            type: 'select',
-            value: 'normal',
-            options: ['normal', 'italic'],
-            group: 'Profil > Ayarlar',
-        },
-        {
-            key: 'profile.settings.title.fontFamily',
-            label: 'Font ailesi',
-            description: 'Başlık font ailesi (cihaza göre değişebilir)',
-            type: 'select',
-            value: 'system',
-            options: ['system', 'sans-serif', 'serif', 'monospace'],
-            group: 'Profil > Ayarlar',
-        },
-        {
-            key: 'profile.settings.title.letterSpacing',
-            label: 'Harf aralığı',
-            description: 'Başlık harf aralığı',
-            type: 'number',
-            value: 0.3,
-            min: -1,
-            max: 6,
-            step: 0.1,
-            group: 'Profil > Ayarlar',
-        },
-        {
-            key: 'profile.settings.title.lineHeight',
-            label: 'Satır yüksekliği',
-            description: 'Başlık satır yüksekliği',
-            type: 'number',
-            value: 28,
-            min: 10,
-            max: 64,
-            step: 1,
-            group: 'Profil > Ayarlar',
-        },
-        {
-            key: 'profile.settings.title.textAlign',
-            label: 'Hizalama',
-            description: 'Başlık metin hizası',
-            type: 'select',
-            value: 'left',
-            options: ['left', 'center', 'right'],
-            group: 'Profil > Ayarlar',
-        },
-        {
-            key: 'profile.settings.title.textTransform',
-            label: 'Metin dönüşümü',
-            description: 'Başlık metin dönüşümü',
-            type: 'select',
-            value: 'none',
-            options: ['none', 'uppercase', 'lowercase', 'capitalize'],
-            group: 'Profil > Ayarlar',
-        },
-        {
-            key: 'profile.settings.sectionTitle.color',
-            label: 'Alt başlık renk',
-            description: 'Alt başlık metin rengi',
-            type: 'color',
-            value: 'auto',
-            group: 'Profil > Stiller',
-        },
-        {
-            key: 'profile.settings.sectionTitle.fontSize',
-            label: 'Alt başlık boyutu',
-            description: 'Alt başlık font boyutu',
-            type: 'number',
-            value: 24,
-            min: 12,
-            max: 48,
-            step: 1,
-            group: 'Profil > Stiller',
-        },
-        {
-            key: 'profile.settings.sectionTitle.fontWeight',
-            label: 'Alt başlık ağırlığı',
-            description: 'Alt başlık font ağırlığı',
-            type: 'select',
-            value: '600',
-            options: ['300', '400', '500', '600', '700', '800'],
-            group: 'Profil > Stiller',
-        },
-        {
-            key: 'profile.settings.itemLabel.color',
-            label: 'Menü metni renk',
-            description: 'Ayar item metin rengi',
-            type: 'color',
-            value: 'auto',
-            group: 'Profil > Stiller',
-        },
-        {
-            key: 'profile.settings.itemLabel.fontSize',
-            label: 'Menü metni boyutu',
-            description: 'Ayar item metin boyutu',
-            type: 'number',
-            value: 18,
-            min: 10,
-            max: 30,
-            step: 1,
-            group: 'Profil > Stiller',
-        },
-        {
-            key: 'profile.settings.itemLabel.fontWeight',
-            label: 'Menü metni ağırlığı',
-            description: 'Ayar item metin ağırlığı',
-            type: 'select',
-            value: '400',
-            options: ['300', '400', '500', '600', '700'],
-            group: 'Profil > Stiller',
-        },
-        {
-            key: 'profile.settings.helperText.color',
-            label: 'Açıklama metni renk',
-            description: 'Yardımcı metin rengi',
-            type: 'color',
-            value: 'auto',
-            group: 'Profil > Stiller',
-        },
-        {
-            key: 'profile.settings.helperText.fontSize',
-            label: 'Açıklama metni boyutu',
-            description: 'Yardımcı metin boyutu',
-            type: 'number',
-            value: 14,
-            min: 10,
-            max: 24,
-            step: 1,
-            group: 'Profil > Stiller',
-        },
-        {
-            key: 'profile.settings.icon.color',
-            label: 'İkon rengi',
-            description: 'Ayar ikon rengi',
-            type: 'color',
-            value: 'auto',
-            group: 'Profil > Stiller',
-        },
-        {
-            key: 'profile.settings.icon.strokeWidth',
-            label: 'İkon kalınlığı',
-            description: 'Ayar ikon stroke kalınlığı',
-            type: 'number',
-            value: 1.2,
-            min: 0.8,
-            max: 2.5,
-            step: 0.1,
-            group: 'Profil > Stiller',
-        },
-        {
-            key: 'profile.settings.icon.size',
-            label: 'İkon boyutu',
-            description: 'Ayar ikon boyutu',
-            type: 'number',
-            value: 24,
-            min: 16,
-            max: 32,
-            step: 1,
-            group: 'Profil > Stiller',
-        },
-        {
-            key: 'profile.settings.icon.close.name',
-            label: 'İkon - Kapat (X)',
-            description: 'Lucide: X',
-            type: 'text',
-            value: 'X',
-            group: 'Profil > İkonlar',
-        },
-        {
-            key: 'profile.settings.icon.close.color',
-            label: 'Kapat renk',
-            description: 'Kapat ikon rengi',
-            type: 'color',
-            value: 'auto',
-            group: 'Profil > İkonlar',
-        },
-        {
-            key: 'profile.settings.icon.close.size',
-            label: 'Kapat boyut',
-            description: 'Kapat ikon boyutu',
-            type: 'number',
-            value: 22,
-            min: 16,
-            max: 32,
-            step: 1,
-            group: 'Profil > İkonlar',
-        },
-        {
-            key: 'profile.settings.icon.close.strokeWidth',
-            label: 'Kapat kalınlık',
-            description: 'Kapat ikon stroke kalınlığı',
-            type: 'number',
-            value: 1.6,
-            min: 0.8,
-            max: 2.5,
-            step: 0.1,
-            group: 'Profil > İkonlar',
-        },
-        {
-            key: 'profile.settings.icon.back.name',
-            label: 'İkon - Geri',
-            description: 'Lucide: ArrowLeft',
-            type: 'text',
-            value: 'ArrowLeft',
-            group: 'Profil > İkonlar',
-        },
-        {
-            key: 'profile.settings.icon.back.color',
-            label: 'Geri renk',
-            description: 'Geri ikon rengi',
-            type: 'color',
-            value: 'auto',
-            group: 'Profil > İkonlar',
-        },
-        {
-            key: 'profile.settings.icon.back.size',
-            label: 'Geri boyut',
-            description: 'Geri ikon boyutu',
-            type: 'number',
-            value: 22,
-            min: 16,
-            max: 32,
-            step: 1,
-            group: 'Profil > İkonlar',
-        },
-        {
-            key: 'profile.settings.icon.back.strokeWidth',
-            label: 'Geri kalınlık',
-            description: 'Geri ikon stroke kalınlığı',
-            type: 'number',
-            value: 1.6,
-            min: 0.8,
-            max: 2.5,
-            step: 0.1,
-            group: 'Profil > İkonlar',
-        },
-        {
-            key: 'profile.settings.icon.theme.name',
-            label: 'İkon - Tema',
-            description: 'Lucide: SunMoon',
-            type: 'text',
-            value: 'SunMoon',
-            group: 'Profil > İkonlar',
-        },
-        {
-            key: 'profile.settings.icon.actions.name',
-            label: 'İkon - Hareketler',
-            description: 'Lucide: SquareActivity',
-            type: 'text',
-            value: 'SquareActivity',
-            group: 'Profil > İkonlar',
-        },
-        {
-            key: 'profile.settings.icon.likes.name',
-            label: 'İkon - Beğenilerin',
-            description: 'Lucide: Heart',
-            type: 'text',
-            value: 'Heart',
-            group: 'Profil > İkonlar',
-        },
-        {
-            key: 'profile.settings.icon.saved.name',
-            label: 'İkon - Kaydedilenlerin',
-            description: 'Lucide: Bookmark',
-            type: 'text',
-            value: 'Bookmark',
-            group: 'Profil > İkonlar',
-        },
-        {
-            key: 'profile.settings.icon.archived.name',
-            label: 'İkon - Arşivlenenler',
-            description: 'Lucide: ClockFading',
-            type: 'text',
-            value: 'ClockFading',
-            group: 'Profil > İkonlar',
-        },
-        {
-            key: 'profile.settings.icon.notInterested.name',
-            label: 'İkon - İlgilenmediklerin',
-            description: 'Lucide: EyeOff',
-            type: 'text',
-            value: 'EyeOff',
-            group: 'Profil > İkonlar',
-        },
-        {
-            key: 'profile.settings.icon.interested.name',
-            label: 'İkon - İlgilendiklerin',
-            description: 'Lucide: Eye',
-            type: 'text',
-            value: 'Eye',
-            group: 'Profil > İkonlar',
-        },
-        {
-            key: 'profile.settings.icon.accountHistory.name',
-            label: 'İkon - Hesap geçmişi',
-            description: 'Lucide: CalendarDays',
-            type: 'text',
-            value: 'CalendarDays',
-            group: 'Profil > İkonlar',
-        },
-        {
-            key: 'profile.settings.icon.watchHistory.name',
-            label: 'İkon - İzleme geçmişi',
-            description: 'Lucide: ImagePlay',
-            type: 'text',
-            value: 'ImagePlay',
-            group: 'Profil > İkonlar',
-        },
-        {
-            key: 'profile.settings.icon.deleted.name',
-            label: 'İkon - Yakınlarda Silinenler',
-            description: 'Lucide: Trash2',
-            type: 'text',
-            value: 'Trash2',
-            group: 'Profil > İkonlar',
-        },
-        {
-            key: 'profile.settings.chevron.color',
-            label: 'Chevron rengi',
-            description: 'Sağ ok rengi',
-            type: 'color',
-            value: 'auto',
-            group: 'Profil > Stiller',
-        },
-        {
-            key: 'profile.settings.item.borderColor',
-            label: 'Item ayırıcı rengi',
-            description: 'Ayar item alt çizgi rengi',
-            type: 'color',
-            value: 'auto',
-            group: 'Profil > Stiller',
-        },
-        {
-            key: 'profile.settings.segment.backgroundColor',
-            label: 'Tema seçici arka plan',
-            description: 'Segment arka plan rengi',
-            type: 'color',
-            value: 'auto',
-            group: 'Profil > Stiller',
-        },
-        {
-            key: 'profile.settings.segment.activeColor',
-            label: 'Tema seçici aktif renk',
-            description: 'Segment aktif arka plan rengi',
-            type: 'color',
-            value: 'auto',
-            group: 'Profil > Stiller',
-        },
-        {
-            key: 'profile.settings.segment.activeTextColor',
-            label: 'Tema seçici aktif yazı rengi',
-            description: 'Segment aktif yazı rengi',
-            type: 'color',
-            value: 'auto',
-            group: 'Profil > Stiller',
-        },
-        {
-            key: 'profile.settings.segment.textColor',
-            label: 'Tema seçici yazı rengi',
-            description: 'Segment pasif yazı rengi',
-            type: 'color',
-            value: 'auto',
-            group: 'Profil > Stiller',
-        },
-        {
-            key: 'profile.settings.actionsHeader',
-            label: 'Profil alt başlık - Hareketler',
-            description: 'Profil ayarlar alt menüsü başlığı',
-            type: 'text',
-            value: 'Hareketler',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.deletedHeader',
-            label: 'Profil alt başlık - Yakınlarda Silinenler',
-            description: 'Profil ayarlar alt menüsü başlığı (silinenler)',
-            type: 'text',
-            value: 'Yakınlarda Silinenler',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.themeLabel',
-            label: 'Profil ayar etiketi - Tema',
-            description: 'Tema seçeneği etiketi',
-            type: 'text',
-            value: 'Tema',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.themeOptionLight',
-            label: 'Tema seçeneği - Açık',
-            description: 'Tema seçeneği Açık metni',
-            type: 'text',
-            value: 'Açık',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.themeOptionDark',
-            label: 'Tema seçeneği - Koyu',
-            description: 'Tema seçeneği Koyu metni',
-            type: 'text',
-            value: 'Koyu',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.themeOptionSystem',
-            label: 'Tema seçeneği - Cihaz',
-            description: 'Tema seçeneği Cihaz metni',
-            type: 'text',
-            value: 'Cihaz',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.actionsLabel',
-            label: 'Profil ayar etiketi - Hareketler',
-            description: 'Hareketler seçeneği etiketi',
-            type: 'text',
-            value: 'Hareketler',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.actionsHeroTitle',
-            label: 'Hareketler - Üst başlık',
-            description: 'Hareketler sayfası üst başlığı',
-            type: 'text',
-            value: 'Hesap yönetimini tek bir yerde yapabilirsin',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.actionsHeroText',
-            label: 'Hareketler - Alt metin',
-            description: 'Hareketler sayfası açıklama metni',
-            type: 'text',
-            value: 'Tüm hesap hareketlerini incele ve yönet',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.accountSettingsHeroTitle',
-            label: 'Hesap ayarları - Üst başlık',
-            description: 'Hesap ayarları sayfası üst başlığı',
-            type: 'text',
-            value: 'Hesap güvenliğin önemli',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.accountSettingsHeroText',
-            label: 'Hesap ayarları - Alt metin',
-            description: 'Hesap ayarları sayfası açıklama metni',
-            type: 'text',
-            value: 'Giriş ve güvenlik ayarlarını kontrol edip güncelleyebilirsin',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.accountSettingsNoticeText',
-            label: 'Hesap ayarları - Uyarı metni',
-            description: 'Hesap ayarları sayfası alt uyarı metni',
-            type: 'text',
-            value: 'Hesap güvenliğin, sağlığın ve uygulama erişiminde sorun yaşıyorsan, verilerinin izinsiz ele geçirildiğini ve paylaşıldığını düşünüyorsan, engellenen ve ya sessize alınan bir kullanıcıdan bildirimler almaya ve içerikler görmeye devam ediyorsan lütfen Güven Merkezi\'ni ziyaret et',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.accountSettingsNoticeLinkLabel',
-            label: 'Hesap ayarları - Güven Merkezi etiket',
-            description: 'Hesap ayarları sayfası link metni',
-            type: 'text',
-            value: 'Güven Merkezi',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.accountSettingsItem.twoFactor',
-            label: 'Hesap ayarları - İki adımlı doğrulama',
-            description: 'Hesap ayarları menüsü item metni',
-            type: 'text',
-            value: 'İki adımlı doğrulama',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.accountSettingsItem.twoFactorHelper',
-            label: 'Hesap ayarları - İki adımlı doğrulama açıklaması',
-            description: 'Hesap ayarları menüsü item açıklama metni',
-            type: 'text',
-            value: 'E-posta adresinizi veya telefon numaranızı iki adımlı doğrulama için kullanın.',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.accountSettingsItem.passwordHelper',
-            label: 'Hesap ayarları - Şifre açıklaması',
-            description: 'Hesap ayarları menüsü item açıklama metni',
-            type: 'text',
-            value: 'Hesap şifreniz size özeldir. Güvenliğiniz için şifrenizi düzenli aralıklarla değiştirmenizi ve İki Adımlı Doğrulama’yı aktif etmenizi öneririz.',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.accountSettingsItem.emailHelper',
-            label: 'Hesap ayarları - E-posta açıklaması',
-            description: 'Hesap ayarları menüsü item açıklama metni',
-            type: 'text',
-            value: 'Hesabınızla ilişkili e-posta adresi giriş, bildirim ve güvenlik doğrulamaları için kullanılır. Güncel ve erişiminizin olduğu bir adres kullandığınızdan emin olun.',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.accountSettingsItem.phoneHelper',
-            label: 'Hesap ayarları - Telefon numarası açıklaması',
-            description: 'Hesap ayarları menüsü item açıklama metni',
-            type: 'text',
-            value: 'Telefon numaranız hesap güvenliği, doğrulama ve önemli bilgilendirmeler için kullanılır. Güncel ve size ait bir numara kullandığınızdan emin olun.',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.accountSettingsItem.statusHelper',
-            label: 'Hesap ayarları - Hesap durumu açıklaması',
-            description: 'Hesap ayarları menüsü item açıklama metni',
-            type: 'text',
-            value: 'Hesap durumunuzu buradan görüntüleyebilir ve hesabınızla ilgili önemli bilgilere erişebilirsiniz.',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.accountSettingsItem.blockedHelper',
-            label: 'Hesap ayarları - Engellenenler açıklaması',
-            description: 'Hesap ayarları menüsü item açıklama metni',
-            type: 'text',
-            value: 'Engellediğiniz hesapları buradan görüntüleyebilir ve dilediğiniz zaman engellemeyi kaldırabilirsiniz.',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.accountSettingsItem.mutedHelper',
-            label: 'Hesap ayarları - Sessize alınanlar açıklaması',
-            description: 'Hesap ayarları menüsü item açıklama metni',
-            type: 'text',
-            value: 'Sessize aldığınız hesapları buradan görüntüleyebilir ve dilediğiniz zaman sessize alma işlemini kaldırabilirsiniz.',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.accountSettingsItem.typeHelper',
-            label: 'Hesap ayarları - Hesap türü açıklaması',
-            description: 'Hesap ayarları menüsü item açıklama metni',
-            type: 'text',
-            value: 'Hesap türünüzü ve ilgili seçenekleri buradan yönetebilirsiniz.',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.accountType.pause',
-            label: 'Hesap türü - Hesabına ara ver',
-            description: 'Hesap türü menüsü item metni',
-            type: 'text',
-            value: 'Hesabına ara ver',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.accountType.creatorHelper',
-            label: 'Hesap türü - İçerik üreticisi açıklaması',
-            description: 'Hesap türü menüsü item açıklama metni',
-            type: 'text',
-            value: 'İçerik üreticisi araçlarına erişmek için başvur.',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.accountType.brandedHelper',
-            label: 'Hesap türü - Markalı içerik açıklaması',
-            description: 'Hesap türü menüsü item açıklama metni',
-            type: 'text',
-            value: 'Markalı içerik seçeneklerini ve işbirliklerini yönet.',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.accountType.verificationHelper',
-            label: 'Hesap türü - Doğrulama açıklaması',
-            description: 'Hesap türü menüsü item açıklama metni',
-            type: 'text',
-            value: 'Hesabını doğrulatmak için talep oluştur.',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.accountType.badgeHelper',
-            label: 'Hesap türü - Rozet açıklaması',
-            description: 'Hesap türü menüsü item açıklama metni',
-            type: 'text',
-            value: 'Rozet başvurunu tamamla ve süreci takip et.',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.accountType.pauseHelper',
-            label: 'Hesap türü - Hesabına ara ver açıklaması',
-            description: 'Hesap türü menüsü item açıklama metni',
-            type: 'text',
-            value: 'Hesabını geçici olarak devre dışı bırakır. Dilediğinde tekrar devam edebilirsin.',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.accountType.terminate',
-            label: 'Hesap türü - Hesabını sonlandır',
-            description: 'Hesap türü menüsü item metni',
-            type: 'text',
-            value: 'Hesabını sonlandır',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.accountType.terminateHelper',
-            label: 'Hesap türü - Hesabını sonlandır açıklaması',
-            description: 'Hesap türü menüsü item açıklama metni',
-            type: 'text',
-            value: 'Hesabını kalıcı olarak kapatır. Bu işlem geri alınamaz.',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.notificationsHeroTitle',
-            label: 'Bildirimler - Üst başlık',
-            description: 'Bildirimler sayfası üst başlığı',
-            type: 'text',
-            value: 'Tercihlerini önemsiyoruz',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.notificationsHeroText',
-            label: 'Bildirimler - Alt metin',
-            description: 'Bildirimler sayfası açıklama metni',
-            type: 'text',
-            value: 'Bildirim tercihlerini istediğin zaman değiştirebilirsin',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.notificationsNoticeText',
-            label: 'Bildirimler - Uyarı metni',
-            description: 'Bildirimler sayfası alt uyarı metni',
-            type: 'text',
-            value: 'Tercihlerinize saygı duyar, istemediğiniz bildirimleri size göndermeyiz. Şeffaflık ilkemiz gereği sizi önemli güncellemeler hakkında bilgilendirmeye devam ederiz. Hesap güvenliğinizle ilgili bildirimler, bu tercihlerden bağımsız olarak her zaman size ulaşır.',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.notificationsItem.pushHelper',
-            label: 'Bildirimler - Anlık bildirimler açıklaması',
-            description: 'Bildirimler menüsü item açıklama metni',
-            type: 'text',
-            value: 'Uygulama bildirimlerini tercihlerinize göre yönetebilirsiniz.',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.notificationsItem.emailHelper',
-            label: 'Bildirimler - E-posta bildirimleri açıklaması',
-            description: 'Bildirimler menüsü item açıklama metni',
-            type: 'text',
-            value: 'İstenmeyen e-postaları yönetebilir ve iletişim tercihlerinizi güncelleyebilirsiniz.',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.notificationsItem.smsHelper',
-            label: 'Bildirimler - SMS bildirimleri açıklaması',
-            description: 'Bildirimler menüsü item açıklama metni',
-            type: 'text',
-            value: 'SMS bildirimlerini kontrol edebilir ve almak istemediklerinizi kapatabilirsiniz.',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.inAppBrowser.heroTitle',
-            label: 'Uygulama içi tarayıcı - Üst başlık',
-            description: 'Uygulama içi tarayıcı sayfası üst başlığı',
-            type: 'text',
-            value: 'Göz atma geçmişi sizin kontrolünüzde',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.inAppBrowser.heroText',
-            label: 'Uygulama içi tarayıcı - Alt metin',
-            description: 'Uygulama içi tarayıcı sayfası açıklama metni',
-            type: 'text',
-            value: 'Geçmişinizi inceleyebilir, yönetebilir ve isterseniz temizleyebilirsiniz',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.inAppBrowser.noticeText',
-            label: 'Uygulama içi tarayıcı - Uyarı metni',
-            description: 'Uygulama içi tarayıcı sayfası alt uyarı metni',
-            type: 'text',
-            value: 'Göz atma geçmişinizi 90 gün sonra siliyoruz.\nBu verileri size daha uygun içerikler ve reklamlar göstermek için kullanıyoruz.',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.inAppBrowser.history.toggleHelper',
-            label: 'Uygulama içi tarayıcı - Geçmiş seçeneği açıklaması',
-            description: 'Tarayıcı geçmişi Açık/Kapalı açıklama metni',
-            type: 'text',
-            value: 'Tarayıcı geçmişinin kaydedilmesini Açık veya Kapalı olarak yönetebilirsiniz.\nVarsayılan ayar Açık’tır.',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.inAppBrowser.history.viewHelper',
-            label: 'Uygulama içi tarayıcı - Geçmişi gör açıklaması',
-            description: 'Tarayıcı geçmişini gör açıklama metni',
-            type: 'text',
-            value: 'Göz atma geçmişinizi görüntüleyebilir ve daha sonra tekrar ziyaret edebilirsiniz.',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.inAppBrowser.history.clearHelper',
-            label: 'Uygulama içi tarayıcı - Geçmişi temizle açıklaması',
-            description: 'Tarayıcı geçmişini temizle açıklama metni',
-            type: 'text',
-            value: 'Göz atma geçmişinizi tercihlerinize göre temizleyebilirsiniz.\nBu veriler temizlendikten sonra görüntülenmez ve kullanılmaz.',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.logoutLabel',
-            label: 'Profil ayar etiketi - Çıkış Yap',
-            description: 'Çıkış yap seçeneği etiketi',
-            type: 'text',
-            value: 'Çıkış Yap',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.deletedLabel',
-            label: 'Profil ayar etiketi - Yakınlarda Silinenler',
-            description: 'Silinenler seçeneği etiketi',
-            type: 'text',
-            value: 'Yakınlarda Silinenler',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.deletedHelper',
-            label: 'Profil ayar açıklaması - Yakınlarda Silinenler',
-            description: 'Silinenler açıklama metni',
-            type: 'text',
-            value: 'Son 15 gün içinde silinenleri geri yükle',
-            group: 'Profil > Metinler',
-        },
-        {
-            key: 'profile.settings.actionsItem.likes',
-            label: 'Hareketler - Beğenilerin',
-            description: 'Hareketler menüsü item metni',
-            type: 'text',
-            value: 'Beğenilerin',
-            group: 'Profil > Hareketler',
-        },
-        {
-            key: 'profile.settings.actionsItem.saved',
-            label: 'Hareketler - Kaydedilenlerin',
-            description: 'Hareketler menüsü item metni',
-            type: 'text',
-            value: 'Kaydedilenlerin',
-            group: 'Profil > Hareketler',
-        },
-        {
-            key: 'profile.settings.actionsItem.archived',
-            label: 'Hareketler - Arşivlenenler',
-            description: 'Hareketler menüsü item metni',
-            type: 'text',
-            value: 'Arşivlenenler',
-            group: 'Profil > Hareketler',
-        },
-        {
-            key: 'profile.settings.actionsItem.notInterested',
-            label: 'Hareketler - İlgilenmediklerin',
-            description: 'Hareketler menüsü item metni',
-            type: 'text',
-            value: 'İlgilenmediklerin',
-            group: 'Profil > Hareketler',
-        },
-        {
-            key: 'profile.settings.actionsItem.notInterestedHelper',
-            label: 'Hareketler - İlgilenmediklerin açıklaması',
-            description: 'Hareketler menüsü item açıklama metni',
-            type: 'text',
-            value: 'İlgilenmediğini işaretlediğin içerikleri yönet.',
-            group: 'Profil > Hareketler',
-        },
-        {
-            key: 'profile.settings.actionsItem.interested',
-            label: 'Hareketler - İlgilendiklerin',
-            description: 'Hareketler menüsü item metni',
-            type: 'text',
-            value: 'İlgilendiklerin',
-            group: 'Profil > Hareketler',
-        },
-        {
-            key: 'profile.settings.actionsItem.interestedHelper',
-            label: 'Hareketler - İlgilendiklerin açıklaması',
-            description: 'Hareketler menüsü item açıklama metni',
-            type: 'text',
-            value: 'İlgilendiğini işaretlediğin içerikleri burada gör.',
-            group: 'Profil > Hareketler',
-        },
-        {
-            key: 'profile.settings.actionsItem.accountHistory',
-            label: 'Hareketler - Hesap geçmişi',
-            description: 'Hareketler menüsü item metni',
-            type: 'text',
-            value: 'Hesap geçmişi',
-            group: 'Profil > Hareketler',
-        },
-        {
-            key: 'profile.settings.actionsItem.accountHistoryHelper',
-            label: 'Hareketler - Hesap geçmişi açıklaması',
-            description: 'Hareketler menüsü item açıklama metni',
-            type: 'text',
-            value: 'Hesap bilgilerini ve oluşturma tarihini görüntüle.',
-            group: 'Profil > Hareketler',
-        },
-        {
-            key: 'profile.settings.actionsItem.watchHistory',
-            label: 'Hareketler - İzleme geçmişi',
-            description: 'Hareketler menüsü item metni',
-            type: 'text',
-            value: 'İzleme geçmişi',
-            group: 'Profil > Hareketler',
-        },
-        {
-            key: 'profile.settings.actionsItem.watchHistoryHelper',
-            label: 'Hareketler - İzleme geçmişi açıklaması',
-            description: 'Hareketler menüsü item açıklama metni',
-            type: 'text',
-            value: 'İzlediğin içerikleri ve tekrar ziyaret ettiklerini gör.',
-            group: 'Profil > Hareketler',
-        },
-    ],
-};
-
-function mergeAdminConfig(storedConfig) {
-    const defaultItems = DEFAULT_ADMIN_CONFIG.items;
-    const defaultMap = new Map(defaultItems.map((item) => [item.key, item]));
-    const storedItems = Array.isArray(storedConfig?.items) ? storedConfig.items : [];
-    const storedMap = new Map(storedItems.map((item) => [item.key, item]));
-
-    // Start with all default items, merging values from stored config if they exist
-    const mergedItems = defaultItems.map((defaultItem) => {
-        const storedItem = storedMap.get(defaultItem.key);
-        if (!storedItem) return defaultItem;
-        return {
-            ...defaultItem,
-            value: storedItem.value ?? defaultItem.value,
-        };
-    });
-
-    // Add items from stored config that ARE NOT in default config
-    storedItems.forEach((item) => {
-        if (!defaultMap.has(item.key)) {
-            mergedItems.push(item);
-        }
-    });
-
-    return {
-        version: typeof storedConfig?.version === 'number' ? storedConfig.version : DEFAULT_ADMIN_CONFIG.version,
-        updatedAt: storedConfig?.updatedAt || DEFAULT_ADMIN_CONFIG.updatedAt,
-        items: mergedItems,
-    };
-}
-
-function loadAdminConfig() {
-    try {
-        if (!fs.existsSync(ADMIN_CONFIG_PATH)) {
-            return DEFAULT_ADMIN_CONFIG;
-        }
-        const raw = fs.readFileSync(ADMIN_CONFIG_PATH, 'utf8');
-        const parsed = JSON.parse(raw);
-        if (parsed && Array.isArray(parsed.items)) {
-            return mergeAdminConfig(parsed);
-        }
-        return DEFAULT_ADMIN_CONFIG;
-    } catch (error) {
-        console.error('[ADMIN CONFIG] Load error:', error);
-        return DEFAULT_ADMIN_CONFIG;
-    }
-}
-
-function sanitizeAdminConfig(input) {
-    if (!input || !Array.isArray(input.items)) {
-        return null;
-    }
-    const items = input.items
-        .map((item) => ({
-            key: String(item.key || '').trim(),
-            label: String(item.label || '').trim(),
-            description: String(item.description || '').trim(),
-            type: String(item.type || 'text').trim(),
-            value: item.value,
-            group: item.group ? String(item.group) : undefined,
-            options: Array.isArray(item.options) ? item.options.map((opt) => String(opt)) : undefined,
-            min: typeof item.min === 'number' ? item.min : undefined,
-            max: typeof item.max === 'number' ? item.max : undefined,
-            step: typeof item.step === 'number' ? item.step : undefined,
-        }))
-        .filter((item) => item.key.length > 0);
-
-    return {
-        version: typeof input.version === 'number' ? input.version : DEFAULT_ADMIN_CONFIG.version,
-        updatedAt: new Date().toISOString(),
-        items,
-    };
-}
-
-function saveAdminConfig(config) {
-    fs.writeFileSync(ADMIN_CONFIG_PATH, JSON.stringify(config, null, 2));
-}
-
-function broadcastAdminConfigUpdate() {
-    if (!adminWss) return;
-    const message = JSON.stringify({ type: 'admin-config-updated', updatedAt: new Date().toISOString() });
-    adminWss.clients.forEach((client) => {
-        if (client.readyState === 1) {
-            client.send(message);
-        }
-    });
-}
-
-app.get('/admin', (req, res) => {
-    res.sendFile(path.join(__dirname, 'admin-panel.html'));
-});
-
-app.get('/admin/config', (req, res) => {
-    res.json(loadAdminConfig());
-});
-
-app.get('/admin/config/defaults', (req, res) => {
-    res.json(DEFAULT_ADMIN_CONFIG);
-});
-
-app.post('/admin/config', (req, res) => {
-    const sanitized = sanitizeAdminConfig(req.body);
-    if (!sanitized) {
-        return res.status(400).json({ error: 'Gecersiz config verisi.' });
-    }
-    try {
-        saveAdminConfig(sanitized);
-        broadcastAdminConfigUpdate();
-        return res.json({ ok: true, config: sanitized });
-    } catch (error) {
-        console.error('[ADMIN CONFIG] Save error:', error);
-        return res.status(500).json({ error: 'Config kaydedilemedi.' });
-    }
-});
-
+// Admin page/config endpoints removed.
 // Helper: Upload to R2 with CDN Cache Headers
 async function uploadToR2(filePath, fileName, contentType) {
     const fileStream = fs.readFileSync(filePath);
@@ -1040,11 +179,11 @@ async function uploadToR2(filePath, fileName, contentType) {
     return `${process.env.R2_PUBLIC_URL}/${fileName}`;
 }
 
-console.log('6. Loading HlsService...');
+logLine('BOOT', 'INIT', 'Loading HlsService module');
 const HlsService = require('./services/HlsService');
-console.log('7. Initializing HlsService...');
-const hlsService = new HlsService(r2, process.env.R2_BUCKET_NAME);
-console.log('8. HlsService READY.');
+logLine('BOOT', 'INIT', 'Initializing HlsService');
+const hlsService = new HlsService(r2, process.env.R2_BUCKET_NAME, { logLine, logBanner });
+logLine('OK', 'INIT', 'HlsService ready');
 
 // 🔥 Upload Progress Tracking
 const uploadProgress = new Map(); // { uniqueId: { stage: string, percent: number } }
@@ -1061,7 +200,7 @@ app.get('/upload-progress/:id', (req, res) => {
 // Helper: Update progress
 function setUploadProgress(id, stage, percent) {
     uploadProgress.set(id, { stage, percent });
-    console.log(`📊 [PROGRESS] ${id}: ${stage} - ${percent}%`);
+    logLine('INFO', 'UPLOAD_PROGRESS', 'Progress update', { id, stage, percent });
 }
 
 function parseAspectRatioValue(value) {
@@ -1200,7 +339,7 @@ async function safeProbeDimensions(inputPath) {
         });
         return extractDimensionsFromProbe(metadata);
     } catch (error) {
-        console.warn('⚠️ [PROBE] Failed to read media dimensions:', error?.message || error);
+        logLine('WARN', 'PROBE', 'Failed to read media dimensions', { error: error?.message || error });
         return { width: 0, height: 0 };
     }
 }
@@ -1222,10 +361,12 @@ app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
     const tempOutputDir = path.join(__dirname, 'temp_uploads');
     const isCarousel = files.length > 1 || files[0].mimetype.startsWith('image/');
 
-    console.log(`\n🎬 [UPLOAD] --- NEW UPLOAD START ---`);
-    console.log(`🎬 [UPLOAD] Count: ${files.length}, Type: ${isCarousel ? 'carousel' : 'video'}`);
-    console.log(`🎬 [UPLOAD] ID: ${uniqueId}`);
-    console.log(`🎬 [UPLOAD] UserID: ${userId}`);
+    logBanner('UPLOAD REQUEST', [
+        `Upload ID  : ${uniqueId}`,
+        `User ID    : ${userId || 'test-user'}`,
+        `Item Count : ${files.length}`,
+        `Post Type  : ${isCarousel ? 'carousel' : 'video'}`,
+    ]);
 
     try {
         const mediaUrls = [];
@@ -1293,7 +434,12 @@ app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
                 const outputWidth = optimizedDims.width || safeWidth;
                 const outputHeight = optimizedDims.height || safeHeight;
                 portraitBase = pickMostPortrait(portraitBase, { width: outputWidth, height: outputHeight });
-                console.log(`   📐 [DIM][POST] source=${width}x${height}, thumb=${thumbDims.width}x${thumbDims.height}, normalized=${safeWidth}x${safeHeight}, output=${outputWidth}x${outputHeight}`);
+                logLine('INFO', 'UPLOAD_DIM', 'Post media dimensions', {
+                    source: `${width}x${height}`,
+                    thumb: `${thumbDims.width}x${thumbDims.height}`,
+                    normalized: `${safeWidth}x${safeHeight}`,
+                    output: `${outputWidth}x${outputHeight}`,
+                });
 
                 let spriteUrl = '';
                 if (i === 0) {
@@ -1352,7 +498,7 @@ app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
         res.json({ success: true, data: data[0] });
 
     } catch (error) {
-        console.error('❌ [UPLOAD] Error:', error);
+        logLine('ERR', 'UPLOAD', 'Upload failed', { error: error?.message || error, uploadId: uniqueId });
         res.status(500).json({ error: error.message });
         if (files) files.forEach(f => { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); });
     }
@@ -1379,7 +525,12 @@ app.post('/upload-story', upload.array('video', 10), async (req, res) => {
     const tempOutputDir = path.join(__dirname, 'temp_uploads');
     const isCarousel = files.length > 1 || files[0].mimetype.startsWith('image/');
 
-    console.log(`📖 [STORY] Upload started: ${uniqueId}, Count: ${files.length}`);
+    logBanner('STORY UPLOAD REQUEST', [
+        `Upload ID  : ${uniqueId}`,
+        `User ID    : ${userId}`,
+        `Item Count : ${files.length}`,
+        `Post Type  : ${isCarousel ? 'carousel' : 'video'}`,
+    ]);
 
     try {
         const mediaUrls = [];
@@ -1430,7 +581,11 @@ app.post('/upload-story', upload.array('video', 10), async (req, res) => {
                 const safeWidth = normalizedSourceDims.width || thumbDims.width || width || 1080;
                 const safeHeight = normalizedSourceDims.height || thumbDims.height || height || 1920;
                 portraitBase = pickMostPortrait(portraitBase, { width: safeWidth, height: safeHeight });
-                console.log(`   📐 [DIM][STORY] source=${width}x${height}, thumb=${thumbDims.width}x${thumbDims.height}, normalized=${safeWidth}x${safeHeight}`);
+                logLine('INFO', 'STORY_DIM', 'Story media dimensions', {
+                    source: `${width}x${height}`,
+                    thumb: `${thumbDims.width}x${thumbDims.height}`,
+                    normalized: `${safeWidth}x${safeHeight}`,
+                });
 
                 if (i === 0) {
                     firstThumbUrl = thumbnailUrl;
@@ -1479,7 +634,7 @@ app.post('/upload-story', upload.array('video', 10), async (req, res) => {
         res.json({ success: true, data: data[0] });
 
     } catch (error) {
-        console.error('❌ [STORY] Error:', error);
+        logLine('ERR', 'STORY', 'Story upload failed', { error: error?.message || error, uploadId: uniqueId });
         res.status(500).json({ error: error.message });
         if (files) files.forEach(f => { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); });
     }
@@ -1556,18 +711,18 @@ app.delete('/videos/:id', async (req, res) => {
     const videoId = req.params.id;
     const force = req.query.force === 'true'; // ?force=true for permanent delete
 
-    console.log(`\n\n🗑️ [DELETE REQUEST START]`);
-    console.log(`   📝 Video ID: ${videoId}`);
-    console.log(`   ❓ Force Query Param: "${req.query.force}"`);
-    console.log(`   🛡️ Parsed Force Mode: ${force}`);
-    console.log(`   👉 Decision: ${force ? 'HARD DELETE (Permanent)' : 'SOFT DELETE (Trash)'}`);
+    logBanner('DELETE REQUEST', [
+        `Video ID: ${videoId}`,
+        `Force query: ${req.query.force ?? 'undefined'}`,
+        `Mode: ${force ? 'HARD DELETE (Permanent)' : 'SOFT DELETE (Trash)'}`,
+    ]);
 
     // 🔐 JWT Authentication
     const authHeader = req.headers.authorization;
-    console.log(`   🔑 Auth Header: ${authHeader ? 'Present' : 'MISSING'}`);
+    logLine('INFO', 'DELETE', 'Authorization header check', { present: Boolean(authHeader) });
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        console.log(`   ❌ No valid Authorization header`);
+        logLine('WARN', 'DELETE', 'No valid Authorization header');
         return res.status(401).json({ error: 'Authorization header required' });
     }
 
@@ -1580,7 +735,10 @@ app.delete('/videos/:id', async (req, res) => {
 
     // Verify user
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    console.log(`   👤 Auth User: ${user?.id || 'NONE'} | Error: ${authError?.message || 'NONE'}`);
+    logLine('INFO', 'DELETE', 'Token verification', {
+        userId: user?.id || 'none',
+        error: authError?.message || 'none',
+    });
 
     if (authError || !user) {
         return res.status(401).json({ error: 'Invalid or expired token' });
@@ -1600,7 +758,10 @@ app.delete('/videos/:id', async (req, res) => {
                 .single();
 
             if (fetchError || !video) {
-                console.warn(`   ⚠️ Video not found during HARD delete search. Error: ${fetchError?.message}`);
+                logLine('WARN', 'DELETE', 'Video not found during hard delete lookup', {
+                    videoId,
+                    error: fetchError?.message || 'none',
+                });
                 return res.status(404).json({ error: 'Video not found' });
             }
 
@@ -1658,13 +819,16 @@ app.delete('/videos/:id', async (req, res) => {
                 objectKeysToDelete.add(`thumbs/${legacyVideoId}.webp`);
             }
 
-            console.log(`   🧹 R2 cleanup targets: ${objectKeysToDelete.size} key(s), ${folderPrefixesToClean.size} folder prefix(es)`);
+            logLine('INFO', 'DELETE', 'R2 cleanup targets prepared', {
+                keys: objectKeysToDelete.size,
+                folders: folderPrefixesToClean.size,
+            });
 
             // 2A. Prefix cleanup for scoped folders
             for (const folderPrefix of folderPrefixesToClean) {
                 try {
                     const prefix = folderPrefix.endsWith('/') ? folderPrefix : `${folderPrefix}/`;
-                    console.log(`   👉 [HARD] Cleaning R2 Folder: ${prefix}`);
+                    logLine('INFO', 'DELETE', 'Cleaning R2 folder', { prefix });
                     const listCmd = new ListObjectsV2Command({
                         Bucket: process.env.R2_BUCKET_NAME,
                         Prefix: prefix
@@ -1679,12 +843,18 @@ app.delete('/videos/:id', async (req, res) => {
                             }
                         };
                         await r2.send(new DeleteObjectsCommand(deleteParams));
-                        console.log(`   ✅ R2 Folder Deleted (${listRes.Contents.length} files) from: ${prefix}`);
+                        logLine('OK', 'DELETE', 'R2 folder cleaned', {
+                            prefix,
+                            deletedFiles: listRes.Contents.length,
+                        });
                     } else {
-                        console.log(`   ⚠️ No files found in R2 folder: ${prefix}`);
+                        logLine('WARN', 'DELETE', 'No files found in R2 folder', { prefix });
                     }
                 } catch (r2Error) {
-                    console.error(`   ⚠️ R2 Cleanup Error for ${folderPrefix}:`, r2Error.message);
+                    logLine('ERR', 'DELETE', 'R2 folder cleanup failed', {
+                        folderPrefix,
+                        error: r2Error?.message || r2Error,
+                    });
                 }
             }
 
@@ -1700,9 +870,11 @@ app.delete('/videos/:id', async (req, res) => {
                             Delete: { Objects: chunk },
                         }));
                     }
-                    console.log(`   ✅ R2 Direct Key Cleanup Sent (${objectKeysToDelete.size} keys)`);
+                    logLine('OK', 'DELETE', 'R2 direct key cleanup sent', { keys: objectKeysToDelete.size });
                 } catch (r2Error) {
-                    console.error('   ⚠️ R2 Direct Key Cleanup Error:', r2Error.message);
+                    logLine('ERR', 'DELETE', 'R2 direct key cleanup failed', {
+                        error: r2Error?.message || r2Error,
+                    });
                 }
             }
 
@@ -1712,22 +884,28 @@ app.delete('/videos/:id', async (req, res) => {
                 .delete()
                 .eq('id', videoId);
 
-            console.log(`   📊 Delete Result: count=${count}, error=${deleteError?.message || 'NONE'}`);
+            logLine('INFO', 'DELETE', 'Database hard delete result', {
+                count,
+                error: deleteError?.message || 'none',
+            });
 
             if (deleteError) throw deleteError;
 
-            console.log('✅ [HARD DELETE] Completed.');
+            logLine('OK', 'DELETE', 'Hard delete completed', { videoId });
             return res.json({ success: true, message: 'Video permanently deleted' });
 
         } else {
             // ============================================
             // SOFT DELETE
             // ============================================
-            console.log(`   👉 Attempting Soft Delete via RPC for ${videoId}`);
+            logLine('INFO', 'DELETE', 'Attempting soft delete RPC', { videoId });
             const { error } = await dbClient.rpc('soft_delete_video', { video_id: videoId });
 
             if (error) {
-                console.error('   ❌ Soft Delete RPC Error:', error);
+                logLine('ERR', 'DELETE', 'Soft delete RPC error', {
+                    videoId,
+                    error: error?.message || error,
+                });
                 throw error;
             }
 
@@ -1736,12 +914,15 @@ app.delete('/videos/:id', async (req, res) => {
             // If the ID didn't exist, the update inside RPC just does nothing.
             // We can check if we want to return 404, but for now Success is fine.
 
-            console.log('✅ [SOFT DELETE] Video marked as deleted.');
+            logLine('OK', 'DELETE', 'Video moved to trash', { videoId });
             return res.json({ success: true, message: 'Video moved to trash' });
         }
 
     } catch (error) {
-        console.error('❌ [DELETE] Unexpected Error:', error);
+        logLine('ERR', 'DELETE', 'Unexpected delete error', {
+            videoId,
+            error: error?.message || error,
+        });
         res.status(500).json({ error: error.message || 'Internal server error' });
     }
 });
@@ -1749,22 +930,22 @@ app.delete('/videos/:id', async (req, res) => {
 // Endpoint: RESTORE Video
 app.post('/videos/:id/restore', async (req, res) => {
     const videoId = req.params.id;
-    console.log(`♻️ [RESTORE] Request for video: ${videoId}`);
+    logBanner('RESTORE REQUEST', [`Video ID: ${videoId}`]);
 
     try {
-        console.log(`   👉 Attempting Restore via RPC for ${videoId}`);
+        logLine('INFO', 'RESTORE', 'Attempting restore RPC', { videoId });
         const { error } = await supabase.rpc('restore_video', { video_id: videoId });
 
         if (error) {
-            console.error('   ❌ Restore RPC Error:', error);
+            logLine('ERR', 'RESTORE', 'Restore RPC error', { videoId, error: error?.message || error });
             throw error;
         }
 
-        console.log('✅ [RESTORE] Video restored successfully.');
+        logLine('OK', 'RESTORE', 'Video restored successfully', { videoId });
         res.json({ success: true, message: 'Video restored' });
 
     } catch (error) {
-        console.error('❌ [RESTORE] Error:', error);
+        logLine('ERR', 'RESTORE', 'Restore failed', { videoId, error: error?.message || error });
         res.status(500).json({ error: error.message });
     }
 });
@@ -1779,7 +960,7 @@ app.post('/upload-avatar', upload.single('image'), async (req, res) => {
     }
 
     try {
-        console.log(`👤 [AVATAR] Process starting for user: ${userId}`);
+        logBanner('AVATAR UPLOAD REQUEST', [`User ID: ${userId}`]);
         const extension = path.extname(file.originalname) || '.jpg';
 
         const fileName = `users/${userId}/profile/avatar${extension}`;
@@ -1792,25 +973,25 @@ app.post('/upload-avatar', upload.single('image'), async (req, res) => {
         const avatarUrl = `${rawAvatarUrl}?t=${Date.now()}`;
 
         // 3. Update Supabase Profile Record
-        console.log(`   👉 Syncing to Supabase Profiles...`);
+        logLine('INFO', 'AVATAR', 'Syncing avatar URL to Supabase profile', { userId });
         const { error: dbError } = await supabase
             .from('profiles')
             .update({ avatar_url: avatarUrl })
             .eq('id', userId);
 
         if (dbError) {
-            console.error('   ❌ Supabase Update Error:', dbError.message);
+            logLine('ERR', 'AVATAR', 'Supabase profile update failed', { userId, error: dbError.message });
             throw dbError;
         }
 
         // Cleanup temp file
         if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
 
-        console.log(`✅ [AVATAR] Success: ${avatarUrl}`);
+        logLine('OK', 'AVATAR', 'Avatar upload completed', { userId, avatarUrl });
         res.json({ success: true, avatarUrl });
 
     } catch (error) {
-        console.error('❌ [AVATAR] Fatal Error:', error);
+        logLine('ERR', 'AVATAR', 'Avatar upload failed', { userId, error: error?.message || error });
         res.status(500).json({ error: error.message });
         if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
     }
@@ -1820,7 +1001,7 @@ app.post('/upload-avatar', upload.single('image'), async (req, res) => {
 // Temporary Migration Endpoint
 app.get('/migrate-assets', async (req, res) => {
     try {
-        console.log("🚀 Starting R2 Migration via Endpoint...");
+        logBanner('MIGRATION REQUEST', ['Starting R2 asset migration endpoint']);
         const mainUserId = "687c8079-e94c-42c2-9442-8a4a6b63dec6";
 
         // 1. Migrate Avatar
@@ -1833,9 +1014,9 @@ app.get('/migrate-assets', async (req, res) => {
                 Key: newAvatarKey
             }));
             await supabase.from('profiles').update({ avatar_url: `${process.env.R2_PUBLIC_URL}/${newAvatarKey}` }).eq('id', mainUserId);
-            console.log("✅ Avatar migrated.");
+            logLine('OK', 'MIGRATION', 'Avatar migrated');
         } catch (e) {
-            console.log("⚠️ Avatar migration skipped.");
+            logLine('WARN', 'MIGRATION', 'Avatar migration skipped', { reason: e?.message || 'already migrated or missing source' });
         }
 
         // 2. Migrate Videos
@@ -1876,9 +1057,9 @@ app.get('/migrate-assets', async (req, res) => {
                         thumbnail_url: `${process.env.R2_PUBLIC_URL}/${newBase}/thumb.jpg`,
                         sprite_url: `${process.env.R2_PUBLIC_URL}/${newBase}/sprite.jpg`
                     }).eq('id', video.id);
-                    console.log(`✅ Video ${video.id} migrated.`);
+                    logLine('OK', 'MIGRATION', 'Video migrated', { videoId: video.id });
                 } catch (err) {
-                    console.error(`❌ Video ${i} error:`, err.message);
+                    logLine('ERR', 'MIGRATION', 'Video migration failed', { index: i, videoId: video.id, error: err?.message || err });
                 }
             }
         }
@@ -1900,6 +1081,7 @@ app.get('/migrate-assets', async (req, res) => {
 
         res.json({ success: true, message: "Migration triggered successfully. Check logs." });
     } catch (err) {
+        logLine('ERR', 'MIGRATION', 'Migration endpoint failed', { error: err?.message || err });
         res.status(500).json({ success: false, error: err.message });
     }
 });
@@ -1927,7 +1109,7 @@ app.get('/drafts', async (req, res) => {
 
         res.json({ success: true, data });
     } catch (error) {
-        console.error('[DRAFTS] Error fetching drafts:', error);
+        logLine('ERR', 'DRAFTS', 'Failed to fetch drafts', { error: error?.message || error, userId });
         res.status(500).json({ error: 'Failed to fetch drafts' });
     }
 });
@@ -1947,7 +1129,7 @@ app.get('/drafts/:id', async (req, res) => {
 
         res.json({ success: true, data });
     } catch (error) {
-        console.error('[DRAFTS] Error fetching draft:', error);
+        logLine('ERR', 'DRAFTS', 'Failed to fetch draft', { draftId: id, error: error?.message || error });
         res.status(500).json({ error: 'Failed to fetch draft' });
     }
 });
@@ -1993,10 +1175,10 @@ app.post('/drafts', async (req, res) => {
 
         if (error) throw error;
 
-        console.log(`✅ [DRAFTS] Created draft ${data.id} for user ${userId}`);
+        logLine('OK', 'DRAFTS', 'Draft created', { draftId: data.id, userId });
         res.json({ success: true, data });
     } catch (error) {
-        console.error('[DRAFTS] Error creating draft:', error);
+        logLine('ERR', 'DRAFTS', 'Failed to create draft', { userId, error: error?.message || error });
         res.status(500).json({ error: 'Failed to create draft' });
     }
 });
@@ -2025,10 +1207,10 @@ app.patch('/drafts/:id', async (req, res) => {
 
         if (error) throw error;
 
-        console.log(`✅ [DRAFTS] Updated draft ${id}`);
+        logLine('OK', 'DRAFTS', 'Draft updated', { draftId: id });
         res.json({ success: true, data });
     } catch (error) {
-        console.error('[DRAFTS] Error updating draft:', error);
+        logLine('ERR', 'DRAFTS', 'Failed to update draft', { draftId: id, error: error?.message || error });
         res.status(500).json({ error: 'Failed to update draft' });
     }
 });
@@ -2045,10 +1227,10 @@ app.delete('/drafts/:id', async (req, res) => {
 
         if (error) throw error;
 
-        console.log(`✅ [DRAFTS] Deleted draft ${id}`);
+        logLine('OK', 'DRAFTS', 'Draft deleted', { draftId: id });
         res.json({ success: true });
     } catch (error) {
-        console.error('[DRAFTS] Error deleting draft:', error);
+        logLine('ERR', 'DRAFTS', 'Failed to delete draft', { draftId: id, error: error?.message || error });
         res.status(500).json({ error: 'Failed to delete draft' });
     }
 });
@@ -2065,18 +1247,18 @@ async function cleanupExpiredDraftsInternal() {
     if (error) throw error;
 
     const count = data?.length || 0;
-    console.log(`🧹 [DRAFTS] Cleaned up ${count} expired drafts`);
+    logLine('INFO', 'DRAFTS', 'Expired drafts cleaned', { deletedCount: count });
     return count;
 }
 
 function startDraftCleanupScheduler() {
     // Avoid relying on the client; run periodic cleanup in the backend.
     cleanupExpiredDraftsInternal().catch((error) => {
-        console.error('[DRAFTS] Scheduled cleanup failed:', error);
+        logLine('ERR', 'DRAFTS', 'Scheduled cleanup failed', { error: error?.message || error });
     });
     setInterval(() => {
         cleanupExpiredDraftsInternal().catch((error) => {
-            console.error('[DRAFTS] Scheduled cleanup failed:', error);
+            logLine('ERR', 'DRAFTS', 'Scheduled cleanup failed', { error: error?.message || error });
         });
     }, DRAFT_CLEANUP_INTERVAL_MS);
 }
@@ -2087,7 +1269,7 @@ app.post('/drafts/cleanup', async (req, res) => {
         const count = await cleanupExpiredDraftsInternal();
         res.json({ success: true, deletedCount: count });
     } catch (error) {
-        console.error('[DRAFTS] Error cleaning up drafts:', error);
+        logLine('ERR', 'DRAFTS', 'Manual cleanup failed', { error: error?.message || error });
         res.status(500).json({ error: 'Failed to cleanup drafts' });
     }
 });
@@ -2097,17 +1279,19 @@ app.get('/health', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-const server = http.createServer(app);
-adminWss = new WebSocketServer({ server, path: '/admin/ws' });
-adminWss.on('connection', (socket) => {
-    socket.send(JSON.stringify({ type: 'admin-config-connected' }));
-});
+app.listen(PORT, '0.0.0.0', () => {
+    const localAccess = `http://localhost:${PORT}`;
+    const ipAddress = getPrimaryIpv4Address();
+    const networkAccess = ipAddress ? `http://${ipAddress}:${PORT}` : 'unavailable';
+    const bindAddress = `http://0.0.0.0:${PORT}`;
 
-server.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Video Backend running on http://0.0.0.0:${PORT}`);
-    console.log(`🏠 Local Access: http://localhost:${PORT}`);
-    console.log(`🌐 Network Access: http://192.168.0.138:${PORT}`);
-    console.log(`📦 Target Bucket: "${process.env.R2_BUCKET_NAME}"`);
-    console.log(`📡 Ready to accept uploads`);
+    logBanner('WizyClub Backend Ready', [
+        `Bind Address : ${bindAddress}`,
+        `Local Access : ${localAccess}`,
+        `Network      : ${networkAccess}`,
+        `R2 Bucket    : ${process.env.R2_BUCKET_NAME || 'undefined'}`,
+        'Status       : Ready to accept uploads',
+    ]);
+
     startDraftCleanupScheduler();
 });

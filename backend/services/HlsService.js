@@ -3,10 +3,41 @@ const fs = require('fs');
 const path = require('path');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 
+function serializeMeta(meta) {
+    if (meta == null) return '';
+    if (typeof meta === 'string') return meta;
+    if (meta instanceof Error) return meta.message;
+    if (typeof meta !== 'object') return String(meta);
+    return Object.entries(meta)
+        .filter(([, value]) => value !== undefined)
+        .map(([key, value]) => `${key}=${typeof value === 'object' ? JSON.stringify(value) : String(value)}`)
+        .join(' ');
+}
+
+function fallbackLogLine(level, scope, message, meta) {
+    const metaText = serializeMeta(meta);
+    const line = `[${new Date().toISOString()}] ${level} [${scope}] ${message}${metaText ? ` | ${metaText}` : ''}`;
+    if (level === 'ERR') {
+        console.error(line);
+        return;
+    }
+    console.log(line);
+}
+
+function fallbackLogBanner(title, lines = []) {
+    console.log(`\n========== ${title} ==========`);
+    for (const line of lines) {
+        console.log(` - ${line}`);
+    }
+    console.log('================================\n');
+}
+
 class HlsService {
-    constructor(r2Client, bucketName) {
+    constructor(r2Client, bucketName, logger = {}) {
         this.r2 = r2Client;
         this.bucket = bucketName;
+        this.logLine = typeof logger.logLine === 'function' ? logger.logLine : fallbackLogLine;
+        this.logBanner = typeof logger.logBanner === 'function' ? logger.logBanner : fallbackLogBanner;
     }
 
     async transcodeToHls(inputPath, outputDir, videoId, outputR2Path, hasAudio = true, originalWidth = 1920, originalHeight = 1080) {
@@ -18,8 +49,12 @@ class HlsService {
         const masterPlaylistName = 'master.m3u8';
         const isPortrait = originalHeight > originalWidth;
 
-        console.log(`🎬 [HLS] Transcoding for ${videoId}... Shape: ${isPortrait ? 'PORTRAIT' : 'LANDSCAPE'} (${originalWidth}x${originalHeight})`);
-        console.log(`   📂 Target R2 Path: ${outputR2Path}`);
+        this.logBanner('HLS TRANSCODE REQUEST', [
+            `Video ID      : ${videoId}`,
+            `Orientation   : ${isPortrait ? 'PORTRAIT' : 'LANDSCAPE'}`,
+            `Source Dims   : ${originalWidth}x${originalHeight}`,
+            `Target Prefix : ${outputR2Path}`,
+        ]);
 
         // ... (resolution calculation logic remains same) ...
 
@@ -84,10 +119,13 @@ class HlsService {
                 '-f hls'
             ])
                 .output(`${hlsOutputDir}/stream_%v.m3u8`)
-                .on('start', (cmd) => console.log('⚡ [FFmpeg]:', cmd))
-                .on('progress', (p) => p.percent && console.log(`⏳ ${p.percent.toFixed(1)}%`))
+                .on('start', (cmd) => this.logLine('INFO', 'HLS_FFMPEG', 'FFmpeg command started', { videoId, cmd }))
+                .on('progress', (p) => p.percent && this.logLine('INFO', 'HLS_FFMPEG', 'FFmpeg progress', {
+                    videoId,
+                    percent: Number(p.percent.toFixed(1)),
+                }))
                 .on('end', async () => {
-                    console.log(`✅ Done.`);
+                    this.logLine('OK', 'HLS_FFMPEG', 'FFmpeg transcode completed', { videoId });
                     try {
                         // Pass outputR2Path to upload function
                         const url = await this.uploadHlsFolderToR2(hlsOutputDir, outputR2Path, masterPlaylistName);
@@ -97,7 +135,7 @@ class HlsService {
                     }
                 })
                 .on('error', (err) => {
-                    console.error('❌ [FFmpeg]:', err.message);
+                    this.logLine('ERR', 'HLS_FFMPEG', 'FFmpeg transcode failed', { videoId, error: err?.message || err });
                     reject(err);
                 })
                 .run();
@@ -106,7 +144,10 @@ class HlsService {
 
     async uploadHlsFolderToR2(folder, targetPrefix, masterFile) {
         const files = fs.readdirSync(folder);
-        console.log(`☁️ Uploading ${files.length} files to ${targetPrefix}...`);
+        this.logLine('INFO', 'HLS_UPLOAD', 'Uploading HLS files to R2', {
+            targetPrefix,
+            fileCount: files.length,
+        });
 
         await Promise.all(files.map(async (file) => {
             const stream = fs.readFileSync(path.join(folder, file));
@@ -120,7 +161,7 @@ class HlsService {
             }));
         }));
 
-        console.log('🎉 Upload complete!');
+        this.logLine('OK', 'HLS_UPLOAD', 'HLS upload complete', { targetPrefix, fileCount: files.length });
         return `${process.env.R2_PUBLIC_URL}/${targetPrefix}/${masterFile}`;
     }
 
@@ -129,7 +170,11 @@ class HlsService {
         const SEGMENT_DURATION = 100;
         const segments = Math.ceil((duration || 1) / SEGMENT_DURATION);
 
-        console.log(`🖼️ [Sprite] Generating MULTI-PART sprite system. Duration: ${duration}s.`);
+        this.logLine('INFO', 'SPRITE', 'Generating multi-part sprite', {
+            videoId,
+            durationSeconds: duration,
+            segments,
+        });
 
         let firstUrl = '';
 
@@ -160,7 +205,7 @@ class HlsService {
             });
 
             // Upload Part
-            console.log(`   ☁️ Uploading ${spriteName}...`);
+            this.logLine('INFO', 'SPRITE', 'Uploading sprite part', { videoId, spriteName, partIndex: i });
             const stream = fs.readFileSync(spritePath);
             const r2Key = `${outputR2Path}/${spriteName}`; // USE outputR2Path
 

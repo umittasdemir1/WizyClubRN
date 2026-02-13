@@ -10,7 +10,13 @@ Her biri otomatik terminal panelleri acip komutlari calistirir:
 - **EV:** `backend` icinde `npm start` + `mobile` icinde `npx expo start --dev-client --clear`
 - **IS:** `backend` icinde `npm start` + `ngrok http 3000` + `mobile` icinde `npx expo start --dev-client --tunnel --clear`
 
-`mobile/.env` yine manuel guncellenmeli (ozellikle iste ngrok URL).
+Task calisirken `mobile/.env` otomatik yazilir:
+- **EV modu:** `scripts/sync-mobile-env.sh home`
+- **IS modu:** `scripts/sync-mobile-env.sh work` (ngrok 4040 API'den aktif `https` URL cekilir)
+
+Opsiyonel olarak kalici deger tanimlayabilirsin:
+- `mobile/.env.home` -> `EXPO_PUBLIC_API_URL=...`
+- `mobile/.env.work` -> `EXPO_PUBLIC_API_URL=...` (ngrok URL okunamazsa fallback)
 
 Ilk kurulumda shell fonksiyonlari `~/.bashrc` icine eklendi.
 Degisikliklerin aktif olmasi icin yeni terminal acabilir ya da:
@@ -43,10 +49,6 @@ tar xvzf ngrok-v3-stable-linux-amd64.tgz
 **Terminal 3: Mobile**
 ```bash
 cd ~/WizyClubRN/mobile
-nano .env
-# EXPO_PUBLIC_API_URL=<NGROK_URL_BURAYA>
-# Kaydet: CTRL+X, Y, Enter
-
 npx expo start --dev-client --tunnel
 
 # Baseline loglarını otomatik yakalamak için:
@@ -68,10 +70,6 @@ npm start
 **Terminal 2: Mobile**
 ```bash
 cd mobile
-nano .env
-# EXPO_PUBLIC_API_URL=http://192.168.0.138:3000
-# (Kendi local IP'ni kullan)
-
 npx expo start --dev-client
 # Tunnel yok!
 
@@ -99,7 +97,7 @@ R2_PUBLIC_URL=https://wizy-r2-proxy.tasdemir-umit.workers.dev
 
 ---
 
-### mobile/.env (Her Ortamda Farklı)
+### mobile/.env (Task tarafindan otomatik yazilir)
 
 **İşte:**
 ```env
@@ -146,7 +144,7 @@ grep R2_PUBLIC_URL ~/WizyClubRN/backend/.env
 **İşte:** Backend + Ngrok + Expo (3 terminal)
 **Evde:** Backend + Expo (2 terminal)
 
-**mobile/.env** → Her gün değişir (ngrok URL)
+**mobile/.env** → Task moduna gore otomatik guncellenir
 **backend/.env** → Sabit kalır (worker URL)
 
 ---

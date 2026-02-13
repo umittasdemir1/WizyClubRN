@@ -19,7 +19,6 @@ import PagerView from '../../src/presentation/components/shared/PagerView';
 import type { PagerViewOnPageSelectedEvent } from 'react-native-pager-view';
 import Video from 'react-native-video';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useIsFocused } from '@react-navigation/native';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as NavigationBar from 'expo-navigation-bar';
@@ -49,14 +48,13 @@ import { useSavedVideos } from '../../src/presentation/hooks/useSavedVideos';
 import { useActiveVideoStore } from '../../src/presentation/store/useActiveVideoStore';
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
 import { LIGHT_COLORS, DARK_COLORS } from '../../src/core/constants';
-import { CONFIG } from '../../src/core/config';
 import VideosTabSvgIcon from '../../assets/icons/videos.svg';
 import { VerifiedBadge } from '../../src/presentation/components/shared/VerifiedBadge';
 import { ProfileSettingsOverlay } from '../../src/presentation/components/profile/ProfileSettingsOverlay';
 import { UserActivityRepositoryImpl } from '../../src/data/repositories/UserActivityRepositoryImpl';
 import { Video as VideoEntity } from '../../src/domain/entities/Video';
 import { isFeedVideoItem } from '../../src/presentation/components/poolFeed/utils/PoolFeedUtils';
-import { logApi, logError, logUI, LogCode } from '@/core/services/Logger';
+import { logError, logUI, LogCode } from '@/core/services/Logger';
 import { shadowStyle } from '@/core/utils/shadow';
 
 const activityRepository = new UserActivityRepositoryImpl();
@@ -196,7 +194,6 @@ export default function ProfileScreen() {
   const { user: authUser, initialize, isInitialized } = useAuthStore();
   const { drafts, fetchDrafts } = useDraftStore();
   const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
-  const isFocused = useIsFocused();
   const syncVideoCountersFromServer = useVideoCounterStore((state) => state.syncFromServer);
 
   // Use authenticated user's ID, fallback to hardcoded for development
@@ -211,262 +208,6 @@ export default function ProfileScreen() {
     }
   }, [currentUserId]);
 
-  const lastAdminConfigFetchRef = useRef<number>(0);
-  const ADMIN_CONFIG_THROTTLE_MS = 10000; // 10 seconds
-
-  const loadAdminConfig = useCallback(async () => {
-    const now = Date.now();
-    if (now - lastAdminConfigFetchRef.current < ADMIN_CONFIG_THROTTLE_MS) {
-      return;
-    }
-    lastAdminConfigFetchRef.current = now;
-
-    try {
-      const response = await fetch(`${CONFIG.API_URL}/admin/config?ts=${Date.now()}`);
-      if (!response.ok) return;
-      const data = await response.json();
-      const items = Array.isArray(data?.items) ? data.items : [];
-      const getValue = (key: string) => items.find((item: any) => item.key === key)?.value;
-      const getNumber = (key: string) => {
-        const value = getValue(key);
-        if (typeof value === 'number') return value;
-        const parsed = Number(value);
-        return Number.isFinite(parsed) ? parsed : undefined;
-      };
-      const getString = (key: string) => {
-        const value = getValue(key);
-        if (typeof value !== 'string') return undefined;
-        const trimmed = value.trim();
-        if (trimmed.toLowerCase() === 'auto') return undefined;
-        return trimmed;
-      };
-
-      const titleText = getString('profile.settings.title.text') || getString('profile.settings.title');
-      setSettingsCopy((prev) => ({
-        ...prev,
-        title: titleText || prev.title,
-        actionsHeader: getString('profile.settings.actionsHeader') || prev.actionsHeader,
-        deletedHeader: getString('profile.settings.deletedHeader') || prev.deletedHeader,
-        themeLabel: getString('profile.settings.themeLabel') || prev.themeLabel,
-        themeOptionLight: getString('profile.settings.themeOptionLight') || prev.themeOptionLight,
-        themeOptionDark: getString('profile.settings.themeOptionDark') || prev.themeOptionDark,
-        themeOptionSystem: getString('profile.settings.themeOptionSystem') || prev.themeOptionSystem,
-        actionsLabel: getString('profile.settings.actionsLabel') || prev.actionsLabel,
-        accountSettingsLabel: getString('profile.settings.accountSettingsLabel') || prev.accountSettingsLabel,
-        accountSettingsHeroTitle: getString('profile.settings.accountSettingsHeroTitle') || prev.accountSettingsHeroTitle,
-        accountSettingsHeroText: getString('profile.settings.accountSettingsHeroText') || prev.accountSettingsHeroText,
-        accountSettingsNoticeText: getString('profile.settings.accountSettingsNoticeText') || prev.accountSettingsNoticeText,
-        accountSettingsNoticeLinkLabel: getString('profile.settings.accountSettingsNoticeLinkLabel') || prev.accountSettingsNoticeLinkLabel,
-        notificationsLabel: getString('profile.settings.notificationsLabel') || prev.notificationsLabel,
-        notificationsHeroTitle: getString('profile.settings.notificationsHeroTitle') || prev.notificationsHeroTitle,
-        notificationsHeroText: getString('profile.settings.notificationsHeroText') || prev.notificationsHeroText,
-        notificationsNoticeText: getString('profile.settings.notificationsNoticeText') || prev.notificationsNoticeText,
-        notificationsItemPush: getString('profile.settings.notificationsItem.push') || prev.notificationsItemPush,
-        notificationsItemEmail: getString('profile.settings.notificationsItem.email') || prev.notificationsItemEmail,
-        notificationsItemSms: getString('profile.settings.notificationsItem.sms') || prev.notificationsItemSms,
-        notificationsItemPushHelper: getString('profile.settings.notificationsItem.pushHelper') || prev.notificationsItemPushHelper,
-        notificationsItemEmailHelper: getString('profile.settings.notificationsItem.emailHelper') || prev.notificationsItemEmailHelper,
-        notificationsItemSmsHelper: getString('profile.settings.notificationsItem.smsHelper') || prev.notificationsItemSmsHelper,
-        inAppBrowserHeroTitle: getString('profile.settings.inAppBrowser.heroTitle') || prev.inAppBrowserHeroTitle,
-        inAppBrowserHeroText: getString('profile.settings.inAppBrowser.heroText') || prev.inAppBrowserHeroText,
-        inAppBrowserNoticeText: getString('profile.settings.inAppBrowser.noticeText') || prev.inAppBrowserNoticeText,
-        inAppBrowserHistoryToggleHelper: getString('profile.settings.inAppBrowser.history.toggleHelper') || prev.inAppBrowserHistoryToggleHelper,
-        inAppBrowserHistoryViewHelper: getString('profile.settings.inAppBrowser.history.viewHelper') || prev.inAppBrowserHistoryViewHelper,
-        inAppBrowserHistoryClearHelper: getString('profile.settings.inAppBrowser.history.clearHelper') || prev.inAppBrowserHistoryClearHelper,
-        inAppBrowserLabel: getString('profile.settings.inAppBrowser.label') || prev.inAppBrowserLabel,
-        browserHistoryLabel: getString('profile.settings.inAppBrowser.history.label') || prev.browserHistoryLabel,
-        browserHistoryOptionOn: getString('profile.settings.inAppBrowser.history.optionOn') || prev.browserHistoryOptionOn,
-        browserHistoryOptionOff: getString('profile.settings.inAppBrowser.history.optionOff') || prev.browserHistoryOptionOff,
-        browserHistoryViewLabel: getString('profile.settings.inAppBrowser.history.view') || prev.browserHistoryViewLabel,
-        browserHistoryClearLabel: getString('profile.settings.inAppBrowser.history.clear') || prev.browserHistoryClearLabel,
-        contentPreferencesLabel: getString('profile.settings.contentPreferences.label') || prev.contentPreferencesLabel,
-        accountSettingsItemPassword: getString('profile.settings.accountSettingsItem.password') || prev.accountSettingsItemPassword,
-        accountSettingsItemEmail: getString('profile.settings.accountSettingsItem.email') || prev.accountSettingsItemEmail,
-        accountSettingsItemPhone: getString('profile.settings.accountSettingsItem.phone') || prev.accountSettingsItemPhone,
-        accountSettingsItemTwoFactor: getString('profile.settings.accountSettingsItem.twoFactor') || prev.accountSettingsItemTwoFactor,
-        accountSettingsItemStatus: getString('profile.settings.accountSettingsItem.status') || prev.accountSettingsItemStatus,
-        accountSettingsItemBlocked: getString('profile.settings.accountSettingsItem.blocked') || prev.accountSettingsItemBlocked,
-        accountSettingsItemMuted: getString('profile.settings.accountSettingsItem.muted') || prev.accountSettingsItemMuted,
-        accountSettingsItemType: getString('profile.settings.accountSettingsItem.type') || prev.accountSettingsItemType,
-        accountSettingsItemPasswordHelper: getString('profile.settings.accountSettingsItem.passwordHelper') || prev.accountSettingsItemPasswordHelper,
-        accountSettingsItemEmailHelper: getString('profile.settings.accountSettingsItem.emailHelper') || prev.accountSettingsItemEmailHelper,
-        accountSettingsItemPhoneHelper: getString('profile.settings.accountSettingsItem.phoneHelper') || prev.accountSettingsItemPhoneHelper,
-        accountSettingsItemTwoFactorHelper: getString('profile.settings.accountSettingsItem.twoFactorHelper') || prev.accountSettingsItemTwoFactorHelper,
-        accountSettingsItemStatusHelper: getString('profile.settings.accountSettingsItem.statusHelper') || prev.accountSettingsItemStatusHelper,
-        accountSettingsItemBlockedHelper: getString('profile.settings.accountSettingsItem.blockedHelper') || prev.accountSettingsItemBlockedHelper,
-        accountSettingsItemMutedHelper: getString('profile.settings.accountSettingsItem.mutedHelper') || prev.accountSettingsItemMutedHelper,
-        accountSettingsItemTypeHelper: getString('profile.settings.accountSettingsItem.typeHelper') || prev.accountSettingsItemTypeHelper,
-        accountTypeCreator: getString('profile.settings.accountType.creator') || prev.accountTypeCreator,
-        accountTypeBranded: getString('profile.settings.accountType.branded') || prev.accountTypeBranded,
-        accountTypeVerification: getString('profile.settings.accountType.verification') || prev.accountTypeVerification,
-        accountTypeBadge: getString('profile.settings.accountType.badge') || prev.accountTypeBadge,
-        accountTypeShop: getString('profile.settings.accountType.shop') || prev.accountTypeShop,
-        accountTypeCreatorHelper: getString('profile.settings.accountType.creatorHelper') || prev.accountTypeCreatorHelper,
-        accountTypeBrandedHelper: getString('profile.settings.accountType.brandedHelper') || prev.accountTypeBrandedHelper,
-        accountTypeVerificationHelper: getString('profile.settings.accountType.verificationHelper') || prev.accountTypeVerificationHelper,
-        accountTypeBadgeHelper: getString('profile.settings.accountType.badgeHelper') || prev.accountTypeBadgeHelper,
-        accountTypeShopHelper: getString('profile.settings.accountType.shopHelper') || prev.accountTypeShopHelper,
-        accountTypePause: getString('profile.settings.accountType.pause') || prev.accountTypePause,
-        accountTypeTerminate: getString('profile.settings.accountType.terminate') || prev.accountTypeTerminate,
-        accountTypePauseHelper: getString('profile.settings.accountType.pauseHelper') || prev.accountTypePauseHelper,
-        accountTypeTerminateHelper: getString('profile.settings.accountType.terminateHelper') || prev.accountTypeTerminateHelper,
-        actionsHeroTitle: getString('profile.settings.actionsHeroTitle') || prev.actionsHeroTitle,
-        actionsHeroText: getString('profile.settings.actionsHeroText') || prev.actionsHeroText,
-        logoutLabel: getString('profile.settings.logoutLabel') || prev.logoutLabel,
-        deletedLabel: getString('profile.settings.deletedLabel') || prev.deletedLabel,
-        deletedHelper: getString('profile.settings.deletedHelper') || prev.deletedHelper,
-        actionsItemLikes: getString('profile.settings.actionsItem.likes') || prev.actionsItemLikes,
-        actionsItemSaved: getString('profile.settings.actionsItem.saved') || prev.actionsItemSaved,
-        actionsItemArchived: getString('profile.settings.actionsItem.archived') || prev.actionsItemArchived,
-        actionsItemNotInterested: getString('profile.settings.actionsItem.notInterested') || prev.actionsItemNotInterested,
-        actionsItemInterested: getString('profile.settings.actionsItem.interested') || prev.actionsItemInterested,
-        actionsItemAccountHistory: getString('profile.settings.actionsItem.accountHistory') || prev.actionsItemAccountHistory,
-        actionsItemWatchHistory: getString('profile.settings.actionsItem.watchHistory') || prev.actionsItemWatchHistory,
-        actionsItemNotInterestedHelper: getString('profile.settings.actionsItem.notInterestedHelper') || prev.actionsItemNotInterestedHelper,
-        actionsItemInterestedHelper: getString('profile.settings.actionsItem.interestedHelper') || prev.actionsItemInterestedHelper,
-        actionsItemAccountHistoryHelper: getString('profile.settings.actionsItem.accountHistoryHelper') || prev.actionsItemAccountHistoryHelper,
-        actionsItemWatchHistoryHelper: getString('profile.settings.actionsItem.watchHistoryHelper') || prev.actionsItemWatchHistoryHelper,
-        interestedTopics: getString('profile.settings.interested.topics') || prev.interestedTopics,
-        accountHistoryTitle: getString('profile.settings.accountHistory.title') || prev.accountHistoryTitle,
-        accountHistoryDateLabel: getString('profile.settings.accountHistory.dateLabel') || prev.accountHistoryDateLabel,
-        accountHistoryEmailLabel: getString('profile.settings.accountHistory.emailLabel') || prev.accountHistoryEmailLabel,
-        accountHistoryIdLabel: getString('profile.settings.accountHistory.idLabel') || prev.accountHistoryIdLabel,
-      }));
-
-      const buildTextOverrides = (prefix: string) => {
-        const overrides: Record<string, any> = {};
-        const color = getString(`${prefix}.color`);
-        if (color) overrides.color = color;
-        const fontSize = getNumber(`${prefix}.fontSize`);
-        if (typeof fontSize === 'number') overrides.fontSize = fontSize;
-        const fontWeight = getString(`${prefix}.fontWeight`);
-        if (fontWeight) overrides.fontWeight = fontWeight;
-        const fontStyle = getString(`${prefix}.fontStyle`);
-        if (fontStyle) overrides.fontStyle = fontStyle;
-        const fontFamily = getString(`${prefix}.fontFamily`);
-        if (fontFamily && fontFamily !== 'system') overrides.fontFamily = fontFamily;
-        const letterSpacing = getNumber(`${prefix}.letterSpacing`);
-        if (typeof letterSpacing === 'number') overrides.letterSpacing = letterSpacing;
-        const lineHeight = getNumber(`${prefix}.lineHeight`);
-        if (typeof lineHeight === 'number') overrides.lineHeight = lineHeight;
-        const textAlign = getString(`${prefix}.textAlign`);
-        if (textAlign) overrides.textAlign = textAlign;
-        const textTransform = getString(`${prefix}.textTransform`);
-        if (textTransform) overrides.textTransform = textTransform;
-        return overrides;
-      };
-
-      setSettingsTitleOverrides(buildTextOverrides('profile.settings.title'));
-      setSettingsSectionTitleOverrides(buildTextOverrides('profile.settings.sectionTitle'));
-      setSettingsItemLabelOverrides(buildTextOverrides('profile.settings.itemLabel'));
-      setSettingsHelperOverrides(buildTextOverrides('profile.settings.helperText'));
-
-      const iconColor = getString('profile.settings.icon.color');
-      setSettingsIconColorOverride(iconColor || null);
-      const iconStrokeWidth = getNumber('profile.settings.icon.strokeWidth');
-      setSettingsIconStrokeWidthOverride(typeof iconStrokeWidth === 'number' ? iconStrokeWidth : null);
-      const iconSize = getNumber('profile.settings.icon.size');
-      setSettingsIconSizeOverride(typeof iconSize === 'number' ? iconSize : null);
-
-      const closeIconColor = getString('profile.settings.icon.close.color');
-      const closeIconSize = getNumber('profile.settings.icon.close.size');
-      const closeIconStroke = getNumber('profile.settings.icon.close.strokeWidth');
-      setSettingsIconCloseOverrides({
-        color: closeIconColor,
-        size: closeIconSize,
-        strokeWidth: closeIconStroke,
-      });
-
-      const backIconColor = getString('profile.settings.icon.back.color');
-      const backIconSize = getNumber('profile.settings.icon.back.size');
-      const backIconStroke = getNumber('profile.settings.icon.back.strokeWidth');
-      setSettingsIconBackOverrides({
-        color: backIconColor,
-        size: backIconSize,
-        strokeWidth: backIconStroke,
-      });
-      const chevronColor = getString('profile.settings.chevron.color');
-      setSettingsChevronColorOverride(chevronColor || null);
-      const borderColor = getString('profile.settings.item.borderColor');
-      setSettingsBorderColorOverride(borderColor || null);
-      const segmentBg = getString('profile.settings.segment.backgroundColor');
-      setSettingsSegmentBgColorOverride(segmentBg || null);
-      const segmentActive = getString('profile.settings.segment.activeColor');
-      setSettingsSegmentActiveColorOverride(segmentActive || null);
-      const segmentActiveText = getString('profile.settings.segment.activeTextColor');
-      setSettingsSegmentActiveTextColorOverride(segmentActiveText || null);
-      const segmentText = getString('profile.settings.segment.textColor');
-      setSettingsSegmentTextColorOverride(segmentText || null);
-    } catch (error) {
-      logApi(LogCode.API_ERROR, 'Profile admin config load failed', { error });
-    }
-  }, []);
-
-  const connectAdminSocket = useCallback(() => {
-    const existing = adminWsRef.current;
-    if (existing && (existing.readyState === WebSocket.OPEN || existing.readyState === WebSocket.CONNECTING)) {
-      return;
-    }
-    const scheduleReconnect = () => {
-      if (adminWsReconnectRef.current) return;
-      adminWsReconnectRef.current = setTimeout(() => {
-        adminWsReconnectRef.current = null;
-        connectAdminSocket();
-      }, 2000);
-    };
-    const wsUrl = CONFIG.API_URL.replace(/^http/, 'ws') + '/admin/ws';
-    const socket = new WebSocket(wsUrl);
-    adminWsRef.current = socket;
-
-    socket.onopen = () => {
-      loadAdminConfig();
-    };
-
-    socket.onmessage = (event) => {
-      try {
-        const data = JSON.parse(String(event.data || '{}'));
-        if (data?.type === 'admin-config-updated') {
-          loadAdminConfig();
-        }
-      } catch {
-        // Ignore malformed messages
-      }
-    };
-
-    socket.onclose = () => {
-      adminWsRef.current = null;
-      if (isProfileFocusedRef.current) {
-        scheduleReconnect();
-      }
-    };
-  }, [loadAdminConfig]);
-
-  useEffect(() => {
-    isProfileFocusedRef.current = isFocused;
-    if (isFocused) {
-      loadAdminConfig();
-      connectAdminSocket();
-      return () => {
-        isProfileFocusedRef.current = false;
-        if (adminWsReconnectRef.current) {
-          clearTimeout(adminWsReconnectRef.current);
-          adminWsReconnectRef.current = null;
-        }
-        if (adminWsRef.current) {
-          adminWsRef.current.close();
-          adminWsRef.current = null;
-        }
-      };
-    }
-    if (adminWsReconnectRef.current) {
-      clearTimeout(adminWsReconnectRef.current);
-      adminWsReconnectRef.current = null;
-    }
-    if (adminWsRef.current) {
-      adminWsRef.current.close();
-      adminWsRef.current = null;
-    }
-  }, [isFocused, loadAdminConfig, connectAdminSocket]);
 
   const { videos, isLoadingMore, hasMore, refreshFeed, loadMore } = useVideoFeed(currentUserId, 50);
   const { videos: savedVideosData, refresh: refreshSavedVideos } = useSavedVideos(currentUserId);
@@ -619,24 +360,21 @@ export default function ProfileScreen() {
   const accountSettingsNoticeSuffix = accountSettingsNoticeLinkIndex >= 0
     ? accountSettingsNoticeText.slice(accountSettingsNoticeLinkIndex + accountSettingsNoticeLinkLabel.length)
     : '';
-  const [settingsTitleOverrides, setSettingsTitleOverrides] = useState<Record<string, any>>({});
-  const [settingsSectionTitleOverrides, setSettingsSectionTitleOverrides] = useState<Record<string, any>>({});
-  const [settingsItemLabelOverrides, setSettingsItemLabelOverrides] = useState<Record<string, any>>({});
-  const [settingsHelperOverrides, setSettingsHelperOverrides] = useState<Record<string, any>>({});
-  const [settingsIconColorOverride, setSettingsIconColorOverride] = useState<string | null>(null);
-  const [settingsIconStrokeWidthOverride, setSettingsIconStrokeWidthOverride] = useState<number | null>(null);
-  const [settingsIconSizeOverride, setSettingsIconSizeOverride] = useState<number | null>(null);
-  const [settingsIconCloseOverrides, setSettingsIconCloseOverrides] = useState<Record<string, any>>({});
-  const [settingsIconBackOverrides, setSettingsIconBackOverrides] = useState<Record<string, any>>({});
-  const [settingsChevronColorOverride, setSettingsChevronColorOverride] = useState<string | null>(null);
-  const [settingsBorderColorOverride, setSettingsBorderColorOverride] = useState<string | null>(null);
-  const [settingsSegmentBgColorOverride, setSettingsSegmentBgColorOverride] = useState<string | null>(null);
-  const [settingsSegmentActiveColorOverride, setSettingsSegmentActiveColorOverride] = useState<string | null>(null);
-  const [settingsSegmentActiveTextColorOverride, setSettingsSegmentActiveTextColorOverride] = useState<string | null>(null);
-  const [settingsSegmentTextColorOverride, setSettingsSegmentTextColorOverride] = useState<string | null>(null);
-  const adminWsRef = useRef<WebSocket | null>(null);
-  const adminWsReconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isProfileFocusedRef = useRef(false);
+  const settingsTitleOverrides: Record<string, any> = {};
+  const settingsSectionTitleOverrides: Record<string, any> = {};
+  const settingsItemLabelOverrides: Record<string, any> = {};
+  const settingsHelperOverrides: Record<string, any> = {};
+  const settingsIconColorOverride: string | null = null;
+  const settingsIconStrokeWidthOverride: number | null = null;
+  const settingsIconSizeOverride: number | null = null;
+  const settingsIconCloseOverrides: Record<string, any> = {};
+  const settingsIconBackOverrides: Record<string, any> = {};
+  const settingsChevronColorOverride: string | null = null;
+  const settingsBorderColorOverride: string | null = null;
+  const settingsSegmentBgColorOverride: string | null = null;
+  const settingsSegmentActiveColorOverride: string | null = null;
+  const settingsSegmentActiveTextColorOverride: string | null = null;
+  const settingsSegmentTextColorOverride: string | null = null;
   const settingsTranslateX = useSharedValue(SCREEN_WIDTH);
   const settingsBackdropOpacity = useSharedValue(0);
   const editProfileSheetRef = useRef<BottomSheet>(null);
@@ -970,10 +708,9 @@ export default function ProfileScreen() {
   };
 
   const openSettings = useCallback(() => {
-    loadAdminConfig();
     setSettingsSection('main');
     setSettingsOpen(true);
-  }, [loadAdminConfig]);
+  }, []);
 
   const closeSettings = useCallback(() => {
     if (['likes', 'saved', 'history', 'archived', 'notInterested', 'interested', 'accountHistory'].includes(settingsSection)) {
