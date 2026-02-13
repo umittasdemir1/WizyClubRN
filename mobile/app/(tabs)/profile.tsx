@@ -452,28 +452,10 @@ export default function ProfileScreen() {
       void loadMore();
     }
   }, [activeTab, hasMore, isLoading, isLoadingMore, loadMore]);
-  const [tabsInitialY, setTabsInitialY] = useState(0);
-  const [isTabsPinned, setIsTabsPinned] = useState(false);
-  const isTabsPinnedRef = useRef(false);
-  const handleTabsAnchorLayout = useCallback((event: LayoutChangeEvent) => {
-    const nextY = event.nativeEvent.layout.y;
-    if (nextY > 0 && Math.abs(nextY - tabsInitialY) > 0.5) {
-      setTabsInitialY(nextY);
-    }
-  }, [tabsInitialY]);
-  const syncTabsPinned = useCallback((offsetY: number) => {
-    if (tabsInitialY <= 0) return;
-    const shouldPin = offsetY >= tabsInitialY;
-    if (isTabsPinnedRef.current !== shouldPin) {
-      isTabsPinnedRef.current = shouldPin;
-      setIsTabsPinned(shouldPin);
-    }
-  }, [tabsInitialY]);
   const handleProfileScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const nativeEvent = event.nativeEvent;
     maybeLoadMore(nativeEvent);
-    syncTabsPinned(nativeEvent.contentOffset.y);
-  }, [maybeLoadMore, syncTabsPinned]);
+  }, [maybeLoadMore]);
 
   // Current User as Domain Entity
   // Always provide a fallback to prevent null errors
@@ -1085,20 +1067,18 @@ export default function ProfileScreen() {
     opacity: settingsBackdropOpacity.value,
   }));
 
-  const renderTabsBar = (asOverlay = false) => (
+  const renderTabsBar = () => (
     <View
       style={[
         styles.navTabs,
         { borderBottomColor: cardBg, backgroundColor: bgContainer },
-        !asOverlay && isTabsPinned ? styles.navTabsGhost : null,
       ]}
-      onLayout={asOverlay ? undefined : handleNavTabsLayout}
-      pointerEvents={!asOverlay && isTabsPinned ? 'none' : 'auto'}
+      onLayout={handleNavTabsLayout}
     >
       <Pressable
         style={styles.tab}
         onPress={() => handleTabPress(0)}
-        onLayout={asOverlay ? undefined : (event) => handleTabLayout(0, event)}
+        onLayout={(event) => handleTabLayout(0, event)}
         hitSlop={{ top: 15, bottom: 15, left: 10, right: 10 }}
       >
         <Animated.View style={gridIconAnimatedStyle}>
@@ -1108,7 +1088,7 @@ export default function ProfileScreen() {
       <Pressable
         style={styles.tab}
         onPress={() => handleTabPress(1)}
-        onLayout={asOverlay ? undefined : (event) => handleTabLayout(1, event)}
+        onLayout={(event) => handleTabLayout(1, event)}
         hitSlop={{ top: 15, bottom: 15, left: 10, right: 10 }}
       >
         <Animated.View style={videoIconAnimatedStyle}>
@@ -1118,7 +1098,7 @@ export default function ProfileScreen() {
       <Pressable
         style={styles.tab}
         onPress={() => handleTabPress(2)}
-        onLayout={asOverlay ? undefined : (event) => handleTabLayout(2, event)}
+        onLayout={(event) => handleTabLayout(2, event)}
         hitSlop={{ top: 15, bottom: 15, left: 10, right: 10 }}
       >
         <Animated.View style={saveIconAnimatedStyle}>
@@ -1129,7 +1109,7 @@ export default function ProfileScreen() {
         <Pressable
           style={styles.tab}
           onPress={() => handleTabPress(3)}
-          onLayout={asOverlay ? undefined : (event) => handleTabLayout(3, event)}
+          onLayout={(event) => handleTabLayout(3, event)}
           hitSlop={{ top: 15, bottom: 15, left: 10, right: 10 }}
         >
           <Animated.View style={storeIconAnimatedStyle}>
@@ -1174,6 +1154,7 @@ export default function ProfileScreen() {
           showsVerticalScrollIndicator={false}
           scrollEventThrottle={16}
           onScroll={handleProfileScroll}
+          stickyHeaderIndices={[1]}
           contentContainerStyle={{ flexGrow: isLoading ? 1 : 0 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={isDark ? "#fff" : "#000"} progressViewOffset={0} />}
         >
@@ -1233,8 +1214,8 @@ export default function ProfileScreen() {
             </View>
           )}
 
-          <View onLayout={handleTabsAnchorLayout}>
-            {renderTabsBar(false)}
+          <View>
+            {renderTabsBar()}
           </View>
 
           <PagerView
@@ -1259,12 +1240,6 @@ export default function ProfileScreen() {
           <View style={{ height: 100 }} />
         </Animated.ScrollView>
       </SwipeWrapper>
-      {!isLoading && isTabsPinned && (
-        <View style={[styles.navTabsPinnedContainer, { top: headerOffset }]}>
-          {renderTabsBar(true)}
-        </View>
-      )}
-
       {previewItem && <PreviewModal item={previewItem} onClose={hidePreview} />}
       <BioBottomSheet ref={bioSheetRef} bio={currentUser.bio || ''} isDark={isDark} />
       <EditProfileSheet
@@ -1499,8 +1474,6 @@ const styles = StyleSheet.create({
   btnActionText: { fontSize: 13, fontWeight: '600' },
   btnIconOnly: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#e5e5e5' },
   navTabs: { flexDirection: 'row', borderBottomWidth: 1, position: 'relative' },
-  navTabsGhost: { opacity: 0 },
-  navTabsPinnedContainer: { position: 'absolute', left: 0, right: 0, zIndex: 900 },
   tab: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12 },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   tabIndicator: { position: 'absolute', left: 0, bottom: 0, height: 2 },

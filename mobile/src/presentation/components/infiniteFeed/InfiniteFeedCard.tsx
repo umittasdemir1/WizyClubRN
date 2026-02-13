@@ -888,35 +888,37 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                 onPress={handleOpen}
                             />
                             {isVideo && isActive && hasReachedLoopLimit && (
-                                <View style={styles.replayButtonsContainer}>
-                                    <Pressable
-                                    style={themedStyles.replayMoreButton}
-                                    onPress={handleWatchMoreClipsPress}
-                                    hitSlop={8}
-                                >
-                                    <VideosIcon width={18} height={18} />
-                                    <View style={styles.replayMoreLabelRow}>
-                                        <Text style={themedStyles.replayMoreText}>Daha fazla </Text>
-                                        <Text style={styles.replayRainbowWord}>
-                                            <Text style={styles.rainbowC}>C</Text>
-                                            <Text style={styles.rainbowL}>l</Text>
-                                            <Text style={styles.rainbowI}>i</Text>
-                                            <Text style={styles.rainbowP}>p</Text>
-                                            <Text style={styles.rainbowS}>s</Text>
-                                        </Text>
-                                        <Text style={themedStyles.replayMoreText}> izle</Text>
+                                <View style={styles.replayOverlay}>
+                                    <View style={styles.replayButtonsContainer}>
+                                        <Pressable
+                                            style={themedStyles.replayMoreButton}
+                                            onPress={handleWatchMoreClipsPress}
+                                            hitSlop={8}
+                                        >
+                                            <VideosIcon width={18} height={18} />
+                                            <View style={styles.replayMoreLabelRow}>
+                                                <Text style={themedStyles.replayMoreText}>Daha fazla </Text>
+                                                <Text style={styles.replayRainbowWord}>
+                                                    <Text style={styles.rainbowC}>C</Text>
+                                                    <Text style={styles.rainbowL}>l</Text>
+                                                    <Text style={styles.rainbowI}>i</Text>
+                                                    <Text style={styles.rainbowP}>p</Text>
+                                                    <Text style={styles.rainbowS}>s</Text>
+                                                </Text>
+                                                <Text style={themedStyles.replayMoreText}> izle</Text>
+                                            </View>
+                                        </Pressable>
+                                        <Pressable
+                                            style={themedStyles.replayBadge}
+                                            onPress={(event) => {
+                                                event.stopPropagation?.();
+                                                handleReplay();
+                                            }}
+                                            hitSlop={8}
+                                        >
+                                            <Text style={themedStyles.replayBadgeText}>Tekrar izle</Text>
+                                        </Pressable>
                                     </View>
-                                </Pressable>
-                                    <Pressable
-                                        style={themedStyles.replayBadge}
-                                        onPress={(event) => {
-                                            event.stopPropagation?.();
-                                            handleReplay();
-                                        }}
-                                        hitSlop={8}
-                                    >
-                                        <Text style={themedStyles.replayBadgeText}>Tekrar izle</Text>
-                                    </Pressable>
                                 </View>
                             )}
                         </View>
@@ -1199,7 +1201,7 @@ const styles = StyleSheet.create({
         maxWidth: '65%',
         flexDirection: 'row',
         alignItems: 'center',
-        zIndex: 3,
+        zIndex: 6,
     },
     mediaTopRightActions: {
         position: 'absolute',
@@ -1207,7 +1209,7 @@ const styles = StyleSheet.create({
         right: 4,
         flexDirection: 'row',
         alignItems: 'center',
-        zIndex: 3,
+        zIndex: 6,
     },
     moreButton: {
         width: 36,
@@ -1224,7 +1226,7 @@ const styles = StyleSheet.create({
         right: 12,
         bottom: 12,
         alignItems: 'flex-end',
-        zIndex: 3,
+        zIndex: 6,
     },
     mediaLeftBottomTime: {
         position: 'absolute',
@@ -1267,15 +1269,18 @@ const styles = StyleSheet.create({
         height: '100%',
         backgroundColor: '#111',
     },
-    replayButtonsContainer: {
-        position: 'absolute',
-        top: '50%',
-        left: 0,
-        right: 0,
+    replayOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.5)',
         alignItems: 'center',
-        transform: [{ translateY: -28 }],
-        zIndex: 2,
-        elevation: 2,
+        justifyContent: 'center',
+        zIndex: 4,
+    },
+    replayButtonsContainer: {
+        position: 'relative',
+        alignItems: 'center',
+        zIndex: 5,
+        elevation: 5,
     },
     replayMoreButton: {
         flexDirection: 'row',
