@@ -96,8 +96,8 @@ export function UploadModal({ isVisible, onClose, initialAssets, uploadMode = 'v
     const { createDraft } = useDraftStore();
 
     const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
-    const bgColor = isDark ? '#000000' : '#FFFFFF';
-    const textColor = isDark ? '#FFFFFF' : '#000000';
+    const bgColor = isDark ? '#080A0F' : '#FFFFFF';
+    const textColor = isDark ? '#FFFFFF' : '#080A0F';
     const subtextColor = isDark ? '#A0A0A0' : '#6B6B6B';
     const borderColor = isDark ? '#2C2C2E' : '#E5E5E5';
     const inputBg = isDark ? '#1C1C1E' : '#F5F5F5';

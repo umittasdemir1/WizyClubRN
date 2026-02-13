@@ -17,7 +17,7 @@ export const DraftActionsSheet = forwardRef<BottomSheet, DraftActionsSheetProps>
     const snapPoints = useMemo(() => ['30%'], []);
 
     const bgColor = isDark ? '#1C1C1E' : '#FFFFFF';
-    const textColor = isDark ? '#FFFFFF' : '#000000';
+    const textColor = isDark ? '#FFFFFF' : '#080A0F';
     const borderColor = isDark ? '#2C2C2E' : '#E5E5E5';
 
     const renderBackdrop = useCallback(

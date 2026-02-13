@@ -14,6 +14,7 @@ interface InfiniteStoryAvatarProps {
     username: string;
     avatarUrl: string;
     hasUnseenStory: boolean;
+    textColor?: string;
     onPress: () => void;
 }
 
@@ -22,6 +23,7 @@ export const InfiniteStoryAvatar = memo(function InfiniteStoryAvatar({
     username,
     avatarUrl,
     hasUnseenStory,
+    textColor,
     onPress,
 }: InfiniteStoryAvatarProps) {
     const isViewedLocal = useStoryStore((state) => state.viewedUserIds.has(userId));
@@ -39,7 +41,7 @@ export const InfiniteStoryAvatar = memo(function InfiniteStoryAvatar({
                     <Avatar url={avatarUrl} size={AVATAR_SIZE} />
                 </AdvancedStoryRing>
             </View>
-            <Text style={styles.username} numberOfLines={1}>
+            <Text style={[styles.username, textColor ? { color: textColor } : null]} numberOfLines={1}>
                 {username}
             </Text>
         </Pressable>

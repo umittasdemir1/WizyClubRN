@@ -19,8 +19,8 @@ export function TrendingHeader({
     showSearch = true,
 }: TrendingHeaderProps) {
     const insets = useSafeAreaInsets();
-    const textColor = isDark ? '#FFFFFF' : '#000000';
-    const iconColor = isDark ? '#FFFFFF' : '#000000';
+    const textColor = isDark ? '#FFFFFF' : '#080A0F';
+    const iconColor = isDark ? '#FFFFFF' : '#080A0F';
 
     return (
         <View style={[styles.container, { paddingTop: insets.top + 10 }]}>

@@ -465,7 +465,7 @@ const styles = StyleSheet.create({
         zIndex: 999,
     },
     heartWrapper: {
-        ...shadowStyle({ color: '#000000', offset: { width: 0, height: 8 }, opacity: 0.5, radius: 15, elevation: 20 }),
+        ...shadowStyle({ color: '#080A0F', offset: { width: 0, height: 8 }, opacity: 0.5, radius: 15, elevation: 20 }),
     },
     dot: {
         height: 6,

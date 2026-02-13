@@ -12,7 +12,7 @@ module.exports = {
         // Brand Gradients (Deals)
         'trendyol-start': '#F97316', 'trendyol-end': '#EF4444',
         'starbucks-start': '#16A34A', 'starbucks-end': '#065F46',
-        'nike-start': '#1F2937', 'nike-end': '#000000',
+        'nike-start': '#1F2937', 'nike-end': '#080A0F',
         'getir-start': '#9333EA', 'getir-end': '#4338CA',
 
         // Story Ring Gradient
@@ -29,13 +29,13 @@ module.exports = {
         'sheet-dark-lighter': '#1C1C1E',
         
         // Theme Colors
-        'theme-dark': '#000000',
+        'theme-dark': '#080A0F',
         'theme-light': '#fefefe',
 
         primary: '#FF3B30',
         accent: '#7C3AED',
         muted: '#8E8E93',
-        bg: '#000000',
+        bg: '#080A0F',
         card: '#121212'
       }
     }

@@ -478,7 +478,7 @@ export default function ExploreScreen() {
                                     <Text style={[styles.carouselTitle, { color: themeColors.textPrimary }]}>
                                         Önerilenler
                                     </Text>
-                                    <MoreIcon width={24} height={24} color={isDark ? '#FFFFFF' : '#000000'} />
+                                    <MoreIcon width={24} height={24} color={isDark ? '#FFFFFF' : '#080A0F'} />
                                 </View>
                                 <TrendingCarousel
                                     data={trendingData}

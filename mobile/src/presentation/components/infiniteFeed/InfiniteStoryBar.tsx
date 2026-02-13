@@ -21,12 +21,14 @@ interface InfiniteStoryBarProps {
     storyUsers: StoryUser[];
     onAvatarPress: (userId: string) => void;
     backgroundColor?: string;
+    textColor?: string;
 }
 
 export const InfiniteStoryBar = memo(function InfiniteStoryBar({
     storyUsers,
     onAvatarPress,
     backgroundColor,
+    textColor,
 }: InfiniteStoryBarProps) {
     const { user: authUser } = useAuthStore();
     // Uses the SAME query key as the prefetch in _layout.tsx
@@ -105,6 +107,7 @@ export const InfiniteStoryBar = memo(function InfiniteStoryBar({
                             username={item.username}
                             avatarUrl={item.avatarUrl}
                             hasUnseenStory={item.hasUnseenStory}
+                            textColor={textColor}
                             onPress={() => onAvatarPress(item.id)}
                         />
                     ))}
@@ -118,7 +121,7 @@ const styles = StyleSheet.create({
     container: {
         width: '100%',
         height: BAR_HEIGHT,
-        backgroundColor: '#000000',
+        backgroundColor: '#080A0F',
     },
     content: {
         flex: 1,

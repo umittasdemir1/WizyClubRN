@@ -13,7 +13,7 @@
   },
   "videoBackground": {
     "label": "Video sahne arka planı",
-    "light": "#000000",
+    "light": "#080A0F",
     "dark": "#080A0F",
     "usage": [
       "mobile/src/presentation/components/story/StoryActions.tsx",
@@ -36,8 +36,8 @@
   },
   "black": {
     "label": "Siyah yardımcı renk",
-    "light": "#000000",
-    "dark": "#000000",
+    "light": "#080A0F",
+    "dark": "#080A0F",
     "usage": [
       "mobile/src/presentation/components/shared/InAppBrowserOverlay.tsx"
     ]
@@ -53,7 +53,7 @@
   },
   "textPrimary": {
     "label": "Birincil metin",
-    "light": "#000000",
+    "light": "#080A0F",
     "dark": "#FFFFFF",
     "usage": [
       "mobile/app/search.tsx",

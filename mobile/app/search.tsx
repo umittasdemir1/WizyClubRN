@@ -307,7 +307,7 @@ export default function SearchScreen() {
         () => ({
             backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
             borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
-            iconColor: isDark ? '#FFFFFF' : '#000000',
+            iconColor: isDark ? '#FFFFFF' : '#080A0F',
         }),
         [isDark]
     );

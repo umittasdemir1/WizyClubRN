@@ -32,7 +32,7 @@ export function PoolFeedBrightnessOverlay() {
 const styles = StyleSheet.create({
     overlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: '#000000',
+        backgroundColor: '#080A0F',
         zIndex: 1, // Above video but below UI elements
     },
 });

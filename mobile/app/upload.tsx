@@ -348,14 +348,14 @@ export default function CameraScreen() {
                     />
                     <LinearGradient
                         pointerEvents="none"
-                        colors={['#000000', 'rgba(0, 0, 0, 0)']}
+                        colors={['#080A0F', 'rgba(0, 0, 0, 0)']}
                         start={{ x: 0, y: 0.5 }}
                         end={{ x: 1, y: 0.5 }}
                         style={[styles.modeFadeEdge, styles.modeFadeLeft]}
                     />
                     <LinearGradient
                         pointerEvents="none"
-                        colors={['rgba(0, 0, 0, 0)', '#000000']}
+                        colors={['rgba(0, 0, 0, 0)', '#080A0F']}
                         start={{ x: 0, y: 0.5 }}
                         end={{ x: 1, y: 0.5 }}
                         style={[styles.modeFadeEdge, styles.modeFadeRight]}

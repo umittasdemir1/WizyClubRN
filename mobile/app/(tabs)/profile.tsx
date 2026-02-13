@@ -55,6 +55,7 @@ import { useActiveVideoStore } from '../../src/presentation/store/useActiveVideo
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
 import { LIGHT_COLORS, DARK_COLORS } from '../../src/core/constants';
 import VideosTabSvgIcon from '../../assets/icons/videos.svg';
+import DarkVideosTabSvgIcon from '../../assets/icons/darkvideos.svg';
 import { VerifiedBadge } from '../../src/presentation/components/shared/VerifiedBadge';
 import { ProfileSettingsOverlay } from '../../src/presentation/components/profile/ProfileSettingsOverlay';
 import { UserActivityRepositoryImpl } from '../../src/data/repositories/UserActivityRepositoryImpl';
@@ -76,8 +77,16 @@ const GridIcon = ({ color, size = INNER_TAB_ICON_SIZE }: { color: string; size?:
   </Svg>
 );
 
-const VideoIcon = ({ color, size = INNER_TAB_ICON_SIZE }: { color: string; size?: number }) => (
-  <VideosTabSvgIcon width={size} height={size} color={color} />
+const VideoIcon = ({
+  color,
+  size = INNER_TAB_ICON_SIZE,
+  IconComponent = VideosTabSvgIcon,
+}: {
+  color: string;
+  size?: number;
+  IconComponent?: any;
+}) => (
+  <IconComponent width={size} height={size} color={color} />
 );
 
 const SaveTabIcon = ({ color, size = INNER_TAB_ICON_SIZE }: { color: string; size?: number }) => (
@@ -190,6 +199,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { isDark, theme, setTheme } = useThemeStore();
+  const ThemedVideosTabSvgIcon = isDark ? VideosTabSvgIcon : DarkVideosTabSvgIcon;
   const { user: authUser, initialize, isInitialized } = useAuthStore();
   const { drafts, fetchDrafts } = useDraftStore();
   const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
@@ -389,6 +399,7 @@ export default function ProfileScreen() {
   const bgBody = themeColors.background;
   const bgContainer = themeColors.background;
   const textPrimary = themeColors.textPrimary;
+  const tabPrimary = isDark ? '#FFFFFF' : '#080A0F';
   const textSecondary = themeColors.textSecondary;
   const cardBg = themeColors.card;
   const iconColor = themeColors.textPrimary;
@@ -1091,7 +1102,7 @@ export default function ProfileScreen() {
         hitSlop={{ top: 15, bottom: 15, left: 10, right: 10 }}
       >
         <Animated.View style={gridIconAnimatedStyle}>
-          <GridIcon color={textPrimary} size={INNER_TAB_ICON_SIZE} />
+          <GridIcon color={tabPrimary} size={INNER_TAB_ICON_SIZE} />
         </Animated.View>
       </Pressable>
       <Pressable
@@ -1101,7 +1112,7 @@ export default function ProfileScreen() {
         hitSlop={{ top: 15, bottom: 15, left: 10, right: 10 }}
       >
         <Animated.View style={videoIconAnimatedStyle}>
-          <VideoIcon color={textPrimary} size={INNER_TAB_ICON_SIZE} />
+          <VideoIcon color={tabPrimary} size={INNER_TAB_ICON_SIZE} IconComponent={ThemedVideosTabSvgIcon} />
         </Animated.View>
       </Pressable>
       <Pressable
@@ -1111,7 +1122,7 @@ export default function ProfileScreen() {
         hitSlop={{ top: 15, bottom: 15, left: 10, right: 10 }}
       >
         <Animated.View style={saveIconAnimatedStyle}>
-          <SaveTabIcon color={textPrimary} size={INNER_TAB_ICON_SIZE} />
+          <SaveTabIcon color={tabPrimary} size={INNER_TAB_ICON_SIZE} />
         </Animated.View>
       </Pressable>
       {showShopTab && (
@@ -1122,7 +1133,7 @@ export default function ProfileScreen() {
           hitSlop={{ top: 15, bottom: 15, left: 10, right: 10 }}
         >
           <Animated.View style={storeIconAnimatedStyle}>
-            <StoreTabIcon color={textPrimary} size={INNER_TAB_ICON_SIZE} />
+            <StoreTabIcon color={tabPrimary} size={INNER_TAB_ICON_SIZE} />
           </Animated.View>
         </Pressable>
       )}
@@ -1130,7 +1141,7 @@ export default function ProfileScreen() {
         pointerEvents="none"
         style={[
           styles.tabIndicator,
-          { backgroundColor: textPrimary },
+          { backgroundColor: tabPrimary },
           tabIndicatorAnimatedStyle,
         ]}
       />
@@ -1520,7 +1531,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
-    ...shadowStyle({ color: '#000000', offset: { width: 0, height: 6 }, opacity: 0.18, radius: 12, elevation: 8 }),
+    ...shadowStyle({ color: '#080A0F', offset: { width: 0, height: 6 }, opacity: 0.18, radius: 12, elevation: 8 }),
   },
   shopModalContent: {
     paddingTop: 26,

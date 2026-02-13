@@ -4,7 +4,7 @@
     "dark": "#080A0F"
   },
   "videoBackground": {
-    "light": "#000000",
+    "light": "#080A0F",
     "dark": "#080A0F"
   },
   "card": {
@@ -12,15 +12,15 @@
     "dark": "#222222"
   },
   "black": {
-    "light": "#000000",
-    "dark": "#000000"
+    "light": "#080A0F",
+    "dark": "#080A0F"
   },
   "border": {
     "light": "#E5E5EA",
     "dark": "#333333"
   },
   "textPrimary": {
-    "light": "#000000",
+    "light": "#080A0F",
     "dark": "#FFFFFF"
   },
   "textSecondary": {

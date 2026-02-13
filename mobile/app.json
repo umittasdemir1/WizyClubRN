@@ -14,17 +14,17 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#000000"
+        "backgroundColor": "#080A0F"
       },
       "edgeToEdgeEnabled": true
     },
     "androidStatusBar": {
-      "backgroundColor": "#000000",
+      "backgroundColor": "#080A0F",
       "barStyle": "light-content",
       "translucent": true
     },
     "androidNavigationBar": {
-      "backgroundColor": "#00000000",
+      "backgroundColor": "#080A0F00",
       "barStyle": "light-content",
       "enforceContrast": false
     },
@@ -41,7 +41,7 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#000000"
+          "backgroundColor": "#080A0F"
         }
       ],
       [

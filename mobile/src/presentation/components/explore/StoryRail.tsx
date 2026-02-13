@@ -18,7 +18,7 @@ interface StoryRailProps {
 }
 
 export function StoryRail({ creators, onCreatorPress, isDark = true }: StoryRailProps) {
-    const textColor = isDark ? '#FFFFFF' : '#000000';
+    const textColor = isDark ? '#FFFFFF' : '#080A0F';
 
     // Circular dimensions
     const size = 80;

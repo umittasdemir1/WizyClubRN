@@ -28,7 +28,7 @@ export const DraftsGrid: React.FC<DraftsGridProps> = ({
   onDraftLongPress,
 }) => {
   const bgColor = isDark ? '#1c1c1e' : '#f0f0f0';
-  const textColor = isDark ? '#FFFFFF' : '#000000';
+  const textColor = isDark ? '#FFFFFF' : '#080A0F';
   const subtextColor = isDark ? '#A0A0A0' : '#6B6B6B';
 
   const [validDrafts, setValidDrafts] = React.useState<ValidatedDraft[]>([]);

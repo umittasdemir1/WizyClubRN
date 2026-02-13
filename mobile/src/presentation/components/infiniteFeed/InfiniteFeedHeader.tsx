@@ -70,7 +70,7 @@ export function InfiniteFeedHeader({
         >
             <View style={[styles.topRow, { paddingTop: headerTopPadding - 10 }]}>
                 <View style={styles.leftTopSlot}>
-                    <UploadButton onPress={onUploadPress} />
+                    <UploadButton onPress={onUploadPress} color={colors.textPrimary} />
                 </View>
                 <View style={styles.centerTopSlot} pointerEvents="box-none">
                     <View style={styles.tabContainer}>
@@ -139,12 +139,13 @@ export function InfiniteFeedHeader({
                 storyUsers={storyUsers}
                 onAvatarPress={onStoryAvatarPress}
                 backgroundColor={colors.background}
+                textColor={colors.textPrimary}
             />
         </View>
     );
 }
 
-function UploadButton({ onPress }: { onPress?: () => void }) {
+function UploadButton({ onPress, color }: { onPress?: () => void; color: string }) {
     const status = useUploadStore(state => state.status);
     const isProcessing = status === 'compressing' || status === 'uploading' || status === 'processing';
 
@@ -156,7 +157,7 @@ function UploadButton({ onPress }: { onPress?: () => void }) {
             onPress={onPress}
             hitSlop={12}
         >
-            <Plus width={HEADER_ICON_SIZE} height={HEADER_ICON_SIZE} color="#FFFFFF" />
+            <Plus width={HEADER_ICON_SIZE} height={HEADER_ICON_SIZE} color={color} />
         </Pressable>
     );
 }

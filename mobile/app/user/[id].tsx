@@ -42,6 +42,7 @@ import Animated, {
 import LikeIcon from '../../assets/icons/like.svg';
 import ShareIcon from '../../assets/icons/share.svg';
 import VideosTabSvgIcon from '../../assets/icons/videos.svg';
+import DarkVideosTabSvgIcon from '../../assets/icons/darkvideos.svg';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import { useProfile } from '../../src/presentation/hooks/useProfile';
 import { LIGHT_COLORS, DARK_COLORS } from '../../src/core/constants';
@@ -66,8 +67,16 @@ const GridIcon = ({ color, size = INNER_TAB_ICON_SIZE }: { color: string; size?:
   </Svg>
 );
 
-const VideoIcon = ({ color, size = INNER_TAB_ICON_SIZE }: { color: string; size?: number }) => (
-  <VideosTabSvgIcon width={size} height={size} color={color} />
+const VideoIcon = ({
+  color,
+  size = INNER_TAB_ICON_SIZE,
+  IconComponent = VideosTabSvgIcon,
+}: {
+  color: string;
+  size?: number;
+  IconComponent?: any;
+}) => (
+  <IconComponent width={size} height={size} color={color} />
 );
 
 const StoreTabIcon = ({ color, size = INNER_TAB_ICON_SIZE }: { color: string; size?: number }) => (
@@ -147,6 +156,7 @@ export default function UserProfileScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const { isDark } = useThemeStore();
+  const ThemedVideosTabSvgIcon = isDark ? VideosTabSvgIcon : DarkVideosTabSvgIcon;
   const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
 
   useFocusEffect(
@@ -184,11 +194,12 @@ export default function UserProfileScreen() {
   const bgBody = themeColors.background;
   const bgContainer = themeColors.background;
   const textPrimary = themeColors.textPrimary;
+  const tabPrimary = isDark ? '#FFFFFF' : '#080A0F';
   const textSecondary = themeColors.textSecondary;
   const cardBg = themeColors.card;
   const iconColor = themeColors.textPrimary;
-  const btnFollowBg = isDark ? '#ffffff' : '#000000';
-  const btnFollowText = isDark ? '#000000' : '#ffffff';
+  const btnFollowBg = isDark ? '#ffffff' : '#080A0F';
+  const btnFollowText = isDark ? '#080A0F' : '#ffffff';
   const btnSecondaryBg = themeColors.card;
   const headerOffset = insets.top + 60;
 
@@ -534,18 +545,18 @@ export default function UserProfileScreen() {
     >
       <TouchableOpacity style={styles.tab} onLayout={asOverlay ? undefined : (event) => handleTabLayout(0, event)} onPress={() => handleTabPress(0)}>
         <Animated.View style={gridIconAnimatedStyle}>
-          <GridIcon color={textPrimary} size={INNER_TAB_ICON_SIZE} />
+          <GridIcon color={tabPrimary} size={INNER_TAB_ICON_SIZE} />
         </Animated.View>
       </TouchableOpacity>
       <TouchableOpacity style={styles.tab} onLayout={asOverlay ? undefined : (event) => handleTabLayout(1, event)} onPress={() => handleTabPress(1)}>
         <Animated.View style={videoIconAnimatedStyle}>
-          <VideoIcon color={textPrimary} size={INNER_TAB_ICON_SIZE} />
+          <VideoIcon color={tabPrimary} size={INNER_TAB_ICON_SIZE} IconComponent={ThemedVideosTabSvgIcon} />
         </Animated.View>
       </TouchableOpacity>
       {showShopTab && (
         <TouchableOpacity style={styles.tab} onLayout={asOverlay ? undefined : (event) => handleTabLayout(2, event)} onPress={() => handleTabPress(2)}>
           <Animated.View style={storeIconAnimatedStyle}>
-            <StoreTabIcon color={textPrimary} size={INNER_TAB_ICON_SIZE} />
+            <StoreTabIcon color={tabPrimary} size={INNER_TAB_ICON_SIZE} />
           </Animated.View>
         </TouchableOpacity>
       )}
@@ -553,7 +564,7 @@ export default function UserProfileScreen() {
         pointerEvents="none"
         style={[
           styles.tabIndicator,
-          { backgroundColor: textPrimary },
+          { backgroundColor: tabPrimary },
           tabIndicatorAnimatedStyle,
         ]}
       />

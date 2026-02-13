@@ -15,6 +15,7 @@ import HomeIcon from '../../assets/icons/home.svg';
 import DealIcon from '../../assets/icons/deal.svg';
 import ProfileIcon from '../../assets/icons/profile.svg';
 import VideosTabSvgIcon from '../../assets/icons/videos.svg';
+import DarkVideosTabSvgIcon from '../../assets/icons/darkvideos.svg';
 
 const TAB_ICON_SIZE = 28;
 const TAB_ICON_ACTIVE_SIZE = 30;
@@ -62,7 +63,8 @@ export default function TabLayout() {
     const isDark = useThemeStore((state) => state.isDark);
     const insets = useSafeAreaInsets();
     const tabBarBackground = isDark ? COLORS.background : LIGHT_COLORS.background;
-    const tabIconColor = isDark ? '#FFFFFF' : '#000000';
+    const tabIconColor = isDark ? '#FFFFFF' : '#080A0F';
+    const ThemedVideosTabSvgIcon = isDark ? VideosTabSvgIcon : DarkVideosTabSvgIcon;
     const setUnreadCount = useNotificationStore((state) => state.setUnreadCount);
 
     useEffect(() => {
@@ -143,7 +145,7 @@ export default function TabLayout() {
                         <View
                             style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}
                         >
-                            <VideosTabSvgIcon
+                            <ThemedVideosTabSvgIcon
                                 width={focused ? TAB_ICON_ACTIVE_SIZE : TAB_ICON_SIZE}
                                 height={focused ? TAB_ICON_ACTIVE_SIZE : TAB_ICON_SIZE}
                                 color={color}

@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         zIndex: 1000,
-        backgroundColor: '#000000', // Solid black
+        backgroundColor: '#080A0F', // Solid black
         borderBottomWidth: 0.5,
         borderBottomColor: 'rgba(255, 255, 255, 0.1)',
     },

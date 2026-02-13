@@ -14,7 +14,7 @@ import { FEED_FLAGS } from './hooks/useInfiniteFeedConfig';
 import { getBufferConfig } from '../../../core/utils/bufferConfig';
 import { shadowStyle } from '@/core/utils/shadow';
 import { PerformanceLogger } from '../../../core/services/PerformanceLogger';
-import VideosIcon from '../../../../assets/icons/videos.svg';
+import VideosIcon from '../../../../assets/icons/darkvideos.svg';
 
 const DESCRIPTION_LIMIT = 70;
 const CARD_HORIZONTAL_PADDING = 16;
@@ -700,22 +700,23 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         const cardBg = mixWithWhite(colors.background, 0.03);
         const borderClr = isDarkTheme ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
         const shadow = shadowStyle({
-            color: '#000000',
+            color: '#080A0F',
             offset: { width: 0, height: 6 },
             radius: 14,
             opacity: isDarkTheme ? 0.35 : 0.18,
             elevation: 6,
         });
         return {
-            fullName: [styles.fullName, { color: colors.textPrimary }],
-            handle: [styles.handle, { color: colors.textSecondary }],
+            fullName: [styles.fullName, { color: '#FFFFFF' }],
+            handle: [styles.handle, { color: 'rgba(255, 255, 255, 0.6)' }],
             description: [styles.description, { color: colors.textPrimary }],
             readMore: [styles.readMore, { color: colors.textSecondary }],
             displayName: [styles.displayName, { color: colors.textPrimary }],
             replayBadge: [styles.replayBadge, { backgroundColor: 'transparent' }],
             replayBadgeText: [styles.replayBadgeText, { color: isDarkTheme ? '#FFFFFF' : '#111111' }],
-            replayMoreButton: [styles.replayMoreButton, { backgroundColor: '#080A0F' }],
-            replayMoreText: [styles.replayMoreText, { color: '#FFFFFF' }],
+            replayMoreButton: [styles.replayMoreButton, { backgroundColor: '#FFFFFF' }],
+            replayMoreText: [styles.replayMoreText, { color: '#080A0F' }],
+            timeHint: [styles.timeHint, { color: colors.textSecondary }],
             cardOuter: [
                 styles.card,
                 disableCardStyle ? styles.cardEdgeToEdge : null,
@@ -1025,13 +1026,13 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                         onCommercialInfoPress={handleCommercialInfoPress}
                     />
                     {!showDescriptionBlock && showTimeHint && (
-                        <Text style={styles.timeHint}>{relativeTime}</Text>
+                        <Text style={themedStyles.timeHint}>{relativeTime}</Text>
                     )}
                 </View>
             )}
             {disableActions && !showDescriptionBlock && showTimeHint && (
                 <View style={styles.cardContent}>
-                    <Text style={styles.timeHint}>{relativeTime}</Text>
+                    <Text style={themedStyles.timeHint}>{relativeTime}</Text>
                 </View>
             )}
 
@@ -1061,7 +1062,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                             </>
                         ) : null}
                     </Text>
-                    {showTimeHint && <Text style={styles.timeHint}>{relativeTime}</Text>}
+                    {showTimeHint && <Text style={themedStyles.timeHint}>{relativeTime}</Text>}
                 </View>
             )}
         </>

@@ -25,7 +25,6 @@ const PARTICLE_DISTANCE = 32;
 const PARTICLE_SIZE = 4;
 const LIKE_PARTICLE_COLORS = ['#FF2146', '#FF3B30', '#FF6B6B', '#FF8A80'];
 const SAVE_PARTICLE_COLORS = ['#FFD700', '#FFC107', '#FFB300', '#FFE082'];
-const WHITE = '#FFFFFF';
 
 // ✅ Pre-calculate particle angles to avoid Math.random() in render
 const PARTICLE_ANGLES = Array.from({ length: PARTICLE_COUNT }).map((_, i) => (Math.PI * 2 * i) / PARTICLE_COUNT + (Math.random() * 0.5));
@@ -135,7 +134,7 @@ const ActionButton = React.memo(function ActionButton({
         onPress?.();
     }, [canToggle, localActive, triggerBurst, onPress]);
 
-    const iconColor = localActive && activeColor ? activeColor : WHITE;
+    const iconColor = localActive && activeColor ? activeColor : colors.textPrimary;
     const iconFill = localActive && activeColor ? activeColor : 'none';
     const strokeWidth = localActive ? 2 : 1.2;
     const formattedCount = useMemo(() => formatCount(count), [count]);
@@ -209,6 +208,9 @@ export const InfiniteFeedActions = React.memo(function InfiniteFeedActions({
     onCommercialInfoPress,
 }: InfiniteFeedActionsProps) {
     const shake = useSharedValue(0);
+    const isDarkTheme = colors.textPrimary.toLowerCase() === '#ffffff';
+    const commercialTagBackgroundColor = isDarkTheme ? '#FFFFFF' : '#080A0F';
+    const commercialTagForegroundColor = isDarkTheme ? '#080A0F' : '#FFFFFF';
 
     const triggerShake = useCallback(() => {
         shake.value = withSequence(
@@ -262,7 +264,7 @@ export const InfiniteFeedActions = React.memo(function InfiniteFeedActions({
                 />
             </View>
             {showCommercialTag ? (
-                <View style={styles.commercialShopTag}>
+                <View style={[styles.commercialShopTag, { backgroundColor: commercialTagBackgroundColor }]}>
                     <Pressable
                         style={styles.commercialMainAction}
                         onPress={onShop}
@@ -270,9 +272,9 @@ export const InfiniteFeedActions = React.memo(function InfiniteFeedActions({
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
                         {showShopIcon ? (
-                            <PictureInPicture size={14} color="#000000" strokeWidth={1.8} />
+                            <PictureInPicture size={14} color={commercialTagForegroundColor} strokeWidth={1.8} />
                         ) : null}
-                        <Text style={styles.commercialShopText} numberOfLines={1}>
+                        <Text style={[styles.commercialShopText, { color: commercialTagForegroundColor }]} numberOfLines={1}>
                             {shopTagText || 'İş Birliği'}
                         </Text>
                     </Pressable>
@@ -281,7 +283,7 @@ export const InfiniteFeedActions = React.memo(function InfiniteFeedActions({
                         onPress={onCommercialInfoPress}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                        <ShieldQuestion size={14} color="#000000" strokeWidth={1.9} />
+                        <ShieldQuestion size={14} color={commercialTagForegroundColor} strokeWidth={1.9} />
                     </Pressable>
                 </View>
             ) : null}
@@ -367,7 +369,7 @@ const styles = StyleSheet.create({
         flexShrink: 1,
     },
     commercialShopText: {
-        color: '#000000',
+        color: '#FFFFFF',
         fontSize: 12,
         fontWeight: '500',
         flexShrink: 1,

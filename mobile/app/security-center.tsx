@@ -7,8 +7,8 @@ import { useThemeStore } from '../src/presentation/store/useThemeStore';
 export default function SecurityCenterScreen() {
   const { theme } = useThemeStore();
   const isDark = theme === 'dark';
-  const bgColor = isDark ? '#000000' : '#FFFFFF';
-  const textColor = isDark ? '#FFFFFF' : '#000000';
+  const bgColor = isDark ? '#080A0F' : '#FFFFFF';
+  const textColor = isDark ? '#FFFFFF' : '#080A0F';
 
   return (
     <>
