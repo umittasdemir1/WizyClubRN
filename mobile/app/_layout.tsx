@@ -1,5 +1,6 @@
 import '../src/utils/ignoreWarnings';
 import { Stack, useSegments } from 'expo-router';
+import { DefaultTheme, DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
@@ -45,6 +46,25 @@ function RootNavigator() {
     const segments = useSegments();
     const isTabsRoute = segments[0] === '(tabs)';
     const hasConfiguredPurchases = useRef(false);
+    const navigationTheme = isDark
+        ? {
+            ...DarkTheme,
+            colors: {
+                ...DarkTheme.colors,
+                background: COLORS.background,
+                card: COLORS.background,
+                border: COLORS.background,
+            },
+        }
+        : {
+            ...DefaultTheme,
+            colors: {
+                ...DefaultTheme.colors,
+                background: LIGHT_COLORS.background,
+                card: LIGHT_COLORS.background,
+                border: LIGHT_COLORS.background,
+            },
+        };
 
     // Keep the screen awake during video playback/app usage
     useEffect(() => {
@@ -120,33 +140,43 @@ function RootNavigator() {
     }, [user?.id]);
 
     return (
-        <Stack screenOptions={{ headerShown: false }}>
-            {/* Auth screens */}
-            <Stack.Screen name="login" options={{ headerShown: false }} />
-            <Stack.Screen name="signup" options={{ headerShown: false }} />
-
-            {/* Main app screens */}
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen
-                name="story/[id]"
-                options={{
-                    presentation: 'transparentModal',
-                    animation: 'fade',
+        <ThemeProvider value={navigationTheme}>
+            <Stack
+                screenOptions={{
                     headerShown: false,
+                    contentStyle: {
+                        backgroundColor: isDark ? COLORS.background : LIGHT_COLORS.background,
+                    },
                 }}
-            />
-        </Stack>
+            >
+                {/* Auth screens */}
+                <Stack.Screen name="login" options={{ headerShown: false }} />
+                <Stack.Screen name="signup" options={{ headerShown: false }} />
+
+                {/* Main app screens */}
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen
+                    name="story/[id]"
+                    options={{
+                        presentation: 'transparentModal',
+                        animation: 'fade',
+                        headerShown: false,
+                    }}
+                />
+            </Stack>
+        </ThemeProvider>
     );
 }
 
 export default function RootLayout() {
     const isDark = useThemeStore((state) => state.isDark);
+    const appBackground = isDark ? COLORS.background : LIGHT_COLORS.background;
     useThemeAppearanceSync();
     useEffect(() => {
         PerformanceLogger.markAppStart();
     }, []);
     return (
-        <GestureHandlerRootView style={{ flex: 1 }}>
+        <GestureHandlerRootView style={{ flex: 1, backgroundColor: appBackground }}>
             <SystemBars
                 style={{
                     statusBar: isDark ? 'light' : 'dark',

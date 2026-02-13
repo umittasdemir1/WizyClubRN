@@ -78,6 +78,9 @@ export default function TabLayout() {
             screenOptions={{
                 headerShown: false,
                 lazy: true,
+                sceneStyle: {
+                    backgroundColor: tabBarBackground,
+                },
                 tabBarStyle: {
                     backgroundColor: tabBarBackground,
                     borderTopWidth: 0,
@@ -136,7 +139,6 @@ export default function TabLayout() {
             <Tabs.Screen
                 name="videos"
                 options={{
-                    lazy: false,
                     tabBarIcon: ({ color, focused }) => (
                         <View
                             style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}

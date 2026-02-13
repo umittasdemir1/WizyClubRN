@@ -1,6 +1,7 @@
 import React from 'react';
-import { SafeAreaView, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useThemeStore } from '../src/presentation/store/useThemeStore';
 
 export default function SecurityCenterScreen() {

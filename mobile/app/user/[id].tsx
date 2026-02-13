@@ -9,10 +9,16 @@ import {
   RefreshControl,
   Dimensions,
   ActivityIndicator,
+  LayoutChangeEvent,
+  NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
 import PagerView from '../../src/presentation/components/shared/PagerView';
-import type { PagerViewOnPageSelectedEvent } from 'react-native-pager-view';
+import type {
+  PageScrollStateChangedNativeEvent,
+  PagerViewOnPageScrollEvent,
+  PagerViewOnPageSelectedEvent,
+} from 'react-native-pager-view';
 import Video from 'react-native-video';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { SystemBars } from 'react-native-edge-to-edge';
@@ -25,7 +31,7 @@ import { MediaGrid } from '../../src/presentation/components/shared/MediaGrid';
 import { BioBottomSheet } from '../../src/presentation/components/profile/BioBottomSheet';
 import { ChevronLeft, MoreVertical, Store } from 'lucide-react-native';
 import BottomSheet from '@gorhom/bottom-sheet';
-import Svg, { Path, Circle } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -50,29 +56,22 @@ import { logSocial, logError, logUI, LogCode } from '@/core/services/Logger';
 import { shadowStyle } from '@/core/utils/shadow';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const INNER_TAB_ICON_SIZE = 26;
+const INNER_TAB_ICON_ACTIVE_SIZE = 28;
 
 // SVG Icons
-const GridIcon = ({ color }: { color: string }) => (
-  <Svg width="26" height="26" viewBox="0 -960 960 960" fill={color}>
+const GridIcon = ({ color, size = INNER_TAB_ICON_SIZE }: { color: string; size?: number }) => (
+  <Svg width={size} height={size} viewBox="0 -960 960 960" fill={color}>
     <Path d="M240-160q-33 0-56.5-23.5T160-240q0-33 23.5-56.5T240-320q33 0 56.5 23.5T320-240q0 33-23.5 56.5T240-160Zm240 0q-33 0-56.5-23.5T400-240q0-33 23.5-56.5T480-320q33 0 56.5 23.5T560-240q0 33-23.5 56.5T480-160Zm240 0q-33 0-56.5-23.5T640-240q0-33 23.5-56.5T720-320q33 0 56.5 23.5T800-240q0 33-23.5 56.5T720-160ZM240-400q-33 0-56.5-23.5T160-480q0-33 23.5-56.5T240-560q33 0 56.5 23.5T320-480q0 33-23.5 56.5T240-400Zm240 0q-33 0-56.5-23.5T400-480q0-33 23.5-56.5T480-560q33 0 56.5 23.5T560-480q0 33-23.5 56.5T480-400Zm240 0q-33 0-56.5-23.5T640-480q0-33 23.5-56.5T720-560q33 0 56.5 23.5T800-480q0 33-23.5 56.5T720-400ZM240-640q-33 0-56.5-23.5T160-720q0-33 23.5-56.5T240-800q33 0 56.5 23.5T320-720q0 33-23.5 56.5T240-640Zm240 0q-33 0-56.5-23.5T400-720q0-33 23.5-56.5T480-800q33 0 56.5 23.5T560-720q0 33-23.5 56.5T480-640Zm240 0q-33 0-56.5-23.5T640-720q0-33 23.5-56.5T720-800q33 0 56.5 23.5T800-720q0 33-23.5 56.5T720-640Z" />
   </Svg>
 );
 
-const VideoIcon = ({ color }: { color: string }) => (
-  <VideosTabSvgIcon width={26} height={26} color={color} />
+const VideoIcon = ({ color, size = INNER_TAB_ICON_SIZE }: { color: string; size?: number }) => (
+  <VideosTabSvgIcon width={size} height={size} color={color} />
 );
 
-const TagsIcon = ({ color }: { color: string }) => (
-  <Svg width="26" height="26" viewBox="0 0 24 24" fill={color}>
-    <Path d="M0 0h24v24H0V0z" fill="none" />
-    <Path d="M2.53 19.65l1.34.56v-9.03l-2.43 5.86c-.41 1.02.08 2.19 1.09 2.61zm19.5-3.7L17.07 3.98c-.31-.75-1.04-1.21-1.81-1.23-.26 0-.53.04-.79.15L7.1 5.95c-.75.31-1.21 1.03-1.23 1.8-.01.27.04.54.15.8l4.96 11.97c.31.76 1.05 1.22 1.83 1.23.26 0 .52-.05.77-.15l7.36-3.05c1.02-.42 1.51-1.59 1.09-2.6zm-9.2 3.8L7.87 7.79l7.35-3.04h.01l4.95 11.95-7.35 3.05z" />
-    <Circle cx="11" cy="9" r="1" />
-    <Path d="M5.88 19.75c0 1.1.9 2 2 2h1.45l-3.45-8.34v6.34z" />
-  </Svg>
-);
-
-const StoreTabIcon = ({ color }: { color: string }) => (
-  <Store size={26} color={color} strokeWidth={1.7} />
+const StoreTabIcon = ({ color, size = INNER_TAB_ICON_SIZE }: { color: string; size?: number }) => (
+  <Store size={size} color={color} strokeWidth={1.7} />
 );
 
 // Animated IconButton
@@ -191,6 +190,7 @@ export default function UserProfileScreen() {
   const btnFollowBg = isDark ? '#ffffff' : '#000000';
   const btnFollowText = isDark ? '#000000' : '#ffffff';
   const btnSecondaryBg = themeColors.card;
+  const headerOffset = insets.top + 60;
 
   // Derive follow state from profile user (which is already synced with global store)
   const isFollowing = profileUser?.isFollowing ?? false;
@@ -227,10 +227,22 @@ export default function UserProfileScreen() {
     videoUrl: v.videoUrl,
   }));
   const videosData = videoOnlyItems.map(v => ({ id: v.id, thumbnail: v.thumbnailUrl, views: v.viewsCount ?? 0, videoUrl: v.videoUrl }));
-  const tagsData: any[] = [];
 
   const pagerRef = useRef<React.ElementRef<typeof PagerView>>(null);
   const [activeTab, setActiveTab] = useState(0);
+  const focusedTabValue = useSharedValue(0);
+  const focusedTabRef = useRef(0);
+  const tabPressTargetRef = useRef<number | null>(null);
+  const swipeStartTabRef = useRef(0);
+  const hasAppliedSwipeFocusRef = useRef(false);
+  const isPagerDraggingRef = useRef(false);
+  const updateFocusedTab = useCallback((nextTab: number) => {
+    if (focusedTabRef.current === nextTab) return;
+    focusedTabRef.current = nextTab;
+    focusedTabValue.value = nextTab;
+  }, [focusedTabValue]);
+  const [showHeaderAvatar, setShowHeaderAvatar] = useState(false);
+  const headerAvatarVisibleRef = useRef(false);
 
   const maybeLoadMore = useCallback((nativeEvent: NativeScrollEvent) => {
     if (isLoading || isLoadingMore || !hasMore) return;
@@ -243,6 +255,33 @@ export default function UserProfileScreen() {
       void loadMore();
     }
   }, [activeTab, hasMore, isLoading, isLoadingMore, loadMore]);
+  const [tabsInitialY, setTabsInitialY] = useState(0);
+  const [isTabsPinned, setIsTabsPinned] = useState(false);
+  const isTabsPinnedRef = useRef(false);
+  const handleTabsAnchorLayout = useCallback((event: LayoutChangeEvent) => {
+    const nextY = event.nativeEvent.layout.y;
+    if (nextY > 0 && Math.abs(nextY - tabsInitialY) > 0.5) {
+      setTabsInitialY(nextY);
+    }
+  }, [tabsInitialY]);
+  const syncTabsPinned = useCallback((offsetY: number) => {
+    if (tabsInitialY <= 0) return;
+    const shouldPin = offsetY >= tabsInitialY;
+    if (isTabsPinnedRef.current !== shouldPin) {
+      isTabsPinnedRef.current = shouldPin;
+      setIsTabsPinned(shouldPin);
+    }
+  }, [tabsInitialY]);
+  const handleUserScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const nativeEvent = event.nativeEvent;
+    const shouldShow = nativeEvent.contentOffset.y > 40;
+    if (headerAvatarVisibleRef.current !== shouldShow) {
+      headerAvatarVisibleRef.current = shouldShow;
+      setShowHeaderAvatar(shouldShow);
+    }
+    maybeLoadMore(nativeEvent);
+    syncTabsPinned(nativeEvent.contentOffset.y);
+  }, [maybeLoadMore, syncTabsPinned]);
   const GRID_COLUMNS = 3;
   const GRID_GAP = 2;
   const GRID_PADDING = 2;
@@ -256,11 +295,57 @@ export default function UserProfileScreen() {
 
   const videoRows = Math.ceil(videosData.length / GRID_COLUMNS);
   const videosHeight = videoRows * (gridItemSize * (16 / 9) + GRID_GAP) + GRID_GAP;
-  const tagsHeight = 300;
   const shopHeight = 260;
   const showShopTab = profileUser?.isVerified === true && profileUser?.shopEnabled === true;
+  const visibleTabCount = showShopTab ? 3 : 2;
+  const [navTabsWidth, setNavTabsWidth] = useState(SCREEN_WIDTH);
+  const [tabLayouts, setTabLayouts] = useState<Record<number, { x: number; width: number }>>({});
+  const tabIndicatorFallbackWidth = navTabsWidth / visibleTabCount;
+  const pagerProgress = useSharedValue(0);
+  const getTabHeight = useCallback((index: number) => {
+    if (index === 0) return gridHeight;
+    if (index === 1) return videosHeight;
+    return shopHeight;
+  }, [gridHeight, shopHeight, videosHeight]);
+  const [pagerHeight, setPagerHeight] = useState(() => getTabHeight(0));
+  const pagerHeightRef = useRef(getTabHeight(0));
+  const updatePagerHeight = useCallback((nextHeight: number) => {
+    if (Math.abs(pagerHeightRef.current - nextHeight) < 0.5) {
+      return;
+    }
+    pagerHeightRef.current = nextHeight;
+    setPagerHeight(nextHeight);
+  }, []);
 
-  const handleTabPress = (index: number) => { setActiveTab(index); pagerRef.current?.setPage(index); };
+  const handleTabPress = useCallback((index: number) => {
+    tabPressTargetRef.current = index;
+    isPagerDraggingRef.current = false;
+    hasAppliedSwipeFocusRef.current = false;
+    updatePagerHeight(Math.max(getTabHeight(activeTab), getTabHeight(index)));
+    updateFocusedTab(index);
+    pagerRef.current?.setPage(index);
+  }, [activeTab, getTabHeight, updateFocusedTab, updatePagerHeight]);
+
+  const handleNavTabsLayout = useCallback((event: LayoutChangeEvent) => {
+    const nextWidth = event.nativeEvent.layout.width;
+    if (nextWidth > 0 && Math.abs(nextWidth - navTabsWidth) > 0.5) {
+      setNavTabsWidth(nextWidth);
+    }
+  }, [navTabsWidth]);
+  const handleTabLayout = useCallback((index: number, event: LayoutChangeEvent) => {
+    const { x, width } = event.nativeEvent.layout;
+    setTabLayouts((prev) => {
+      const current = prev[index];
+      if (
+        current &&
+        Math.abs(current.x - x) < 0.5 &&
+        Math.abs(current.width - width) < 0.5
+      ) {
+        return prev;
+      }
+      return { ...prev, [index]: { x, width } };
+    });
+  }, []);
 
   const showPreview = (item: any) => {
     if (item?.videoUrl) {
@@ -270,7 +355,7 @@ export default function UserProfileScreen() {
   const hidePreview = () => setPreviewItem(null);
 
   const pagerPages = [
-    <View key="0">
+    <View key="0" style={{ backgroundColor: bgBody }}>
       <MediaGrid
         items={postsData}
         isDark={isDark}
@@ -283,22 +368,14 @@ export default function UserProfileScreen() {
         showMediaTypeIcon={true}
       />
     </View>,
-    <View key="1">
+    <View key="1" style={{ backgroundColor: bgBody }}>
       <MediaGrid items={videosData.map((video) => ({ ...video, type: 'video' as const }))} isDark={isDark} aspectRatio={9 / 16} onPreview={showPreview} onPreviewEnd={hidePreview} gap={GRID_GAP} padding={GRID_PADDING} useVideoSvgForViewCountIcon={true} />
-    </View>,
-    <View key="2">
-      <MediaGrid items={tagsData} isDark={isDark} aspectRatio={0.8} onPreview={showPreview} onPreviewEnd={hidePreview} gap={GRID_GAP} padding={GRID_PADDING} />
-      {tagsData.length === 0 && (
-        <View style={{ padding: 40, alignItems: 'center' }}>
-          <Text style={{ color: textSecondary }}>Etiketlenmiş gönderi yok</Text>
-        </View>
-      )}
     </View>,
   ];
 
   if (showShopTab) {
     pagerPages.push(
-      <View key="3">
+      <View key="2" style={{ backgroundColor: bgBody }}>
         <View style={{ padding: 40, alignItems: 'center' }}>
           <Text style={{ color: textSecondary }}>Mağaza henüz boş</Text>
         </View>
@@ -307,15 +384,183 @@ export default function UserProfileScreen() {
   }
 
   useEffect(() => {
-    if (!showShopTab && activeTab > 2) {
-      setActiveTab(2);
-      pagerRef.current?.setPage(2);
+    if (!showShopTab && activeTab > 1) {
+      tabPressTargetRef.current = null;
+      setActiveTab(1);
+      updateFocusedTab(1);
+      pagerProgress.value = 1;
+      updatePagerHeight(getTabHeight(1));
+      pagerRef.current?.setPage(1);
     }
-  }, [activeTab, showShopTab]);
+  }, [activeTab, getTabHeight, pagerProgress, showShopTab, updateFocusedTab, updatePagerHeight]);
+
+  useEffect(() => {
+    const safeTab = showShopTab ? activeTab : Math.min(activeTab, 1);
+    updatePagerHeight(getTabHeight(safeTab));
+  }, [activeTab, getTabHeight, showShopTab, updatePagerHeight]);
+
+  const handlePageScroll = useCallback((e: PagerViewOnPageScrollEvent) => {
+    const { position, offset } = e.nativeEvent;
+
+    // Snap indicator to destination tab immediately when swipe starts.
+    let targetProgress = position + offset;
+    if (offset > 0) {
+      if (position < activeTab) {
+        targetProgress = position;
+      } else if (position === activeTab) {
+        targetProgress = Math.min(position + 1, visibleTabCount - 1);
+      }
+    }
+
+    const isProgrammaticTabPress = tabPressTargetRef.current !== null;
+    const isDragScroll = isPagerDraggingRef.current;
+    if (!isProgrammaticTabPress && !isDragScroll) {
+      return;
+    }
+
+    pagerProgress.value = targetProgress;
+    const nextPosition = Math.min(position + 1, visibleTabCount - 1);
+    const swipeHeight = offset > 0
+      ? Math.max(getTabHeight(position), getTabHeight(nextPosition))
+      : getTabHeight(position);
+    updatePagerHeight(swipeHeight);
+    if (isProgrammaticTabPress) {
+      return;
+    }
+
+    if (!isDragScroll) {
+      return;
+    }
+
+    if (hasAppliedSwipeFocusRef.current) {
+      return;
+    }
+
+    if (position !== swipeStartTabRef.current) {
+      hasAppliedSwipeFocusRef.current = true;
+      updateFocusedTab(position);
+      return;
+    }
+
+    if (offset > 0) {
+      const nextFocusedTab =
+        position < swipeStartTabRef.current
+          ? position
+          : Math.min(position + 1, visibleTabCount - 1);
+      hasAppliedSwipeFocusRef.current = true;
+      updateFocusedTab(nextFocusedTab);
+    }
+  }, [activeTab, getTabHeight, pagerProgress, updateFocusedTab, updatePagerHeight, visibleTabCount]);
+
+  const handlePageScrollStateChanged = useCallback((e: PageScrollStateChangedNativeEvent) => {
+    const { pageScrollState } = e.nativeEvent;
+
+    if (tabPressTargetRef.current !== null) {
+      if (pageScrollState === 'idle') {
+        tabPressTargetRef.current = null;
+      }
+      return;
+    }
+
+    if (pageScrollState === 'dragging') {
+      isPagerDraggingRef.current = true;
+      hasAppliedSwipeFocusRef.current = false;
+      swipeStartTabRef.current = activeTab;
+      return;
+    }
+
+    if (pageScrollState === 'idle') {
+      const settledTab = Math.min(
+        Math.max(Math.round(pagerProgress.value), 0),
+        visibleTabCount - 1
+      );
+      // Revert only if swipe cancelled and pager settled back to where it started.
+      if (settledTab === swipeStartTabRef.current) {
+        updateFocusedTab(swipeStartTabRef.current);
+      }
+      isPagerDraggingRef.current = false;
+      hasAppliedSwipeFocusRef.current = false;
+      swipeStartTabRef.current = activeTab;
+    }
+  }, [activeTab, pagerProgress, updateFocusedTab, visibleTabCount]);
+
+  const handlePageSelected = useCallback((e: PagerViewOnPageSelectedEvent) => {
+    const nextTab = e.nativeEvent.position;
+    tabPressTargetRef.current = null;
+    isPagerDraggingRef.current = false;
+    hasAppliedSwipeFocusRef.current = false;
+    swipeStartTabRef.current = nextTab;
+    pagerProgress.value = nextTab;
+    setActiveTab((prev) => (prev === nextTab ? prev : nextTab));
+    updatePagerHeight(getTabHeight(nextTab));
+    updateFocusedTab(nextTab);
+  }, [getTabHeight, pagerProgress, updateFocusedTab, updatePagerHeight]);
+
+  const tabIndicatorAnimatedStyle = useAnimatedStyle(() => {
+    const clampedProgress = Math.min(Math.max(pagerProgress.value, 0), visibleTabCount - 1);
+    const lowerIndex = Math.floor(clampedProgress);
+    const upperIndex = Math.min(Math.ceil(clampedProgress), visibleTabCount - 1);
+    const t = clampedProgress - lowerIndex;
+    const lowerLayout = tabLayouts[lowerIndex];
+    const upperLayout = tabLayouts[upperIndex] || lowerLayout;
+    const lowerX = lowerLayout ? lowerLayout.x : lowerIndex * tabIndicatorFallbackWidth;
+    const upperX = upperLayout ? upperLayout.x : upperIndex * tabIndicatorFallbackWidth;
+    const lowerWidth = lowerLayout ? lowerLayout.width : tabIndicatorFallbackWidth;
+    const upperWidth = upperLayout ? upperLayout.width : lowerWidth;
+    return {
+      width: lowerWidth + (upperWidth - lowerWidth) * t,
+      transform: [{ translateX: lowerX + (upperX - lowerX) * t }],
+    };
+  }, [tabIndicatorFallbackWidth, tabLayouts, visibleTabCount]);
+  const tabActiveScale = INNER_TAB_ICON_ACTIVE_SIZE / INNER_TAB_ICON_SIZE;
+  const gridIconAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: focusedTabValue.value === 0 ? tabActiveScale : 1 }],
+  }));
+  const videoIconAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: focusedTabValue.value === 1 ? tabActiveScale : 1 }],
+  }));
+  const storeIconAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: focusedTabValue.value === 2 ? tabActiveScale : 1 }],
+  }));
+  const renderTabsBar = (asOverlay = false) => (
+    <View
+      style={[
+        styles.navTabs,
+        { borderBottomColor: cardBg, backgroundColor: bgContainer },
+        !asOverlay && isTabsPinned ? styles.navTabsGhost : null,
+      ]}
+      onLayout={asOverlay ? undefined : handleNavTabsLayout}
+      pointerEvents={!asOverlay && isTabsPinned ? 'none' : 'auto'}
+    >
+      <TouchableOpacity style={styles.tab} onLayout={asOverlay ? undefined : (event) => handleTabLayout(0, event)} onPress={() => handleTabPress(0)}>
+        <Animated.View style={gridIconAnimatedStyle}>
+          <GridIcon color={textPrimary} size={INNER_TAB_ICON_SIZE} />
+        </Animated.View>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.tab} onLayout={asOverlay ? undefined : (event) => handleTabLayout(1, event)} onPress={() => handleTabPress(1)}>
+        <Animated.View style={videoIconAnimatedStyle}>
+          <VideoIcon color={textPrimary} size={INNER_TAB_ICON_SIZE} />
+        </Animated.View>
+      </TouchableOpacity>
+      {showShopTab && (
+        <TouchableOpacity style={styles.tab} onLayout={asOverlay ? undefined : (event) => handleTabLayout(2, event)} onPress={() => handleTabPress(2)}>
+          <Animated.View style={storeIconAnimatedStyle}>
+            <StoreTabIcon color={textPrimary} size={INNER_TAB_ICON_SIZE} />
+          </Animated.View>
+        </TouchableOpacity>
+      )}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.tabIndicator,
+          { backgroundColor: textPrimary },
+          tabIndicatorAnimatedStyle,
+        ]}
+      />
+    </View>
+  );
   const bioLimit = 110;
   const truncatedBio = user.bio.length > bioLimit ? user.bio.substring(0, bioLimit) + '...' : user.bio;
-  const [showHeaderAvatar, setShowHeaderAvatar] = useState(false);
-  const headerAvatarVisibleRef = useRef(false);
 
   return (
     <View style={[styles.container, { backgroundColor: bgBody }]}>
@@ -345,19 +590,12 @@ export default function UserProfileScreen() {
       </View>
 
       <Animated.ScrollView
-        onScroll={(event) => {
-          const nativeEvent = event.nativeEvent;
-          const shouldShow = nativeEvent.contentOffset.y > 40;
-          if (headerAvatarVisibleRef.current !== shouldShow) {
-            headerAvatarVisibleRef.current = shouldShow;
-            setShowHeaderAvatar(shouldShow);
-          }
-          maybeLoadMore(nativeEvent);
-        }}
+        style={{ backgroundColor: bgBody, marginTop: headerOffset }}
+        onScroll={handleUserScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: insets.top + 60, flexGrow: isLoading ? 1 : 0 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={isDark ? "#fff" : "#000"} progressViewOffset={insets.top + 60} />}
+        contentContainerStyle={{ flexGrow: isLoading ? 1 : 0 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={isDark ? "#fff" : "#000"} progressViewOffset={0} />}
       >
         {isLoading ? (
           <View style={styles.loadingContainer}>
@@ -446,22 +684,21 @@ export default function UserProfileScreen() {
           </View>
         )}
 
-        <View style={[styles.navTabs, { borderBottomColor: cardBg }]}>
-          <TouchableOpacity style={[styles.tab, activeTab === 0 && [styles.activeTab, { borderBottomColor: textPrimary }]]} onPress={() => handleTabPress(0)}><GridIcon color={activeTab === 0 ? textPrimary : textSecondary} /></TouchableOpacity>
-          <TouchableOpacity style={[styles.tab, activeTab === 1 && [styles.activeTab, { borderBottomColor: textPrimary }]]} onPress={() => handleTabPress(1)}><VideoIcon color={activeTab === 1 ? textPrimary : textSecondary} /></TouchableOpacity>
-          <TouchableOpacity style={[styles.tab, activeTab === 2 && [styles.activeTab, { borderBottomColor: textPrimary }]]} onPress={() => handleTabPress(2)}><TagsIcon color={activeTab === 2 ? textPrimary : textSecondary} /></TouchableOpacity>
-          {showShopTab && (
-            <TouchableOpacity style={[styles.tab, activeTab === 3 && [styles.activeTab, { borderBottomColor: textPrimary }]]} onPress={() => handleTabPress(3)}>
-              <StoreTabIcon color={activeTab === 3 ? textPrimary : textSecondary} />
-            </TouchableOpacity>
-          )}
+        <View onLayout={handleTabsAnchorLayout}>
+          {renderTabsBar(false)}
         </View>
 
         <PagerView
           ref={pagerRef}
-          style={{ width: '100%', height: activeTab === 0 ? gridHeight : activeTab === 1 ? videosHeight : activeTab === 2 ? tagsHeight : shopHeight }}
+          style={{
+            width: '100%',
+            height: pagerHeight,
+            backgroundColor: bgBody,
+          }}
           initialPage={0}
-          onPageSelected={(e: PagerViewOnPageSelectedEvent) => setActiveTab(e.nativeEvent.position)}
+          onPageScroll={handlePageScroll}
+          onPageScrollStateChanged={handlePageScrollStateChanged}
+          onPageSelected={handlePageSelected}
         >
           {pagerPages}
         </PagerView>
@@ -472,6 +709,11 @@ export default function UserProfileScreen() {
         )}
         <View style={{ height: 100 }} />
       </Animated.ScrollView>
+      {!isLoading && isTabsPinned && (
+        <View style={[styles.navTabsPinnedContainer, { top: headerOffset }]}>
+          {renderTabsBar(true)}
+        </View>
+      )}
 
       {/* Overlays & Modals */}
       {previewItem && <PreviewModal item={previewItem} onClose={hidePreview} />}
@@ -496,9 +738,11 @@ const styles = StyleSheet.create({
   btnFollow: { flex: 1, height: 36, borderRadius: 50, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   btnFollowText: { fontSize: 13, fontWeight: '600' },
   btnIconOnly: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 0 },
-  navTabs: { flexDirection: 'row', borderBottomWidth: 1 },
+  navTabs: { flexDirection: 'row', borderBottomWidth: 1, position: 'relative' },
+  navTabsGhost: { opacity: 0 },
+  navTabsPinnedContainer: { position: 'absolute', left: 0, right: 0, zIndex: 900 },
   tab: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12 },
-  activeTab: { borderBottomWidth: 2 },
+  tabIndicator: { position: 'absolute', left: 0, bottom: 0, height: 2 },
   socialClubsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15, marginVertical: 10, width: '100%' },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   previewOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', zIndex: 999 },

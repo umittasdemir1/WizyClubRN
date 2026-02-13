@@ -26,12 +26,15 @@ import { TrendingHeader } from '../../src/presentation/components/explore/Trendi
 import { StoryRail } from '../../src/presentation/components/explore/StoryRail';
 import { TrendingCarousel } from '../../src/presentation/components/explore/TrendingCarousel';
 import { MasonryFeed } from '../../src/presentation/components/explore/MasonryFeed';
+import { ExploreSkeleton } from '../../src/presentation/components/explore/ExploreSkeleton';
 import { useActiveVideoStore } from '../../src/presentation/store/useActiveVideoStore';
 import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
 import { SystemBars } from 'react-native-edge-to-edge';
 import { getVideoUrl } from '../../src/core/utils/videoUrl';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const INITIAL_THUMBNAIL_GATE_COUNT = 12;
+const THUMBNAIL_PREFETCH_TIMEOUT_MS = 2200;
 interface PreviewModalProps {
     item: {
         id: string;
@@ -206,8 +209,60 @@ export default function ExploreScreen() {
 
     const [refreshing, setRefreshing] = useState(false);
     const [previewItem, setPreviewItem] = useState<{ id: string; thumbnailUrl: string; videoUrl: string; username?: string; fullName?: string; avatarUrl?: string } | null>(null);
+    const [areInitialThumbnailsReady, setAreInitialThumbnailsReady] = useState(false);
     const scrollY = useRef(new Animated.Value(0)).current;
-    const showSkeleton = videos.length === 0 || isLoading;
+    const hasResolvedThumbnailGateRef = useRef(false);
+    const thumbnailGateRunIdRef = useRef(0);
+    const showSkeleton = isLoading || videos.length === 0 || !areInitialThumbnailsReady;
+
+    useEffect(() => {
+        if (hasResolvedThumbnailGateRef.current) return;
+
+        if (videos.length === 0) {
+            if (!isLoading) {
+                hasResolvedThumbnailGateRef.current = true;
+                setAreInitialThumbnailsReady(true);
+            }
+            return;
+        }
+
+        const thumbnailUrls = videos
+            .map((video) => video.thumbnailUrl)
+            .filter((url): url is string => Boolean(url))
+            .slice(0, INITIAL_THUMBNAIL_GATE_COUNT);
+
+        if (thumbnailUrls.length === 0) {
+            hasResolvedThumbnailGateRef.current = true;
+            setAreInitialThumbnailsReady(true);
+            return;
+        }
+
+        let cancelled = false;
+        const runId = ++thumbnailGateRunIdRef.current;
+
+        const prefetchWithTimeout = async (url: string) => {
+            try {
+                await Promise.race([
+                    Image.prefetch(url),
+                    new Promise((resolve) => setTimeout(resolve, THUMBNAIL_PREFETCH_TIMEOUT_MS)),
+                ]);
+            } catch {
+                // Ignore per-image prefetch errors; gate is completion-based.
+            }
+        };
+
+        Promise.all(thumbnailUrls.map((url) => prefetchWithTimeout(url)))
+            .finally(() => {
+                if (cancelled) return;
+                if (runId !== thumbnailGateRunIdRef.current) return;
+                hasResolvedThumbnailGateRef.current = true;
+                setAreInitialThumbnailsReady(true);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [isLoading, videos]);
 
     useFocusEffect(
         useCallback(() => {
@@ -348,13 +403,19 @@ export default function ExploreScreen() {
                 onSwipeRight={previewItem ? undefined : () => router.push('/')}
                 edgeOnly={!!previewItem}
             >
-                <View style={[styles.container, styles.loadingContainer, { backgroundColor: bgBody }]}>
-                    <ActivityIndicator size="large" color={isDark ? '#fff' : '#000'} />
+                <View style={[styles.container, { backgroundColor: bgBody }]}>
+                    <TrendingHeader
+                        title="Şimdi Keşfet"
+                        isDark={isDark}
+                        showSearch={true}
+                        onSearchPress={handleSearchPress}
+                    />
+                    <ExploreSkeleton isDark={isDark} topOffset={0} />
                     <View
                         pointerEvents="none"
                         style={[
                             styles.statusBarOverlay,
-                            { height: insets.top, backgroundColor: bgBody },
+                            { height: insets.top, backgroundColor: 'transparent' },
                         ]}
                     />
                 </View>
@@ -469,10 +530,6 @@ export default function ExploreScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-    },
-    loadingContainer: {
-        justifyContent: 'center',
-        alignItems: 'center',
     },
     sectionHeader: {
         flexDirection: 'row',

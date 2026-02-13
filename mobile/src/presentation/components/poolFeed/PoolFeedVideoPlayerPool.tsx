@@ -655,6 +655,23 @@ export const PoolFeedVideoPlayerPool = memo(forwardRef<PoolFeedVideoPlayerPoolRe
 
         switch (result.action) {
             case ErrorAction.ABORT:
+                {
+                    const existingTimeout = retryTimeoutsRef.current[slotIndex];
+                    if (existingTimeout) clearTimeout(existingTimeout);
+                    retryTimeoutsRef.current[slotIndex] = null;
+                }
+                setSlots(prev => {
+                    const newSlots = [...prev];
+                    if (newSlots[slotIndex]?.videoId !== slotVideoId) return prev;
+                    newSlots[slotIndex] = {
+                        ...newSlots[slotIndex],
+                        source: '',
+                        hasError: true,
+                        isLoaded: false,
+                        isReadyForDisplay: false,
+                    };
+                    return newSlots;
+                });
                 onRemoveVideo?.(slot.index);
                 break;
 
@@ -664,6 +681,7 @@ export const PoolFeedVideoPlayerPool = memo(forwardRef<PoolFeedVideoPlayerPoolRe
                     const existingTimeout = retryTimeoutsRef.current[slotIndex];
                     if (existingTimeout) clearTimeout(existingTimeout);
 
+                    const retryDelay = result.retryDelayMs ?? FEED_CONFIG.RETRY_DELAY_MS;
                     retryTimeoutsRef.current[slotIndex] = setTimeout(() => {
                         if (!isMountedRef.current) return;
                         setSlots(prev => {
@@ -675,7 +693,7 @@ export const PoolFeedVideoPlayerPool = memo(forwardRef<PoolFeedVideoPlayerPoolRe
                             };
                             return newSlots;
                         });
-                    }, FEED_CONFIG.RETRY_DELAY_MS);
+                    }, retryDelay);
                 }
                 break;
         }

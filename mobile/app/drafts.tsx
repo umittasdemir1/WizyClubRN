@@ -3,13 +3,13 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   Alert,
   ScrollView,
 } from 'react-native';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { SystemBars } from 'react-native-edge-to-edge';
 import BottomSheet from '@gorhom/bottom-sheet';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useThemeStore } from '../src/presentation/store/useThemeStore';
 import { useDraftStore } from '../src/presentation/store/useDraftStore';
 import { useAuthStore } from '../src/presentation/store/useAuthStore';
