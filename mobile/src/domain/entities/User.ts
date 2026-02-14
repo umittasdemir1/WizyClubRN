@@ -20,4 +20,5 @@ export interface User {
     tiktokUrl?: string;
     youtubeUrl?: string;
     xUrl?: string;
+    facebookUrl?: string;
 }

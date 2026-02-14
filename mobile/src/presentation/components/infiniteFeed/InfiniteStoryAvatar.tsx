@@ -1,20 +1,24 @@
 import React, { memo } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { Avatar } from '../shared/Avatar';
-import { AdvancedStoryRing } from '../shared/AdvancedStoryRing';
-import { useStoryStore } from '../../store/useStoryStore';
+import { Plus } from 'lucide-react-native';
+import { StoryRingAvatar } from '../shared/StoryRingAvatar';
 
 const AVATAR_SIZE = 64;
 const THICKNESS = 1.5;
 const GAP = 1.5;
 const RING_SIZE = AVATAR_SIZE + (THICKNESS * 2) + (GAP * 2);
+const CREATE_BUTTON_SIZE = 24;
+const CREATE_ICON_SIZE = 16;
 
 interface InfiniteStoryAvatarProps {
     userId: string;
     username: string;
     avatarUrl: string;
+    hasStory?: boolean;
     hasUnseenStory: boolean;
     textColor?: string;
+    showCreateButton?: boolean;
+    onCreatePress?: () => void;
     onPress: () => void;
 }
 
@@ -22,24 +26,42 @@ export const InfiniteStoryAvatar = memo(function InfiniteStoryAvatar({
     userId,
     username,
     avatarUrl,
+    hasStory = true,
     hasUnseenStory,
     textColor,
+    showCreateButton = false,
+    onCreatePress,
     onPress,
 }: InfiniteStoryAvatarProps) {
-    const isViewedLocal = useStoryStore((state) => state.viewedUserIds.has(userId));
-    const isViewed = !hasUnseenStory || isViewedLocal;
+    const ringViewed = !hasStory;
+    const shouldShowCreateButton = showCreateButton && Boolean(onCreatePress);
 
     return (
         <Pressable onPress={onPress} style={styles.container}>
             <View style={styles.avatarContainer}>
-                <AdvancedStoryRing
-                    size={RING_SIZE}
-                    thickness={THICKNESS}
-                    gap={GAP}
-                    viewed={isViewed}
-                >
-                    <Avatar url={avatarUrl} size={AVATAR_SIZE} />
-                </AdvancedStoryRing>
+                <View style={styles.avatarFrame}>
+                    <StoryRingAvatar
+                        avatarUrl={avatarUrl}
+                        avatarSize={AVATAR_SIZE}
+                        hasActiveStory={hasStory}
+                        isViewed={ringViewed}
+                        showViewedRingWhenNoStory={true}
+                        thickness={THICKNESS}
+                        gap={GAP}
+                    />
+                </View>
+                {shouldShowCreateButton ? (
+                    <Pressable
+                        onPress={(event) => {
+                            event.stopPropagation();
+                            onCreatePress?.();
+                        }}
+                        hitSlop={8}
+                        style={styles.createButton}
+                    >
+                        <Plus size={CREATE_ICON_SIZE} color="#080A0F" strokeWidth={2.8} />
+                    </Pressable>
+                ) : null}
             </View>
             <Text style={[styles.username, textColor ? { color: textColor } : null]} numberOfLines={1}>
                 {username}
@@ -55,6 +77,26 @@ const styles = StyleSheet.create({
     },
     avatarContainer: {
         marginBottom: 6,
+        position: 'relative',
+    },
+    avatarFrame: {
+        width: RING_SIZE,
+        height: RING_SIZE,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    createButton: {
+        position: 'absolute',
+        right: -3,
+        bottom: -3,
+        width: CREATE_BUTTON_SIZE,
+        height: CREATE_BUTTON_SIZE,
+        borderRadius: CREATE_BUTTON_SIZE / 2,
+        backgroundColor: '#FFFFFF',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1.5,
+        borderColor: '#080A0F',
     },
     username: {
         color: 'white',

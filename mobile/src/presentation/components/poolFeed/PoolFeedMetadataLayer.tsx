@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Video } from '../../../domain/entities/Video';
-import { Avatar } from '../shared/Avatar';
+import { StoryRingAvatar } from '../shared/StoryRingAvatar';
 import { VerifiedBadge } from '../shared/VerifiedBadge';
 import { textShadowStyle } from '@/core/utils/shadow';
 import { isDisabled } from './hooks/usePoolFeedConfig';
@@ -9,6 +9,7 @@ import { isDisabled } from './hooks/usePoolFeedConfig';
 interface PoolFeedMetadataLayerData {
     video: Video;
     currentUserId?: string;
+    hasActiveStory?: boolean;
 }
 
 interface PoolFeedMetadataLayerHandlers {
@@ -31,7 +32,7 @@ export function PoolFeedMetadataLayer({
     data,
     handlers,
 }: PoolFeedMetadataLayerProps) {
-    const { video, currentUserId } = data;
+    const { video, currentUserId, hasActiveStory } = data;
     const { onAvatarPress, onFollowPress, onReadMorePress, onCommercialTagPress } = handlers;
     const insets = useSafeAreaInsets();
     const bottom = Math.max(BASE_BOTTOM_POSITION, insets.bottom + SAFE_AREA_OFFSET);
@@ -52,9 +53,13 @@ export function PoolFeedMetadataLayer({
             <View style={styles.userRow}>
                 {!isDisabled('DISABLE_AVATAR') && (
                     <Pressable onPress={onAvatarPress} hitSlop={8}>
-                        <View style={styles.avatarBorder}>
-                            <Avatar url={video.user.avatarUrl} size={40} />
-                        </View>
+                        <StoryRingAvatar
+                            avatarUrl={video.user.avatarUrl}
+                            avatarSize={40}
+                            hasActiveStory={Boolean(hasActiveStory)}
+                            showViewedRingWhenNoStory={false}
+                            fallbackColor="#2A2A2A"
+                        />
                     </Pressable>
                 )}
 
@@ -142,15 +147,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         marginBottom: 12,
-    },
-    avatarBorder: {
-        width: 45,
-        height: 45,
-        borderRadius: 22.5,
-        borderWidth: 1,
-        borderColor: 'white',
-        alignItems: 'center',
-        justifyContent: 'center',
     },
     nameRow: {
         flexDirection: 'row',

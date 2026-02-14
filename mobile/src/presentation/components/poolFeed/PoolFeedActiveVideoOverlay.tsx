@@ -54,6 +54,7 @@ const SCREEN_HEIGHT = Dimensions.get('window').height;
 interface ActiveVideoOverlayData {
     video: Video;
     currentUserId?: string;
+    hasActiveStory?: boolean;
     activeIndex: number;
     isPlayable: boolean;
 }
@@ -103,7 +104,7 @@ export const PoolFeedActiveVideoOverlay = memo(function PoolFeedActiveVideoOverl
     timeline,
     actions,
 }: ActiveVideoOverlayProps) {
-    const { video, currentUserId, activeIndex, isPlayable } = data;
+    const { video, currentUserId, hasActiveStory, activeIndex, isPlayable } = data;
     const {
         hasError,
         retryCount,
@@ -293,7 +294,7 @@ export const PoolFeedActiveVideoOverlay = memo(function PoolFeedActiveVideoOverl
 
                         {/* Metadata Layer (Bottom left) */}
                         <PoolFeedMetadataLayer
-                            data={{ video, currentUserId }}
+                            data={{ video, currentUserId, hasActiveStory }}
                             handlers={{
                                 onAvatarPress: handleProfilePress,
                                 onFollowPress: onToggleFollow,

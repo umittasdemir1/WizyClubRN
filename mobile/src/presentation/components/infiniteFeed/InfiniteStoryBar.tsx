@@ -15,11 +15,13 @@ interface StoryUser {
     username: string;
     avatarUrl: string;
     hasUnseenStory: boolean;
+    hasStory?: boolean;
 }
 
 interface InfiniteStoryBarProps {
     storyUsers: StoryUser[];
     onAvatarPress: (userId: string) => void;
+    onCreateStoryPress?: () => void;
     backgroundColor?: string;
     textColor?: string;
 }
@@ -27,6 +29,7 @@ interface InfiniteStoryBarProps {
 export const InfiniteStoryBar = memo(function InfiniteStoryBar({
     storyUsers,
     onAvatarPress,
+    onCreateStoryPress,
     backgroundColor,
     textColor,
 }: InfiniteStoryBarProps) {
@@ -46,6 +49,7 @@ export const InfiniteStoryBar = memo(function InfiniteStoryBar({
                 id: profileUser.id,
                 username: profileUser.username,
                 avatarUrl: profileUser.avatarUrl,
+                hasStory: Boolean(profileUser.hasStories),
             };
         }
         if (authUser) {
@@ -54,13 +58,17 @@ export const InfiniteStoryBar = memo(function InfiniteStoryBar({
                 id: authUser.id,
                 username,
                 avatarUrl: DEFAULT_AVATAR,
+                hasStory: false,
             };
         }
         return null;
     }, [profileUser, authUser]);
 
     const sortedUsers = useMemo(() => {
-        let users = [...storyUsers];
+        let users: StoryUser[] = storyUsers.map((user) => ({
+            ...user,
+            hasStory: true,
+        }));
 
         if (currentUserDisplay) {
             users = users.filter(u => u.id !== currentUserDisplay.id);
@@ -83,6 +91,7 @@ export const InfiniteStoryBar = memo(function InfiniteStoryBar({
                 username: 'Hikayen',
                 avatarUrl: displayAvatar,
                 hasUnseenStory: selfInList ? selfInList.hasUnseenStory : false,
+                hasStory: Boolean(selfInList || currentUserDisplay.hasStory),
             });
         }
 
@@ -100,17 +109,23 @@ export const InfiniteStoryBar = memo(function InfiniteStoryBar({
                     contentContainerStyle={styles.scrollContent}
                     decelerationRate="fast"
                 >
-                    {sortedUsers.map((item) => (
-                        <InfiniteStoryAvatar
-                            key={item.id}
-                            userId={item.id}
-                            username={item.username}
-                            avatarUrl={item.avatarUrl}
-                            hasUnseenStory={item.hasUnseenStory}
-                            textColor={textColor}
-                            onPress={() => onAvatarPress(item.id)}
-                        />
-                    ))}
+                    {sortedUsers.map((item) => {
+                        const isCurrentUser = Boolean(currentUserDisplay && item.id === currentUserDisplay.id);
+                        return (
+                            <InfiniteStoryAvatar
+                                key={item.id}
+                                userId={item.id}
+                                username={item.username}
+                                avatarUrl={item.avatarUrl}
+                                hasStory={item.hasStory}
+                                hasUnseenStory={item.hasUnseenStory}
+                                textColor={textColor}
+                                showCreateButton={isCurrentUser}
+                                onCreatePress={onCreateStoryPress}
+                                onPress={() => onAvatarPress(item.id)}
+                            />
+                        );
+                    })}
                 </ScrollView>
             </View>
         </View>

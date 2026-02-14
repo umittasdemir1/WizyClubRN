@@ -1,9 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { Avatar } from '../shared/Avatar';
-import { AdvancedStoryRing } from '../shared/AdvancedStoryRing';
+import { StoryRingAvatar } from '../shared/StoryRingAvatar';
 import { useStoryStore } from '../../store/useStoryStore';
-import { shadowStyle } from '@/core/utils/shadow';
 
 interface ProfileStatsProps {
   userId?: string;
@@ -28,12 +26,7 @@ export const ProfileStats: React.FC<ProfileStatsProps> = ({
 }) => {
   const textColor = isDark ? '#fff' : '#000';
   const labelColor = isDark ? '#888' : '#555';
-  const cardBg = isDark ? '#1c1c1e' : '#f0f0f0';
   const avatarSize = 90;
-  // Desired specs: 3px thickness, 3px gap
-  const THICKNESS = 3;
-  const GAP = 3;
-  const RING_SIZE = avatarSize + (THICKNESS * 2) + (GAP * 2);
 
   // Reactive selector: re-renders only when this specific condition changes
   const isViewedLocal = useStoryStore(state => userId ? state.viewedUserIds.has(userId) : false);
@@ -47,6 +40,7 @@ export const ProfileStats: React.FC<ProfileStatsProps> = ({
     // If backend says true, check local store too (maybe we just watched it)
     isViewed = !hasUnseenStory || isViewedLocal;
   }
+  const ringViewed = hasStories ? isViewed : true;
 
   return (
     <View style={styles.container}>
@@ -60,15 +54,13 @@ export const ProfileStats: React.FC<ProfileStatsProps> = ({
 
       {/* Main Avatar (Center) */}
       <Pressable onPress={onAvatarPress} style={styles.avatarWrapper}>
-        {hasStories ? (
-          <AdvancedStoryRing size={RING_SIZE} thickness={THICKNESS} gap={GAP} viewed={isViewed}>
-            <Avatar url={mainAvatarUrl} size={avatarSize} />
-          </AdvancedStoryRing>
-        ) : (
-          <View style={[styles.avatarBox, { borderColor: cardBg, borderWidth: 2 }]}>
-            <Avatar url={mainAvatarUrl} size={avatarSize} />
-          </View>
-        )}
+        <StoryRingAvatar
+          avatarUrl={mainAvatarUrl}
+          avatarSize={avatarSize}
+          hasActiveStory={hasStories}
+          isViewed={ringViewed}
+          showViewedRingWhenNoStory={true}
+        />
       </Pressable>
 
       {/* Takipte (Right) */}
@@ -114,12 +106,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-  },
-  avatarBox: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    overflow: 'hidden',
-    ...shadowStyle({ color: '#000', offset: { width: 0, height: 2 }, opacity: 0.1, radius: 4, elevation: 5 }),
   },
 });

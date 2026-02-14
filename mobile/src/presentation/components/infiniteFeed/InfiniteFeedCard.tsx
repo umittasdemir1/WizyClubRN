@@ -9,6 +9,7 @@ import { Video as VideoEntity } from '../../../domain/entities/Video';
 import { InfiniteFeedActions } from './InfiniteFeedActions';
 import { InfiniteCarouselLayer } from './InfiniteCarouselLayer';
 import { VerifiedBadge } from '../shared/VerifiedBadge';
+import { StoryRingAvatar } from '../shared/StoryRingAvatar';
 import { ThemeColors } from './InfiniteFeedTypes';
 import { FEED_FLAGS } from './hooks/useInfiniteFeedConfig';
 import { getBufferConfig } from '../../../core/utils/bufferConfig';
@@ -109,6 +110,7 @@ interface InfiniteFeedCardProps {
     isMuted: boolean;
     isPaused: boolean;
     currentUserId?: string;
+    hasActiveStory?: boolean;
     onToggleMute: () => void;
     onOpen: (id: string, index: number) => void;
     onOpenProfile: (userId: string) => void;
@@ -138,6 +140,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     isMuted,
     isPaused,
     currentUserId,
+    hasActiveStory = false,
     onToggleMute,
     onOpen,
     onOpenProfile,
@@ -219,10 +222,6 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     const avatarUrl = useMemo(
         () => (isNonEmptyString(item.user?.avatarUrl) ? item.user.avatarUrl : ''),
         [item.user?.avatarUrl]
-    );
-    const avatarCacheKey = useMemo(
-        () => (avatarUrl ? getStableImageCacheKey(avatarUrl) : undefined),
-        [avatarUrl]
     );
 
     const sourceVideoUrl = getVideoUrl(item);
@@ -778,17 +777,13 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                             <View style={styles.mediaHeaderOverlay}>
                                 <View style={styles.userInfoRow}>
                                     <Pressable onPress={handleProfilePress} hitSlop={8}>
-                                        {avatarUrl ? (
-                                            <Image
-                                                source={{ uri: avatarUrl, cacheKey: avatarCacheKey }}
-                                                style={styles.avatar}
-                                                contentFit="cover"
-                                                cachePolicy="memory-disk"
-                                                transition={0}
-                                            />
-                                        ) : (
-                                            <View style={[styles.avatar, { backgroundColor: colors.card }]} />
-                                        )}
+                                        <StoryRingAvatar
+                                            avatarUrl={avatarUrl}
+                                            avatarSize={42}
+                                            hasActiveStory={hasActiveStory}
+                                            showViewedRingWhenNoStory={false}
+                                            fallbackColor={colors.card}
+                                        />
                                     </Pressable>
                                     <View style={styles.headerText}>
                                         <View style={styles.nameRow}>
@@ -928,17 +923,13 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                             <View style={styles.mediaHeaderOverlay}>
                                 <View style={styles.userInfoRow}>
                                     <Pressable onPress={handleProfilePress} hitSlop={8}>
-                                        {avatarUrl ? (
-                                            <Image
-                                                source={{ uri: avatarUrl, cacheKey: avatarCacheKey }}
-                                                style={styles.avatar}
-                                                contentFit="cover"
-                                                cachePolicy="memory-disk"
-                                                transition={0}
-                                            />
-                                        ) : (
-                                            <View style={[styles.avatar, { backgroundColor: colors.card }]} />
-                                        )}
+                                        <StoryRingAvatar
+                                            avatarUrl={avatarUrl}
+                                            avatarSize={42}
+                                            hasActiveStory={hasActiveStory}
+                                            showViewedRingWhenNoStory={false}
+                                            fallbackColor={colors.card}
+                                        />
                                     </Pressable>
                                     <View style={styles.headerText}>
                                         <View style={styles.nameRow}>
@@ -1109,12 +1100,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 10,
-    },
-    avatar: {
-        width: 42,
-        height: 42,
-        borderRadius: 21,
-        backgroundColor: '#2a2a2a',
     },
     headerText: {
         flex: 1,

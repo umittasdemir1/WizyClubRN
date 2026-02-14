@@ -94,7 +94,8 @@ export class ProfileRepositoryImpl implements IProfileRepository {
             instagramUrl: dto.instagram_url,
             tiktokUrl: dto.tiktok_url,
             youtubeUrl: dto.youtube_url,
-            xUrl: dto.x_url
+            xUrl: dto.x_url,
+            facebookUrl: dto.facebook_url
         };
     }
 }

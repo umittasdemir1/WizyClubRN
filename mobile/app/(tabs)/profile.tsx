@@ -1136,10 +1136,18 @@ export default function ProfileScreen() {
       ]}>
         <View style={styles.topNav}>
           <View style={styles.navIcon} />
-          <Text style={[styles.headerUsername, { color: textPrimary }]}>{!isLoading ? `@${user.username}` : ''}</Text>
+          <Text style={[styles.headerUsername, { color: textPrimary }]}>{`@${user.username}`}</Text>
           <View style={styles.navActions}>
+            <View style={styles.navLinkLeftOfMenu}>
+              <SocialTags
+                isDark={isDark}
+                user={user.entity}
+                onlyLink
+                panelDirection="left"
+              />
+            </View>
             <TouchableOpacity
-              style={[styles.navIconButton, { alignItems: 'flex-end' }]}
+              style={[styles.navIconButton, styles.menuButtonShiftLeft, { alignItems: 'flex-end' }]}
               onPress={openSettings}
             >
               <Menu size={24} color={iconColor} />
@@ -1147,23 +1155,17 @@ export default function ProfileScreen() {
           </View>
         </View>
       </View>
-
       <SwipeWrapper enableLeft={false} onSwipeRight={() => router.push('/notifications')} edgeOnly={true}>
         <Animated.ScrollView
           style={{ marginTop: headerOffset }}
           showsVerticalScrollIndicator={false}
           scrollEventThrottle={16}
           onScroll={handleProfileScroll}
-          stickyHeaderIndices={[1]}
-          contentContainerStyle={{ flexGrow: isLoading ? 1 : 0 }}
+          stickyHeaderIndices={[isLoading ? 2 : 1]}
+          contentContainerStyle={{ flexGrow: 1 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={isDark ? "#fff" : "#000"} progressViewOffset={0} />}
         >
-          {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={isDark ? '#fff' : '#000'} />
-            </View>
-          ) : (
-            <View style={styles.profileContainer}>
+          <View style={styles.profileContainer}>
               <ProfileStats
                 userId={user.entity.id}
                 followingCount={user.followingCount}
@@ -1207,10 +1209,11 @@ export default function ProfileScreen() {
                   <Text style={[styles.btnActionText, { color: btnEditText }]}>Profili Paylaş</Text>
                 </Pressable>
               </View>
+            </View>
 
-              <View style={styles.socialClubsRow}>
-                <SocialTags isDark={isDark} user={user.entity} />
-              </View>
+          {isLoading && (
+            <View style={styles.loadingContainerOverlay} pointerEvents="none">
+              <ActivityIndicator size="small" color={isDark ? '#fff' : '#000'} />
             </View>
           )}
 
@@ -1463,7 +1466,9 @@ const styles = StyleSheet.create({
   topNav: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 10, height: 60, position: 'relative' },
   navIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   navActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  navLinkLeftOfMenu: { marginRight: -8 },
   navIconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  menuButtonShiftLeft: { transform: [{ translateX: -6 }] },
   headerUsername: { fontSize: 20, fontWeight: '600', position: 'absolute', left: 0, right: 0, textAlign: 'center', zIndex: -1 },
   profileContainer: { alignItems: 'center', paddingHorizontal: 10, marginTop: 5 },
   userNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
@@ -1472,6 +1477,7 @@ const styles = StyleSheet.create({
   actionsContainer: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 25, height: 36, paddingHorizontal: 5, width: '100%' },
   btnAction: { flex: 1, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   btnActionText: { fontSize: 13, fontWeight: '600' },
+  loadingContainerOverlay: { position: 'absolute', top: 0, right: 0, padding: 8 },
   btnIconOnly: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#e5e5e5' },
   navTabs: { flexDirection: 'row', borderBottomWidth: 1, position: 'relative' },
   tab: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12 },

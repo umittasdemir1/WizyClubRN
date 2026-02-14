@@ -1,6 +1,8 @@
 import '../src/utils/ignoreWarnings';
 import { Stack, useSegments } from 'expo-router';
 import { DefaultTheme, DarkTheme, ThemeProvider } from '@react-navigation/native';
+import { FontAwesome6 } from '@expo/vector-icons';
+import * as Font from 'expo-font';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
@@ -28,6 +30,13 @@ import { QUERY_KEYS } from '../src/core/query/queryClient';
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
+// Preload vector icon font so profile/header icons render immediately.
+const fontAwesome6Family = (FontAwesome6 as unknown as { font?: Record<string, number> }).font;
+if (fontAwesome6Family) {
+    void Font.loadAsync(fontAwesome6Family).catch(() => {
+        // no-op
+    });
+}
 
 Notifications.setNotificationHandler({
     handleNotification: async () => ({

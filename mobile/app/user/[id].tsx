@@ -570,13 +570,23 @@ export default function UserProfileScreen() {
             {showHeaderAvatar && user.avatarUrl ? <Avatar url={user.avatarUrl} size={32} /> : null}
           </View>
           <Text style={[styles.headerUsername, { color: textPrimary }]}>{!isLoading ? `@${user.username}` : ''}</Text>
-          <TouchableOpacity
-            style={[styles.navIcon, { alignItems: 'flex-end' }]}
-            onPress={() => setIsUserOptionsVisible(true)}
-            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-          >
-            <MoreVertical size={24} color={iconColor} />
-          </TouchableOpacity>
+          <View style={styles.navActions}>
+            <View style={styles.navLinkLeftOfMenu}>
+              <SocialTags
+                isDark={isDark}
+                user={profileUser}
+                onlyLink
+                panelDirection="left"
+              />
+            </View>
+            <TouchableOpacity
+              style={[styles.navIconButton, styles.menuButtonShiftLeft, { alignItems: 'flex-end' }]}
+              onPress={() => setIsUserOptionsVisible(true)}
+              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+            >
+              <MoreVertical size={24} color={iconColor} />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -667,12 +677,6 @@ export default function UserProfileScreen() {
                 />
               </View>
             </View>
-
-            <View style={styles.socialClubsRow}>
-              {(profileUser?.instagramUrl || profileUser?.tiktokUrl || profileUser?.youtubeUrl || profileUser?.xUrl || profileUser?.website) && (
-                <SocialTags isDark={isDark} user={profileUser} />
-              )}
-            </View>
           </View>
         )}
 
@@ -715,6 +719,10 @@ const styles = StyleSheet.create({
   topNav: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 10, height: 60, position: 'relative' },
   leftNav: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   navIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  navActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  navLinkLeftOfMenu: { marginRight: -8 },
+  navIconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  menuButtonShiftLeft: { transform: [{ translateX: -6 }] },
   headerUsername: { fontSize: 20, fontWeight: '600', position: 'absolute', left: 0, right: 0, textAlign: 'center', zIndex: -1 },
   profileContainer: { alignItems: 'center', paddingHorizontal: 10, marginTop: 5 },
   userNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
@@ -727,7 +735,6 @@ const styles = StyleSheet.create({
   navTabs: { flexDirection: 'row', borderBottomWidth: 1, position: 'relative' },
   tab: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12 },
   tabIndicator: { position: 'absolute', left: 0, bottom: 0, height: 2 },
-  socialClubsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15, marginVertical: 10, width: '100%' },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   previewOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', zIndex: 999 },
   previewCard: { width: '80%', height: 480, borderRadius: 30, overflow: 'hidden', backgroundColor: '#000', ...shadowStyle({ color: '#000', offset: { width: 0, height: 10 }, opacity: 0.5, radius: 15, elevation: 20 }) },

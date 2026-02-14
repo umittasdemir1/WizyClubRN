@@ -316,6 +316,10 @@ export function InfiniteFeedManager({
             return acc;
         }, []);
     }, [storyListData]);
+    const activeStoryUserIds = useMemo(
+        () => new Set<string>(storyUsers.map((user: any) => user.id).filter(Boolean)),
+        [storyUsers]
+    );
 
     const setResolvedSourceForId = useCallback((videoId: string, source: string | null) => {
         setResolvedVideoSources((prev) => {
@@ -833,6 +837,7 @@ export function InfiniteFeedManager({
             ? (index <= effectivePendingInlineIndex && index >= effectivePendingInlineIndex - prewarmRange)
             : (index >= effectivePendingInlineIndex && index <= effectivePendingInlineIndex + prewarmRange);
         const allowDecodePrewarm = prewarmDistance >= 1 && prewarmDistance <= prewarmPlayRange;
+        const hasActiveStory = Boolean(item.user?.id && activeStoryUserIds.has(item.user.id));
 
         return (
             <InfiniteFeedCard
@@ -846,6 +851,7 @@ export function InfiniteFeedManager({
                 isMuted={muted}
                 isPaused={browserVisible || pausedByLifecycle}
                 currentUserId={userId}
+                hasActiveStory={hasActiveStory}
                 onToggleMute={handlers.onToggleMute}
                 onOpen={handlers.onOpen}
                 onOpenProfile={handlers.onOpenProfile}
@@ -863,7 +869,7 @@ export function InfiniteFeedManager({
                 networkType={networkType}
             />
         );
-    }, [activeInlineId, effectivePendingInlineId, effectivePendingInlineIndex, globalIsPaused, isInAppBrowserVisible, isRouteFocused, isScreenFocused]);
+    }, [activeInlineId, activeStoryUserIds, effectivePendingInlineId, effectivePendingInlineIndex, globalIsPaused, isInAppBrowserVisible, isRouteFocused, isScreenFocused]);
 
     // Active item changes when card visibility crosses threshold
     const viewabilityConfig = useRef({

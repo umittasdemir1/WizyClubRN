@@ -138,6 +138,7 @@ export function InfiniteFeedHeader({
             <InfiniteStoryBar
                 storyUsers={storyUsers}
                 onAvatarPress={onStoryAvatarPress}
+                onCreateStoryPress={onUploadPress}
                 backgroundColor={colors.background}
                 textColor={colors.textPrimary}
             />

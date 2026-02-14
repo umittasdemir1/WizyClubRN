@@ -512,13 +512,39 @@ app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
 app.post('/upload-story', upload.array('video', 10), async (req, res) => {
     const files = req.files;
     const { userId, description, brandName, brandUrl, commercialType } = req.body;
+    const authHeader = req.headers.authorization;
+    let dbClient = supabase;
+    let authenticatedUserId = null;
 
     if (!files || files.length === 0) {
         return res.status(400).json({ error: 'No files provided' });
     }
 
-    if (!userId) {
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.replace('Bearer ', '');
+        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+        if (authError || !user) {
+            return res.status(401).json({ error: 'Invalid or expired token' });
+        }
+
+        authenticatedUserId = user.id;
+        dbClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY, {
+            global: { headers: { Authorization: `Bearer ${token}` } }
+        });
+    }
+
+    const effectiveUserId = authenticatedUserId || userId;
+
+    if (!effectiveUserId) {
         return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    if (authenticatedUserId && userId && userId !== authenticatedUserId) {
+        logLine('WARN', 'STORY', 'Request userId mismatch, using token user', {
+            bodyUserId: userId,
+            tokenUserId: authenticatedUserId,
+        });
     }
 
     const uniqueId = uuidv4();
@@ -527,7 +553,7 @@ app.post('/upload-story', upload.array('video', 10), async (req, res) => {
 
     logBanner('STORY UPLOAD REQUEST', [
         `Upload ID  : ${uniqueId}`,
-        `User ID    : ${userId}`,
+        `User ID    : ${effectiveUserId}`,
         `Item Count : ${files.length}`,
         `Post Type  : ${isCarousel ? 'carousel' : 'video'}`,
     ]);
@@ -543,7 +569,7 @@ app.post('/upload-story', upload.array('video', 10), async (req, res) => {
             const file = files[i];
             const isVideo = file.mimetype.startsWith('video/');
             const indexLabel = files.length > 1 ? `_${i}` : '';
-            const baseKey = `media/${userId}/stories/${uniqueId}${indexLabel}`;
+            const baseKey = `media/${effectiveUserId}/stories/${uniqueId}${indexLabel}`;
             const inputPath = file.path;
 
             if (isVideo) {
@@ -614,8 +640,8 @@ app.post('/upload-story', upload.array('video', 10), async (req, res) => {
         const isCommercial = commercialType && commercialType !== 'İş Birliği İçermiyor';
         const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-        const { data, error } = await supabase.from('stories').insert({
-            user_id: userId,
+        const { data, error } = await dbClient.from('stories').insert({
+            user_id: effectiveUserId,
             video_url: mediaUrls[0].url,
             thumbnail_url: firstThumbUrl,
             media_urls: mediaUrls,

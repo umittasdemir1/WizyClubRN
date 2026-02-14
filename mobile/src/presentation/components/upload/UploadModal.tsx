@@ -29,6 +29,7 @@ import { router } from 'expo-router';
 import { useStoryStore } from '../../store/useStoryStore';
 import { SystemBars } from 'react-native-edge-to-edge';
 import { LogCode, logUI, logError, logData } from '@/core/services/Logger';
+import { supabase } from '@/core/supabase';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PREVIEW_ITEM_WIDTH = SCREEN_WIDTH * 0.7;
@@ -246,6 +247,17 @@ export function UploadModal({ isVisible, onClose, initialAssets, uploadMode = 'v
             const uploadUrl = `${CONFIG.API_URL}${endpoint}`;
             logData(LogCode.VIDEO_UPLOAD_START, 'Starting upload', { uploadUrl, uploadMode });
             xhr.open('POST', uploadUrl);
+
+            // Forward Supabase access token so backend can execute inserts under user context (RLS-safe).
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                const accessToken = session?.access_token;
+                if (accessToken) {
+                    xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
+                }
+            } catch (sessionError) {
+                logError(LogCode.ERROR_NETWORK, 'Failed to fetch auth session for upload', sessionError);
+            }
 
             // 🔥 SIMPLE: Linear progress from 0 to 95, then 100 on success
             let currentProgress = 0;

@@ -1,7 +1,6 @@
 import React, { memo } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { Avatar } from '../shared/Avatar';
-import { AdvancedStoryRing } from '../shared/AdvancedStoryRing';
+import { StoryRingAvatar } from '../shared/StoryRingAvatar';
 import { useStoryStore } from '../../store/useStoryStore';
 
 const AVATAR_SIZE = 64;
@@ -35,14 +34,15 @@ export const PoolFeedStoryAvatar = memo(function PoolFeedStoryAvatar({
     return (
         <Pressable onPress={onPress} style={styles.container}>
             <View style={styles.avatarContainer}>
-                <AdvancedStoryRing 
-                    size={RING_SIZE} 
-                    thickness={THICKNESS} 
-                    gap={GAP} 
-                    viewed={isViewed}
-                >
-                    <Avatar url={avatarUrl} size={AVATAR_SIZE} />
-                </AdvancedStoryRing>
+                <StoryRingAvatar
+                    avatarUrl={avatarUrl}
+                    avatarSize={AVATAR_SIZE}
+                    hasActiveStory={true}
+                    isViewed={isViewed}
+                    showViewedRingWhenNoStory={true}
+                    thickness={THICKNESS}
+                    gap={GAP}
+                />
             </View>
             <Text style={styles.username} numberOfLines={1}>
                 {username}

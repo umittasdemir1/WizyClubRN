@@ -1,7 +1,6 @@
 import React from 'react';
 import { ScrollView, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Image } from 'expo-image';
-import { AdvancedStoryRing } from '../shared/AdvancedStoryRing';
+import { StoryRingAvatar } from '../shared/StoryRingAvatar';
 import { useStoryStore } from '../../store/useStoryStore';
 
 interface StoryCreator {
@@ -21,9 +20,10 @@ export function StoryRail({ creators, onCreatorPress, isDark = true }: StoryRail
     const textColor = isDark ? '#FFFFFF' : '#080A0F';
 
     // Circular dimensions
-    const size = 80;
+    const ringSize = 80;
     const THICKNESS = 2.5;
     const GAP = 2.5;
+    const avatarSize = ringSize - (THICKNESS * 2) - (GAP * 2);
 
     // Subscribe to the Set of viewed user IDs for reactivity
     const viewedUserIds = useStoryStore((state) => state.viewedUserIds);
@@ -44,21 +44,15 @@ export function StoryRail({ creators, onCreatorPress, isDark = true }: StoryRail
                             style={styles.creatorItem}
                             onPress={() => onCreatorPress(creator.id)}
                         >
-                            <AdvancedStoryRing
-                                size={size}
+                            <StoryRingAvatar
+                                avatarUrl={creator.avatarUrl}
+                                avatarSize={avatarSize}
+                                hasActiveStory={true}
+                                isViewed={isViewed}
+                                showViewedRingWhenNoStory={true}
                                 thickness={THICKNESS}
                                 gap={GAP}
-                                viewed={isViewed}
-                            >
-                                <Image
-                                    source={{ uri: creator.avatarUrl }}
-                                    style={{
-                                        width: '100%',
-                                        height: '100%',
-                                    }}
-                                    contentFit="cover"
-                                />
-                            </AdvancedStoryRing>
+                            />
                             <Text
                                 style={[styles.username, { color: textColor }]}
                                 numberOfLines={1}

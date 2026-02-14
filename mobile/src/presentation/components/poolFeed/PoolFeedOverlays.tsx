@@ -182,6 +182,10 @@ export const PoolFeedOverlays = forwardRef<PoolFeedOverlaysRef, PoolFeedOverlays
             }
             return [];
         }, [props.overlayItems, activeVideo, props.activeIndex, props.isPlayable]);
+        const activeStoryUserIds = useMemo(
+            () => new Set<string>((storyUsers ?? []).map((user: any) => user?.id).filter(Boolean)),
+            [storyUsers]
+        );
 
         const overlayDataList = useMemo(() => (
             overlayTargets.map((item) => ({
@@ -189,11 +193,12 @@ export const PoolFeedOverlays = forwardRef<PoolFeedOverlaysRef, PoolFeedOverlays
                 data: {
                     video: item.video,
                     currentUserId: props.currentUserId || undefined,
+                    hasActiveStory: Boolean(item.video.user?.id && activeStoryUserIds.has(item.video.user.id)),
                     activeIndex: item.index,
                     isPlayable: item.isPlayable,
                 }
             }))
-        ), [overlayTargets, props.currentUserId]);
+        ), [activeStoryUserIds, overlayTargets, props.currentUserId]);
 
         const activeVideoPlayback = useMemo(() => ({
             hasError: playback.hasError,

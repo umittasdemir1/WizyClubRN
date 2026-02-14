@@ -186,6 +186,7 @@ export class SupabaseProfileDataSource {
         if ('tiktokUrl' in user) dto.tiktok_url = user.tiktokUrl;
         if ('youtubeUrl' in user) dto.youtube_url = user.youtubeUrl;
         if ('xUrl' in user) dto.x_url = user.xUrl;
+        if ('facebookUrl' in user) dto.facebook_url = user.facebookUrl;
 
         dto.updated_at = new Date().toISOString();
         return dto;
