@@ -17,20 +17,12 @@ type RingSegment = {
 };
 
 const ACTIVE_RING_STOPS = [
-  '#EDA65D',
-  '#E6CF67',
-  '#BFD576',
-  '#99D3D6',
-  '#A9BCE8',
-  '#B8A4E6',
-  '#DE86B8',
-  '#F26B60',
-  '#D77FBD',
-  '#9FADE6',
-  '#86BFE7',
-  '#A9D776',
-  '#E5CA67',
-  '#EDA65D',
+  '#FF416C',
+  '#FF9068',
+  '#FFD93D',
+  '#6BCF7F',
+  '#4D96FF',
+  '#FF416C',
 ];
 
 const VIEWED_RING_COLOR = '#9A9A9A';

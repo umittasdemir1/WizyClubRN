@@ -286,6 +286,18 @@ export function InfiniteFeedManager({
         setMoreDeleteConfirmationVisible(true);
     }, [currentUserId, selectedMoreVideoId, videos]);
 
+    const handleMoreSheetEdit = useCallback(() => {
+        const targetId = selectedMoreVideoId;
+        if (!targetId) return;
+
+        const selectedVideo = videos.find((video) => video.id === targetId);
+        const isOwnVideo = !!currentUserId && selectedVideo?.user?.id === currentUserId;
+        if (!isOwnVideo) return;
+
+        moreOptionsSheetRef.current?.close();
+        router.push(`/edit?videoId=${encodeURIComponent(targetId)}` as any);
+    }, [currentUserId, router, selectedMoreVideoId, videos]);
+
     const handleCancelMoreDelete = useCallback(() => {
         setMoreDeleteConfirmationVisible(false);
     }, []);
@@ -1106,6 +1118,7 @@ export function InfiniteFeedManager({
                 ) : null}
                 <InfiniteFeedMoreOptionsSheet
                     ref={moreOptionsSheetRef}
+                    onEditPress={isOwnMoreOptionsVideo ? handleMoreSheetEdit : undefined}
                     onDeletePress={isOwnMoreOptionsVideo ? handleMoreSheetDelete : undefined}
                     onSheetStateChange={setIsMoreSheetOpen}
                 />

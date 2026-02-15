@@ -21,6 +21,7 @@ interface StoryActionsProps {
     onShop: () => void;
     showShop?: boolean;
     onEmojiSelect: (emoji: string) => void;
+    overlay?: boolean;
 }
 
 const EMOJIS = ['❤️', '🔥', '👏', '😂', '😍', '🎉', '👍', '💯', '😮', '🤩', '😎', '🥰', '😘', '🙌', '💪', '✨'];
@@ -62,6 +63,7 @@ export function StoryActions({
     onShop,
     showShop = false,
     onEmojiSelect,
+    overlay = false,
 }: StoryActionsProps) {
     const insets = useSafeAreaInsets();
     const [localLiked, setLocalLiked] = useState(isLiked);
@@ -96,7 +98,14 @@ export function StoryActions({
     };
 
     return (
-        <View style={[styles.container, { paddingBottom: insets.bottom +10 }]} pointerEvents="box-none">
+        <View
+            style={[
+                styles.container,
+                overlay && styles.containerOverlay,
+                { paddingBottom: insets.bottom + 10 },
+            ]}
+            pointerEvents="box-none"
+        >
             <View style={styles.actionBar}>
                 {/* Emoji Pill Area */}
                 <View style={styles.emojiContainer}>
@@ -194,6 +203,9 @@ const styles = StyleSheet.create({
         width: '100%',
         backgroundColor: COLORS.videoBackground,
         paddingTop: 16,
+    },
+    containerOverlay: {
+        backgroundColor: 'transparent',
     },
     actionBar: {
         flexDirection: 'row',

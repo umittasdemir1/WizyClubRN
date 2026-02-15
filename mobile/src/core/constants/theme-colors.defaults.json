@@ -17,7 +17,6 @@
     "dark": "#080A0F",
     "usage": [
       "mobile/src/presentation/components/story/StoryActions.tsx",
-      "mobile/src/presentation/components/story/StoryPage.tsx",
       "mobile/src/presentation/components/story/StoryViewer.tsx",
       "mobile/src/presentation/components/poolFeed/PoolFeedStatusViews.tsx",
       "mobile/src/presentation/components/poolFeed/PoolFeedManager.styles.ts"

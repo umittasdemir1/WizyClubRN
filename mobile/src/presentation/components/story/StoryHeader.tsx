@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { X } from 'lucide-react-native';
+import { MoreVertical } from 'lucide-react-native';
 import Animated, { useAnimatedStyle, SharedValue } from 'react-native-reanimated';
 import { Story } from '../../../domain/entities/Story';
 import { Avatar } from '../shared/Avatar';
@@ -12,6 +12,7 @@ interface StoryHeaderProps {
     totalStories: number;
     currentStoryIndex: number;
     onClose: () => void;
+    onMorePress?: () => void;
     onCommercialPress?: () => void;
 }
 
@@ -49,8 +50,9 @@ const ProgressBarItem = ({ index, currentStoryIndex, progress }: {
             barProgress = progress.value;
         }
 
+        const clampedProgress = Math.max(0, Math.min(barProgress, 1));
         return {
-            width: `${barProgress * 100}%`,
+            width: `${clampedProgress * 100}%`,
         };
     });
 
@@ -67,6 +69,7 @@ export function StoryHeader({
     totalStories,
     currentStoryIndex,
     onClose,
+    onMorePress,
     onCommercialPress,
 }: StoryHeaderProps) {
     const insets = useSafeAreaInsets();
@@ -103,8 +106,8 @@ export function StoryHeader({
                     <Text style={styles.time}>{getTimeAgo(story.createdAt)}</Text>
                 </View>
 
-                <Pressable onPress={onClose} style={styles.closeButton} hitSlop={12}>
-                    <X color="white" size={24} />
+                <Pressable onPress={onMorePress ?? onClose} style={styles.closeButton} hitSlop={12}>
+                    <MoreVertical color="white" size={22} strokeWidth={2.4} />
                 </Pressable>
             </View>
         </View>
@@ -124,6 +127,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         gap: 4,
         height: 2,
+        marginTop: -5,
         marginBottom: 12,
     },
     progressBarBackground: {

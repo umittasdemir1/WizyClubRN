@@ -2,7 +2,7 @@ import React, { forwardRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Flag, EyeOff, Minimize2, Maximize2, Trash2, LampDesk, GalleryVerticalEnd, Gauge } from 'lucide-react-native';
+import { Flag, EyeOff, Minimize2, Maximize2, Trash2, LampDesk, GalleryVerticalEnd, Gauge, Pencil } from 'lucide-react-native';
 import { useThemeStore } from '../../store/useThemeStore';
 import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
 import { useBrightnessStore } from '../../store/useBrightnessStore';
@@ -12,12 +12,13 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface MoreOptionsSheetProps {
     onCleanScreenPress?: () => void;
+    onEditPress?: () => void;
     onDeletePress?: () => void;
     isCleanScreen?: boolean;
 }
 
 export const MoreOptionsSheet = forwardRef<BottomSheet, MoreOptionsSheetProps>(
-    ({ onCleanScreenPress, onDeletePress, isCleanScreen = false }, ref) => {
+    ({ onCleanScreenPress, onEditPress, onDeletePress, isCleanScreen = false }, ref) => {
     const { isDark } = useThemeStore();
     const insets = useSafeAreaInsets();
     const { brightness, setBrightness } = useBrightnessStore();
@@ -72,6 +73,13 @@ export const MoreOptionsSheet = forwardRef<BottomSheet, MoreOptionsSheetProps>(
 
     const handleDeletePress = () => {
         onDeletePress?.();
+        if (ref && typeof ref !== 'function' && ref.current) {
+            ref.current.close();
+        }
+    };
+
+    const handleEditPress = () => {
+        onEditPress?.();
         if (ref && typeof ref !== 'function' && ref.current) {
             ref.current.close();
         }
@@ -139,6 +147,15 @@ export const MoreOptionsSheet = forwardRef<BottomSheet, MoreOptionsSheetProps>(
                     options={viewingModes.map((mode) => mode.label)}
                     isDark={isDark}
                 />
+                {onEditPress && (
+                    <OptionItem
+                        icon={<Pencil color={textColor} size={24} strokeWidth={1.2} />}
+                        label="Düzenle"
+                        textColor={textColor}
+                        borderColor={borderColor}
+                        onPress={handleEditPress}
+                    />
+                )}
                 {onDeletePress && (
                     <OptionItem
                         icon={<Trash2 color={textColor} size={24} strokeWidth={1.2} />}

@@ -36,6 +36,8 @@ export interface UseFeedActionsOptions {
     toggleShare: (videoId: string) => void;
     /** Delete video function */
     deleteVideo: (videoId: string) => void;
+    /** Open edit screen function */
+    openEditScreen: (videoId: string) => void;
     /** Toggle pause function */
     togglePause: () => void;
     /** Open in-app browser function */
@@ -73,6 +75,8 @@ export interface UseFeedActionsReturn {
     handleCleanScreen: () => void;
     /** Handle delete press */
     handleDeletePress: () => void;
+    /** Handle sheet edit */
+    handleSheetEdit: () => void;
     /** Handle sheet delete */
     handleSheetDelete: () => void;
     /** Confirm delete video */
@@ -120,6 +124,7 @@ export function usePoolFeedActions(options: UseFeedActionsOptions): UseFeedActio
         toggleFollow,
         toggleShare,
         deleteVideo,
+        openEditScreen,
         togglePause,
         openInAppBrowser,
         setCleanScreen,
@@ -281,6 +286,12 @@ export function usePoolFeedActions(options: UseFeedActionsOptions): UseFeedActio
         setDeleteModalVisible(true);
     }, [activeVideoId]);
 
+    const handleSheetEdit = useCallback(() => {
+        if (!activeVideoId) return;
+        moreOptionsSheetRef.current?.close();
+        openEditScreen(activeVideoId);
+    }, [activeVideoId, moreOptionsSheetRef, openEditScreen]);
+
     const handleSheetDelete = useCallback(() => {
         moreOptionsSheetRef.current?.close();
         handleDeletePress();
@@ -329,6 +340,7 @@ export function usePoolFeedActions(options: UseFeedActionsOptions): UseFeedActio
         handleOpenDescription,
         handleCleanScreen,
         handleDeletePress,
+        handleSheetEdit,
         handleSheetDelete,
         confirmDeleteVideo,
         cancelDelete,

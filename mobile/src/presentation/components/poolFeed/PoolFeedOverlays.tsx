@@ -97,6 +97,7 @@ export interface PoolFeedOverlaysProps {
         onStoryAvatarPress: (userId: string) => void;
         onCloseStoryBar: () => void;
         onCleanScreen: () => void;
+        onSheetEdit: () => void;
         onSheetDelete: () => void;
         onFollowPress: () => void;
         onDescriptionChange: (index: number) => void;
@@ -290,6 +291,7 @@ export const PoolFeedOverlays = forwardRef<PoolFeedOverlaysRef, PoolFeedOverlays
                         <MoreOptionsSheet
                             ref={moreOptionsSheetRef}
                             onCleanScreenPress={actions.onCleanScreen}
+                            onEditPress={isOwnActiveVideo ? actions.onSheetEdit : undefined}
                             onDeletePress={isOwnActiveVideo ? actions.onSheetDelete : undefined}
                             isCleanScreen={isCleanScreen}
                         />

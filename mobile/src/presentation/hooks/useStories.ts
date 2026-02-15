@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Story } from '../../domain/entities/Story';
 import { GetStoriesUseCase } from '../../domain/usecases/GetStoriesUseCase';
@@ -6,8 +6,8 @@ import { StoryRepositoryImpl } from '../../data/repositories/StoryRepositoryImpl
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useStoryStore } from '../store/useStoryStore';
 import { useAuthStore } from '../store/useAuthStore';
-import { logStory, LogCode } from '@/core/services/Logger';
-import { QUERY_KEYS } from '../../core/query/queryClient';
+import { supabase } from '../../core/supabase';
+import { queryClient, QUERY_KEYS } from '../../core/query/queryClient';
 
 const storyRepository = new StoryRepositoryImpl();
 const getStoriesUseCase = new GetStoriesUseCase(storyRepository);
@@ -27,16 +27,44 @@ export function useStories(userId?: string, mode?: 'default' | 'infinite' | 'poo
     const refreshTrigger = useStoryStore(state => state.refreshTrigger);
     const viewedUserIds = useStoryStore(state => state.viewedUserIds);
     const currentUser = useAuthStore(state => state.user);
+    const storiesQueryKey = useMemo(
+        () => [...QUERY_KEYS.STORIES, currentUser?.id || 'anon'] as const,
+        [currentUser?.id]
+    );
 
     const {
         data: allStories = [],
         isLoading: isStoriesLoading,
         error
     } = useQuery({
-        queryKey: [...QUERY_KEYS.STORIES, currentUser?.id || 'anon'],
+        queryKey: storiesQueryKey,
         queryFn: () => getStoriesUseCase.execute(currentUser?.id),
         staleTime: 1000 * 30, // 30 seconds
     });
+
+    // Manual refresh trigger (used by upload/delete flows)
+    useEffect(() => {
+        if (refreshTrigger <= 0) return;
+        void queryClient.invalidateQueries({ queryKey: storiesQueryKey });
+    }, [refreshTrigger, storiesQueryKey]);
+
+    // Realtime updates so story ring reacts instantly to insert/delete/update.
+    useEffect(() => {
+        const channel = supabase
+            .channel(`stories-realtime-${mode || 'default'}-${currentUser?.id || 'anon'}`)
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'stories' },
+                () => {
+                    void queryClient.invalidateQueries({ queryKey: storiesQueryKey });
+                }
+            )
+            .subscribe();
+
+        return () => {
+            void supabase.removeChannel(channel);
+        };
+    }, [currentUser?.id, mode, storiesQueryKey]);
 
     // Derived Data: Sorted and Grouped Users
     const { sortedUsers, usersMap } = useMemo(() => {

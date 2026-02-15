@@ -2,19 +2,20 @@ import React, { forwardRef, useCallback, useMemo } from 'react';
 import { Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Flag, EyeOff, Trash2 } from 'lucide-react-native';
+import { Flag, EyeOff, Trash2, Pencil } from 'lucide-react-native';
 import { useThemeStore } from '../../store/useThemeStore';
 import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface InfiniteFeedMoreOptionsSheetProps {
+    onEditPress?: () => void;
     onDeletePress?: () => void;
     onSheetStateChange?: (isOpen: boolean) => void;
 }
 
 export const InfiniteFeedMoreOptionsSheet = forwardRef<BottomSheet, InfiniteFeedMoreOptionsSheetProps>(
-    ({ onDeletePress, onSheetStateChange }, ref) => {
+    ({ onEditPress, onDeletePress, onSheetStateChange }, ref) => {
         const { isDark } = useThemeStore();
         const insets = useSafeAreaInsets();
 
@@ -29,6 +30,12 @@ export const InfiniteFeedMoreOptionsSheet = forwardRef<BottomSheet, InfiniteFeed
 
         const handleDeletePress = () => {
             onDeletePress?.();
+            if (ref && typeof ref !== 'function' && ref.current) {
+                ref.current.close();
+            }
+        };
+        const handleEditPress = () => {
+            onEditPress?.();
             if (ref && typeof ref !== 'function' && ref.current) {
                 ref.current.close();
             }
@@ -56,6 +63,15 @@ export const InfiniteFeedMoreOptionsSheet = forwardRef<BottomSheet, InfiniteFeed
                 handleIndicatorStyle={{ backgroundColor: handleColor }}
             >
                 <BottomSheetView style={styles.contentContainer}>
+                    {onEditPress && (
+                        <OptionItem
+                            icon={<Pencil color={textColor} size={24} strokeWidth={1.2} />}
+                            label="Düzenle"
+                            textColor={textColor}
+                            borderColor={borderColor}
+                            onPress={handleEditPress}
+                        />
+                    )}
                     {onDeletePress && (
                         <OptionItem
                             icon={<Trash2 color={textColor} size={24} strokeWidth={1.2} />}

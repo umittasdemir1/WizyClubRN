@@ -210,9 +210,15 @@ export const PoolFeedManager = ({
         setIsCarouselInteracting,
     });
 
+    const handleOpenEditScreen = useCallback((videoId: string) => {
+        if (!videoId) return;
+        router.push(`/edit?videoId=${encodeURIComponent(videoId)}` as any);
+    }, [router]);
+
     const actionApi = usePoolFeedActions({
         activeVideo, activeVideoId, toggleLike, toggleSave, toggleFollow,
         toggleShare, deleteVideo, togglePause, openInAppBrowser,
+        openEditScreen: handleOpenEditScreen,
         setCleanScreen, isCleanScreen, descriptionSheetRef, moreOptionsSheetRef,
         videoPlayerRef, activeTimeRef: videoCallbacks.activeTimeRef,
         insetTop: insets.top,
@@ -349,6 +355,7 @@ export const PoolFeedManager = ({
         onStoryAvatarPress: (userId: string) => router.push(`/story/${userId}` as any),
         onCloseStoryBar: () => setActiveTab('foryou'),
         onCleanScreen: actionApi.handleCleanScreen,
+        onSheetEdit: actionApi.handleSheetEdit,
         onSheetDelete: actionApi.handleSheetDelete,
         onFollowPress: actionApi.handleToggleFollow,
         onDescriptionChange: (index: number) => index > 0 && !isPaused && togglePause(),

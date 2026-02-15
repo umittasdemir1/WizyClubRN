@@ -17,6 +17,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { useSocialStore } from '../store/useSocialStore';
 import { useStartupStore, initStartupTimer } from '../store/useStartupStore';
 import { useVideoCounterStore } from '../store/useVideoCounterStore';
+import { useVideoEditStore, applyDescriptionOverridesToVideos } from '../store/useVideoEditStore';
 import { useResolvedVideoCounters } from './useResolvedVideoCounters';
 import { isVideoCacheDisabled } from '../../core/utils/videoCacheToggle';
 import { getVideoUrl } from '../../core/utils/videoUrl';
@@ -83,6 +84,19 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
     const syncSocialData = useSocialStore((state) => state.syncSocialData);
     const syncVideoCountersFromServer = useVideoCounterStore((state) => state.syncFromServer);
     const applyVideoCounterDelta = useVideoCounterStore((state) => state.applyLocalCounterDelta);
+    const descriptionByVideoId = useVideoEditStore((state) => state.descriptionByVideoId);
+
+    const setVideosWithDescriptionOverrides = useCallback(
+        (nextVideosOrUpdater: Video[] | ((prevVideos: Video[]) => Video[])) => {
+            setVideos((prevVideos) => {
+                const nextVideos = typeof nextVideosOrUpdater === 'function'
+                    ? nextVideosOrUpdater(prevVideos)
+                    : nextVideosOrUpdater;
+                return applyDescriptionOverridesToVideos(nextVideos, descriptionByVideoId);
+            });
+        },
+        [descriptionByVideoId]
+    );
 
     // Initialize Cache
     useEffect(() => {
@@ -160,6 +174,11 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
         };
     }, []);
 
+    useEffect(() => {
+        if (Object.keys(descriptionByVideoId).length === 0) return;
+        setVideos((prevVideos) => applyDescriptionOverridesToVideos(prevVideos, descriptionByVideoId));
+    }, [descriptionByVideoId]);
+
     const safePageSize = Number.isFinite(pageSize) && pageSize > 0 ? Math.floor(pageSize) : 10;
 
     const fetchFeed = useCallback(async () => {
@@ -170,11 +189,11 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
             // Get fresh userId from store to avoid stale closure
             const freshUserId = useAuthStore.getState().user?.id || 'anon';
             const feedResult = await getVideoFeedUseCase.execute(safePageSize, freshUserId, filterUserId, null);
-            const fetchedVideos = feedResult.videos;
+            const fetchedVideos = applyDescriptionOverridesToVideos(feedResult.videos, descriptionByVideoId);
             syncVideoCountersFromServer(fetchedVideos);
 
             if (isMounted.current) {
-                setVideos(fetchedVideos);
+                setVideosWithDescriptionOverrides(fetchedVideos);
                 setCursor(feedResult.nextCursor);
                 setHasMore(Boolean(feedResult.nextCursor));
 
@@ -198,7 +217,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
                 setIsLoading(false);
             }
         }
-    }, [getVideoFeedUseCase, filterUserId, safePageSize, syncSocialData, syncVideoCountersFromServer]); // Removed currentUserId from dependencies
+    }, [descriptionByVideoId, getVideoFeedUseCase, filterUserId, safePageSize, setVideosWithDescriptionOverrides, syncSocialData, syncVideoCountersFromServer]); // Removed currentUserId from dependencies
 
     const refreshFeed = useCallback(async () => {
         if (isRefreshing) return;
@@ -212,11 +231,11 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
             // Get fresh userId from store
             const freshUserId = useAuthStore.getState().user?.id || 'anon';
             const feedResult = await getVideoFeedUseCase.execute(safePageSize, freshUserId, filterUserId, null);
-            const fetchedVideos = feedResult.videos;
+            const fetchedVideos = applyDescriptionOverridesToVideos(feedResult.videos, descriptionByVideoId);
             syncVideoCountersFromServer(fetchedVideos);
 
             if (isMounted.current) {
-                setVideos(fetchedVideos);
+                setVideosWithDescriptionOverrides(fetchedVideos);
                 setCursor(feedResult.nextCursor);
                 setHasMore(Boolean(feedResult.nextCursor));
 
@@ -240,7 +259,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
                 setIsRefreshing(false);
             }
         }
-    }, [isRefreshing, getVideoFeedUseCase, filterUserId, safePageSize, syncSocialData, syncVideoCountersFromServer]); // Removed currentUserId
+    }, [descriptionByVideoId, isRefreshing, getVideoFeedUseCase, filterUserId, safePageSize, setVideosWithDescriptionOverrides, syncSocialData, syncVideoCountersFromServer]); // Removed currentUserId
 
     const loadMore = useCallback(async () => {
         if (isLoadingMore || !hasMore || isLoading || !cursor) return;
@@ -251,7 +270,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
             // Get fresh userId from store
             const freshUserId = useAuthStore.getState().user?.id || 'anon';
             const feedResult = await getVideoFeedUseCase.execute(safePageSize, freshUserId, filterUserId, cursor);
-            const fetchedVideos = feedResult.videos;
+            const fetchedVideos = applyDescriptionOverridesToVideos(feedResult.videos, descriptionByVideoId);
             syncVideoCountersFromServer(fetchedVideos);
             const isCursorStuck =
                 feedResult.nextCursor?.createdAt === cursor.createdAt &&
@@ -259,7 +278,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
 
             if (isMounted.current) {
                 if (fetchedVideos.length > 0) {
-                    setVideos(prev => {
+                    setVideosWithDescriptionOverrides(prev => {
                         const existingIds = new Set(prev.map((video) => video.id));
                         const uniqueVideos = fetchedVideos.filter((video) => !existingIds.has(video.id));
                         if (!uniqueVideos.length) return prev;
@@ -289,7 +308,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
                 setIsLoadingMore(false);
             }
         }
-    }, [cursor, isLoadingMore, hasMore, isLoading, getVideoFeedUseCase, filterUserId, safePageSize, syncSocialData, syncVideoCountersFromServer]); // Removed currentUserId
+    }, [cursor, descriptionByVideoId, isLoadingMore, hasMore, isLoading, getVideoFeedUseCase, filterUserId, safePageSize, setVideosWithDescriptionOverrides, syncSocialData, syncVideoCountersFromServer]); // Removed currentUserId
 
     // Optimistic Update with Rollback
     const toggleLike = useCallback(async (videoId: string) => {
@@ -311,7 +330,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
         applyVideoCounterDelta(videoId, 'likesCount', likeDelta);
 
         // Optimistic update
-        setVideos((prevVideos) =>
+        setVideosWithDescriptionOverrides((prevVideos) =>
             prevVideos.map((video) => {
                 if (video.id === videoId) {
                     return {
@@ -334,7 +353,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
                 applyVideoCounterDelta(videoId, 'likesCount', correctionDelta);
             }
 
-            setVideos((prevVideos) =>
+            setVideosWithDescriptionOverrides((prevVideos) =>
                 prevVideos.map((video) => {
                     if (video.id === videoId) {
                         return {
@@ -353,7 +372,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
             // Rollback on error
             logError(LogCode.DB_UPDATE, 'Toggle like failed, reverting', err);
             applyVideoCounterDelta(videoId, 'likesCount', -likeDelta);
-            setVideos((prevVideos) =>
+            setVideosWithDescriptionOverrides((prevVideos) =>
                 prevVideos.map((video) => {
                     if (video.id === videoId) {
                         return {
@@ -368,7 +387,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
         } finally {
             pendingLikeVideoIdsRef.current.delete(videoId);
         }
-    }, [applyVideoCounterDelta, toggleLikeUseCase, user, videos]);
+    }, [applyVideoCounterDelta, setVideosWithDescriptionOverrides, toggleLikeUseCase, user, videos]);
 
     const toggleSave = useCallback(async (videoId: string) => {
         if (!user) {
@@ -389,7 +408,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
         applyVideoCounterDelta(videoId, 'savesCount', saveDelta);
 
         // Optimistic update
-        setVideos((prevVideos) =>
+        setVideosWithDescriptionOverrides((prevVideos) =>
             prevVideos.map((video) => {
                 if (video.id === videoId) {
                     return {
@@ -412,7 +431,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
                 applyVideoCounterDelta(videoId, 'savesCount', correctionDelta);
             }
 
-            setVideos((prevVideos) =>
+            setVideosWithDescriptionOverrides((prevVideos) =>
                 prevVideos.map((video) => {
                     if (video.id === videoId) {
                         return {
@@ -432,7 +451,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
             logError(LogCode.DB_UPDATE, 'Toggle save failed, reverting', err);
             applyVideoCounterDelta(videoId, 'savesCount', -saveDelta);
             // Rollback
-            setVideos((prevVideos) =>
+            setVideosWithDescriptionOverrides((prevVideos) =>
                 prevVideos.map((video) => {
                     if (video.id === videoId) {
                         return {
@@ -447,7 +466,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
         } finally {
             pendingSaveVideoIdsRef.current.delete(videoId);
         }
-    }, [applyVideoCounterDelta, toggleSaveUseCase, user, videos]);
+    }, [applyVideoCounterDelta, setVideosWithDescriptionOverrides, toggleSaveUseCase, user, videos]);
 
     const counterResolvedVideos = useResolvedVideoCounters(videos);
 
@@ -493,7 +512,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
 
     const incrementShareCount = useCallback(async (videoId: string) => {
         applyVideoCounterDelta(videoId, 'sharesCount', 1);
-        setVideos((prevVideos) =>
+        setVideosWithDescriptionOverrides((prevVideos) =>
             prevVideos.map((video) => {
                 if (video.id === videoId) {
                     return {
@@ -517,7 +536,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
         } catch (error) {
             logError(LogCode.DB_UPDATE, 'Failed to sync share count', error);
         }
-    }, [applyVideoCounterDelta]);
+    }, [applyVideoCounterDelta, setVideosWithDescriptionOverrides]);
 
     const toggleShare = useCallback(async (videoId: string) => {
         const video = videos.find(v => v.id === videoId);
@@ -536,7 +555,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
 
     const toggleShop = useCallback((videoId: string) => {
         applyVideoCounterDelta(videoId, 'shopsCount', 1);
-        setVideos((prevVideos) =>
+        setVideosWithDescriptionOverrides((prevVideos) =>
             prevVideos.map((video) => {
                 if (video.id === videoId) {
                     return {
@@ -547,7 +566,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
                 return video;
             })
         );
-    }, [applyVideoCounterDelta]);
+    }, [applyVideoCounterDelta, setVideosWithDescriptionOverrides]);
 
     const deleteVideo = useCallback(async (videoId: string) => {
         // 1. Get current state
@@ -578,7 +597,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
         }
 
         // 4. Optimistic Update - Remove from list
-        setVideos((prev) => prev.filter(v => v.id !== videoId));
+        setVideosWithDescriptionOverrides((prev) => prev.filter(v => v.id !== videoId));
 
         // 5. Network call (background) with JWT authentication for HARD DELETE
         try {
@@ -612,15 +631,15 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
         } catch (error: any) {
             logError(LogCode.DB_DELETE, 'Video delete failed, rolling back', error);
             // Rollback on failure
-            setVideos(currentVideos);
+            setVideosWithDescriptionOverrides(currentVideos);
             Alert.alert("Silme Başarısız", error.message || "Bilinmeyen hata");
         }
-    }, [videos]);
+    }, [setVideosWithDescriptionOverrides, videos]);
 
     // 🔥 Prepend a newly uploaded video to the top of the feed
     const prependVideo = useCallback((newVideo: Video) => {
         syncVideoCountersFromServer([newVideo]);
-        setVideos(current => {
+        setVideosWithDescriptionOverrides(current => {
             // Prevent duplicates
             if (current.some(v => v.id === newVideo.id)) {
                 logData(LogCode.REPO_SAVE, 'Video already exists, skipping prepend', { videoId: newVideo.id });
@@ -633,7 +652,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
         // Invalidate profile for upload count parity
         const freshUserId = useAuthStore.getState().user?.id || 'anon';
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PROFILE(freshUserId) });
-    }, [syncVideoCountersFromServer]);
+    }, [setVideosWithDescriptionOverrides, syncVideoCountersFromServer]);
 
     // ✅ [PERF] Unified fetch effect
     // This handles both the initial load AND user changes (login/logout/switch)

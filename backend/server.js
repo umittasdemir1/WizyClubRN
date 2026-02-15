@@ -731,6 +731,192 @@ function deriveLegacyVideoIdFromKey(key) {
     return null;
 }
 
+function buildStoryCleanupTargets(story) {
+    const objectKeysToDelete = new Set();
+    const folderPrefixesToClean = new Set();
+
+    const registerCleanupTarget = (value) => {
+        const key = extractR2KeyFromValue(value);
+        if (!key) return;
+        objectKeysToDelete.add(key);
+
+        const slashIndex = key.lastIndexOf('/');
+        if (slashIndex > 0) {
+            folderPrefixesToClean.add(key.slice(0, slashIndex));
+        }
+    };
+
+    if (story && typeof story === 'object') {
+        registerCleanupTarget(story.video_url);
+        registerCleanupTarget(story.thumbnail_url);
+
+        const mediaUrls = parseMediaUrlsField(story.media_urls);
+        for (const mediaItem of mediaUrls) {
+            if (!mediaItem || typeof mediaItem !== 'object') continue;
+            registerCleanupTarget(mediaItem.url);
+            registerCleanupTarget(mediaItem.thumbnail);
+            registerCleanupTarget(mediaItem.sprite);
+        }
+    }
+
+    return { objectKeysToDelete, folderPrefixesToClean };
+}
+
+function splitIntoChunks(values, size) {
+    const chunks = [];
+    for (let i = 0; i < values.length; i += size) {
+        chunks.push(values.slice(i, i + size));
+    }
+    return chunks;
+}
+
+async function deleteR2ObjectsUnderPrefix(prefix) {
+    let deletedCount = 0;
+    let continuationToken = undefined;
+    const normalizedPrefix = prefix.endsWith('/') ? prefix : `${prefix}/`;
+
+    do {
+        const listRes = await r2.send(new ListObjectsV2Command({
+            Bucket: process.env.R2_BUCKET_NAME,
+            Prefix: normalizedPrefix,
+            ContinuationToken: continuationToken,
+        }));
+
+        const listedKeys = Array.isArray(listRes.Contents)
+            ? listRes.Contents
+                .map((obj) => obj?.Key)
+                .filter((key) => typeof key === 'string' && key.length > 0)
+            : [];
+
+        for (const keyChunk of splitIntoChunks(listedKeys, 1000)) {
+            if (keyChunk.length === 0) continue;
+            await r2.send(new DeleteObjectsCommand({
+                Bucket: process.env.R2_BUCKET_NAME,
+                Delete: {
+                    Objects: keyChunk.map((Key) => ({ Key })),
+                },
+            }));
+            deletedCount += keyChunk.length;
+        }
+
+        continuationToken = listRes.IsTruncated ? listRes.NextContinuationToken : undefined;
+    } while (continuationToken);
+
+    return deletedCount;
+}
+
+async function cleanupStoryAssetsFromR2(story, options = {}) {
+    const { scope = 'STORY_CLEANUP', storyId = story?.id } = options;
+    const { objectKeysToDelete, folderPrefixesToClean } = buildStoryCleanupTargets(story);
+    const cleanedPrefixes = new Set();
+    let deletedCount = 0;
+
+    for (const folderPrefix of folderPrefixesToClean) {
+        const normalizedPrefix = folderPrefix.endsWith('/') ? folderPrefix : `${folderPrefix}/`;
+        try {
+            deletedCount += await deleteR2ObjectsUnderPrefix(normalizedPrefix);
+            cleanedPrefixes.add(normalizedPrefix);
+        } catch (error) {
+            logLine('WARN', scope, 'R2 prefix cleanup failed', {
+                storyId,
+                folderPrefix: normalizedPrefix,
+                error: error?.message || error,
+            });
+            throw error;
+        }
+    }
+
+    const directKeys = Array.from(objectKeysToDelete).filter((key) =>
+        !Array.from(cleanedPrefixes).some((prefix) => key.startsWith(prefix))
+    );
+
+    for (const keyChunk of splitIntoChunks(directKeys, 1000)) {
+        if (keyChunk.length === 0) continue;
+        try {
+            await r2.send(new DeleteObjectsCommand({
+                Bucket: process.env.R2_BUCKET_NAME,
+                Delete: {
+                    Objects: keyChunk.map((Key) => ({ Key })),
+                },
+            }));
+            deletedCount += keyChunk.length;
+        } catch (error) {
+            logLine('WARN', scope, 'R2 direct key cleanup failed', {
+                storyId,
+                keyCount: keyChunk.length,
+                error: error?.message || error,
+            });
+            throw error;
+        }
+    }
+
+    return { deletedCount };
+}
+
+// Endpoint: DELETE Story (Hard Delete)
+app.delete('/stories/:id', async (req, res) => {
+    const storyId = req.params.id;
+
+    logBanner('DELETE STORY REQUEST', [
+        `Story ID: ${storyId}`,
+        'Mode: HARD DELETE (Permanent)',
+    ]);
+
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Authorization header required' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const dbClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY, {
+        global: { headers: { Authorization: `Bearer ${token}` } },
+    });
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+        return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
+    try {
+        const { data: story, error: fetchError } = await dbClient
+            .from('stories')
+            .select('id, user_id, video_url, thumbnail_url, media_urls')
+            .eq('id', storyId)
+            .single();
+
+        if (fetchError || !story) {
+            return res.status(404).json({ error: 'Story not found' });
+        }
+
+        if (story.user_id !== user.id) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
+        await cleanupStoryAssetsFromR2(story, { scope: 'DELETE_STORY', storyId });
+
+        const { data: deletedRows, error: deleteError } = await dbClient
+            .from('stories')
+            .delete()
+            .eq('id', storyId)
+            .eq('user_id', user.id)
+            .select('id');
+
+        if (deleteError) throw deleteError;
+        if (!deletedRows || deletedRows.length === 0) {
+            return res.status(404).json({ error: 'Story not found' });
+        }
+
+        logLine('OK', 'DELETE_STORY', 'Story hard deleted', { storyId, userId: user.id });
+        return res.json({ success: true, message: 'Story deleted permanently' });
+    } catch (error) {
+        logLine('ERR', 'DELETE_STORY', 'Story hard delete failed', {
+            storyId,
+            error: error?.message || error,
+        });
+        return res.status(500).json({ error: error.message || 'Internal server error' });
+    }
+});
+
 
 // Endpoint: DELETE Video (Soft Delete by default)
 app.delete('/videos/:id', async (req, res) => {
@@ -1261,7 +1447,80 @@ app.delete('/drafts/:id', async (req, res) => {
     }
 });
 
+const STORY_CLEANUP_INTERVAL_MS = 30 * 60 * 1000;
+const STORY_CLEANUP_DELETE_BATCH_SIZE = 200;
 const DRAFT_CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+async function cleanupExpiredStoriesInternal() {
+    const nowIso = new Date().toISOString();
+    const { data: expiredStories, error: fetchError } = await supabase
+        .from('stories')
+        .select('id, user_id, video_url, thumbnail_url, media_urls, expires_at')
+        .lt('expires_at', nowIso)
+        .order('expires_at', { ascending: true });
+
+    if (fetchError) throw fetchError;
+
+    if (!expiredStories || expiredStories.length === 0) {
+        return { deletedCount: 0, failedCount: 0, deletedR2Objects: 0 };
+    }
+
+    const deletableStoryIds = [];
+    const failedStoryIds = [];
+    let deletedR2Objects = 0;
+
+    for (const story of expiredStories) {
+        try {
+            const cleanup = await cleanupStoryAssetsFromR2(story, {
+                scope: 'STORY_CLEANUP',
+                storyId: story.id,
+            });
+            deletedR2Objects += cleanup.deletedCount || 0;
+            deletableStoryIds.push(story.id);
+        } catch (error) {
+            failedStoryIds.push(story.id);
+            logLine('WARN', 'STORY_CLEANUP', 'Skipping story hard delete because R2 cleanup failed', {
+                storyId: story.id,
+                error: error?.message || error,
+            });
+        }
+    }
+
+    let deletedCount = 0;
+    for (const storyIdChunk of splitIntoChunks(deletableStoryIds, STORY_CLEANUP_DELETE_BATCH_SIZE)) {
+        if (storyIdChunk.length === 0) continue;
+
+        const { data: deletedRows, error: deleteError } = await supabase
+            .from('stories')
+            .delete()
+            .in('id', storyIdChunk)
+            .select('id');
+
+        if (deleteError) throw deleteError;
+        deletedCount += deletedRows?.length || 0;
+    }
+
+    logLine('INFO', 'STORY_CLEANUP', 'Expired stories cleaned', {
+        expiredCount: expiredStories.length,
+        deletedCount,
+        failedCount: failedStoryIds.length,
+        deletedR2Objects,
+    });
+
+    return { deletedCount, failedCount: failedStoryIds.length, deletedR2Objects };
+}
+
+function startStoryCleanupScheduler() {
+    cleanupExpiredStoriesInternal().catch((error) => {
+        logLine('ERR', 'STORY_CLEANUP', 'Scheduled cleanup failed', { error: error?.message || error });
+    });
+
+    setInterval(() => {
+        cleanupExpiredStoriesInternal().catch((error) => {
+            logLine('ERR', 'STORY_CLEANUP', 'Scheduled cleanup failed', { error: error?.message || error });
+        });
+    }, STORY_CLEANUP_INTERVAL_MS);
+}
 
 async function cleanupExpiredDraftsInternal() {
     const { data, error } = await supabase
@@ -1288,6 +1547,17 @@ function startDraftCleanupScheduler() {
         });
     }, DRAFT_CLEANUP_INTERVAL_MS);
 }
+
+// Cleanup expired stories (hard delete + R2 cleanup)
+app.post('/stories/cleanup', async (req, res) => {
+    try {
+        const result = await cleanupExpiredStoriesInternal();
+        res.json({ success: true, ...result });
+    } catch (error) {
+        logLine('ERR', 'STORY_CLEANUP', 'Manual cleanup failed', { error: error?.message || error });
+        res.status(500).json({ error: 'Failed to cleanup stories' });
+    }
+});
 
 // Cleanup expired drafts (cron job endpoint)
 app.post('/drafts/cleanup', async (req, res) => {
@@ -1319,5 +1589,6 @@ app.listen(PORT, '0.0.0.0', () => {
         'Status       : Ready to accept uploads',
     ]);
 
+    startStoryCleanupScheduler();
     startDraftCleanupScheduler();
 });

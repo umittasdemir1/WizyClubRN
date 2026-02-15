@@ -12,20 +12,12 @@
 - Double-border effect: none (single ring stroke only).
 
 ## Active Palette (clockwise, starts from top)
-1. `#EDA65D`
-2. `#E6CF67`
-3. `#BFD576`
-4. `#99D3D6`
-5. `#A9BCE8`
-6. `#B8A4E6`
-7. `#DE86B8`
-8. `#F26B60`
-9. `#D77FBD`
-10. `#9FADE6`
-11. `#86BFE7`
-12. `#A9D776`
-13. `#E5CA67`
-14. `#EDA65D` (loop close)
+1. `#FF416C`
+2. `#FF9068`
+3. `#FFD93D`
+4. `#6BCF7F`
+5. `#4D96FF`
+6. `#FF416C` (loop close)
 
 ## Geometry + Rendering
 - Start angle: `-90deg` (top).
