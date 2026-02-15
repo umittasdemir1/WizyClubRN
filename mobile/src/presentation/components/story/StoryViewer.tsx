@@ -23,6 +23,7 @@ import { StoryHeader } from './StoryHeader';
 import { StoryActions } from './StoryActions';
 import { FlyingEmoji } from './FlyingEmoji';
 import { StoryMoreOptionsSheet } from './StoryMoreOptionsSheet';
+import { StoryDeleteConfirmationModal } from './StoryDeleteConfirmationModal';
 import { useRouter } from 'expo-router';
 import PagerView from '../shared/PagerView';
 import { CONFIG } from '../../../core/config';
@@ -32,7 +33,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { StoryRepositoryImpl } from '../../../data/repositories/StoryRepositoryImpl';
 import { useInAppBrowserStore } from '../../store/useInAppBrowserStore';
 import { useActiveVideoStore } from '../../store/useActiveVideoStore';
-import { logError, LogCode } from '@/core/services/Logger';
+import { logError, LogCode } from '../../../core/services/Logger';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('screen');
 const IMAGE_STORY_DURATION_MS = 5000;
@@ -87,6 +88,7 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
     const [isPaused, setIsPaused] = useState(false);
     const [isLiked, setIsLiked] = useState(stories[initialIndex]?.isLiked || false);
     const [isMoreSheetOpen, setIsMoreSheetOpen] = useState(false);
+    const [isDeleteConfirmationVisible, setIsDeleteConfirmationVisible] = useState(false);
     const [isDeletingStory, setIsDeletingStory] = useState(false);
     const [deletedOriginalStoryIds, setDeletedOriginalStoryIds] = useState<Set<string>>(new Set());
     const [flyingEmojis, setFlyingEmojis] = useState<FlyingEmojiData[]>([]);
@@ -283,8 +285,20 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
         }
     }, [dragTranslateY]);
 
+    const handleOpenDeleteConfirmation = useCallback(() => {
+        setIsDeleteConfirmationVisible(true);
+        setIsPaused(true);
+    }, []);
+
+    const handleCancelDelete = useCallback(() => {
+        setIsDeleteConfirmationVisible(false);
+        setIsPaused(false);
+    }, []);
+
     const handleDeleteStory = useCallback(async () => {
         if (!isOwnStory || !activeStory?.originalId || isDeletingStory) return;
+
+        setIsDeleteConfirmationVisible(false);
 
         const token = useAuthStore.getState().session?.access_token;
         if (!token) {
@@ -780,10 +794,16 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
                 <StoryMoreOptionsSheet
                     ref={moreOptionsSheetRef}
                     isOwnStory={isOwnStory}
-                    onDeletePress={isOwnStory ? handleDeleteStory : undefined}
+                    onDeletePress={isOwnStory ? handleOpenDeleteConfirmation : undefined}
                     onSheetStateChange={handleMoreSheetStateChange}
                 />
             </View>
+
+            {/* <StoryDeleteConfirmationModal
+                visible={isDeleteConfirmationVisible}
+                onCancel={handleCancelDelete}
+                onConfirm={handleDeleteStory}
+            /> */}
 
             {flyingEmojis.map((emojiData) => (
                 <FlyingEmoji

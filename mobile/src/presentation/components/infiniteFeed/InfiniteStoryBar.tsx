@@ -49,7 +49,6 @@ export const InfiniteStoryBar = memo(function InfiniteStoryBar({
                 id: profileUser.id,
                 username: profileUser.username,
                 avatarUrl: profileUser.avatarUrl,
-                hasStory: Boolean(profileUser.hasStories),
             };
         }
         if (authUser) {
@@ -58,7 +57,6 @@ export const InfiniteStoryBar = memo(function InfiniteStoryBar({
                 id: authUser.id,
                 username,
                 avatarUrl: DEFAULT_AVATAR,
-                hasStory: false,
             };
         }
         return null;
@@ -91,7 +89,9 @@ export const InfiniteStoryBar = memo(function InfiniteStoryBar({
                 username: 'Hikayen',
                 avatarUrl: displayAvatar,
                 hasUnseenStory: selfInList ? selfInList.hasUnseenStory : false,
-                hasStory: Boolean(selfInList || currentUserDisplay.hasStory),
+                // Source of truth: current stories list only.
+                // Avoid profile.hasStories cache lag after delete.
+                hasStory: Boolean(selfInList),
             });
         }
 
@@ -122,7 +122,10 @@ export const InfiniteStoryBar = memo(function InfiniteStoryBar({
                                 textColor={textColor}
                                 showCreateButton={isCurrentUser}
                                 onCreatePress={onCreateStoryPress}
-                                onPress={() => onAvatarPress(item.id)}
+                                onPress={() => {
+                                    if (!item.hasStory) return;
+                                    onAvatarPress(item.id);
+                                }}
                             />
                         );
                     })}

@@ -158,7 +158,15 @@ const r2 = new S3Client({
 });
 
 logLine('BOOT', 'INIT', 'Initializing Supabase client');
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
+
+if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    logLine('INFO', 'INIT', 'Using Service Role Key for backend operations (RLS Bypass)');
+} else {
+    logLine('WARN', 'INIT', 'Service Role Key not found! Using Anon Key. RLS policies may block writes.');
+}
+
+const supabase = createClient(process.env.SUPABASE_URL, supabaseKey);
 
 // Swagger / OpenAPI docs (local)
 const openApiPath = path.join(__dirname, 'docs', 'openapi.yaml');

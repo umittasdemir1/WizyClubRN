@@ -248,6 +248,8 @@ export function InfiniteFeedManager({
     }, [currentUserId, router]);
 
     const handleStoryAvatarPress = useCallback((userId: string) => {
+        // StoryBar already gates presses with hasStory; avoid a second guard here
+        // because it can become stale and block valid story navigation.
         router.push(`/story/${userId}` as any);
     }, [router]);
 
