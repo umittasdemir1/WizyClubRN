@@ -1075,6 +1075,7 @@ export function InfiniteFeedManager({
                         colors={themeColors}
                         insetTop={insets.top}
                         onUploadPress={() => router.push('/upload')}
+                        onCreateStoryPress={() => router.push('/storyUpload')}
                         onNotificationPress={() => router.push('/notifications')}
                         storyUsers={storyUsers}
                         onStoryAvatarPress={handleStoryAvatarPress}

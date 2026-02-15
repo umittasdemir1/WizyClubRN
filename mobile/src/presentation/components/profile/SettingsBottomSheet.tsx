@@ -91,7 +91,7 @@ export const SettingsBottomSheet = forwardRef<BottomSheet, SettingsBottomSheetPr
               <View style={styles.settingInfo}>
                 <Text style={[styles.settingLabel, { color: textColor }]}>Yakınlarda Silinenler</Text>
                 <Text style={[styles.settingValue, { color: secondaryColor }]}>
-                  Son 15 gün içinde silinenleri geri yükle
+                  Silinen içerikleri geri yükle
                 </Text>
               </View>
               {/* Chevron or icon */}

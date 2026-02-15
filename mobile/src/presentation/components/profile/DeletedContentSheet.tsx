@@ -11,8 +11,12 @@ interface DeletedContentMenuProps {
     isActive: boolean;
 }
 
+type ContentTab = 'videos' | 'stories';
+
 export const DeletedContentMenu = ({ isDark, isActive }: DeletedContentMenuProps) => {
+    const [activeTab, setActiveTab] = useState<ContentTab>('videos');
     const [deletedVideos, setDeletedVideos] = useState<any[]>([]);
+    const [deletedStories, setDeletedStories] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const metaColor = isDark ? '#9a9aa0' : '#6b6b72';
     const textColor = isDark ? '#f2f2f4' : '#121214';
@@ -21,10 +25,10 @@ export const DeletedContentMenu = ({ isDark, isActive }: DeletedContentMenuProps
     const actionBg = isDark ? '#2c2c2e' : '#ededf0';
     const dangerBg = '#FF3B30';
     const dangerText = '#FFFFFF';
+    const tabActiveBg = isDark ? '#3a3a3e' : '#e0e0e4';
+    const tabInactiveBg = isDark ? '#1c1c1e' : '#f2f2f5';
 
     const fetchDeletedVideos = async () => {
-        setIsLoading(true);
-        // Supabase NOT query: we want deleted_at NOT null
         const { data } = await supabase
             .from('videos')
             .select('*')
@@ -34,25 +38,52 @@ export const DeletedContentMenu = ({ isDark, isActive }: DeletedContentMenuProps
         if (data) {
             setDeletedVideos(data);
         }
+    };
+
+    const fetchDeletedStories = async () => {
+        try {
+            const { useAuthStore } = require('../../store/useAuthStore');
+            const token = useAuthStore.getState().session?.access_token;
+            if (!token) return;
+
+            const response = await fetch(`${CONFIG.API_URL}/stories/recently-deleted`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+            const result = await response.json();
+            if (result.success && result.data) {
+                setDeletedStories(result.data);
+            }
+        } catch (e) {
+            logError(LogCode.DB_QUERY_ERROR, 'Failed to fetch deleted stories', { error: e });
+        }
+    };
+
+    const fetchAll = async () => {
+        setIsLoading(true);
+        await Promise.all([fetchDeletedVideos(), fetchDeletedStories()]);
         setIsLoading(false);
     };
 
     useEffect(() => {
         if (isActive) {
-            fetchDeletedVideos();
+            fetchAll();
         }
     }, [isActive]);
 
-    const handleRestore = async (id: string) => {
+    // ---- Video Actions ----
+    const handleRestoreVideo = async (id: string) => {
         try {
-            // Call Backend Restore Endpoint
             const response = await fetch(`${CONFIG.API_URL}/videos/${id}/restore`, {
                 method: 'POST',
             });
             const result = await response.json();
             if (result.success) {
                 Alert.alert("Başarılı", "Video başarıyla geri yüklendi!");
-                fetchDeletedVideos(); // Refresh list
+                fetchDeletedVideos();
             } else {
                 Alert.alert("Hata", "Geri yükleme başarısız oldu.");
             }
@@ -61,7 +92,7 @@ export const DeletedContentMenu = ({ isDark, isActive }: DeletedContentMenuProps
         }
     };
 
-    const handlePermanentDelete = async (id: string) => {
+    const handlePermanentDeleteVideo = async (id: string) => {
         Alert.alert(
             "Kalıcı Olarak Sil?",
             "Bu işlem geri alınamaz.",
@@ -72,7 +103,6 @@ export const DeletedContentMenu = ({ isDark, isActive }: DeletedContentMenuProps
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            // 🔥 Get auth token for authenticated delete
                             const { useAuthStore } = require('../../store/useAuthStore');
                             const token = useAuthStore.getState().session?.access_token;
                             logVideo(LogCode.VIDEO_DELETE_PERMANENT, 'Permanent delete initiated', {
@@ -80,7 +110,6 @@ export const DeletedContentMenu = ({ isDark, isActive }: DeletedContentMenuProps
                                 hasToken: !!token
                             });
 
-                            // Call Backend DELETE with ?force=true + Auth header
                             const response = await fetch(`${CONFIG.API_URL}/videos/${id}?force=true`, {
                                 method: 'DELETE',
                                 headers: {
@@ -101,14 +130,86 @@ export const DeletedContentMenu = ({ isDark, isActive }: DeletedContentMenuProps
         );
     };
 
-    const getDaysLeft = (deletedAt: string) => {
+    // ---- Story Actions ----
+    const handleRestoreStory = async (id: string) => {
+        try {
+            const { useAuthStore } = require('../../store/useAuthStore');
+            const token = useAuthStore.getState().session?.access_token;
+            if (!token) {
+                Alert.alert("Hata", "Oturum bulunamadı.");
+                return;
+            }
+
+            const response = await fetch(`${CONFIG.API_URL}/stories/${id}/restore`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+            const result = await response.json();
+            if (result.success) {
+                Alert.alert("Başarılı", "Hikaye başarıyla geri yüklendi!");
+                fetchDeletedStories();
+            } else {
+                Alert.alert("Hata", result.error || "Geri yükleme başarısız oldu.");
+            }
+        } catch (e) {
+            Alert.alert("Hata", "Bir sorun oluştu.");
+        }
+    };
+
+    const handlePermanentDeleteStory = async (id: string) => {
+        Alert.alert(
+            "Kalıcı Olarak Sil?",
+            "Bu işlem geri alınamaz. Hikaye hem veritabanından hem depolamadan kalıcı olarak silinir.",
+            [
+                { text: "Vazgeç", style: 'cancel' },
+                {
+                    text: "Sil",
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            const { useAuthStore } = require('../../store/useAuthStore');
+                            const token = useAuthStore.getState().session?.access_token;
+                            if (!token) return;
+
+                            const response = await fetch(`${CONFIG.API_URL}/stories/${id}?force=true`, {
+                                method: 'DELETE',
+                                headers: {
+                                    'Authorization': `Bearer ${token}`,
+                                    'Content-Type': 'application/json',
+                                },
+                            });
+                            const result = await response.json();
+                            if (result.success) {
+                                fetchDeletedStories();
+                            }
+                        } catch (e) {
+                            logError(LogCode.DB_DELETE, 'Story permanent delete failed', { error: e, storyId: id });
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    // ---- Time helpers ----
+    const getVideoDaysLeft = (deletedAt: string) => {
         const deletedAtMs = new Date(deletedAt).getTime();
         const diffDays = Math.floor((Date.now() - deletedAtMs) / (1000 * 60 * 60 * 24));
         return Math.max(0, 15 - diffDays);
     };
 
-    const renderItem = ({ item }: { item: any }) => (
-        <View style={[styles.itemContainer, { borderBottomColor: separatorColor }]}>
+    const getStoryHoursLeft = (deletedAt: string) => {
+        const deletedAtMs = new Date(deletedAt).getTime();
+        const diffHours = (Date.now() - deletedAtMs) / (1000 * 60 * 60);
+        return Math.max(0, Math.ceil(24 - diffHours));
+    };
+
+    // ---- Render items ----
+    const renderVideoItem = (item: any) => (
+        <View key={item.id} style={[styles.itemContainer, { borderBottomColor: separatorColor }]}>
             <Image
                 source={{ uri: item.thumbnail_url }}
                 style={[styles.thumbnail, { borderColor: thumbnailBorder }]}
@@ -121,21 +222,21 @@ export const DeletedContentMenu = ({ isDark, isActive }: DeletedContentMenuProps
                     </Text>
                     <View style={[styles.daysLeftPill, { backgroundColor: actionBg }]}>
                         <Text style={[styles.daysLeftText, { color: '#FFFFFF' }]}>
-                            {getDaysLeft(item.deleted_at) === 0 ? 'Süre doldu' : `${getDaysLeft(item.deleted_at)} gün kaldı`}
+                            {getVideoDaysLeft(item.deleted_at) === 0 ? 'Süre doldu' : `${getVideoDaysLeft(item.deleted_at)} gün kaldı`}
                         </Text>
                     </View>
                 </View>
                 <View style={styles.actionsRow}>
                     <TouchableOpacity
                         style={[styles.actionButton, { backgroundColor: actionBg }]}
-                        onPress={() => handleRestore(item.id)}
+                        onPress={() => handleRestoreVideo(item.id)}
                     >
                         <RotateCcw size={18} color={textColor} strokeWidth={1.2} />
                         <Text style={[styles.actionText, { color: textColor }]}>Geri yükle</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={[styles.actionButton, { backgroundColor: dangerBg }]}
-                        onPress={() => handlePermanentDelete(item.id)}
+                        onPress={() => handlePermanentDeleteVideo(item.id)}
                     >
                         <Trash2 size={18} color={dangerText} strokeWidth={1.2} />
                         <Text style={[styles.actionText, { color: dangerText }]}>Kalıcı sil</Text>
@@ -145,11 +246,88 @@ export const DeletedContentMenu = ({ isDark, isActive }: DeletedContentMenuProps
         </View>
     );
 
+    const renderStoryItem = (item: any) => {
+        const hoursLeft = getStoryHoursLeft(item.deleted_at);
+        return (
+            <View key={item.id} style={[styles.itemContainer, { borderBottomColor: separatorColor }]}>
+                <Image
+                    source={{ uri: item.thumbnail_url }}
+                    style={[styles.thumbnail, { borderColor: thumbnailBorder }]}
+                    contentFit="cover"
+                />
+                <View style={styles.infoContainer}>
+                    <View style={styles.metaRow}>
+                        <Text style={[styles.dateText, { color: '#FFFFFF' }]}>
+                            Silinme: {new Date(item.deleted_at).toLocaleDateString()}
+                        </Text>
+                        <View style={[styles.daysLeftPill, { backgroundColor: hoursLeft <= 2 ? dangerBg : actionBg }]}>
+                            <Text style={[styles.daysLeftText, { color: '#FFFFFF' }]}>
+                                {hoursLeft === 0 ? 'Süre doldu' : `${hoursLeft} saat kaldı`}
+                            </Text>
+                        </View>
+                    </View>
+                    <View style={styles.actionsRow}>
+                        <TouchableOpacity
+                            style={[styles.actionButton, { backgroundColor: actionBg }]}
+                            onPress={() => handleRestoreStory(item.id)}
+                        >
+                            <RotateCcw size={18} color={textColor} strokeWidth={1.2} />
+                            <Text style={[styles.actionText, { color: textColor }]}>Geri yükle</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.actionButton, { backgroundColor: dangerBg }]}
+                            onPress={() => handlePermanentDeleteStory(item.id)}
+                        >
+                            <Trash2 size={18} color={dangerText} strokeWidth={1.2} />
+                            <Text style={[styles.actionText, { color: dangerText }]}>Kalıcı sil</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </View>
+        );
+    };
+
+    const currentItems = activeTab === 'videos' ? deletedVideos : deletedStories;
+
     return (
         <View style={styles.container}>
+            {/* Tab switcher */}
+            <View style={[styles.tabContainer, { backgroundColor: tabInactiveBg }]}>
+                <TouchableOpacity
+                    style={[
+                        styles.tab,
+                        activeTab === 'videos' && { backgroundColor: tabActiveBg },
+                    ]}
+                    onPress={() => setActiveTab('videos')}
+                >
+                    <Text style={[
+                        styles.tabText,
+                        { color: activeTab === 'videos' ? textColor : metaColor },
+                    ]}>
+                        Videolar {deletedVideos.length > 0 ? `(${deletedVideos.length})` : ''}
+                    </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={[
+                        styles.tab,
+                        activeTab === 'stories' && { backgroundColor: tabActiveBg },
+                    ]}
+                    onPress={() => setActiveTab('stories')}
+                >
+                    <Text style={[
+                        styles.tabText,
+                        { color: activeTab === 'stories' ? textColor : metaColor },
+                    ]}>
+                        Hikayeler {deletedStories.length > 0 ? `(${deletedStories.length})` : ''}
+                    </Text>
+                </TouchableOpacity>
+            </View>
+
             <View style={styles.header}>
                 <Text style={[styles.subtitle, { color: metaColor }]}>
-                    Silinen videolar 15 gün içinde geri yüklenebilir.
+                    {activeTab === 'videos'
+                        ? 'Silinen videolar 15 gün içinde geri yüklenebilir.'
+                        : 'Silinen hikayeler 24 saat içinde geri yüklenebilir.'}
                 </Text>
             </View>
 
@@ -157,15 +335,18 @@ export const DeletedContentMenu = ({ isDark, isActive }: DeletedContentMenuProps
                 <View style={styles.emptyState}>
                     <Text style={{ color: metaColor }}>Yükleniyor...</Text>
                 </View>
-            ) : deletedVideos.length === 0 ? (
+            ) : currentItems.length === 0 ? (
                 <View style={styles.emptyState}>
-                    <Text style={{ color: metaColor }}>Silinen içerik yok.</Text>
+                    <Text style={{ color: metaColor }}>
+                        {activeTab === 'videos' ? 'Silinen video yok.' : 'Silinen hikaye yok.'}
+                    </Text>
                 </View>
             ) : (
                 <View style={styles.listContainer}>
-                    {deletedVideos.map((item) => (
-                        <View key={item.id}>{renderItem({ item })}</View>
-                    ))}
+                    {activeTab === 'videos'
+                        ? deletedVideos.map((item) => renderVideoItem(item))
+                        : deletedStories.map((item) => renderStoryItem(item))
+                    }
                 </View>
             )}
         </View>
@@ -175,6 +356,24 @@ export const DeletedContentMenu = ({ isDark, isActive }: DeletedContentMenuProps
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+    },
+    tabContainer: {
+        flexDirection: 'row',
+        marginHorizontal: 16,
+        marginBottom: 12,
+        borderRadius: 10,
+        padding: 3,
+    },
+    tab: {
+        flex: 1,
+        paddingVertical: 8,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    tabText: {
+        fontSize: 14,
+        fontWeight: '600',
     },
     header: {
         paddingHorizontal: 16,

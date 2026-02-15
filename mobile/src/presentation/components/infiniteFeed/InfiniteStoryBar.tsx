@@ -123,7 +123,13 @@ export const InfiniteStoryBar = memo(function InfiniteStoryBar({
                                 showCreateButton={isCurrentUser}
                                 onCreatePress={onCreateStoryPress}
                                 onPress={() => {
-                                    if (!item.hasStory) return;
+                                    if (!item.hasStory) {
+                                        // If current user has no story, open story upload
+                                        if (isCurrentUser && onCreateStoryPress) {
+                                            onCreateStoryPress();
+                                        }
+                                        return;
+                                    }
                                     onAvatarPress(item.id);
                                 }}
                             />

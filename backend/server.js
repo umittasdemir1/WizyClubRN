@@ -861,13 +861,15 @@ async function cleanupStoryAssetsFromR2(story, options = {}) {
     return { deletedCount };
 }
 
-// Endpoint: DELETE Story (Hard Delete)
+// Endpoint: DELETE Story (Soft Delete by default, ?force=true for permanent)
 app.delete('/stories/:id', async (req, res) => {
     const storyId = req.params.id;
+    const force = req.query.force === 'true';
 
     logBanner('DELETE STORY REQUEST', [
         `Story ID: ${storyId}`,
-        'Mode: HARD DELETE (Permanent)',
+        `Force query: ${req.query.force ?? 'undefined'}`,
+        `Mode: ${force ? 'HARD DELETE (Permanent)' : 'SOFT DELETE (Trash)'}`,
     ]);
 
     const authHeader = req.headers.authorization;
@@ -900,24 +902,110 @@ app.delete('/stories/:id', async (req, res) => {
             return res.status(403).json({ error: 'Forbidden' });
         }
 
-        await cleanupStoryAssetsFromR2(story, { scope: 'DELETE_STORY', storyId });
+        if (force) {
+            // ============================================
+            // HARD DELETE (Permanent) - R2 + DB
+            // ============================================
+            await cleanupStoryAssetsFromR2(story, { scope: 'DELETE_STORY', storyId });
 
-        const { data: deletedRows, error: deleteError } = await dbClient
+            const { data: deletedRows, error: deleteError } = await dbClient
+                .from('stories')
+                .delete()
+                .eq('id', storyId)
+                .eq('user_id', user.id)
+                .select('id');
+
+            if (deleteError) throw deleteError;
+            if (!deletedRows || deletedRows.length === 0) {
+                return res.status(404).json({ error: 'Story not found' });
+            }
+
+            logLine('OK', 'DELETE_STORY', 'Story hard deleted', { storyId, userId: user.id });
+            return res.json({ success: true, message: 'Story deleted permanently' });
+        } else {
+            // ============================================
+            // SOFT DELETE - Set deleted_at timestamp
+            // ============================================
+            const { error: updateError } = await dbClient
+                .from('stories')
+                .update({ deleted_at: new Date().toISOString() })
+                .eq('id', storyId)
+                .eq('user_id', user.id);
+
+            if (updateError) throw updateError;
+
+            logLine('OK', 'DELETE_STORY', 'Story soft deleted (moved to trash)', { storyId, userId: user.id });
+            return res.json({ success: true, message: 'Story moved to trash' });
+        }
+    } catch (error) {
+        logLine('ERR', 'DELETE_STORY', 'Story delete failed', {
+            storyId,
+            force,
+            error: error?.message || error,
+        });
+        return res.status(500).json({ error: error.message || 'Internal server error' });
+    }
+});
+
+// Endpoint: RESTORE Story (from trash)
+app.post('/stories/:id/restore', async (req, res) => {
+    const storyId = req.params.id;
+    logBanner('RESTORE STORY REQUEST', [`Story ID: ${storyId}`]);
+
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Authorization header required' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const dbClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY, {
+        global: { headers: { Authorization: `Bearer ${token}` } },
+    });
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+        return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
+    try {
+        // Check story exists and belongs to user and is soft-deleted
+        const { data: story, error: fetchError } = await dbClient
             .from('stories')
-            .delete()
+            .select('id, user_id, deleted_at')
             .eq('id', storyId)
-            .eq('user_id', user.id)
-            .select('id');
+            .not('deleted_at', 'is', null)
+            .single();
 
-        if (deleteError) throw deleteError;
-        if (!deletedRows || deletedRows.length === 0) {
-            return res.status(404).json({ error: 'Story not found' });
+        if (fetchError || !story) {
+            return res.status(404).json({ error: 'Deleted story not found' });
         }
 
-        logLine('OK', 'DELETE_STORY', 'Story hard deleted', { storyId, userId: user.id });
-        return res.json({ success: true, message: 'Story deleted permanently' });
+        if (story.user_id !== user.id) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
+        // Check if 24 hours have passed since deletion
+        const deletedAt = new Date(story.deleted_at);
+        const now = new Date();
+        const hoursSinceDelete = (now.getTime() - deletedAt.getTime()) / (1000 * 60 * 60);
+
+        if (hoursSinceDelete >= 24) {
+            return res.status(410).json({ error: 'Story can no longer be restored. 24 hours have passed.' });
+        }
+
+        // Restore: set deleted_at to null
+        const { error: updateError } = await dbClient
+            .from('stories')
+            .update({ deleted_at: null })
+            .eq('id', storyId)
+            .eq('user_id', user.id);
+
+        if (updateError) throw updateError;
+
+        logLine('OK', 'RESTORE_STORY', 'Story restored successfully', { storyId, userId: user.id });
+        return res.json({ success: true, message: 'Story restored' });
     } catch (error) {
-        logLine('ERR', 'DELETE_STORY', 'Story hard delete failed', {
+        logLine('ERR', 'RESTORE_STORY', 'Story restore failed', {
             storyId,
             error: error?.message || error,
         });
@@ -925,6 +1013,135 @@ app.delete('/stories/:id', async (req, res) => {
     }
 });
 
+// Endpoint: GET Recently Deleted Stories
+app.get('/stories/recently-deleted', async (req, res) => {
+    logLine('INFO', 'RECENTLY_DELETED', 'Fetching recently deleted stories');
+
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Authorization header required' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+        return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
+    try {
+        // Get stories deleted within last 24 hours
+        const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+        const { data: stories, error: fetchError } = await supabase
+            .from('stories')
+            .select('*, profiles(*)')
+            .eq('user_id', user.id)
+            .not('deleted_at', 'is', null)
+            .gt('deleted_at', cutoff)
+            .order('deleted_at', { ascending: false });
+
+        if (fetchError) throw fetchError;
+
+        logLine('OK', 'RECENTLY_DELETED', 'Recently deleted stories fetched', {
+            userId: user.id,
+            count: stories?.length || 0,
+        });
+
+        return res.json({ success: true, data: stories || [] });
+    } catch (error) {
+        logLine('ERR', 'RECENTLY_DELETED', 'Failed to fetch recently deleted stories', {
+            error: error?.message || error,
+        });
+        return res.status(500).json({ error: error.message || 'Internal server error' });
+    }
+});
+
+// Endpoint: Cleanup expired soft-deleted stories (called by cron or manually)
+app.post('/stories/cleanup-expired', async (req, res) => {
+    logBanner('CLEANUP EXPIRED STORIES', ['Mode: Hard delete soft-deleted stories older than 24h']);
+
+    try {
+        const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+        // Fetch all soft-deleted stories older than 24h
+        const { data: expiredStories, error: fetchError } = await supabase
+            .from('stories')
+            .select('id, user_id, video_url, thumbnail_url, media_urls, deleted_at')
+            .not('deleted_at', 'is', null)
+            .lt('deleted_at', cutoff);
+
+        if (fetchError) throw fetchError;
+
+        if (!expiredStories || expiredStories.length === 0) {
+            logLine('INFO', 'CLEANUP', 'No expired soft-deleted stories found');
+            return res.json({ success: true, cleaned: 0 });
+        }
+
+        logLine('INFO', 'CLEANUP', 'Found expired stories to clean', { count: expiredStories.length });
+
+        let cleaned = 0;
+        for (const story of expiredStories) {
+            try {
+                // 1. Clean R2 assets
+                await cleanupStoryAssetsFromR2(story, { scope: 'CLEANUP_EXPIRED', storyId: story.id });
+
+                // 2. Hard delete from DB
+                await supabase
+                    .from('stories')
+                    .delete()
+                    .eq('id', story.id);
+
+                cleaned++;
+                logLine('OK', 'CLEANUP', 'Expired story permanently deleted', { storyId: story.id });
+            } catch (storyError) {
+                logLine('ERR', 'CLEANUP', 'Failed to clean expired story', {
+                    storyId: story.id,
+                    error: storyError?.message || storyError,
+                });
+            }
+        }
+
+        logLine('OK', 'CLEANUP', 'Cleanup completed', { total: expiredStories.length, cleaned });
+        return res.json({ success: true, total: expiredStories.length, cleaned });
+    } catch (error) {
+        logLine('ERR', 'CLEANUP', 'Cleanup failed', { error: error?.message || error });
+        return res.status(500).json({ error: error.message || 'Internal server error' });
+    }
+});
+
+// Auto-cleanup: Run every hour to clean expired soft-deleted stories
+async function runStoryCleanup() {
+    try {
+        const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const { data: expiredStories, error: fetchError } = await supabase
+            .from('stories')
+            .select('id, user_id, video_url, thumbnail_url, media_urls, deleted_at')
+            .not('deleted_at', 'is', null)
+            .lt('deleted_at', cutoff);
+
+        if (fetchError || !expiredStories || expiredStories.length === 0) return;
+
+        logLine('INFO', 'AUTO_CLEANUP', 'Auto-cleaning expired stories', { count: expiredStories.length });
+
+        for (const story of expiredStories) {
+            try {
+                await cleanupStoryAssetsFromR2(story, { scope: 'AUTO_CLEANUP', storyId: story.id });
+                await supabase.from('stories').delete().eq('id', story.id);
+                logLine('OK', 'AUTO_CLEANUP', 'Story permanently deleted', { storyId: story.id });
+            } catch (err) {
+                logLine('ERR', 'AUTO_CLEANUP', 'Failed to clean story', { storyId: story.id, error: err?.message });
+            }
+        }
+    } catch (err) {
+        logLine('ERR', 'AUTO_CLEANUP', 'Auto-cleanup failed', { error: err?.message });
+    }
+}
+
+// Run cleanup every hour
+setInterval(runStoryCleanup, 60 * 60 * 1000);
+// Run once on startup (after 30 seconds to let server fully start)
+setTimeout(runStoryCleanup, 30 * 1000);
 
 // Endpoint: DELETE Video (Soft Delete by default)
 app.delete('/videos/:id', async (req, res) => {

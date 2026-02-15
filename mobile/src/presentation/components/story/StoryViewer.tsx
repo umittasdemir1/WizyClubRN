@@ -110,9 +110,11 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
     const lastTickTsRef = useRef(0);
     const isVideoBufferingRef = useRef(false);
     const wasPausedBeforeMoreSheetRef = useRef(false);
+    const keepPausedForDeleteModalRef = useRef(false);
     const pendingPageAfterDeleteRef = useRef<number | null>(null);
     const dragTranslateY = useRef(new RNAnimated.Value(0)).current;
     const swipeClosingRef = useRef(false);
+    const activeStoryIdRef = useRef<string | null>(null);
 
     const visibleStories = useMemo(
         () => stories.filter((story) => !deletedOriginalStoryIds.has(story.id)),
@@ -207,29 +209,18 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
         if (!story) return;
         if (progressTickerRef.current) return;
 
+        // For videos, progress is driven entirely by video player callbacks.
+        // Only start ticker for image stories.
+        if (story.mediaType === 'video') return;
+
         lastTickTsRef.current = Date.now();
+        progressDurationMsRef.current = IMAGE_STORY_DURATION_MS;
         progressTickerRef.current = setInterval(() => {
             const now = Date.now();
             const deltaMs = Math.max(0, now - lastTickTsRef.current);
             lastTickTsRef.current = now;
 
-            if (isPausedRef.current) {
-                return;
-            }
-
-            if (story.mediaType === 'video') {
-                if (isVideoBufferingRef.current) {
-                    return;
-                }
-
-                if (progressDurationMsRef.current <= 0) {
-                    return;
-                }
-
-                progressPositionMsRef.current += deltaMs;
-                setProgressFromPosition('video');
-                return;
-            }
+            if (isPausedRef.current) return;
 
             progressPositionMsRef.current += deltaMs;
             if (progressPositionMsRef.current >= IMAGE_STORY_DURATION_MS) {
@@ -278,7 +269,7 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
 
         swipeClosingRef.current = false;
         dragTranslateY.setValue(0);
-        const shouldResume = !wasPausedBeforeMoreSheetRef.current;
+        const shouldResume = !wasPausedBeforeMoreSheetRef.current && !keepPausedForDeleteModalRef.current;
         wasPausedBeforeMoreSheetRef.current = false;
         if (shouldResume) {
             setIsPaused(false);
@@ -286,11 +277,15 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
     }, [dragTranslateY]);
 
     const handleOpenDeleteConfirmation = useCallback(() => {
+        keepPausedForDeleteModalRef.current = true;
+        moreOptionsSheetRef.current?.close();
+        setIsMoreSheetOpen(false);
         setIsDeleteConfirmationVisible(true);
         setIsPaused(true);
     }, []);
 
     const handleCancelDelete = useCallback(() => {
+        keepPausedForDeleteModalRef.current = false;
         setIsDeleteConfirmationVisible(false);
         setIsPaused(false);
     }, []);
@@ -298,6 +293,7 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
     const handleDeleteStory = useCallback(async () => {
         if (!isOwnStory || !activeStory?.originalId || isDeletingStory) return;
 
+        keepPausedForDeleteModalRef.current = false;
         setIsDeleteConfirmationVisible(false);
 
         const token = useAuthStore.getState().session?.access_token;
@@ -343,7 +339,7 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
 
             triggerStoryRefresh();
         } catch (error: any) {
-            logError(LogCode.DB_DELETE, 'Story hard delete failed', {
+            logError(LogCode.DB_DELETE, 'Story soft delete failed', {
                 error,
                 storyId: activeStory.originalId,
             });
@@ -506,14 +502,16 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
         setIsLiked(activeStory.isLiked || false);
         setIsPaused(false);
         resetProgressEngine();
+        activeStoryIdRef.current = activeStory.id;
 
         if (activeStory.mediaType === 'image') {
             progressDurationMsRef.current = IMAGE_STORY_DURATION_MS;
+            startProgressTicker(activeStory);
         } else {
+            // For video: duration will be set by handleVideoLoad/handleVideoProgress.
+            // Progress is driven entirely by video player callbacks.
             progressDurationMsRef.current = videoDurationsRef.current[activeStory.id] || 0;
         }
-
-        startProgressTicker(activeStory);
     }, [activeStory?.id, activeStory?.mediaType, dragTranslateY, resetProgressEngine, startProgressTicker]);
 
     useEffect(() => {
@@ -526,15 +524,16 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
         if (durationMs <= 0) return;
 
         videoDurationsRef.current[storyId] = durationMs;
-        if (activeStory?.id !== storyId) return;
+        if (activeStoryIdRef.current !== storyId) return;
 
         progressDurationMsRef.current = durationMs;
         progressPositionMsRef.current = Math.min(progressPositionMsRef.current, durationMs);
         setProgressFromPosition('video');
-    }, [activeStory?.id, setProgressFromPosition]);
+    }, [setProgressFromPosition]);
 
     const handleVideoProgress = useCallback((storyId: string) => (data: any) => {
-        if (!activeStory || activeStory.id !== storyId) return;
+        if (activeStoryIdRef.current !== storyId) return;
+        if (isPausedRef.current) return;
 
         const eventDurationMs = Math.max(
             Number(data?.seekableDuration || 0),
@@ -552,12 +551,12 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
         if (progressDurationMsRef.current > 0) {
             setProgressFromPosition('video');
         }
-    }, [activeStory, setProgressFromPosition]);
+    }, [setProgressFromPosition]);
 
     const handleVideoBuffer = useCallback((storyId: string) => (data: any) => {
-        if (!activeStory || activeStory.id !== storyId) return;
+        if (activeStoryIdRef.current !== storyId) return;
         isVideoBufferingRef.current = !!data?.isBuffering;
-    }, [activeStory]);
+    }, []);
 
     const handleVideoEnd = useCallback(() => {
         progress.value = 1;
@@ -785,7 +784,7 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
                 style={styles.sheetsContainer}
                 pointerEvents={isMoreSheetOpen ? 'box-none' : 'none'}
             >
-                {isMoreSheetOpen ? (
+                {isMoreSheetOpen && !isDeleteConfirmationVisible ? (
                     <Pressable
                         style={styles.sheetDismissOverlay}
                         onPress={() => moreOptionsSheetRef.current?.close()}
@@ -799,11 +798,11 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
                 />
             </View>
 
-            {/* <StoryDeleteConfirmationModal
+            <StoryDeleteConfirmationModal
                 visible={isDeleteConfirmationVisible}
                 onCancel={handleCancelDelete}
                 onConfirm={handleDeleteStory}
-            /> */}
+            />
 
             {flyingEmojis.map((emojiData) => (
                 <FlyingEmoji

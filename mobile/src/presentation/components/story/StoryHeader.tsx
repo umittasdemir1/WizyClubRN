@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
     progressContainer: {
         flexDirection: 'row',
         gap: 4,
-        height: 2,
+        height: 2.5,
         marginTop: -5,
         marginBottom: 12,
     },

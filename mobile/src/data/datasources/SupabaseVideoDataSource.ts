@@ -255,6 +255,7 @@ export class SupabaseVideoDataSource {
             supabase
                 .from('stories')
                 .select('*, profiles(*)')
+                .is('deleted_at', null)
                 .gt('expires_at', now)
                 .order('created_at', { ascending: false })
                 .limit(50),

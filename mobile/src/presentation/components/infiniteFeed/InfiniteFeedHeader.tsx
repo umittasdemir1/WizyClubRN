@@ -20,6 +20,7 @@ interface InfiniteFeedHeaderProps {
     colors: ThemeColors;
     insetTop: number;
     onUploadPress?: () => void;
+    onCreateStoryPress?: () => void;
     onNotificationPress?: () => void;
     storyUsers: {
         id: string;
@@ -36,6 +37,7 @@ export function InfiniteFeedHeader({
     colors,
     insetTop,
     onUploadPress,
+    onCreateStoryPress,
     onNotificationPress,
     storyUsers,
     onStoryAvatarPress,
@@ -138,7 +140,7 @@ export function InfiniteFeedHeader({
             <InfiniteStoryBar
                 storyUsers={storyUsers}
                 onAvatarPress={onStoryAvatarPress}
-                onCreateStoryPress={onUploadPress}
+                onCreateStoryPress={onCreateStoryPress || onUploadPress}
                 backgroundColor={colors.background}
                 textColor={colors.textPrimary}
             />
