@@ -23,13 +23,13 @@ import { ChevronLeft, ChevronRight, Users, Tag, PlusCircle, X } from 'lucide-rea
 import { useThemeStore } from '../../store/useThemeStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
 import { CONFIG } from '../../../core/config';
 import { router } from 'expo-router';
 import { useStoryStore } from '../../store/useStoryStore';
 import { SystemBars } from 'react-native-edge-to-edge';
 import { LogCode, logUI, logError, logData } from '@/core/services/Logger';
 import { supabase } from '@/core/supabase';
+import { useModalSheetTheme } from '../../hooks/useModalSheetTheme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PREVIEW_ITEM_WIDTH = SCREEN_WIDTH * 0.7;
@@ -59,6 +59,7 @@ const COMMERCIAL_TYPES = [
 
 export function UploadModal({ isVisible, onClose, initialAssets, uploadMode = 'video' }: UploadModalProps) {
     const { isDark } = useThemeStore();
+    const modalTheme = useModalSheetTheme(isDark);
     const { user } = useAuthStore();
     const insets = useSafeAreaInsets();
     const [selectedAssets, setSelectedAssets] = useState<ImagePicker.ImagePickerAsset[]>(initialAssets || []);
@@ -96,12 +97,11 @@ export function UploadModal({ isVisible, onClose, initialAssets, uploadMode = 'v
     const { startUpload, setProgress, setStatus, setSuccess, setError, setThumbnailUri } = useUploadStore();
     const { createDraft } = useDraftStore();
 
-    const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
-    const bgColor = isDark ? '#080A0F' : '#FFFFFF';
-    const textColor = isDark ? '#FFFFFF' : '#080A0F';
-    const subtextColor = isDark ? '#A0A0A0' : '#6B6B6B';
-    const borderColor = isDark ? '#2C2C2E' : '#E5E5E5';
-    const inputBg = isDark ? '#1C1C1E' : '#F5F5F5';
+    const bgColor = modalTheme.fullScreenBackground;
+    const textColor = modalTheme.textPrimary;
+    const subtextColor = modalTheme.textSecondary;
+    const borderColor = modalTheme.sheetBorder;
+    const inputBg = modalTheme.inputBackground;
 
     const handleSaveDraft = async () => {
         if (selectedAssets.length === 0) {
@@ -495,7 +495,7 @@ export function UploadModal({ isVisible, onClose, initialAssets, uploadMode = 'v
                     {/* Bottom Buttons */}
                     <View style={[styles.bottomButtons, { backgroundColor: bgColor, borderTopColor: borderColor, paddingBottom: insets.bottom + 12 }]}>
                         <Pressable
-                            style={[styles.draftButton, { backgroundColor: isDark ? '#2C2C2E' : '#F0F0F0' }]}
+                            style={[styles.draftButton, { backgroundColor: modalTheme.sheetCard }]}
                             onPress={handleSaveDraft}
                         >
                             <Text style={[styles.draftButtonText, { color: textColor }]}>Taslağı Kaydet</Text>
@@ -519,11 +519,11 @@ export function UploadModal({ isVisible, onClose, initialAssets, uploadMode = 'v
                 onRequestClose={() => setShowCommercialMenu(false)}
             >
                 <Pressable
-                    style={styles.modalOverlay}
+                    style={[styles.modalOverlay, { backgroundColor: modalTheme.modalOverlay }]}
                     onPress={() => setShowCommercialMenu(false)}
                 >
-                    <View style={[styles.menuModal, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF' }]}>
-                        <View style={styles.menuHeader}>
+                    <View style={[styles.menuModal, { backgroundColor: modalTheme.modalBackground }]}>
+                        <View style={[styles.menuHeader, { borderBottomColor: borderColor }]}>
                             <Text style={[styles.menuTitle, { color: textColor }]}>Ticari İlişki Türü Seçin</Text>
                         </View>
                         <ScrollView style={styles.menuList}>
@@ -540,12 +540,12 @@ export function UploadModal({ isVisible, onClose, initialAssets, uploadMode = 'v
                                     <Text style={[
                                         styles.menuOptionText,
                                         { color: textColor },
-                                        commercialType === type && styles.menuOptionTextSelected
+                                        commercialType === type && { color: modalTheme.accent, fontWeight: '600' }
                                     ]}>
                                         {type}
                                     </Text>
                                     {commercialType === type && (
-                                        <Text style={styles.checkmark}>✓</Text>
+                                        <Text style={[styles.checkmark, { color: modalTheme.accent }]}>✓</Text>
                                     )}
                                 </Pressable>
                             ))}
@@ -562,11 +562,11 @@ export function UploadModal({ isVisible, onClose, initialAssets, uploadMode = 'v
                 onRequestClose={() => setShowBrandInfoModal(false)}
             >
                 <Pressable
-                    style={styles.modalOverlay}
+                    style={[styles.modalOverlay, { backgroundColor: modalTheme.modalOverlay }]}
                     onPress={() => setShowBrandInfoModal(false)}
                 >
-                    <View style={[styles.menuModal, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF' }]}>
-                        <View style={styles.menuHeader}>
+                    <View style={[styles.menuModal, { backgroundColor: modalTheme.modalBackground }]}>
+                        <View style={[styles.menuHeader, { borderBottomColor: borderColor }]}>
                             <Text style={[styles.menuTitle, { color: textColor }]}>{commercialType}</Text>
                         </View>
 
@@ -592,7 +592,7 @@ export function UploadModal({ isVisible, onClose, initialAssets, uploadMode = 'v
                             />
 
                             <Pressable
-                                style={[styles.brandSaveButton, { backgroundColor: '#3A8DFF' }]}
+                                style={[styles.brandSaveButton, { backgroundColor: modalTheme.accent }]}
                                 onPress={() => setShowBrandInfoModal(false)}
                             >
                                 <Text style={styles.brandSaveButtonText}>Kaydet</Text>
@@ -610,11 +610,11 @@ export function UploadModal({ isVisible, onClose, initialAssets, uploadMode = 'v
                 onRequestClose={() => setShowTagInputModal(false)}
             >
                 <Pressable
-                    style={styles.modalOverlay}
+                    style={[styles.modalOverlay, { backgroundColor: modalTheme.modalOverlay }]}
                     onPress={() => setShowTagInputModal(false)}
                 >
-                    <View style={[styles.menuModal, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF' }]}>
-                        <View style={styles.menuHeader}>
+                    <View style={[styles.menuModal, { backgroundColor: modalTheme.modalBackground }]}>
+                        <View style={[styles.menuHeader, { borderBottomColor: borderColor }]}>
                             <Text style={[styles.menuTitle, { color: textColor }]}>Konu Etiketi Ekle</Text>
                         </View>
 
@@ -637,7 +637,7 @@ export function UploadModal({ isVisible, onClose, initialAssets, uploadMode = 'v
                             </Text>
 
                             <Pressable
-                                style={[styles.brandSaveButton, { backgroundColor: '#3A8DFF' }]}
+                                style={[styles.brandSaveButton, { backgroundColor: modalTheme.accent }]}
                                 onPress={handleSaveTag}
                             >
                                 <Text style={styles.brandSaveButtonText}>Ekle</Text>

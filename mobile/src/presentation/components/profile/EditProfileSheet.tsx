@@ -6,11 +6,11 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { useThemeStore } from '../../store/useThemeStore';
-import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
 import { User } from '../../../domain/entities/User';
 import { ProfileRepositoryImpl } from '../../../data/repositories/ProfileRepositoryImpl';
 import { logRepo, logError, LogCode } from '@/core/services/Logger';
 import { shadowStyle } from '@/core/utils/shadow';
+import { useModalSheetTheme } from '../../hooks/useModalSheetTheme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -28,6 +28,7 @@ type SubViewType = 'name' | 'username' | 'bio' | 'socialLinks' | null;
 export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
   ({ user, onUpdateProfile, onUploadAvatar, onUpdateCompleted }, ref) => {
     const { isDark } = useThemeStore();
+    const modalTheme = useModalSheetTheme(isDark);
     const insets = useSafeAreaInsets();
 
     const topOffset = insets.top + 60 + 25;
@@ -66,13 +67,11 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
       setTempX(user.xUrl || '');
     }, [user]);
 
-    const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
-
-    const bgColor = isDark ? '#1c1c1e' : themeColors.background;
-    const textColor = themeColors.textPrimary;
-    const secondaryTextColor = themeColors.textSecondary;
-    const borderColor = themeColors.border;
-    const handleColor = isDark ? '#fff' : '#000';
+    const bgColor = modalTheme.sheetBackground;
+    const textColor = modalTheme.textPrimary;
+    const secondaryTextColor = modalTheme.textSecondary;
+    const borderColor = modalTheme.sheetBorder;
+    const handleColor = modalTheme.sheetHandle;
 
     const handleClose = () => {
       if (ref && 'current' in ref && ref.current) {

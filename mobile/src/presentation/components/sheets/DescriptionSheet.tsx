@@ -5,9 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, MoreVertical } from 'lucide-react-native';
 import { Avatar } from '../shared/Avatar';
 import { Video } from '../../../domain/entities/Video';
-import { useThemeStore } from '../../store/useThemeStore';
-import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
 import { logSheet, LogCode } from '@/core/services/Logger';
+import { useModalSheetTheme } from '../../hooks/useModalSheetTheme';
 
 interface DescriptionSheetProps {
   video: Video | null;
@@ -19,14 +18,14 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export const DescriptionSheet = forwardRef<BottomSheet, DescriptionSheetProps>(
   ({ video, onFollowPress, onChange }, ref) => {
-    const { isDark } = useThemeStore();
+    const modalTheme = useModalSheetTheme();
+    const { isDark } = modalTheme;
     const insets = useSafeAreaInsets();
 
-    const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
-    const bgColor = isDark ? '#1c1c1e' : themeColors.background;
-    const textPrimary = themeColors.textPrimary;
-    const textSecondary = isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)';
-    const handleColor = isDark ? '#8e8e93' : '#c6c6c8';
+    const bgColor = modalTheme.sheetBackground;
+    const textPrimary = modalTheme.textPrimary;
+    const textSecondary = modalTheme.textSecondary;
+    const handleColor = modalTheme.sheetHandle;
 
     const topOffset = insets.top + 60 + 25;
     const snapPoints = useMemo(() => [SCREEN_HEIGHT - topOffset], [insets.top]);
@@ -99,7 +98,7 @@ export const DescriptionSheet = forwardRef<BottomSheet, DescriptionSheetProps>(
                   styles.followPill,
                   {
                     backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
-                    borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)',
+                    borderColor: modalTheme.sheetBorder,
                   }
                 ]}
                 onPress={onFollowPress}
@@ -112,7 +111,7 @@ export const DescriptionSheet = forwardRef<BottomSheet, DescriptionSheetProps>(
         </View>
 
         {/* Divider */}
-        <View style={[styles.divider, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]} />
+        <View style={[styles.divider, { backgroundColor: modalTheme.modalSeparator }]} />
 
         {/* Scrollable Content */}
         <BottomSheetScrollView

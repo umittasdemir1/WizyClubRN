@@ -3,8 +3,7 @@ import { Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Flag, EyeOff, Trash2, Pencil } from 'lucide-react-native';
-import { useThemeStore } from '../../store/useThemeStore';
-import { LIGHT_COLORS, DARK_COLORS } from '../../../core/constants';
+import { useModalSheetTheme } from '../../hooks/useModalSheetTheme';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -16,17 +15,16 @@ interface InfiniteFeedMoreOptionsSheetProps {
 
 export const InfiniteFeedMoreOptionsSheet = forwardRef<BottomSheet, InfiniteFeedMoreOptionsSheetProps>(
     ({ onEditPress, onDeletePress, onSheetStateChange }, ref) => {
-        const { isDark } = useThemeStore();
+        const modalTheme = useModalSheetTheme();
         const insets = useSafeAreaInsets();
 
         const topOffset = insets.top + 60 + 25;
         const snapPoints = useMemo(() => [SCREEN_HEIGHT - topOffset], [topOffset]);
 
-        const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
-        const bgColor = isDark ? '#1c1c1e' : themeColors.background;
-        const handleColor = isDark ? '#fff' : '#000';
-        const textColor = isDark ? '#fff' : '#000';
-        const borderColor = isDark ? '#333' : '#e5e5e5';
+        const bgColor = modalTheme.sheetBackground;
+        const handleColor = modalTheme.sheetHandle;
+        const textColor = modalTheme.textPrimary;
+        const borderColor = modalTheme.sheetBorder;
 
         const handleDeletePress = () => {
             onDeletePress?.();

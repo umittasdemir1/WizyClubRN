@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity } from 'react-native';
+import { useModalSheetTheme } from '../../hooks/useModalSheetTheme';
 
 interface InfiniteFeedDeleteConfirmationModalProps {
     visible: boolean;
@@ -12,6 +13,7 @@ export const InfiniteFeedDeleteConfirmationModal = ({
     onCancel,
     onConfirm,
 }: InfiniteFeedDeleteConfirmationModalProps) => {
+    const modalTheme = useModalSheetTheme();
     if (!visible) return null;
 
     return (
@@ -21,25 +23,25 @@ export const InfiniteFeedDeleteConfirmationModal = ({
             animationType="fade"
             onRequestClose={onCancel}
         >
-            <View style={styles.overlay}>
-                <View style={styles.container}>
+            <View style={[styles.overlay, { backgroundColor: modalTheme.modalOverlay }]}>
+                <View style={[styles.container, { backgroundColor: modalTheme.modalBackground }]}>
                     <View style={styles.content}>
-                        <Text style={styles.title}>Bu içeriği silmek istiyor musunuz?</Text>
-                        <Text style={styles.message}>
+                        <Text style={[styles.title, { color: modalTheme.textPrimary }]}>Bu içeriği silmek istiyor musunuz?</Text>
+                        <Text style={[styles.message, { color: modalTheme.textPrimary }]}>
                             Silinen içerik 15 gün boyunca geri alınabilir. Bu sürenin sonunda kalıcı olarak silinir.
                         </Text>
                     </View>
 
-                    <View style={styles.separator} />
+                    <View style={[styles.separator, { backgroundColor: modalTheme.modalSeparator }]} />
 
                     <TouchableOpacity style={styles.button} onPress={onConfirm}>
                         <Text style={[styles.buttonText, styles.destructiveText]}>İçeriği sil</Text>
                     </TouchableOpacity>
 
-                    <View style={styles.separator} />
+                    <View style={[styles.separator, { backgroundColor: modalTheme.modalSeparator }]} />
 
                     <TouchableOpacity style={styles.button} onPress={onCancel}>
-                        <Text style={styles.buttonText}>İptal</Text>
+                        <Text style={[styles.buttonText, { color: modalTheme.actionPrimary }]}>İptal</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -50,7 +52,6 @@ export const InfiniteFeedDeleteConfirmationModal = ({
 const styles = StyleSheet.create({
     overlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -59,7 +60,6 @@ const styles = StyleSheet.create({
         borderRadius: 32,
         overflow: 'hidden',
         alignItems: 'center',
-        backgroundColor: '#1c1c1e',
     },
     content: {
         padding: 16,
@@ -67,14 +67,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     title: {
-        color: '#FFFFFF',
         fontSize: 17,
         fontWeight: '600',
         marginBottom: 4,
         textAlign: 'center',
     },
     message: {
-        color: '#FFFFFF',
         fontSize: 13,
         textAlign: 'center',
         lineHeight: 18,
@@ -82,7 +80,6 @@ const styles = StyleSheet.create({
     separator: {
         height: 1,
         width: '100%',
-        backgroundColor: '#38383A',
     },
     button: {
         width: '100%',
@@ -91,7 +88,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     buttonText: {
-        color: '#0A84FF',
         fontSize: 17,
         fontWeight: '400',
     },
