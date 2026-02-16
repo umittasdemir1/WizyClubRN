@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity } from 'react-native';
-import { useModalSheetTheme } from '../../hooks/useModalSheetTheme';
+import { useSurfaceTheme } from '../../hooks/useSurfaceTheme';
 
 interface UserOptionsModalProps {
     visible: boolean;
@@ -10,7 +10,7 @@ interface UserOptionsModalProps {
 }
 
 export const UserOptionsModal = ({ visible, username, onClose, onAction }: UserOptionsModalProps) => {
-    const modalTheme = useModalSheetTheme();
+    const modalTheme = useSurfaceTheme();
     const [confirmType, setConfirmType] = useState<'none' | 'block' | 'mute' | 'report'>('none');
 
     const handleActionPress = (type: 'block' | 'mute' | 'report') => {
@@ -23,27 +23,27 @@ export const UserOptionsModal = ({ visible, username, onClose, onAction }: UserO
     };
 
     const renderMainOptions = () => (
-        <View style={[styles.container, { backgroundColor: modalTheme.modalBackground }]}>
+        <View style={[styles.container, modalTheme.styles.modalCard]}>
             <View style={styles.content}>
                 <Text style={[styles.title, { color: modalTheme.textPrimary }]}>@{username}</Text>
             </View>
 
-            <View style={[styles.separator, { backgroundColor: modalTheme.modalSeparator }]} />
+            <View style={[styles.separator, modalTheme.styles.separator]} />
             <TouchableOpacity style={styles.button} onPress={() => handleActionPress('block')}>
                 <Text style={[styles.buttonText, styles.destructiveText]}>Engelle</Text>
             </TouchableOpacity>
 
-            <View style={[styles.separator, { backgroundColor: modalTheme.modalSeparator }]} />
+            <View style={[styles.separator, modalTheme.styles.separator]} />
             <TouchableOpacity style={styles.button} onPress={() => handleActionPress('mute')}>
                 <Text style={[styles.buttonText, { color: modalTheme.actionPrimary }]}>Sessize Al</Text>
             </TouchableOpacity>
 
-            <View style={[styles.separator, { backgroundColor: modalTheme.modalSeparator }]} />
+            <View style={[styles.separator, modalTheme.styles.separator]} />
             <TouchableOpacity style={styles.button} onPress={() => handleActionPress('report')}>
                 <Text style={[styles.buttonText, { color: modalTheme.actionPrimary }]}>Bildir / Raporla</Text>
             </TouchableOpacity>
 
-            <View style={[styles.separator, { backgroundColor: modalTheme.modalSeparator }]} />
+            <View style={[styles.separator, modalTheme.styles.separator]} />
             <TouchableOpacity style={styles.button} onPress={resetAndClose}>
                 <Text style={[styles.buttonText, { color: modalTheme.actionPrimary, fontWeight: '600' }]}>İptal</Text>
             </TouchableOpacity>
@@ -58,18 +58,18 @@ export const UserOptionsModal = ({ visible, username, onClose, onAction }: UserO
         }[type];
 
         return (
-            <View style={[styles.container, { backgroundColor: modalTheme.modalBackground }]}>
+            <View style={[styles.container, modalTheme.styles.modalCard]}>
                 <View style={styles.content}>
                     <Text style={[styles.title, { color: modalTheme.textPrimary }]}>{config.title}</Text>
                     <Text style={[styles.message, { color: modalTheme.textPrimary }]}>{config.msg}</Text>
                 </View>
 
-                <View style={[styles.separator, { backgroundColor: modalTheme.modalSeparator }]} />
+                <View style={[styles.separator, modalTheme.styles.separator]} />
                 <TouchableOpacity style={styles.button} onPress={() => { onAction(type); resetAndClose(); }}>
                     <Text style={[styles.buttonText, styles.destructiveText]}>{config.title}</Text>
                 </TouchableOpacity>
 
-                <View style={[styles.separator, { backgroundColor: modalTheme.modalSeparator }]} />
+                <View style={[styles.separator, modalTheme.styles.separator]} />
                 <TouchableOpacity style={styles.button} onPress={() => setConfirmType('none')}>
                     <Text style={[styles.buttonText, { color: modalTheme.actionPrimary }]}>Geri Dön</Text>
                 </TouchableOpacity>
@@ -79,7 +79,7 @@ export const UserOptionsModal = ({ visible, username, onClose, onAction }: UserO
 
     return (
         <Modal transparent visible={visible} animationType="fade" onRequestClose={resetAndClose}>
-            <View style={[styles.overlay, { backgroundColor: modalTheme.modalOverlay }]}>
+            <View style={[styles.overlay, modalTheme.styles.modalOverlay]}>
                 {confirmType === 'none' ? renderMainOptions() : renderConfirmOption(confirmType)}
             </View>
         </Modal>

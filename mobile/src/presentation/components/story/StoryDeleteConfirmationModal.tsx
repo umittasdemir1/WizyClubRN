@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity } from 'react-native';
-import { useModalSheetTheme } from '../../hooks/useModalSheetTheme';
+import { useSurfaceTheme } from '../../hooks/useSurfaceTheme';
 
 interface StoryDeleteConfirmationModalProps {
     visible: boolean;
@@ -13,7 +13,7 @@ export const StoryDeleteConfirmationModal = ({
     onCancel,
     onConfirm,
 }: StoryDeleteConfirmationModalProps) => {
-    const modalTheme = useModalSheetTheme();
+    const modalTheme = useSurfaceTheme();
     if (!visible) return null;
 
     return (
@@ -23,8 +23,8 @@ export const StoryDeleteConfirmationModal = ({
             animationType="fade"
             onRequestClose={onCancel}
         >
-            <View style={[styles.overlay, { backgroundColor: modalTheme.modalOverlaySoft }]}>
-                <View style={[styles.container, { backgroundColor: modalTheme.modalBackground }]}>
+            <View style={[styles.overlay, modalTheme.styles.modalOverlaySoft]}>
+                <View style={[styles.container, modalTheme.styles.modalCard]}>
                     <View style={styles.content}>
                         <Text style={[styles.title, { color: modalTheme.textPrimary }]}>Bu hikayeyi silmek istiyor musunuz?</Text>
                         <Text style={[styles.message, { color: modalTheme.textPrimary }]}>
@@ -32,13 +32,13 @@ export const StoryDeleteConfirmationModal = ({
                         </Text>
                     </View>
 
-                    <View style={[styles.separator, { backgroundColor: modalTheme.modalSeparator }]} />
+                    <View style={[styles.separator, modalTheme.styles.separator]} />
 
                     <TouchableOpacity style={styles.button} onPress={onConfirm}>
                         <Text style={[styles.buttonText, styles.destructiveText]}>Hikayeyi sil</Text>
                     </TouchableOpacity>
 
-                    <View style={[styles.separator, { backgroundColor: modalTheme.modalSeparator }]} />
+                    <View style={[styles.separator, modalTheme.styles.separator]} />
 
                     <TouchableOpacity style={styles.button} onPress={onCancel}>
                         <Text style={[styles.buttonText, { color: modalTheme.actionPrimary }]}>İptal</Text>

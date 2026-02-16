@@ -3,7 +3,7 @@ import { Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Flag, EyeOff, Trash2, Pencil } from 'lucide-react-native';
-import { useModalSheetTheme } from '../../hooks/useModalSheetTheme';
+import { useSurfaceTheme } from '../../hooks/useSurfaceTheme';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -15,14 +15,12 @@ interface InfiniteFeedMoreOptionsSheetProps {
 
 export const InfiniteFeedMoreOptionsSheet = forwardRef<BottomSheet, InfiniteFeedMoreOptionsSheetProps>(
     ({ onEditPress, onDeletePress, onSheetStateChange }, ref) => {
-        const modalTheme = useModalSheetTheme();
+        const modalTheme = useSurfaceTheme();
         const insets = useSafeAreaInsets();
 
         const topOffset = insets.top + 60 + 25;
         const snapPoints = useMemo(() => [SCREEN_HEIGHT - topOffset], [topOffset]);
 
-        const bgColor = modalTheme.sheetBackground;
-        const handleColor = modalTheme.sheetHandle;
         const textColor = modalTheme.textPrimary;
         const borderColor = modalTheme.sheetBorder;
 
@@ -57,8 +55,8 @@ export const InfiniteFeedMoreOptionsSheet = forwardRef<BottomSheet, InfiniteFeed
                 enablePanDownToClose={true}
                 enableContentPanningGesture={false}
                 enableHandlePanningGesture={true}
-                backgroundStyle={{ backgroundColor: bgColor, borderTopLeftRadius: 40, borderTopRightRadius: 40 }}
-                handleIndicatorStyle={{ backgroundColor: handleColor }}
+                backgroundStyle={modalTheme.styles.sheetBackground}
+                handleIndicatorStyle={modalTheme.styles.sheetHandle}
             >
                 <BottomSheetView style={styles.contentContainer}>
                     {onEditPress && (

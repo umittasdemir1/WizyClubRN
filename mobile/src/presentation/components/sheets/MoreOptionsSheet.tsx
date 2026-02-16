@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Flag, EyeOff, Minimize2, Maximize2, Trash2, LampDesk, GalleryVerticalEnd, Gauge, Pencil } from 'lucide-react-native';
 import { useBrightnessStore } from '../../store/useBrightnessStore';
 import { useActiveVideoStore } from '../../store/useActiveVideoStore';
-import { useModalSheetTheme } from '../../hooks/useModalSheetTheme';
+import { useSurfaceTheme } from '../../hooks/useSurfaceTheme';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -18,7 +18,7 @@ interface MoreOptionsSheetProps {
 
 export const MoreOptionsSheet = forwardRef<BottomSheet, MoreOptionsSheetProps>(
     ({ onCleanScreenPress, onEditPress, onDeletePress, isCleanScreen = false }, ref) => {
-    const modalTheme = useModalSheetTheme();
+    const modalTheme = useSurfaceTheme();
     const { isDark } = modalTheme;
     const insets = useSafeAreaInsets();
     const { brightness, setBrightness } = useBrightnessStore();
@@ -30,8 +30,6 @@ export const MoreOptionsSheet = forwardRef<BottomSheet, MoreOptionsSheetProps>(
     const topOffset = insets.top + 60 + 25;
     const snapPoints = useMemo(() => [SCREEN_HEIGHT - topOffset], [insets.top]);
 
-    const bgColor = modalTheme.sheetBackground;
-    const handleColor = modalTheme.sheetHandle;
     const textColor = modalTheme.textPrimary;
     const borderColor = modalTheme.sheetBorder;
 
@@ -90,8 +88,8 @@ export const MoreOptionsSheet = forwardRef<BottomSheet, MoreOptionsSheetProps>(
             index={-1}
             snapPoints={snapPoints}
             enablePanDownToClose={true}
-            backgroundStyle={{ backgroundColor: bgColor, borderTopLeftRadius: 40, borderTopRightRadius: 40 }}
-            handleIndicatorStyle={{ backgroundColor: handleColor }}
+            backgroundStyle={modalTheme.styles.sheetBackground}
+            handleIndicatorStyle={modalTheme.styles.sheetHandle}
         >
             <BottomSheetView style={styles.contentContainer}>
                 <OptionItem

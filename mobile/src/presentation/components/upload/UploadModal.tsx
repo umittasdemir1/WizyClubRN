@@ -29,7 +29,7 @@ import { useStoryStore } from '../../store/useStoryStore';
 import { SystemBars } from 'react-native-edge-to-edge';
 import { LogCode, logUI, logError, logData } from '@/core/services/Logger';
 import { supabase } from '@/core/supabase';
-import { useModalSheetTheme } from '../../hooks/useModalSheetTheme';
+import { useSurfaceTheme } from '../../hooks/useSurfaceTheme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PREVIEW_ITEM_WIDTH = SCREEN_WIDTH * 0.7;
@@ -59,7 +59,7 @@ const COMMERCIAL_TYPES = [
 
 export function UploadModal({ isVisible, onClose, initialAssets, uploadMode = 'video' }: UploadModalProps) {
     const { isDark } = useThemeStore();
-    const modalTheme = useModalSheetTheme(isDark);
+    const modalTheme = useSurfaceTheme(isDark);
     const { user } = useAuthStore();
     const insets = useSafeAreaInsets();
     const [selectedAssets, setSelectedAssets] = useState<ImagePicker.ImagePickerAsset[]>(initialAssets || []);
@@ -519,10 +519,10 @@ export function UploadModal({ isVisible, onClose, initialAssets, uploadMode = 'v
                 onRequestClose={() => setShowCommercialMenu(false)}
             >
                 <Pressable
-                    style={[styles.modalOverlay, { backgroundColor: modalTheme.modalOverlay }]}
+                    style={[styles.modalOverlay, modalTheme.styles.modalOverlay]}
                     onPress={() => setShowCommercialMenu(false)}
                 >
-                    <View style={[styles.menuModal, { backgroundColor: modalTheme.modalBackground }]}>
+                    <View style={[styles.menuModal, modalTheme.styles.modalCard]}>
                         <View style={[styles.menuHeader, { borderBottomColor: borderColor }]}>
                             <Text style={[styles.menuTitle, { color: textColor }]}>Ticari İlişki Türü Seçin</Text>
                         </View>
@@ -562,10 +562,10 @@ export function UploadModal({ isVisible, onClose, initialAssets, uploadMode = 'v
                 onRequestClose={() => setShowBrandInfoModal(false)}
             >
                 <Pressable
-                    style={[styles.modalOverlay, { backgroundColor: modalTheme.modalOverlay }]}
+                    style={[styles.modalOverlay, modalTheme.styles.modalOverlay]}
                     onPress={() => setShowBrandInfoModal(false)}
                 >
-                    <View style={[styles.menuModal, { backgroundColor: modalTheme.modalBackground }]}>
+                    <View style={[styles.menuModal, modalTheme.styles.modalCard]}>
                         <View style={[styles.menuHeader, { borderBottomColor: borderColor }]}>
                             <Text style={[styles.menuTitle, { color: textColor }]}>{commercialType}</Text>
                         </View>
@@ -610,10 +610,10 @@ export function UploadModal({ isVisible, onClose, initialAssets, uploadMode = 'v
                 onRequestClose={() => setShowTagInputModal(false)}
             >
                 <Pressable
-                    style={[styles.modalOverlay, { backgroundColor: modalTheme.modalOverlay }]}
+                    style={[styles.modalOverlay, modalTheme.styles.modalOverlay]}
                     onPress={() => setShowTagInputModal(false)}
                 >
-                    <View style={[styles.menuModal, { backgroundColor: modalTheme.modalBackground }]}>
+                    <View style={[styles.menuModal, modalTheme.styles.modalCard]}>
                         <View style={[styles.menuHeader, { borderBottomColor: borderColor }]}>
                             <Text style={[styles.menuTitle, { color: textColor }]}>Konu Etiketi Ekle</Text>
                         </View>

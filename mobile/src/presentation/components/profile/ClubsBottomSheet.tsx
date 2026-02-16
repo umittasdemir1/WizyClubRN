@@ -4,7 +4,7 @@ import BottomSheet, { BottomSheetView, BottomSheetScrollView } from '@gorhom/bot
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X } from 'lucide-react-native';
 import { Image } from 'expo-image';
-import { useModalSheetTheme } from '../../hooks/useModalSheetTheme';
+import { useSurfaceTheme } from '../../hooks/useSurfaceTheme';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -23,16 +23,14 @@ interface ClubsBottomSheetProps {
 export const ClubsBottomSheet = forwardRef<BottomSheet, ClubsBottomSheetProps>(
   ({ clubs, isDark }, ref) => {
     const insets = useSafeAreaInsets();
-    const modalTheme = useModalSheetTheme(isDark);
+    const modalTheme = useSurfaceTheme(isDark);
 
     const topOffset = insets.top + 60 + 25;
     const snapPoints = useMemo(() => [SCREEN_HEIGHT - topOffset], [insets.top]);
 
-    const bgColor = modalTheme.sheetBackground;
     const textColor = modalTheme.textPrimary;
     const secondaryColor = modalTheme.sheetMutedText;
     const borderColor = modalTheme.sheetBorder;
-    const handleColor = modalTheme.sheetHandle;
     const cardBg = modalTheme.sheetCard;
 
     return (
@@ -41,8 +39,8 @@ export const ClubsBottomSheet = forwardRef<BottomSheet, ClubsBottomSheetProps>(
         index={-1}
         snapPoints={snapPoints}
         enablePanDownToClose={true}
-        backgroundStyle={{ backgroundColor: bgColor, borderTopLeftRadius: 40, borderTopRightRadius: 40 }}
-        handleIndicatorStyle={{ backgroundColor: handleColor }}
+        backgroundStyle={modalTheme.styles.sheetBackground}
+        handleIndicatorStyle={modalTheme.styles.sheetHandle}
       >
         <BottomSheetView style={styles.container}>
           {/* Header */}

@@ -6,7 +6,7 @@ import { ChevronLeft, MoreVertical } from 'lucide-react-native';
 import { Avatar } from '../shared/Avatar';
 import { Video } from '../../../domain/entities/Video';
 import { logSheet, LogCode } from '@/core/services/Logger';
-import { useModalSheetTheme } from '../../hooks/useModalSheetTheme';
+import { useSurfaceTheme } from '../../hooks/useSurfaceTheme';
 
 interface DescriptionSheetProps {
   video: Video | null;
@@ -18,14 +18,12 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export const DescriptionSheet = forwardRef<BottomSheet, DescriptionSheetProps>(
   ({ video, onFollowPress, onChange }, ref) => {
-    const modalTheme = useModalSheetTheme();
+    const modalTheme = useSurfaceTheme();
     const { isDark } = modalTheme;
     const insets = useSafeAreaInsets();
 
-    const bgColor = modalTheme.sheetBackground;
     const textPrimary = modalTheme.textPrimary;
     const textSecondary = modalTheme.textSecondary;
-    const handleColor = modalTheme.sheetHandle;
 
     const topOffset = insets.top + 60 + 25;
     const snapPoints = useMemo(() => [SCREEN_HEIGHT - topOffset], [insets.top]);
@@ -58,15 +56,11 @@ export const DescriptionSheet = forwardRef<BottomSheet, DescriptionSheetProps>(
         enablePanDownToClose={true}
         enableContentPanningGesture={false}
         enableHandlePanningGesture={true}
-        backgroundStyle={{
-          backgroundColor: bgColor,
-          borderTopLeftRadius: 40,
-          borderTopRightRadius: 40,
-        }}
-        handleIndicatorStyle={{ backgroundColor: handleColor }}
+        backgroundStyle={modalTheme.styles.sheetBackground}
+        handleIndicatorStyle={modalTheme.styles.sheetHandle}
       >
         {/* Fixed Header */}
-        <View style={[styles.header, { backgroundColor: bgColor }]}>
+        <View style={[styles.header, { backgroundColor: modalTheme.sheetBackground }]}>
           <View style={styles.headerLeft}>
             <Pressable
               onPress={handleClose}

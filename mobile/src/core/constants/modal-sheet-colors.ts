@@ -1,40 +1,7 @@
-export const MODAL_SHEET_COLORS = {
-    light: {
-        fullScreenBackground: '#FFFFFF',
-        sheetBackground: '#FFFFFF',
-        sheetHandle: '#000000',
-        sheetBorder: '#E5E5E5',
-        sheetCard: '#F0F0F0',
-        sheetMutedText: '#555555',
-        segmentedFill: '#EDEDF0',
-        inputBackground: '#F5F5F5',
-        previewSurface: '#F5F5F5',
-        modalOverlay: 'rgba(0,0,0,0.5)',
-        modalOverlaySoft: 'rgba(0,0,0,0.45)',
-        modalBackground: '#FFFFFF',
-        modalSeparator: '#E5E5EA',
-        accent: '#3A8DFF',
-        actionPrimary: '#0A84FF',
-        actionDanger: '#FF453A',
-    },
-    dark: {
-        fullScreenBackground: '#080A0F',
-        sheetBackground: '#0F141C',
-        sheetHandle: '#FFFFFF',
-        sheetBorder: '#38383A',
-        sheetCard: '#2C2C2E',
-        sheetMutedText: '#888888',
-        segmentedFill: '#2C2C2E',
-        inputBackground: '#1C1C1E',
-        previewSurface: '#2C2C2E',
-        modalOverlay: 'rgba(0,0,0,0.5)',
-        modalOverlaySoft: 'rgba(0,0,0,0.45)',
-        modalBackground: '#0F141C',
-        modalSeparator: '#38383A',
-        accent: '#3A8DFF',
-        actionPrimary: '#0A84FF',
-        actionDanger: '#FF453A',
-    },
-} as const;
-
-export type ModalSheetPalette = (typeof MODAL_SHEET_COLORS)['light'];
+// Backward compatibility layer.
+// Yeni genel dosya: `surface-theme-tokens.ts`
+export {
+    SURFACE_THEME_TOKENS as MODAL_SHEET_COLORS,
+    type SurfaceThemePalette as ModalSheetPalette,
+    type ShadowToken,
+} from './surface-theme-tokens';

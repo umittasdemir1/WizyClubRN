@@ -3,7 +3,7 @@ import { Dimensions, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Archive, Ban, EyeOff, Flag, Pencil, Star, Trash2 } from 'lucide-react-native';
-import { useModalSheetTheme } from '../../hooks/useModalSheetTheme';
+import { useSurfaceTheme } from '../../hooks/useSurfaceTheme';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -31,14 +31,12 @@ export const StoryMoreOptionsSheet = forwardRef<BottomSheet, StoryMoreOptionsShe
         onBlockPress,
         onSheetStateChange,
     }, ref) => {
-        const modalTheme = useModalSheetTheme();
+        const modalTheme = useSurfaceTheme();
         const insets = useSafeAreaInsets();
 
         const topOffset = insets.top + 60 + 25;
         const snapPoints = useMemo(() => [SCREEN_HEIGHT - topOffset], [topOffset]);
 
-        const bgColor = modalTheme.sheetBackground;
-        const handleColor = modalTheme.sheetHandle;
         const textColor = modalTheme.textPrimary;
         const borderColor = modalTheme.sheetBorder;
 
@@ -73,8 +71,8 @@ export const StoryMoreOptionsSheet = forwardRef<BottomSheet, StoryMoreOptionsShe
                 enablePanDownToClose={true}
                 enableContentPanningGesture={false}
                 enableHandlePanningGesture={true}
-                backgroundStyle={{ backgroundColor: bgColor, borderTopLeftRadius: 40, borderTopRightRadius: 40 }}
-                handleIndicatorStyle={{ backgroundColor: handleColor }}
+                backgroundStyle={modalTheme.styles.sheetBackground}
+                handleIndicatorStyle={modalTheme.styles.sheetHandle}
             >
                 <BottomSheetView style={[styles.contentContainer, { paddingBottom: insets.bottom + 16 }]}>
                     {isOwnStory ? (

@@ -2,7 +2,7 @@ import React, { forwardRef, useMemo } from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useModalSheetTheme } from '../../hooks/useModalSheetTheme';
+import { useSurfaceTheme } from '../../hooks/useSurfaceTheme';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -11,15 +11,13 @@ interface ShoppingSheetProps {
 }
 
 export const ShoppingSheet = forwardRef<BottomSheet, ShoppingSheetProps>((props, ref) => {
-    const modalTheme = useModalSheetTheme();
+    const modalTheme = useSurfaceTheme();
     const { isDark } = modalTheme;
     const insets = useSafeAreaInsets();
 
     const topOffset = insets.top + 60 + 25;
     const snapPoints = useMemo(() => [SCREEN_HEIGHT - topOffset], [insets.top]);
 
-    const bgColor = modalTheme.sheetBackground;
-    const handleColor = modalTheme.sheetHandle;
     const textColor = modalTheme.textPrimary;
 
     return (
@@ -28,8 +26,8 @@ export const ShoppingSheet = forwardRef<BottomSheet, ShoppingSheetProps>((props,
             index={-1}
             snapPoints={snapPoints}
             enablePanDownToClose={true}
-            backgroundStyle={{ backgroundColor: bgColor, borderTopLeftRadius: 40, borderTopRightRadius: 40 }}
-            handleIndicatorStyle={{ backgroundColor: handleColor }}
+            backgroundStyle={modalTheme.styles.sheetBackground}
+            handleIndicatorStyle={modalTheme.styles.sheetHandle}
         >
             <BottomSheetView style={styles.contentContainer}>
                 <Text style={[styles.title, { color: textColor }]}>Shop Products</Text>

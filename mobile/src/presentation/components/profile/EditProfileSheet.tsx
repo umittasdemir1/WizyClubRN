@@ -10,7 +10,7 @@ import { User } from '../../../domain/entities/User';
 import { ProfileRepositoryImpl } from '../../../data/repositories/ProfileRepositoryImpl';
 import { logRepo, logError, LogCode } from '@/core/services/Logger';
 import { shadowStyle } from '@/core/utils/shadow';
-import { useModalSheetTheme } from '../../hooks/useModalSheetTheme';
+import { useSurfaceTheme } from '../../hooks/useSurfaceTheme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -28,7 +28,7 @@ type SubViewType = 'name' | 'username' | 'bio' | 'socialLinks' | null;
 export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
   ({ user, onUpdateProfile, onUploadAvatar, onUpdateCompleted }, ref) => {
     const { isDark } = useThemeStore();
-    const modalTheme = useModalSheetTheme(isDark);
+    const modalTheme = useSurfaceTheme(isDark);
     const insets = useSafeAreaInsets();
 
     const topOffset = insets.top + 60 + 25;
@@ -71,7 +71,6 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
     const textColor = modalTheme.textPrimary;
     const secondaryTextColor = modalTheme.textSecondary;
     const borderColor = modalTheme.sheetBorder;
-    const handleColor = modalTheme.sheetHandle;
 
     const handleClose = () => {
       if (ref && 'current' in ref && ref.current) {
@@ -454,12 +453,8 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
           ref={ref}
           snapPoints={snapPoints}
           enablePanDownToClose={true}
-          backgroundStyle={{
-            backgroundColor: bgColor,
-            borderTopLeftRadius: 40,
-            borderTopRightRadius: 40,
-          }}
-          handleIndicatorStyle={{ backgroundColor: handleColor }}
+          backgroundStyle={modalTheme.styles.sheetBackground}
+          handleIndicatorStyle={modalTheme.styles.sheetHandle}
           index={-1}
         >
           <BottomSheetView style={styles.container}>

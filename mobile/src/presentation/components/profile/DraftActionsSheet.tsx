@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
 import BottomSheet, { BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import { Edit3, Share2, Trash2 } from 'lucide-react-native';
 import { Draft } from '../../../domain/entities/Draft';
-import { useModalSheetTheme } from '../../hooks/useModalSheetTheme';
+import { useSurfaceTheme } from '../../hooks/useSurfaceTheme';
 
 interface DraftActionsSheetProps {
   draft: Draft | null;
@@ -15,10 +15,9 @@ interface DraftActionsSheetProps {
 
 export const DraftActionsSheet = forwardRef<BottomSheet, DraftActionsSheetProps>(
   ({ draft, isDark, onEdit, onShare, onDelete }, ref) => {
-    const modalTheme = useModalSheetTheme(isDark);
+    const modalTheme = useSurfaceTheme(isDark);
     const snapPoints = useMemo(() => ['30%'], []);
 
-    const bgColor = modalTheme.sheetBackground;
     const textColor = modalTheme.textPrimary;
     const borderColor = modalTheme.sheetBorder;
 
@@ -73,8 +72,8 @@ export const DraftActionsSheet = forwardRef<BottomSheet, DraftActionsSheetProps>
         snapPoints={snapPoints}
         enablePanDownToClose
         backdropComponent={renderBackdrop}
-        backgroundStyle={{ backgroundColor: bgColor }}
-        handleIndicatorStyle={{ backgroundColor: modalTheme.sheetHandle }}
+        backgroundStyle={modalTheme.styles.sheetBackground}
+        handleIndicatorStyle={modalTheme.styles.sheetHandle}
       >
         <View style={styles.container}>
           <Text style={[styles.title, { color: textColor }]}>

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-nati
 import BottomSheet, { BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X } from 'lucide-react-native';
-import { useModalSheetTheme } from '../../hooks/useModalSheetTheme';
+import { useSurfaceTheme } from '../../hooks/useSurfaceTheme';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -15,16 +15,14 @@ interface BioBottomSheetProps {
 export const BioBottomSheet = forwardRef<BottomSheet, BioBottomSheetProps>(
   ({ bio, isDark }, ref) => {
     const insets = useSafeAreaInsets();
-    const modalTheme = useModalSheetTheme(isDark);
+    const modalTheme = useSurfaceTheme(isDark);
 
     const topOffset = insets.top + 60 + 25;
     const snapPoints = useMemo(() => [SCREEN_HEIGHT - topOffset], [insets.top]);
 
-    const bgColor = modalTheme.sheetBackground;
     const textColor = modalTheme.textPrimary;
     const secondaryColor = modalTheme.sheetMutedText;
     const borderColor = modalTheme.sheetBorder;
-    const handleColor = modalTheme.sheetHandle;
 
     return (
       <BottomSheet
@@ -32,8 +30,8 @@ export const BioBottomSheet = forwardRef<BottomSheet, BioBottomSheetProps>(
         index={-1}
         snapPoints={snapPoints}
         enablePanDownToClose={true}
-        backgroundStyle={{ backgroundColor: bgColor, borderTopLeftRadius: 40, borderTopRightRadius: 40 }}
-        handleIndicatorStyle={{ backgroundColor: handleColor }}
+        backgroundStyle={modalTheme.styles.sheetBackground}
+        handleIndicatorStyle={modalTheme.styles.sheetHandle}
       >
         <BottomSheetView style={styles.container}>
           {/* Header */}
