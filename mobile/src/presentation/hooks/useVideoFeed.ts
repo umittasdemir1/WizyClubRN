@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { Alert, Share } from 'react-native';
+import { Alert, Share, unstable_batchedUpdates } from 'react-native';
 import { Video } from '../../domain/entities/Video';
 import { VideoFeedCursor } from '../../domain/entities/VideoFeed';
 import { GetVideoFeedUseCase } from '../../domain/usecases/GetVideoFeedUseCase';
@@ -330,18 +330,20 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
         applyVideoCounterDelta(videoId, 'likesCount', likeDelta);
 
         // Optimistic update
-        setVideosWithDescriptionOverrides((prevVideos) =>
-            prevVideos.map((video) => {
-                if (video.id === videoId) {
-                    return {
-                        ...video,
-                        isLiked: optimisticIsLiked,
-                        likesCount: optimisticLikesCount,
-                    };
-                }
-                return video;
-            })
-        );
+        unstable_batchedUpdates(() => {
+            setVideosWithDescriptionOverrides((prevVideos) =>
+                prevVideos.map((video) => {
+                    if (video.id === videoId) {
+                        return {
+                            ...video,
+                            isLiked: optimisticIsLiked,
+                            likesCount: optimisticLikesCount,
+                        };
+                    }
+                    return video;
+                })
+            );
+        });
 
         try {
             const freshUserId = useAuthStore.getState().user?.id || 'anon';
@@ -353,18 +355,20 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
                 applyVideoCounterDelta(videoId, 'likesCount', correctionDelta);
             }
 
-            setVideosWithDescriptionOverrides((prevVideos) =>
-                prevVideos.map((video) => {
-                    if (video.id === videoId) {
-                        return {
-                            ...video,
-                            isLiked: serverIsLiked,
-                            likesCount: finalLikesCount,
-                        };
-                    }
-                    return video;
-                })
-            );
+            unstable_batchedUpdates(() => {
+                setVideosWithDescriptionOverrides((prevVideos) =>
+                    prevVideos.map((video) => {
+                        if (video.id === videoId) {
+                            return {
+                                ...video,
+                                isLiked: serverIsLiked,
+                                likesCount: finalLikesCount,
+                            };
+                        }
+                        return video;
+                    })
+                );
+            });
 
             // Invalidate profile query to update like counts if cached
             queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PROFILE(freshUserId) });
@@ -408,18 +412,20 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
         applyVideoCounterDelta(videoId, 'savesCount', saveDelta);
 
         // Optimistic update
-        setVideosWithDescriptionOverrides((prevVideos) =>
-            prevVideos.map((video) => {
-                if (video.id === videoId) {
-                    return {
-                        ...video,
-                        isSaved: optimisticIsSaved,
-                        savesCount: optimisticSavesCount,
-                    };
-                }
-                return video;
-            })
-        );
+        unstable_batchedUpdates(() => {
+            setVideosWithDescriptionOverrides((prevVideos) =>
+                prevVideos.map((video) => {
+                    if (video.id === videoId) {
+                        return {
+                            ...video,
+                            isSaved: optimisticIsSaved,
+                            savesCount: optimisticSavesCount,
+                        };
+                    }
+                    return video;
+                })
+            );
+        });
 
         try {
             const freshUserId = useAuthStore.getState().user?.id || 'anon';
@@ -431,18 +437,20 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
                 applyVideoCounterDelta(videoId, 'savesCount', correctionDelta);
             }
 
-            setVideosWithDescriptionOverrides((prevVideos) =>
-                prevVideos.map((video) => {
-                    if (video.id === videoId) {
-                        return {
-                            ...video,
-                            isSaved: serverIsSaved,
-                            savesCount: finalSavesCount,
-                        };
-                    }
-                    return video;
-                })
-            );
+            unstable_batchedUpdates(() => {
+                setVideosWithDescriptionOverrides((prevVideos) =>
+                    prevVideos.map((video) => {
+                        if (video.id === videoId) {
+                            return {
+                                ...video,
+                                isSaved: serverIsSaved,
+                                savesCount: finalSavesCount,
+                            };
+                        }
+                        return video;
+                    })
+                );
+            });
 
             // Invalidate saved videos and profile to reflect changes
             queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SAVED_VIDEOS(freshUserId) });

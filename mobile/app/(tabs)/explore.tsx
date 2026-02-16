@@ -4,7 +4,7 @@ import { useIsFocused } from '@react-navigation/native';
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
-import { useStories } from '../../src/presentation/hooks/useStories';
+
 import { useThemeStore } from '../../src/presentation/store/useThemeStore';
 import { isDisabled } from '../../src/presentation/components/poolFeed/hooks/usePoolFeedConfig';
 import Video from 'react-native-video';
@@ -23,7 +23,7 @@ import MoreIcon from '../../assets/icons/more.svg';
 
 // New Components
 import { TrendingHeader } from '../../src/presentation/components/explore/TrendingHeader';
-import { StoryRail } from '../../src/presentation/components/explore/StoryRail';
+
 import { TrendingCarousel } from '../../src/presentation/components/explore/TrendingCarousel';
 import { MasonryFeed } from '../../src/presentation/components/explore/MasonryFeed';
 import { ExploreSkeleton } from '../../src/presentation/components/explore/ExploreSkeleton';
@@ -309,9 +309,7 @@ export default function ExploreScreen() {
         router.push('/videos');
     };
 
-    const handleStoryPress = (id: string) => {
-        router.push(`/story/${id}`);
-    };
+
 
     const showPreview = (item: any) => {
         if (item?.videoUrl) {
@@ -355,26 +353,7 @@ export default function ExploreScreen() {
         .filter((item): item is NonNullable<typeof item> => item != null)
         .slice(0, 5);
 
-    const { stories: storyListData } = useStories();
 
-    const storyCreatorsMap = new Map();
-    (storyListData as any[]).forEach((story: any) => {
-        const existing = storyCreatorsMap.get(story.user.id);
-        if (!existing) {
-            storyCreatorsMap.set(story.user.id, {
-                id: story.user.id,
-                username: story.user.username,
-                avatarUrl: story.user.avatarUrl,
-                hasUnseen: !story.isViewed
-            });
-        } else {
-            if (!story.isViewed) {
-                existing.hasUnseen = true;
-            }
-        }
-    });
-
-    let creators = Array.from(storyCreatorsMap.values());
 
     const discoveryItems = videos.map((v, i) => {
         const media = v.mediaUrls ?? [];
@@ -457,19 +436,7 @@ export default function ExploreScreen() {
                                 onSearchPress={handleSearchPress}
                             />
                         </Animated.View>
-                        {/* 1. Stories Section */}
-                        {creators.length > 0 && (
-                            <>
-                                <Text style={[styles.sectionTitle, { color: themeColors.textPrimary }]}>
-                                    Hikayeler
-                                </Text>
-                                <StoryRail
-                                    creators={creators}
-                                    onCreatorPress={handleStoryPress}
-                                    isDark={isDark}
-                                />
-                            </>
-                        )}
+
 
                         {/* 2. Featured Carousel Section */}
                         {!isRecommendedDisabled && (

@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, type GestureResponderEvent } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { Volume2, VolumeX, MoreVertical } from 'lucide-react-native';
 import VideoPlayer, { type OnLoadData, type OnLoadStartData, type OnProgressData, type OnVideoErrorData } from 'react-native-video';
@@ -307,6 +308,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     }, [item.id, onFollow]);
 
     const handleToggleMute = useCallback(() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         onToggleMute();
     }, [onToggleMute]);
 
@@ -980,7 +982,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                         event.stopPropagation?.();
                                         handleToggleMute();
                                     }}
-                                    hitSlop={10}
+                                    hitSlop={15}
                                 >
                                     {isMuted ? (
                                         <VolumeX size={18} color="#FFFFFF" strokeWidth={1.6} />

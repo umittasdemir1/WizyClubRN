@@ -11,6 +11,7 @@ import Animated, {
     SharedValue,
 } from 'react-native-reanimated';
 import { Heart, Send, Bookmark, PictureInPicture, ShieldQuestion } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 import { formatCount } from '../../../core/utils';
 import { ThemeColors } from './InfiniteFeedTypes';
 import { FEED_FLAGS } from './hooks/useInfiniteFeedConfig';
@@ -112,6 +113,20 @@ const ActionButton = React.memo(function ActionButton({
         transform: [{ scale: scale.value }],
     }));
 
+    const handlePressIn = useCallback(() => {
+        // Immediate tactile and visual response on the UI thread
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        if (!FEED_FLAGS.INF_DISABLE_ACTION_ANIMATIONS) {
+            scale.value = withTiming(0.85, { duration: 60, easing: Easing.out(Easing.ease) });
+        }
+    }, [scale]);
+
+    const handlePressOut = useCallback(() => {
+        if (!FEED_FLAGS.INF_DISABLE_ACTION_ANIMATIONS) {
+            scale.value = withTiming(1, { duration: 150, easing: Easing.out(Easing.back(2)) });
+        }
+    }, [scale]);
+
     const handlePress = useCallback(() => {
         const nextActive = canToggle ? !localActive : localActive;
         if (canToggle) {
@@ -153,9 +168,11 @@ const ActionButton = React.memo(function ActionButton({
     return (
         <Pressable
             onPress={handlePress}
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
             onLongPress={onLongPress}
             style={[styles.actionButton, isZeroCount && zeroText ? styles.actionButtonZeroState : null]}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
             <Animated.View style={[styles.iconWrapper, animatedStyle]}>
                 {enableBurst && localActive && !FEED_FLAGS.INF_DISABLE_ACTION_ANIMATIONS && (
@@ -267,9 +284,12 @@ export const InfiniteFeedActions = React.memo(function InfiniteFeedActions({
                 <View style={[styles.commercialShopTag, { backgroundColor: commercialTagBackgroundColor }]}>
                     <Pressable
                         style={styles.commercialMainAction}
-                        onPress={onShop}
+                        onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            onShop();
+                        }}
                         onLongPress={triggerShake}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
                         {showShopIcon ? (
                             <PictureInPicture size={14} color={commercialTagForegroundColor} strokeWidth={1.8} />
@@ -280,8 +300,11 @@ export const InfiniteFeedActions = React.memo(function InfiniteFeedActions({
                     </Pressable>
                     <Pressable
                         style={styles.commercialInfoButton}
-                        onPress={onCommercialInfoPress}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            onCommercialInfoPress();
+                        }}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
                         <ShieldQuestion size={14} color={commercialTagForegroundColor} strokeWidth={1.9} />
                     </Pressable>

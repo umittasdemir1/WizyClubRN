@@ -5,7 +5,6 @@ import {
     Pressable,
     Alert,
     RefreshControl,
-    ActivityIndicator,
     Dimensions,
     unstable_batchedUpdates,
     type NativeSyntheticEvent,
@@ -43,6 +42,7 @@ import { useInAppBrowserStore } from '../../store/useInAppBrowserStore';
 import { PerformanceLogger } from '../../../core/services/PerformanceLogger';
 import { useUploadStore } from '../../store/useUploadStore';
 import { supabase } from '../../../core/supabase';
+import { ThinSpinner } from '../shared/ThinSpinner';
 
 interface InfiniteFeedManagerProps {
     videos: InfiniteFeedVideo[];
@@ -1025,7 +1025,7 @@ export function InfiniteFeedManager({
     const listEmpty = (
         <View style={styles.emptyState}>
             {isLoading ? (
-                <ActivityIndicator size="large" color={themeColors.textPrimary} />
+                <ThinSpinner size={80} color={themeColors.textPrimary} />
             ) : (
                 <>
                     <Text style={[styles.emptyTitle, { color: themeColors.textPrimary }]}>Akış boş görünüyor</Text>
@@ -1094,7 +1094,7 @@ export function InfiniteFeedManager({
                 onEndReachedThreshold={0.6}
                 ListFooterComponent={
                     isLoadingMore ? (
-                        <ActivityIndicator style={styles.footerLoader} color={themeColors.textPrimary} />
+                        <ThinSpinner size={32} color={themeColors.textPrimary} style={styles.footerLoader} />
                     ) : null
                 }
                 ListEmptyComponent={listEmpty}

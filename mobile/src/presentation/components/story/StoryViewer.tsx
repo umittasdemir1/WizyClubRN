@@ -8,14 +8,12 @@ import {
     Share,
     Alert,
     useWindowDimensions,
-    Animated as RNAnimated,
-    PanResponder,
-    Easing,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
 import Video, { SelectedTrackType } from 'react-native-video';
-import { useSharedValue } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, runOnJS, interpolate, Extrapolation } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BottomSheet from '@gorhom/bottom-sheet';
 import { Story } from '../../../domain/entities/Story';
@@ -34,6 +32,8 @@ import { StoryRepositoryImpl } from '../../../data/repositories/StoryRepositoryI
 import { useInAppBrowserStore } from '../../store/useInAppBrowserStore';
 import { useActiveVideoStore } from '../../store/useActiveVideoStore';
 import { logError, LogCode } from '../../../core/services/Logger';
+import { StoryViewerSkeleton } from './StoryViewerSkeleton';
+import { VideoCacheService } from '../../../data/services/VideoCacheService';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('screen');
 const IMAGE_STORY_DURATION_MS = 5000;
@@ -112,9 +112,12 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
     const wasPausedBeforeMoreSheetRef = useRef(false);
     const keepPausedForDeleteModalRef = useRef(false);
     const pendingPageAfterDeleteRef = useRef<number | null>(null);
-    const dragTranslateY = useRef(new RNAnimated.Value(0)).current;
-    const swipeClosingRef = useRef(false);
+    const dragTranslateY = useSharedValue(0);
+    const isSwipeClosing = useSharedValue(false);
     const activeStoryIdRef = useRef<string | null>(null);
+    const loadedMediaIdsRef = useRef<Set<string>>(new Set());
+    const [mediaReady, setMediaReady] = useState(false);
+    const [resolvedVideoUrls, setResolvedVideoUrls] = useState<Record<string, string>>({});
 
     const visibleStories = useMemo(
         () => stories.filter((story) => !deletedOriginalStoryIds.has(story.id)),
@@ -251,30 +254,30 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
     }, [router]);
 
     const handleOpenMoreOptions = useCallback(() => {
-        swipeClosingRef.current = false;
-        dragTranslateY.setValue(0);
+        isSwipeClosing.value = false;
+        dragTranslateY.value = 0;
         wasPausedBeforeMoreSheetRef.current = isPausedRef.current;
         setIsPaused(true);
         setIsMoreSheetOpen(true);
         moreOptionsSheetRef.current?.snapToIndex(0);
-    }, [dragTranslateY]);
+    }, [dragTranslateY, isSwipeClosing]);
 
     const handleMoreSheetStateChange = useCallback((isOpen: boolean) => {
         setIsMoreSheetOpen(isOpen);
         if (isOpen) {
-            swipeClosingRef.current = false;
-            dragTranslateY.setValue(0);
+            isSwipeClosing.value = false;
+            dragTranslateY.value = 0;
             return;
         }
 
-        swipeClosingRef.current = false;
-        dragTranslateY.setValue(0);
+        isSwipeClosing.value = false;
+        dragTranslateY.value = 0;
         const shouldResume = !wasPausedBeforeMoreSheetRef.current && !keepPausedForDeleteModalRef.current;
         wasPausedBeforeMoreSheetRef.current = false;
         if (shouldResume) {
             setIsPaused(false);
         }
-    }, [dragTranslateY]);
+    }, [dragTranslateY, isSwipeClosing]);
 
     const handleOpenDeleteConfirmation = useCallback(() => {
         keepPausedForDeleteModalRef.current = true;
@@ -350,81 +353,56 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
         }
     }, [activeStory?.originalId, currentIndex, expandedStories, handleClose, isDeletingStory, isOwnStory, setPagerPage, triggerStoryRefresh]);
 
-    const restoreDraggedPosition = useCallback(() => {
-        RNAnimated.spring(dragTranslateY, {
-            toValue: 0,
-            useNativeDriver: true,
-            tension: 190,
-            friction: 24,
-        }).start();
-    }, [dragTranslateY]);
-
-    const handleSwipeRelease = useCallback((dy: number, vy: number) => {
-        const travelY = Math.max(0, dy);
-        const shouldClose =
-            travelY > SWIPE_CLOSE_DISTANCE ||
-            (travelY > SWIPE_CLOSE_DISTANCE * 0.4 && vy > SWIPE_CLOSE_VELOCITY);
-
-        if (!shouldClose) {
-            restoreDraggedPosition();
-            return;
-        }
-
-        if (swipeClosingRef.current) {
-            return;
-        }
-        swipeClosingRef.current = true;
-
-        const remaining = Math.max(0, viewportHeight - travelY);
-        const rawDuration = (remaining / viewportHeight) * SWIPE_CLOSE_MAX_DURATION_MS;
-        const duration = Math.max(
-            SWIPE_CLOSE_MIN_DURATION_MS,
-            Math.min(SWIPE_CLOSE_MAX_DURATION_MS, Math.round(rawDuration))
-        );
-
-        RNAnimated.timing(dragTranslateY, {
-            toValue: viewportHeight,
-            duration,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-        }).start(() => {
-            handleClose();
-        });
-    }, [dragTranslateY, handleClose, restoreDraggedPosition, viewportHeight]);
-
-    const closePanResponder = useMemo(
+    const dismissGesture = useMemo(
         () =>
-            PanResponder.create({
-                onStartShouldSetPanResponder: () => false,
-                onMoveShouldSetPanResponder: (_, gesture) => {
-                    if (isMoreSheetOpen) return false;
-                    if (swipeClosingRef.current) return false;
-                    const absDx = Math.abs(gesture.dx);
-                    const absDy = Math.abs(gesture.dy);
-                    return gesture.dy > 8 && absDy > absDx * 1.3;
-                },
-                onMoveShouldSetPanResponderCapture: (_, gesture) => {
-                    if (isMoreSheetOpen) return false;
-                    if (swipeClosingRef.current) return false;
-                    const absDx = Math.abs(gesture.dx);
-                    const absDy = Math.abs(gesture.dy);
-                    return gesture.dy > 8 && absDy > absDx * 1.3;
-                },
-                onPanResponderMove: (_, gesture) => {
-                    if (isMoreSheetOpen) return;
-                    if (swipeClosingRef.current) return;
-                    dragTranslateY.setValue(Math.max(0, gesture.dy));
-                },
-                onPanResponderRelease: (_, gesture) => {
-                    if (isMoreSheetOpen) return;
-                    handleSwipeRelease(gesture.dy, gesture.vy);
-                },
-                onPanResponderTerminate: (_, gesture) => {
-                    if (isMoreSheetOpen) return;
-                    handleSwipeRelease(gesture.dy, gesture.vy);
-                },
-            }),
-        [dragTranslateY, handleSwipeRelease, isMoreSheetOpen]
+            Gesture.Pan()
+                .activeOffsetY(12)
+                .failOffsetX([-15, 15])
+                .enabled(!isMoreSheetOpen)
+                .onUpdate((e) => {
+                    'worklet';
+                    if (isSwipeClosing.value) return;
+                    dragTranslateY.value = Math.max(0, e.translationY);
+                })
+                .onEnd((e) => {
+                    'worklet';
+                    if (isSwipeClosing.value) return;
+
+                    const travelY = Math.max(0, e.translationY);
+                    const shouldClose =
+                        travelY > SWIPE_CLOSE_DISTANCE ||
+                        (travelY > SWIPE_CLOSE_DISTANCE * 0.4 && e.velocityY > SWIPE_CLOSE_VELOCITY * 1000);
+
+                    if (!shouldClose) {
+                        dragTranslateY.value = withSpring(0, {
+                            damping: 20,
+                            stiffness: 300,
+                            mass: 0.8,
+                        });
+                        return;
+                    }
+
+                    isSwipeClosing.value = true;
+
+                    const closeTarget = SCREEN_HEIGHT + 80;
+                    const remaining = Math.max(0, closeTarget - travelY);
+                    const rawDuration = (remaining / closeTarget) * SWIPE_CLOSE_MAX_DURATION_MS;
+                    const duration = Math.max(
+                        SWIPE_CLOSE_MIN_DURATION_MS,
+                        Math.min(SWIPE_CLOSE_MAX_DURATION_MS, Math.round(rawDuration)),
+                    );
+
+                    dragTranslateY.value = withTiming(
+                        closeTarget,
+                        { duration },
+                        (finished) => {
+                            if (finished) {
+                                runOnJS(handleClose)();
+                            }
+                        },
+                    );
+                }),
+        [dragTranslateY, handleClose, isMoreSheetOpen, isSwipeClosing],
     );
 
     useEffect(() => {
@@ -497,12 +475,15 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
         if (!activeStory) return;
 
         longPressTriggeredRef.current = false;
-        swipeClosingRef.current = false;
-        dragTranslateY.setValue(0);
+        isSwipeClosing.value = false;
+        dragTranslateY.value = 0;
         setIsLiked(activeStory.isLiked || false);
         setIsPaused(false);
         resetProgressEngine();
         activeStoryIdRef.current = activeStory.id;
+
+        // Reset mediaReady: check if this media was already loaded
+        setMediaReady(loadedMediaIdsRef.current.has(activeStory.id));
 
         if (activeStory.mediaType === 'image') {
             progressDurationMsRef.current = IMAGE_STORY_DURATION_MS;
@@ -513,6 +494,39 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
             progressDurationMsRef.current = videoDurationsRef.current[activeStory.id] || 0;
         }
     }, [activeStory?.id, activeStory?.mediaType, dragTranslateY, resetProgressEngine, startProgressTicker]);
+
+    // Resolve cached video URLs for all video stories
+    useEffect(() => {
+        let cancelled = false;
+        const videoStories = expandedStories.filter(s => s.mediaType === 'video' && s.videoUrl);
+
+        videoStories.forEach(async (story) => {
+            const url = story.videoUrl;
+            // Already resolved?
+            if (resolvedVideoUrls[story.id]) return;
+
+            // Try memory cache first (instant)
+            const memoryCached = VideoCacheService.getMemoryCachedPath(url);
+            if (memoryCached) {
+                if (!cancelled) {
+                    setResolvedVideoUrls(prev => ({ ...prev, [story.id]: memoryCached }));
+                }
+                return;
+            }
+
+            // Try disk cache, then download
+            try {
+                const cachedPath = await VideoCacheService.cacheVideo(url);
+                if (cachedPath && !cancelled) {
+                    setResolvedVideoUrls(prev => ({ ...prev, [story.id]: cachedPath }));
+                }
+            } catch (err) {
+                // Silently fallback to network URL
+            }
+        });
+
+        return () => { cancelled = true; };
+    }, [expandedStories]);
 
     useEffect(() => {
         isPausedRef.current = isPaused;
@@ -534,6 +548,12 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
     const handleVideoProgress = useCallback((storyId: string) => (data: any) => {
         if (activeStoryIdRef.current !== storyId) return;
         if (isPausedRef.current) return;
+
+        // Fallback: if progress fires, the video is playing — dismiss skeleton
+        if (!loadedMediaIdsRef.current.has(storyId)) {
+            loadedMediaIdsRef.current.add(storyId);
+            setMediaReady(true);
+        }
 
         const eventDurationMs = Math.max(
             Number(data?.seekableDuration || 0),
@@ -668,151 +688,186 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
         return { width, height };
     }, [viewportHeight, viewportWidth]);
 
-    const dragOpacity = dragTranslateY.interpolate({
-        inputRange: [0, viewportHeight * 0.6],
-        outputRange: [1, 0.5],
-        extrapolate: 'clamp',
+    const animatedContainerStyle = useAnimatedStyle(() => {
+        const opacity = interpolate(
+            dragTranslateY.value,
+            [0, viewportHeight * 0.6],
+            [1, 0.5],
+            Extrapolation.CLAMP,
+        );
+        return {
+            transform: [{ translateY: dragTranslateY.value }],
+            opacity,
+        };
     });
 
     return (
-        <RNAnimated.View
-            style={[
-                styles.container,
-                {
-                    transform: [{ translateY: dragTranslateY }],
-                    opacity: dragOpacity,
-                },
-            ]}
-            {...(isMoreSheetOpen ? {} : closePanResponder.panHandlers)}
-        >
-            <ImageBackground
-                source={{ uri: activeStory.thumbnailUrl }}
-                style={StyleSheet.absoluteFill}
-                blurRadius={50}
+        <GestureDetector gesture={dismissGesture}>
+            <Animated.View
+                style={[
+                    styles.container,
+                    animatedContainerStyle,
+                ]}
             >
-                <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
-            </ImageBackground>
+                <ImageBackground
+                    source={{ uri: activeStory.thumbnailUrl }}
+                    style={StyleSheet.absoluteFill}
+                    blurRadius={50}
+                >
+                    <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+                </ImageBackground>
 
-            <View style={styles.videoArea}>
-                <View style={[styles.stageWrapper, { paddingTop: insets.top + STAGE_EXTRA_TOP_OFFSET }]}>
-                    <View style={[styles.stage, stageSize]}>
-                        <PagerView
-                            ref={pagerRef}
-                            style={StyleSheet.absoluteFill}
-                            initialPage={initialIndex}
-                            onPageSelected={handlePageSelected}
-                            orientation="horizontal"
-                            overdrag={false}
-                            scrollEnabled={true}
-                        >
-                            {expandedStories.map((story, index) => (
-                                <View key={story.id} style={styles.page}>
-                                    {story.mediaType === 'video' ? (
-                                        <Video
-                                            ref={(ref) => { videoRefs.current[story.id] = ref; }}
-                                            source={{ uri: story.videoUrl }}
-                                            style={styles.video}
-                                            resizeMode={mediaResizeMode}
-                                            repeat={false}
-                                            paused={isPaused || index !== currentIndex}
-                                            muted={isMuted}
-                                            selectedAudioTrack={isMuted ? { type: SelectedTrackType.DISABLED } : undefined}
-                                            progressUpdateInterval={50}
-                                            onLoad={handleVideoLoad(story.id)}
-                                            onProgress={index === currentIndex ? handleVideoProgress(story.id) : undefined}
-                                            onBuffer={index === currentIndex ? handleVideoBuffer(story.id) : undefined}
-                                            onEnd={index === currentIndex ? handleVideoEnd : undefined}
-                                            ignoreSilentSwitch="ignore"
-                                            mixWithOthers={isMuted ? 'mix' : undefined}
-                                            disableFocus={isMuted}
-                                        />
-                                    ) : (
-                                        <Image
-                                            source={{ uri: story.videoUrl }}
-                                            style={styles.video}
-                                            contentFit={imageContentFit}
-                                            priority="high"
-                                            cachePolicy="memory-disk"
-                                        />
-                                    )}
-                                </View>
-                            ))}
-                        </PagerView>
+                <View style={styles.videoArea}>
+                    <View style={[styles.stageWrapper, { paddingTop: insets.top + STAGE_EXTRA_TOP_OFFSET }]}>
+                        <View style={[styles.stage, stageSize]}>
+                            <PagerView
+                                ref={pagerRef}
+                                style={StyleSheet.absoluteFill}
+                                initialPage={initialIndex}
+                                onPageSelected={handlePageSelected}
+                                orientation="horizontal"
+                                overdrag={false}
+                                scrollEnabled={true}
+                            >
+                                {expandedStories.map((story, index) => (
+                                    <View key={story.id} style={styles.page}>
+                                        {story.mediaType === 'video' ? (
+                                            <Video
+                                                ref={(ref) => { videoRefs.current[story.id] = ref; }}
+                                                source={{ uri: resolvedVideoUrls[story.id] || story.videoUrl }}
+                                                style={styles.video}
+                                                resizeMode={mediaResizeMode}
+                                                repeat={false}
+                                                paused={isPaused || index !== currentIndex}
+                                                muted={isMuted}
+                                                selectedAudioTrack={isMuted ? { type: SelectedTrackType.DISABLED } : undefined}
+                                                progressUpdateInterval={50}
+                                                onLoad={handleVideoLoad(story.id)}
+                                                onReadyForDisplay={() => {
+                                                    if (!loadedMediaIdsRef.current.has(story.id)) {
+                                                        loadedMediaIdsRef.current.add(story.id);
+                                                    }
+                                                    if (activeStoryIdRef.current === story.id) {
+                                                        setMediaReady(true);
+                                                    }
+                                                }}
+                                                onProgress={index === currentIndex ? handleVideoProgress(story.id) : undefined}
+                                                onBuffer={index === currentIndex ? handleVideoBuffer(story.id) : undefined}
+                                                onEnd={index === currentIndex ? handleVideoEnd : undefined}
+                                                onError={() => {
+                                                    if (activeStoryIdRef.current === story.id) {
+                                                        setMediaReady(true);
+                                                    }
+                                                }}
+                                                ignoreSilentSwitch="ignore"
+                                                mixWithOthers={isMuted ? 'mix' : undefined}
+                                                disableFocus={isMuted}
+                                            />
+                                        ) : (
+                                            <Image
+                                                source={{ uri: story.videoUrl }}
+                                                style={styles.video}
+                                                contentFit={imageContentFit}
+                                                priority="high"
+                                                cachePolicy="memory-disk"
+                                                onLoad={() => {
+                                                    loadedMediaIdsRef.current.add(story.id);
+                                                    if (activeStoryIdRef.current === story.id) {
+                                                        setMediaReady(true);
+                                                    }
+                                                }}
+                                                onError={() => {
+                                                    if (activeStoryIdRef.current === story.id) {
+                                                        setMediaReady(true);
+                                                    }
+                                                }}
+                                            />
+                                        )}
+                                    </View>
+                                ))}
+                            </PagerView>
 
-                        <View style={styles.tapZones} pointerEvents="box-none">
-                            <Pressable
-                                style={styles.leftZone}
-                                onPress={handleTapLeft}
-                                onLongPress={handleLongPressPause}
-                                delayLongPress={HOLD_PAUSE_DELAY_MS}
-                                onPressOut={handlePressOut}
-                            />
-                            <Pressable
-                                style={styles.rightZone}
-                                onPress={handleTapRight}
-                                onLongPress={handleLongPressPause}
-                                delayLongPress={HOLD_PAUSE_DELAY_MS}
-                                onPressOut={handlePressOut}
-                            />
+                            <View style={styles.tapZones} pointerEvents="box-none">
+                                <Pressable
+                                    style={styles.leftZone}
+                                    onPress={handleTapLeft}
+                                    onLongPress={handleLongPressPause}
+                                    delayLongPress={HOLD_PAUSE_DELAY_MS}
+                                    onPressOut={handlePressOut}
+                                />
+                                <Pressable
+                                    style={styles.rightZone}
+                                    onPress={handleTapRight}
+                                    onLongPress={handleLongPressPause}
+                                    delayLongPress={HOLD_PAUSE_DELAY_MS}
+                                    onPressOut={handlePressOut}
+                                />
+                            </View>
                         </View>
                     </View>
                 </View>
-            </View>
 
-            <StoryHeader
-                story={activeStory as Story}
-                progress={progress}
-                totalStories={expandedStories.length}
-                currentStoryIndex={currentIndex}
-                onClose={handleClose}
-                onMorePress={handleOpenMoreOptions}
-            />
-
-            <View style={styles.actionsOverlay} pointerEvents="box-none">
-                <StoryActions
-                    isLiked={isLiked}
-                    onLike={handleLike}
-                    onShare={handleShare}
-                    onShop={handleShop}
-                    showShop={!!activeStory.brandUrl}
-                    onEmojiSelect={handleEmojiSelect}
-                    overlay
+                <StoryHeader
+                    story={activeStory as Story}
+                    progress={progress}
+                    totalStories={expandedStories.length}
+                    currentStoryIndex={currentIndex}
+                    onClose={handleClose}
+                    onMorePress={handleOpenMoreOptions}
                 />
-            </View>
 
-            <View
-                style={styles.sheetsContainer}
-                pointerEvents={isMoreSheetOpen ? 'box-none' : 'none'}
-            >
-                {isMoreSheetOpen && !isDeleteConfirmationVisible ? (
-                    <Pressable
-                        style={styles.sheetDismissOverlay}
-                        onPress={() => moreOptionsSheetRef.current?.close()}
+                {!mediaReady && (
+                    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+                        <StoryViewerSkeleton />
+                    </View>
+                )}
+
+                <View style={styles.actionsOverlay} pointerEvents="box-none">
+                    <StoryActions
+                        isLiked={isLiked}
+                        onLike={handleLike}
+                        onShare={handleShare}
+                        onShop={handleShop}
+                        showShop={!!activeStory.brandUrl}
+                        onEmojiSelect={handleEmojiSelect}
+                        overlay
                     />
-                ) : null}
-                <StoryMoreOptionsSheet
-                    ref={moreOptionsSheetRef}
-                    isOwnStory={isOwnStory}
-                    onDeletePress={isOwnStory ? handleOpenDeleteConfirmation : undefined}
-                    onSheetStateChange={handleMoreSheetStateChange}
-                />
-            </View>
+                </View>
 
-            <StoryDeleteConfirmationModal
-                visible={isDeleteConfirmationVisible}
-                onCancel={handleCancelDelete}
-                onConfirm={handleDeleteStory}
-            />
+                <View
+                    style={styles.sheetsContainer}
+                    pointerEvents={isMoreSheetOpen ? 'box-none' : 'none'}
+                >
+                    {isMoreSheetOpen && !isDeleteConfirmationVisible ? (
+                        <Pressable
+                            style={styles.sheetDismissOverlay}
+                            onPress={() => moreOptionsSheetRef.current?.close()}
+                        />
+                    ) : null}
+                    <StoryMoreOptionsSheet
+                        ref={moreOptionsSheetRef}
+                        isOwnStory={isOwnStory}
+                        onDeletePress={isOwnStory ? handleOpenDeleteConfirmation : undefined}
+                        onSheetStateChange={handleMoreSheetStateChange}
+                    />
+                </View>
 
-            {flyingEmojis.map((emojiData) => (
-                <FlyingEmoji
-                    key={emojiData.id}
-                    emoji={emojiData.emoji}
-                    startX={emojiData.x}
-                    startY={emojiData.y}
+                <StoryDeleteConfirmationModal
+                    visible={isDeleteConfirmationVisible}
+                    onCancel={handleCancelDelete}
+                    onConfirm={handleDeleteStory}
                 />
-            ))}
-        </RNAnimated.View>
+
+                {flyingEmojis.map((emojiData) => (
+                    <FlyingEmoji
+                        key={emojiData.id}
+                        emoji={emojiData.emoji}
+                        startX={emojiData.x}
+                        startY={emojiData.y}
+                    />
+                ))}
+            </Animated.View>
+        </GestureDetector>
     );
 }
 
