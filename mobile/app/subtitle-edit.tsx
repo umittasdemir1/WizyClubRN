@@ -108,8 +108,9 @@ export default function SubtitleEditScreen() {
                 throw new Error(payload?.error || 'Generate failed');
             }
             Alert.alert('Başlatıldı', 'Altyazı üretimi başlatıldı. Biraz sonra yenileyin.');
-        } catch (error: any) {
-            Alert.alert('Hata', error?.message || 'Altyazı üretimi başlatılamadı.');
+        } catch (error: unknown) {
+            const err = error as Error;
+            Alert.alert('Hata', err?.message || 'Altyazı üretimi başlatılamadı.');
         } finally {
             setIsGenerating(false);
         }
@@ -133,8 +134,9 @@ export default function SubtitleEditScreen() {
                 throw new Error(payload?.error || 'Save failed');
             }
             Alert.alert('Kaydedildi', 'Altyazı düzenlemeleri kaydedildi.');
-        } catch (error: any) {
-            Alert.alert('Hata', error?.message || 'Kaydetme başarısız.');
+        } catch (error: unknown) {
+            const err = error as Error;
+            Alert.alert('Hata', err?.message || 'Kaydetme başarısız.');
         } finally {
             setIsSaving(false);
         }

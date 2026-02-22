@@ -1,4 +1,4 @@
-import '../src/utils/ignoreWarnings';
+import '../src/core/utils/ignoreWarnings';
 import { Stack, useSegments } from 'expo-router';
 import { DefaultTheme, DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { FontAwesome6 } from '@expo/vector-icons';

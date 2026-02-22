@@ -1,37 +1,18 @@
 import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AppState, Platform } from 'react-native';
+import { AppState } from 'react-native';
 
 // Supabase Configuration — loaded from mobile/.env
 // Restart Expo after changing .env: npx expo start --clear
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
 
-// Web-compatible storage adapter
-const createWebStorage = () => {
-    if (typeof window === 'undefined') {
-        // SSR fallback - return no-op storage
-        return {
-            getItem: () => null,
-            setItem: () => { },
-            removeItem: () => { },
-        };
-    }
-    return {
-        getItem: (key: string) => window.localStorage.getItem(key),
-        setItem: (key: string, value: string) => window.localStorage.setItem(key, value),
-        removeItem: (key: string) => window.localStorage.removeItem(key),
-    };
-};
-
-const storage = Platform.OS === 'web' ? createWebStorage() : AsyncStorage;
-
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
-        storage,
+        storage: AsyncStorage,
         autoRefreshToken: true,
         persistSession: true,
-        detectSessionInUrl: Platform.OS === 'web',
+        detectSessionInUrl: false,
     },
 });
 
@@ -39,24 +20,10 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 // if the app is in the foreground. When this is added, you will continue
 // to receive `onAuthStateChange` events with the `TOKEN_REFRESHED` or
 // `SIGNED_OUT` event if the user's session is terminated.
-// Only setup AppState listener on native platforms
-if (Platform.OS !== 'web') {
-    AppState.addEventListener('change', (state) => {
-        if (state === 'active') {
-            supabase.auth.startAutoRefresh();
-        } else {
-            supabase.auth.stopAutoRefresh();
-        }
-    });
-} else {
-    // Web: Use visibility API
-    if (typeof window !== 'undefined') {
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') {
-                supabase.auth.startAutoRefresh();
-            } else {
-                supabase.auth.stopAutoRefresh();
-            }
-        });
+AppState.addEventListener('change', (state) => {
+    if (state === 'active') {
+        supabase.auth.startAutoRefresh();
+    } else {
+        supabase.auth.stopAutoRefresh();
     }
-}
+});

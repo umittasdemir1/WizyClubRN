@@ -78,12 +78,7 @@ const SUBTITLE_ALIGN_CYCLE: SubtitleTextAlign[] = ['center', 'end', 'start'];
 const PREVIEW_PROGRESS_COMMIT_INTERVAL_MS = 120;
 const PREVIEW_PROGRESS_MIN_DELTA_MS = 160;
 
-// These are still used locally for the style editor panel
-function resolveSubtitleTextAlign(textAlign: SubtitleTextAlign | undefined): 'left' | 'center' | 'right' {
-    if (textAlign === 'center') return 'center';
-    if (textAlign === 'end' || textAlign === 'right') return 'right';
-    return 'left';
-}
+import { resolveSubtitleTextAlign } from '../src/core/utils/subtitleUtils';
 
 function getNextSubtitleAlign(current: SubtitleTextAlign | undefined): SubtitleTextAlign {
     const currentIndex = SUBTITLE_ALIGN_CYCLE.indexOf(current || 'center');

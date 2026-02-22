@@ -341,12 +341,13 @@ export function StoryViewer({ stories, initialIndex = 0, onNext, onPrev }: Story
             }
 
             triggerStoryRefresh();
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const err = error as Error;
             logError(LogCode.DB_DELETE, 'Story soft delete failed', {
-                error,
+                error: err,
                 storyId: activeStory.originalId,
             });
-            Alert.alert('Silme Başarısız', error?.message || 'Bilinmeyen hata');
+            Alert.alert('Silme Başarısız', err?.message || 'Bilinmeyen hata');
             setIsPaused(false);
         } finally {
             setIsDeletingStory(false);

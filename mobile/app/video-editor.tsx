@@ -38,11 +38,7 @@ const FILTER_OPTIONS: Array<{ id: UploadComposerFilterPreset; label: string }> =
 
 const DEFAULT_SUBTITLE_STYLE = { fontSize: 18, textAlign: 'center' as SubtitleTextAlign, showOverlay: true };
 
-function resolveSubtitleTextAlign(textAlign: SubtitleTextAlign | undefined): 'left' | 'center' | 'right' {
-    if (textAlign === 'center') return 'center';
-    if (textAlign === 'end' || textAlign === 'right') return 'right';
-    return 'left';
-}
+import { resolveSubtitleTextAlign } from '../src/core/utils/subtitleUtils';
 
 const formatSeconds = (value: number) => {
     const safe = Math.max(0, value);

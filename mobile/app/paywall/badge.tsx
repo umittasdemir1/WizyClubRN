@@ -89,7 +89,8 @@ export default function BadgePaywallScreen() {
     try {
       await Purchases.purchasePackage(selectedPackage);
       showModal('Başarılı', 'Rozet için kaydın tamamlandı.', 'success');
-    } catch (err: any) {
+    } catch (error: unknown) {
+      const err = error as Error & { userCancelled?: boolean };
       if (err?.userCancelled) return;
       showModal('Satın alma başarısız', err?.message || 'Beklenmeyen bir hata oluştu.', 'error');
     } finally {

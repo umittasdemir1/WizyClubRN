@@ -636,11 +636,12 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
             // Invalidate profile to update counts
             const freshUserId = useAuthStore.getState().user?.id || 'anon';
             queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PROFILE(freshUserId) });
-        } catch (error: any) {
-            logError(LogCode.DB_DELETE, 'Video delete failed, rolling back', error);
+        } catch (error: unknown) {
+            const err = error as Error;
+            logError(LogCode.DB_DELETE, 'Video delete failed, rolling back', err);
             // Rollback on failure
             setVideosWithDescriptionOverrides(currentVideos);
-            Alert.alert("Silme Başarısız", error.message || "Bilinmeyen hata");
+            Alert.alert("Silme Başarısız", err.message || "Bilinmeyen hata");
         }
     }, [setVideosWithDescriptionOverrides, videos]);
 

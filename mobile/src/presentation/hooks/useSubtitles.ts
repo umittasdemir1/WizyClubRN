@@ -129,7 +129,8 @@ export function useSubtitles(videoId: string | undefined) {
                         setSubtitles(null);
                     }
                 }
-            } catch (err: any) {
+            } catch (error: unknown) {
+                const err = error as Error;
                 if (isMounted) {
                     setError(err.message || 'Subtitles could not be loaded');
                     console.warn('[SUBTITLE_HOOK] Fetch error:', err);

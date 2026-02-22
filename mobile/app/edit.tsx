@@ -163,8 +163,9 @@ export default function EditPostScreen() {
                 throw new Error(payload?.error || 'Altyazı üretimi başlatılamadı.');
             }
             Alert.alert('Başlatıldı', 'Altyazı üretimi başlatıldı.');
-        } catch (error: any) {
-            Alert.alert('Hata', error?.message || 'Altyazı üretimi başlatılamadı.');
+        } catch (error: unknown) {
+            const err = error as Error;
+            Alert.alert('Hata', err?.message || 'Altyazı üretimi başlatılamadı.');
         }
     }, [resolvedVideoId]);
 

@@ -75,8 +75,8 @@ export function InfiniteFeedUploadPreview({ borderColor }: { borderColor: string
                         <View style={styles.progressTrack}>
                             <View style={[styles.progressFill, { width: `${displayProgress}%` }]}>
                                 <LinearGradient
-                                    colors={gradientConfig.colors}
-                                    locations={gradientConfig.locations}
+                                    colors={gradientConfig.colors as unknown as readonly [string, string, ...string[]]}
+                                    locations={gradientConfig.locations as readonly [number, number, ...number[]] | null | undefined}
                                     start={{ x: 0, y: 0.5 }}
                                     end={{ x: 1, y: 0.5 }}
                                     style={styles.progressGradient}

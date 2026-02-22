@@ -81,7 +81,8 @@ export const useAuthStore = create<AuthState>((set) => ({
       logAuth(LogCode.AUTH_LOGIN_SUCCESS, 'User signed in', { userId: data.user?.id, email });
       set({ user: data.user, session: data.session, isLoading: false, error: null });
       return { success: true };
-    } catch (err: any) {
+    } catch (error: unknown) {
+      const err = error as Error;
       logError(LogCode.AUTH_LOGIN_FAILED, 'Sign in exception', err);
       const errorMessage = 'Beklenmeyen bir hata oluştu.';
       set({ isLoading: false, error: errorMessage });
@@ -143,7 +144,8 @@ export const useAuthStore = create<AuthState>((set) => ({
 
       set({ isLoading: false, error: null });
       return { success: true };
-    } catch (err: any) {
+    } catch (error: unknown) {
+      const err = error as Error;
       logError(LogCode.AUTH_LOGIN_FAILED, 'Sign up exception', err);
       const errorMessage = 'Beklenmeyen bir hata oluştu.';
       set({ isLoading: false, error: errorMessage });

@@ -16,11 +16,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SUBTITLE_SIDE_MARGIN = 20;
 const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = { fontSize: 18, textAlign: 'center', showOverlay: true };
 
-function resolveSubtitleTextAlign(textAlign: SubtitleTextAlign | undefined): 'left' | 'center' | 'right' {
-    if (textAlign === 'center') return 'center';
-    if (textAlign === 'end' || textAlign === 'right') return 'right';
-    return 'left';
-}
+import { resolveSubtitleTextAlign } from '@/core/utils/subtitleUtils';
 
 export const DraggableSubtitleOverlay = ({
     segments,

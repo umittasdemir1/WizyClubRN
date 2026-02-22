@@ -20,8 +20,9 @@ export class ProfileRepositoryImpl implements IProfileRepository {
             }
 
             return this.mapDtoToUser(data);
-        } catch (error: any) {
-            logError(LogCode.REPO_ERROR, 'Profile repository getProfile error', { error, userId, viewerId });
+        } catch (error: unknown) {
+            const err = error as Error;
+            logError(LogCode.REPO_ERROR, 'Profile repository getProfile error', { error: err, userId, viewerId });
             return null;
         }
     }
@@ -39,8 +40,9 @@ export class ProfileRepositoryImpl implements IProfileRepository {
                 following_count: 0,
                 posts_count: 0
             });
-        } catch (error: any) {
-            logError(LogCode.REPO_ERROR, 'Profile repository getProfileLite error', { error, userId });
+        } catch (error: unknown) {
+            const err = error as Error;
+            logError(LogCode.REPO_ERROR, 'Profile repository getProfileLite error', { error: err, userId });
             return null;
         }
     }
@@ -49,8 +51,9 @@ export class ProfileRepositoryImpl implements IProfileRepository {
         try {
             const data = await this.dataSource.searchProfiles(query, limit, viewerId);
             return data.map((dto: any) => this.mapDtoToUser(dto));
-        } catch (error: any) {
-            logError(LogCode.REPO_ERROR, 'Profile repository search error', { error, query, viewerId });
+        } catch (error: unknown) {
+            const err = error as Error;
+            logError(LogCode.REPO_ERROR, 'Profile repository search error', { error: err, query, viewerId });
             return [];
         }
     }

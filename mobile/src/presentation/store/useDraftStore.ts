@@ -34,9 +34,10 @@ export const useDraftStore = create<DraftState>((set, get) => ({
     try {
       const drafts = await repository.getDrafts(userId);
       set({ drafts, isLoading: false });
-    } catch (error: any) {
-      logError(LogCode.REPO_ERROR, 'Error fetching drafts', error);
-      set({ error: error.message, isLoading: false });
+    } catch (error: unknown) {
+      const err = error as Error;
+      logError(LogCode.REPO_ERROR, 'Error fetching drafts', err);
+      set({ error: err.message, isLoading: false });
     }
   },
 
@@ -50,10 +51,11 @@ export const useDraftStore = create<DraftState>((set, get) => ({
         isLoading: false,
       }));
       return newDraft;
-    } catch (error: any) {
-      logError(LogCode.DRAFT_SAVE, 'Error creating draft', error);
-      set({ error: error.message, isLoading: false });
-      throw error;
+    } catch (error: unknown) {
+      const err = error as Error;
+      logError(LogCode.DRAFT_SAVE, 'Error creating draft', err);
+      set({ error: err.message, isLoading: false });
+      throw err;
     }
   },
 
@@ -63,10 +65,11 @@ export const useDraftStore = create<DraftState>((set, get) => ({
       set((state) => ({
         drafts: state.drafts.map((d) => (d.id === draftId ? updatedDraft : d)),
       }));
-    } catch (error: any) {
-      logError(LogCode.REPO_ERROR, 'Error updating draft', error);
-      set({ error: error.message });
-      throw error;
+    } catch (error: unknown) {
+      const err = error as Error;
+      logError(LogCode.REPO_ERROR, 'Error updating draft', err);
+      set({ error: err.message });
+      throw err;
     }
   },
 
@@ -78,10 +81,11 @@ export const useDraftStore = create<DraftState>((set, get) => ({
           drafts: state.drafts.filter((d) => d.id !== draftId),
         }));
       }
-    } catch (error: any) {
-      logError(LogCode.DRAFT_DELETE, 'Error deleting draft', error);
-      set({ error: error.message });
-      throw error;
+    } catch (error: unknown) {
+      const err = error as Error;
+      logError(LogCode.DRAFT_DELETE, 'Error deleting draft', err);
+      set({ error: err.message });
+      throw err;
     }
   },
 
