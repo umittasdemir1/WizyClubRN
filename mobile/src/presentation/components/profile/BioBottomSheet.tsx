@@ -35,7 +35,7 @@ export const BioBottomSheet = forwardRef<BottomSheet, BioBottomSheetProps>(
       >
         <BottomSheetView style={styles.container}>
           {/* Header */}
-          <View style={[styles.header, { borderBottomColor: borderColor }]}>
+          <View style={[styles.header, { borderBottomColor: borderColor, borderBottomWidth: modalTheme.separatorWidth }]}>
             <Text style={[styles.title, { color: textColor }]}>Hakkında</Text>
             <TouchableOpacity
               onPress={() => {
@@ -75,7 +75,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 15,
     paddingBottom: 10,
-    borderBottomWidth: 1,
   },
   title: {
     fontSize: 18,

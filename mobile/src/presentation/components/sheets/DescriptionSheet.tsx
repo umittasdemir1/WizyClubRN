@@ -105,7 +105,7 @@ export const DescriptionSheet = forwardRef<BottomSheet, DescriptionSheetProps>(
         </View>
 
         {/* Divider */}
-        <View style={[styles.divider, { backgroundColor: modalTheme.modalSeparator }]} />
+        <View style={[styles.divider, { backgroundColor: modalTheme.modalSeparator, height: modalTheme.separatorWidth }]} />
 
         {/* Scrollable Content */}
         <BottomSheetScrollView
@@ -169,7 +169,6 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   divider: {
-    height: 1,
     marginVertical: 12,
     marginHorizontal: 16,
   },

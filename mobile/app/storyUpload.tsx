@@ -13,9 +13,10 @@ import * as MediaLibrary from 'expo-media-library';
 import { X, Zap, ZapOff, Cog, RefreshCcw } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { UploadModal } from '../src/presentation/components/upload/UploadModal';
 import { LogCode, logError, logUI } from '@/core/services/Logger';
 import { textShadowStyle } from '@/core/utils/shadow';
+import { useGalleryPickerStore } from '../src/presentation/store/useGalleryPickerStore';
+import { useUploadComposerStore } from '../src/presentation/store/useUploadComposerStore';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -33,9 +34,10 @@ export default function StoryUploadScreen() {
     const [permission, requestPermission] = useCameraPermissions();
     const [lastPhoto, setLastPhoto] = useState<string | null>(null);
 
-    // Upload Modal state
-    const [showUploadModal, setShowUploadModal] = useState(false);
-    const [selectedAssetsForUpload, setSelectedAssetsForUpload] = useState<ImagePicker.ImagePickerAsset[]>([]);
+    // Upload Flow
+    const pickedAssets = useGalleryPickerStore((state) => state.pickedAssets);
+    const clearPickedAssets = useGalleryPickerStore((state) => state.clearPickedAssets);
+    const setDraft = useUploadComposerStore((state) => state.setDraft);
 
     // Get last photo from gallery for preview
     useEffect(() => {
@@ -56,6 +58,9 @@ export default function StoryUploadScreen() {
             }
         })();
     }, []);
+
+    // Gallery picking navigation is now handled directly within GalleryPicker.tsx
+    // to ensure correct navigation stack (Composer -> Back -> Gallery).
 
     const toggleFlash = () => {
         setFlash(current => current === 'off' ? 'on' : 'off');
@@ -80,18 +85,12 @@ export default function StoryUploadScreen() {
         );
     }
 
-    const openGallery = async () => {
-        const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.All,
-            allowsMultipleSelection: true,
-            selectionLimit: 10,
-            quality: 1,
+    const openGallery = () => {
+        clearPickedAssets();
+        router.push({
+            pathname: '/galleryPicker',
+            params: { createMode: 'story' },
         });
-
-        if (!result.canceled) {
-            setSelectedAssetsForUpload(result.assets);
-            setShowUploadModal(true);
-        }
     };
 
     const takePicture = async () => {
@@ -112,8 +111,21 @@ export default function StoryUploadScreen() {
                     exif: null,
                     mimeType: 'image/jpeg'
                 };
-                setSelectedAssetsForUpload([photoAsset]);
-                setShowUploadModal(true);
+
+                setDraft({
+                    selectedAssets: [photoAsset],
+                    uploadMode: 'story',
+                    coverAssetIndex: 0,
+                    playbackRate: 1,
+                    videoVolume: 1,
+                    cropRatio: '9:16',
+                    filterPreset: 'none',
+                    qualityPreset: 'medium',
+                    subtitleLanguage: 'auto',
+                    trimStartSec: 0,
+                    trimEndSec: 0,
+                });
+                router.push('/upload-composer');
             } catch (error) {
                 logError(LogCode.CAMERA_ERROR, 'Failed to take picture for story', error);
             }
@@ -189,17 +201,6 @@ export default function StoryUploadScreen() {
                     <Text style={styles.modeLabelText}>HİKAYE</Text>
                 </View>
             </View>
-
-            {/* Upload Modal - Always story mode */}
-            <UploadModal
-                isVisible={showUploadModal}
-                onClose={() => {
-                    setShowUploadModal(false);
-                    setSelectedAssetsForUpload([]);
-                }}
-                initialAssets={selectedAssetsForUpload}
-                uploadMode="story"
-            />
         </View>
     );
 }

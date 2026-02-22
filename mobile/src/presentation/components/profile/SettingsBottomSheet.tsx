@@ -38,7 +38,7 @@ export const SettingsBottomSheet = forwardRef<BottomSheet, SettingsBottomSheetPr
       >
         <BottomSheetView style={styles.container}>
           {/* Header */}
-          <View style={[styles.header, { borderBottomColor: borderColor }]}>
+          <View style={[styles.header, { borderBottomColor: borderColor, borderBottomWidth: modalTheme.separatorWidth }]}>
             <Text style={[styles.title, { color: textColor }]}>Ayarlar</Text>
             <TouchableOpacity
               onPress={() => {
@@ -59,7 +59,7 @@ export const SettingsBottomSheet = forwardRef<BottomSheet, SettingsBottomSheetPr
             showsVerticalScrollIndicator={false}
           >
             {/* Theme Toggle */}
-            <View style={[styles.settingItem, { borderBottomColor: borderColor }]}>
+            <View style={[styles.settingItem, { borderBottomColor: borderColor, borderBottomWidth: modalTheme.separatorWidth }]}>
               <View style={styles.settingInfo}>
                 <Text style={[styles.settingLabel, { color: textColor }]}>Tema</Text>
                 <Text style={[styles.settingValue, { color: secondaryColor }]}>
@@ -128,7 +128,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 15,
     paddingBottom: 15,
-    borderBottomWidth: 1,
   },
   title: {
     fontSize: 20,
@@ -148,7 +147,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 16,
-    borderBottomWidth: 1,
   },
   settingInfo: {
     flex: 1,

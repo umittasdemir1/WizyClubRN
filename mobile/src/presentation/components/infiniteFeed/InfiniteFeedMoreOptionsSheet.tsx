@@ -1,144 +1,249 @@
-import React, { forwardRef, useCallback, useMemo } from 'react';
-import { Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
-import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Flag, EyeOff, Trash2, Pencil } from 'lucide-react-native';
+﻿import React, { forwardRef, useMemo } from 'react';
+import { BottomSheetModal } from '@gorhom/bottom-sheet';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import {
+    MessageSquareWarning,
+    EyeOff,
+    Trash2,
+    Pencil,
+    UserMinus,
+    Info,
+    Star,
+    CircleUserRound,
+    Bookmark,
+    QrCode,
+    ClosedCaption,
+} from 'lucide-react-native';
 import { useSurfaceTheme } from '../../hooks/useSurfaceTheme';
-
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+import { FeedMoreOptionsSheetBase } from '../sheets/FeedMoreOptionsSheetBase';
+import { FeedMoreOptionItem, FeedMoreSegmentedItem } from '../sheets/FeedMoreOptionsSheetItems';
+import { SubtitlePreferenceMode } from '../../store/useSubtitlePreferencesStore';
 
 interface InfiniteFeedMoreOptionsSheetProps {
+    onSavePress?: () => void;
+    onQrCodePress?: () => void;
     onEditPress?: () => void;
     onDeletePress?: () => void;
+    onUnfollowPress?: () => void;
+    onWhyThisPostPress?: () => void;
+    onShowMorePress?: () => void;
+    onAboutAccountPress?: () => void;
+    showSubtitleOption?: boolean;
+    subtitleMode?: SubtitlePreferenceMode;
+    onSubtitleModeChange?: (mode: SubtitlePreferenceMode) => void;
+    isFollowingCreator?: boolean;
     onSheetStateChange?: (isOpen: boolean) => void;
 }
 
-export const InfiniteFeedMoreOptionsSheet = forwardRef<BottomSheet, InfiniteFeedMoreOptionsSheetProps>(
-    ({ onEditPress, onDeletePress, onSheetStateChange }, ref) => {
+export const InfiniteFeedMoreOptionsSheet = forwardRef<BottomSheetModal, InfiniteFeedMoreOptionsSheetProps>(
+    ({
+        onSavePress,
+        onQrCodePress,
+        onEditPress,
+        onDeletePress,
+        onUnfollowPress,
+        onWhyThisPostPress,
+        onShowMorePress,
+        onAboutAccountPress,
+        showSubtitleOption = false,
+        subtitleMode = 'off',
+        onSubtitleModeChange,
+        isFollowingCreator = false,
+        onSheetStateChange,
+    }, ref) => {
         const modalTheme = useSurfaceTheme();
-        const insets = useSafeAreaInsets();
-
-        const topOffset = insets.top + 60 + 25;
-        const snapPoints = useMemo(() => [SCREEN_HEIGHT - topOffset], [topOffset]);
-
         const textColor = modalTheme.textPrimary;
         const borderColor = modalTheme.sheetBorder;
+        const borderWidth = modalTheme.separatorWidth;
 
-        const handleDeletePress = () => {
-            onDeletePress?.();
+        const optionCount = useMemo(
+            () =>
+                (onEditPress ? 1 : 0) +
+                (onDeletePress ? 1 : 0) +
+                (isFollowingCreator ? 1 : 0) +
+                (showSubtitleOption ? 1 : 0) +
+                2.5 +
+                2 +
+                3,
+            [isFollowingCreator, onDeletePress, onEditPress, showSubtitleOption]
+        );
+
+        const dismiss = () => {
             if (ref && typeof ref !== 'function' && ref.current) {
-                ref.current.close();
+                ref.current.dismiss();
             }
         };
-        const handleEditPress = () => {
-            onEditPress?.();
-            if (ref && typeof ref !== 'function' && ref.current) {
-                ref.current.close();
-            }
-        };
-        const handleAnimate = useCallback((_fromIndex: number, toIndex: number) => {
-            if (toIndex > 0 && ref && typeof ref !== 'function' && ref.current) {
-                ref.current.snapToIndex(0);
-            }
-        }, [ref]);
-        const handleChange = useCallback((index: number) => {
-            onSheetStateChange?.(index >= 0);
-        }, [onSheetStateChange]);
 
         return (
-            <BottomSheet
+            <FeedMoreOptionsSheetBase
                 ref={ref}
-                index={-1}
-                snapPoints={snapPoints}
-                onAnimate={handleAnimate}
-                onChange={handleChange}
-                enablePanDownToClose={true}
-                enableContentPanningGesture={false}
-                enableHandlePanningGesture={true}
-                backgroundStyle={modalTheme.styles.sheetBackground}
-                handleIndicatorStyle={modalTheme.styles.sheetHandle}
+                optionCount={optionCount}
+                onSheetStateChange={onSheetStateChange}
             >
-                <BottomSheetView style={styles.contentContainer}>
-                    {onEditPress && (
-                        <OptionItem
-                            icon={<Pencil color={textColor} size={24} strokeWidth={1.2} />}
-                            label="Düzenle"
-                            textColor={textColor}
-                            borderColor={borderColor}
-                            onPress={handleEditPress}
-                        />
-                    )}
-                    {onDeletePress && (
-                        <OptionItem
-                            icon={<Trash2 color={textColor} size={24} strokeWidth={1.2} />}
-                            label="Sil"
-                            textColor={textColor}
-                            borderColor={borderColor}
-                            onPress={handleDeletePress}
-                        />
-                    )}
-                    <OptionItem icon={<Flag color={textColor} size={24} strokeWidth={1.2} />} label="Raporla" textColor={textColor} borderColor={borderColor} />
-                    <OptionItem
-                        icon={<EyeOff color={textColor} size={24} strokeWidth={1.2} />}
-                        label="İlgilenmiyorum"
+                <View style={[styles.quickActionsRow, { borderBottomColor: borderColor, borderBottomWidth: borderWidth ?? 1 }]}>
+                    <TouchableOpacity
+                        style={styles.quickActionButton}
+                        onPress={() => {
+                            onSavePress?.();
+                            dismiss();
+                        }}
+                    >
+                        <Bookmark color={textColor} size={30} strokeWidth={1.2} />
+                        <Text style={[styles.quickActionLabel, { color: textColor }]}>Kaydet</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.quickActionButton}
+                        onPress={() => {
+                            onQrCodePress?.();
+                            dismiss();
+                        }}
+                    >
+                        <QrCode color={textColor} size={30} strokeWidth={1.2} />
+                        <Text style={[styles.quickActionLabel, { color: textColor }]}>QR kodu</Text>
+                    </TouchableOpacity>
+                </View>
+                {showSubtitleOption ? (
+                    <FeedMoreSegmentedItem
+                        icon={<ClosedCaption color={textColor} size={24} strokeWidth={1.2} />}
+                        label="Altyazı"
+                        hint="Videodan oluşturulan otomatik altyazıları gösterir"
                         textColor={textColor}
                         borderColor={borderColor}
-                        isLast
+                        borderWidth={borderWidth}
+                        activeLabel={
+                            subtitleMode === 'always'
+                                ? 'Her Zaman'
+                                : subtitleMode === 'video'
+                                    ? 'Açık'
+                                    : 'Kapalı'
+                        }
+                        onSelect={(label) => {
+                            if (!onSubtitleModeChange) return;
+                            if (label === 'Her Zaman') {
+                                onSubtitleModeChange('always');
+                                return;
+                            }
+                            if (label === 'Açık') {
+                                onSubtitleModeChange('video');
+                                return;
+                            }
+                            onSubtitleModeChange('off');
+                        }}
+                        options={['Kapalı', 'Açık', 'Her Zaman']}
+                        isDark={modalTheme.isDark}
                     />
-                </BottomSheetView>
-            </BottomSheet>
+                ) : null}
+                {onEditPress && (
+                    <FeedMoreOptionItem
+                        icon={<Pencil color={textColor} size={24} strokeWidth={1.2} />}
+                        label="Düzenle"
+                        textColor={textColor}
+                        borderColor={borderColor}
+                        borderWidth={borderWidth}
+                        onPress={() => {
+                            onEditPress();
+                            dismiss();
+                        }}
+                    />
+                )}
+                {onDeletePress && (
+                    <FeedMoreOptionItem
+                        icon={<Trash2 color={textColor} size={24} strokeWidth={1.2} />}
+                        label="Sil"
+                        textColor={textColor}
+                        borderColor={borderColor}
+                        borderWidth={borderWidth}
+                        onPress={() => {
+                            onDeletePress();
+                            dismiss();
+                        }}
+                    />
+                )}
+                {isFollowingCreator && onUnfollowPress && (
+                    <FeedMoreOptionItem
+                        icon={<UserMinus color={textColor} size={24} strokeWidth={1.2} />}
+                        label="Takibi bırak"
+                        textColor={textColor}
+                        borderColor={borderColor}
+                        borderWidth={borderWidth}
+                        onPress={() => {
+                            onUnfollowPress();
+                            dismiss();
+                        }}
+                    />
+                )}
+                <FeedMoreOptionItem
+                    icon={<Info color={textColor} size={24} strokeWidth={1.2} />}
+                    label="Neden bu gönderiyi görüyorsun?"
+                    textColor={textColor}
+                    borderColor={borderColor}
+                    borderWidth={borderWidth}
+                    onPress={() => {
+                        onWhyThisPostPress?.();
+                        dismiss();
+                    }}
+                />
+                <FeedMoreOptionItem
+                    icon={<Star color={textColor} size={24} strokeWidth={1.2} />}
+                    label="Daha fazla göster"
+                    textColor={textColor}
+                    borderColor={borderColor}
+                    borderWidth={borderWidth}
+                    onPress={() => {
+                        onShowMorePress?.();
+                        dismiss();
+                    }}
+                />
+                <FeedMoreOptionItem
+                    icon={<EyeOff color={textColor} size={24} strokeWidth={1.2} />}
+                    label="İlgilenmiyorum"
+                    textColor={textColor}
+                    borderColor={borderColor}
+                    borderWidth={borderWidth}
+                />
+                <FeedMoreOptionItem
+                    icon={<CircleUserRound color={textColor} size={24} strokeWidth={1.2} />}
+                    label="Bu hesap hakkında"
+                    textColor={textColor}
+                    borderColor={borderColor}
+                    borderWidth={borderWidth}
+                    onPress={() => {
+                        onAboutAccountPress?.();
+                        dismiss();
+                    }}
+                />
+                <FeedMoreOptionItem
+                    icon={<MessageSquareWarning color={textColor} size={24} strokeWidth={1.2} />}
+                    label="Bildir"
+                    textColor={textColor}
+                    borderColor={borderColor}
+                    borderWidth={borderWidth}
+                    isLast
+                />
+            </FeedMoreOptionsSheetBase>
         );
     }
 );
 
-function OptionItem({
-    icon,
-    label,
-    textColor,
-    borderColor,
-    onPress,
-    labelColor,
-    isLast = false,
-}: {
-    icon: React.ReactNode;
-    label: string;
-    textColor: string;
-    labelColor?: string;
-    borderColor: string;
-    onPress?: () => void;
-    isLast?: boolean;
-}) {
-    return (
-        <TouchableOpacity
-            style={[
-                styles.optionItem,
-                { borderBottomColor: borderColor },
-                isLast && styles.optionItemLast,
-            ]}
-            onPress={onPress}
-        >
-            {icon}
-            <Text style={[styles.optionLabel, { color: labelColor || textColor }]}>{label}</Text>
-        </TouchableOpacity>
-    );
-}
-
 const styles = StyleSheet.create({
-    contentContainer: {
-        flex: 1,
-        padding: 16,
-    },
-    optionItem: {
+    quickActionsRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 16,
-        borderBottomWidth: 1,
+        justifyContent: 'space-around',
+        paddingHorizontal: 8,
+        paddingTop: 0,
+        paddingBottom: 8,
+        marginBottom: 2,
     },
-    optionItemLast: {
-        borderBottomWidth: 0,
+    quickActionButton: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        minWidth: 96,
+        paddingVertical: 8,
     },
-    optionLabel: {
-        fontSize: 16,
-        marginLeft: 16,
+    quickActionLabel: {
+        marginTop: 8,
+        fontSize: 13,
+        fontWeight: '600',
     },
 });

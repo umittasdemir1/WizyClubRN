@@ -16,6 +16,8 @@ import { useAuthStore } from '../src/presentation/store/useAuthStore';
 import { DraftsGrid } from '../src/presentation/components/profile/DraftsGrid';
 import { DraftActionsSheet } from '../src/presentation/components/profile/DraftActionsSheet';
 import { Draft } from '../src/domain/entities/Draft';
+import { useUploadComposerStore } from '../src/presentation/store/useUploadComposerStore';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function DraftsScreen() {
   const router = useRouter();
@@ -46,8 +48,7 @@ export default function DraftsScreen() {
   );
 
   const handleDraftPress = (draft: Draft) => {
-    // TODO: Navigate to upload modal with draft data
-    Alert.alert('Taslağı Düzenle', 'Düzenleme özelliği yakında eklenecek.');
+    handleEditDraft(draft);
   };
 
   const handleDraftLongPress = (draft: Draft) => {
@@ -56,8 +57,27 @@ export default function DraftsScreen() {
   };
 
   const handleEditDraft = (draft: Draft) => {
-    // TODO: Open UploadModal with draft data pre-filled
-    Alert.alert('Taslağı Düzenle', 'Düzenleme özelliği yakında eklenecek.');
+    // Convert Draft entity to UploadComposerDraft
+    useUploadComposerStore.getState().setDraft({
+      selectedAssets: [{
+        uri: draft.mediaUri,
+        type: draft.mediaType,
+        width: 0,
+        height: 0,
+      } as ImagePicker.ImagePickerAsset],
+      uploadMode: draft.uploadMode,
+      coverAssetIndex: 0,
+      playbackRate: 1,
+      videoVolume: 1,
+      cropRatio: '9:16',
+      filterPreset: 'none',
+      qualityPreset: 'medium',
+      subtitleLanguage: 'auto',
+      trimStartSec: 0,
+      trimEndSec: 0,
+    });
+
+    router.push('/upload-composer');
   };
 
   const handleShareDraft = (draft: Draft) => {

@@ -23,10 +23,16 @@ import { InAppBrowserOverlay } from '../src/presentation/components/shared/InApp
 import Purchases from 'react-native-purchases';
 import { CONFIG } from '../src/core/config';
 import * as Notifications from 'expo-notifications';
+import { configureReanimatedLogger, ReanimatedLogLevel } from 'react-native-reanimated';
 import { LogCode, logAuth, logError } from '@/core/services/Logger';
 import { PerformanceLogger } from '../src/core/services/PerformanceLogger';
 import { ProfileRepositoryImpl } from '../src/data/repositories/ProfileRepositoryImpl';
 import { QUERY_KEYS } from '../src/core/query/queryClient';
+
+configureReanimatedLogger({
+    level: ReanimatedLogLevel.warn,
+    strict: false,
+});
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();

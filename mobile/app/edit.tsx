@@ -22,6 +22,7 @@ import { useVideoEditStore } from '../src/presentation/store/useVideoEditStore';
 import { LIGHT_COLORS, DARK_COLORS } from '../src/core/constants';
 import { supabase } from '../src/core/supabase';
 import { logError, LogCode } from '../src/core/services/Logger';
+import { CONFIG } from '../src/core/config';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PREVIEW_WIDTH = SCREEN_WIDTH * 0.40;
@@ -144,6 +145,29 @@ export default function EditPostScreen() {
         router.back();
     }, [description, hasUnsavedChanges, isSaving, resolvedVideoId, router, upsertDescription, user?.id]);
 
+    const handleOpenSubtitleEditor = useCallback(() => {
+        if (!resolvedVideoId) return;
+        router.push(`/subtitle-edit?videoId=${encodeURIComponent(resolvedVideoId)}` as any);
+    }, [resolvedVideoId, router]);
+
+    const handleGenerateSubtitles = useCallback(async () => {
+        if (!resolvedVideoId) return;
+        try {
+            const response = await fetch(`${CONFIG.API_URL}/videos/${resolvedVideoId}/subtitles/generate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ language: 'auto' }),
+            });
+            if (!response.ok) {
+                const payload = await response.json().catch(() => ({}));
+                throw new Error(payload?.error || 'Altyazı üretimi başlatılamadı.');
+            }
+            Alert.alert('Başlatıldı', 'Altyazı üretimi başlatıldı.');
+        } catch (error: any) {
+            Alert.alert('Hata', error?.message || 'Altyazı üretimi başlatılamadı.');
+        }
+    }, [resolvedVideoId]);
+
     return (
         <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -216,6 +240,15 @@ export default function EditPostScreen() {
                             maxLength={2200}
                             textAlignVertical="top"
                         />
+                    </View>
+
+                    <View style={styles.subtitleActions}>
+                        <Pressable style={styles.subtitleButton} onPress={handleGenerateSubtitles}>
+                            <Text style={styles.subtitleButtonText}>Altyazı Oluştur</Text>
+                        </Pressable>
+                        <Pressable style={styles.subtitleButton} onPress={handleOpenSubtitleEditor}>
+                            <Text style={styles.subtitleButtonText}>Altyazı Düzenle</Text>
+                        </Pressable>
                     </View>
                 </ScrollView>
             )}
@@ -315,6 +348,22 @@ const styles = StyleSheet.create({
     descriptionSection: {
         marginHorizontal: 16,
         marginTop: 8,
+    },
+    subtitleActions: {
+        marginHorizontal: 16,
+        marginTop: 20,
+        gap: 10,
+    },
+    subtitleButton: {
+        borderRadius: 10,
+        backgroundColor: '#3A8DFF',
+        paddingVertical: 12,
+        alignItems: 'center',
+    },
+    subtitleButtonText: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: '700',
     },
     descriptionInput: {
         fontSize: 15,

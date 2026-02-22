@@ -21,7 +21,7 @@ import {
 } from 'react-native';
 import Animated, { SharedValue } from 'react-native-reanimated';
 
-import BottomSheet from '@gorhom/bottom-sheet';
+import BottomSheet, { BottomSheetModal } from '@gorhom/bottom-sheet';
 import { PoolFeedSaveToast } from './PoolFeedSaveToast';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -43,7 +43,7 @@ export interface PoolFeedOverlaysProps {
     /** Active video */
     activeVideo: Video | null;
     /** Sheet Refs for hook integration */
-    moreOptionsSheetRef: React.RefObject<BottomSheet>;
+    moreOptionsSheetRef: React.RefObject<BottomSheetModal>;
     descriptionSheetRef: React.RefObject<BottomSheet>;
     /** Active video ID */
     activeVideoId: string | null;
@@ -51,6 +51,12 @@ export interface PoolFeedOverlaysProps {
     currentUserId: string | null;
     /** Is own video */
     isOwnActiveVideo: boolean;
+    /** Show subtitle option in more sheet */
+    showSubtitleOption: boolean;
+    /** Subtitle mode for active video */
+    subtitleMode: 'off' | 'video' | 'always';
+    /** Subtitle mode change handler */
+    onSubtitleModeChange: (mode: 'off' | 'video' | 'always') => void;
     /** Is clean screen mode */
     isCleanScreen: boolean;
     /** Is seeking */
@@ -126,7 +132,7 @@ export interface PoolFeedOverlaysProps {
 }
 
 export interface PoolFeedOverlaysRef {
-    moreOptionsSheet: BottomSheet | null;
+    moreOptionsSheet: BottomSheetModal | null;
     descriptionSheet: BottomSheet | null;
 }
 
@@ -139,6 +145,9 @@ export const PoolFeedOverlays = forwardRef<PoolFeedOverlaysRef, PoolFeedOverlays
         const {
             activeVideo,
             isOwnActiveVideo,
+            showSubtitleOption,
+            subtitleMode,
+            onSubtitleModeChange,
             isCleanScreen,
             isSeeking,
             activeTab,
@@ -293,6 +302,9 @@ export const PoolFeedOverlays = forwardRef<PoolFeedOverlaysRef, PoolFeedOverlays
                             onCleanScreenPress={actions.onCleanScreen}
                             onEditPress={isOwnActiveVideo ? actions.onSheetEdit : undefined}
                             onDeletePress={isOwnActiveVideo ? actions.onSheetDelete : undefined}
+                            showSubtitleOption={showSubtitleOption}
+                            subtitleMode={subtitleMode}
+                            onSubtitleModeChange={onSubtitleModeChange}
                             isCleanScreen={isCleanScreen}
                         />
                     )}

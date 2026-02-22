@@ -1,316 +1,226 @@
-import React, { forwardRef, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
-import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Flag, EyeOff, Minimize2, Maximize2, Trash2, LampDesk, GalleryVerticalEnd, Gauge, Pencil } from 'lucide-react-native';
+﻿import React, { forwardRef, useMemo } from 'react';
+import { BottomSheetModal } from '@gorhom/bottom-sheet';
+import {
+    MessageSquareWarning,
+    EyeOff,
+    Minimize2,
+    Maximize2,
+    Trash2,
+    LampDesk,
+    GalleryVerticalEnd,
+    Gauge,
+    Pencil,
+    ClosedCaption,
+} from 'lucide-react-native';
 import { useBrightnessStore } from '../../store/useBrightnessStore';
 import { useActiveVideoStore } from '../../store/useActiveVideoStore';
 import { useSurfaceTheme } from '../../hooks/useSurfaceTheme';
-
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+import { FeedMoreOptionsSheetBase } from './FeedMoreOptionsSheetBase';
+import { FeedMoreOptionItem, FeedMoreSegmentedItem } from './FeedMoreOptionsSheetItems';
 
 interface MoreOptionsSheetProps {
     onCleanScreenPress?: () => void;
     onEditPress?: () => void;
     onDeletePress?: () => void;
+    showSubtitleOption?: boolean;
+    subtitleMode?: 'off' | 'video' | 'always';
+    onSubtitleModeChange?: (mode: 'off' | 'video' | 'always') => void;
     isCleanScreen?: boolean;
 }
 
-export const MoreOptionsSheet = forwardRef<BottomSheet, MoreOptionsSheetProps>(
-    ({ onCleanScreenPress, onEditPress, onDeletePress, isCleanScreen = false }, ref) => {
-    const modalTheme = useSurfaceTheme();
-    const { isDark } = modalTheme;
-    const insets = useSafeAreaInsets();
-    const { brightness, setBrightness } = useBrightnessStore();
-    const playbackRate = useActiveVideoStore((state) => state.playbackRate);
-    const setPlaybackRate = useActiveVideoStore((state) => state.setPlaybackRate);
-    const viewingMode = useActiveVideoStore((state) => state.viewingMode);
-    const setViewingMode = useActiveVideoStore((state) => state.setViewingMode);
+export const MoreOptionsSheet = forwardRef<BottomSheetModal, MoreOptionsSheetProps>(
+    ({
+        onCleanScreenPress,
+        onEditPress,
+        onDeletePress,
+        showSubtitleOption = false,
+        subtitleMode = 'off',
+        onSubtitleModeChange,
+        isCleanScreen = false,
+    }, ref) => {
+        const modalTheme = useSurfaceTheme();
+        const { isDark } = modalTheme;
+        const { brightness, setBrightness } = useBrightnessStore();
+        const playbackRate = useActiveVideoStore((state) => state.playbackRate);
+        const setPlaybackRate = useActiveVideoStore((state) => state.setPlaybackRate);
+        const viewingMode = useActiveVideoStore((state) => state.viewingMode);
+        const setViewingMode = useActiveVideoStore((state) => state.setViewingMode);
 
-    const topOffset = insets.top + 60 + 25;
-    const snapPoints = useMemo(() => [SCREEN_HEIGHT - topOffset], [insets.top]);
+        const textColor = modalTheme.textPrimary;
+        const borderColor = modalTheme.sheetBorder;
+        const borderWidth = modalTheme.separatorWidth;
 
-    const textColor = modalTheme.textPrimary;
-    const borderColor = modalTheme.sheetBorder;
+        const optionCount = useMemo(
+            () =>
+                6 +
+                (onEditPress ? 1 : 0) +
+                (onDeletePress ? 1 : 0) +
+                (showSubtitleOption ? 1 : 0) +
+                1.5,
+            [onDeletePress, onEditPress, showSubtitleOption]
+        );
 
-    const handleCleanScreenPress = () => {
-        onCleanScreenPress?.();
-        if (ref && typeof ref !== 'function' && ref.current) {
-            ref.current.close();
-        }
-    };
+        const dismiss = () => {
+            if (ref && typeof ref !== 'function' && ref.current) {
+                ref.current.dismiss();
+            }
+        };
 
-    const eyeComfortLevels = [
-        { label: 'Yumuşak', value: 0.33 },
-        { label: 'Dinlendirici', value: 0.66 },
-        { label: 'Doğal', value: 1.0 },
-    ];
+        const eyeComfortLevels = [
+            { label: 'Yumuşak', value: 0.33 },
+            { label: 'Dinlendirici', value: 0.66 },
+            { label: 'Doğal', value: 1.0 },
+        ];
+        const speedLevels = [
+            { label: '0.5x', value: 0.5 },
+            { label: '1x', value: 1.0 },
+            { label: '1.5x', value: 1.5 },
+            { label: '2x', value: 2.0 },
+        ];
+        const viewingModes = [
+            { label: 'Kapalı', value: 'off' as const },
+            { label: 'Hızlı', value: 'fast' as const },
+            { label: 'Tam İzleme', value: 'full' as const },
+        ];
 
-    const getClosestLevel = (value: number) => {
-        return eyeComfortLevels.reduce((closest, level) => {
-            return Math.abs(level.value - value) < Math.abs(closest.value - value) ? level : closest;
-        }, eyeComfortLevels[0]);
-    };
+        const activeEyeComfort = eyeComfortLevels.reduce((closest, level) => {
+            return Math.abs(level.value - brightness) < Math.abs(closest.value - brightness) ? level : closest;
+        }, eyeComfortLevels[0]).label;
 
-    const activeEyeComfort = getClosestLevel(brightness).label;
-    const speedLevels = [
-        { label: '0.5x', value: 0.5 },
-        { label: '1x', value: 1.0 },
-        { label: '1.5x', value: 1.5 },
-        { label: '2x', value: 2.0 },
-    ];
-    const viewingModes = [
-        { label: 'Kapalı', value: 'off' as const },
-        { label: 'Hızlı', value: 'fast' as const },
-        { label: 'Tam İzleme', value: 'full' as const },
-    ];
-    const activeSpeed = speedLevels.reduce((closest, level) => {
-        return Math.abs(level.value - playbackRate) < Math.abs(closest.value - playbackRate) ? level : closest;
-    }, speedLevels[0]).label;
+        const activeSpeed = speedLevels.reduce((closest, level) => {
+            return Math.abs(level.value - playbackRate) < Math.abs(closest.value - playbackRate) ? level : closest;
+        }, speedLevels[0]).label;
 
-    const handleDeletePress = () => {
-        onDeletePress?.();
-        if (ref && typeof ref !== 'function' && ref.current) {
-            ref.current.close();
-        }
-    };
-
-    const handleEditPress = () => {
-        onEditPress?.();
-        if (ref && typeof ref !== 'function' && ref.current) {
-            ref.current.close();
-        }
-    };
-
-    return (
-        <BottomSheet
-            ref={ref}
-            index={-1}
-            snapPoints={snapPoints}
-            enablePanDownToClose={true}
-            backgroundStyle={modalTheme.styles.sheetBackground}
-            handleIndicatorStyle={modalTheme.styles.sheetHandle}
-        >
-            <BottomSheetView style={styles.contentContainer}>
-                <OptionItem
-                    icon={isCleanScreen ? <Minimize2 color={textColor} size={24} strokeWidth={1.2} /> : <Maximize2 color={textColor} size={24} strokeWidth={1.2} />}
+        return (
+            <FeedMoreOptionsSheetBase ref={ref} optionCount={optionCount}>
+                <FeedMoreOptionItem
+                    icon={isCleanScreen
+                        ? <Minimize2 color={textColor} size={24} strokeWidth={1.2} />
+                        : <Maximize2 color={textColor} size={24} strokeWidth={1.2} />}
                     label="Temiz Ekran"
                     textColor={textColor}
                     borderColor={borderColor}
-                    onPress={handleCleanScreenPress}
+                    borderWidth={borderWidth}
+                    onPress={() => {
+                        onCleanScreenPress?.();
+                        dismiss();
+                    }}
                 />
-                <SegmentedItem
+                {showSubtitleOption && (
+                    <FeedMoreSegmentedItem
+                        icon={<ClosedCaption color={textColor} size={24} strokeWidth={1.2} />}
+                        label="Altyazı"
+                        hint="Videodan oluşturulan otomatik altyazıları gösterir"
+                        textColor={textColor}
+                        borderColor={borderColor}
+                        borderWidth={borderWidth}
+                        activeLabel={
+                            subtitleMode === 'always'
+                                ? 'Her Zaman'
+                                : subtitleMode === 'video'
+                                    ? 'Açık'
+                                    : 'Kapalı'
+                        }
+                        onSelect={(label) => {
+                            if (!onSubtitleModeChange) return;
+                            if (label === 'Her Zaman') {
+                                onSubtitleModeChange('always');
+                                return;
+                            }
+                            if (label === 'Açık') {
+                                onSubtitleModeChange('video');
+                                return;
+                            }
+                            onSubtitleModeChange('off');
+                        }}
+                        options={['Kapalı', 'Açık', 'Her Zaman']}
+                        isDark={isDark}
+                    />
+                )}
+                <FeedMoreSegmentedItem
                     icon={<LampDesk color={textColor} size={24} strokeWidth={1.2} />}
                     label="Göz Rahatlığı"
                     textColor={textColor}
                     borderColor={borderColor}
+                    borderWidth={borderWidth}
                     activeLabel={activeEyeComfort}
                     onSelect={(label) => {
                         const selected = eyeComfortLevels.find((level) => level.label === label);
-                        if (selected) {
-                            setBrightness(selected.value);
-                        }
+                        if (selected) setBrightness(selected.value);
                     }}
                     options={eyeComfortLevels.map((level) => level.label)}
                     isDark={isDark}
                 />
-                <SegmentedItem
+                <FeedMoreSegmentedItem
                     icon={<Gauge color={textColor} size={24} strokeWidth={1.2} />}
                     label="Hız"
                     textColor={textColor}
                     borderColor={borderColor}
+                    borderWidth={borderWidth}
                     activeLabel={activeSpeed}
                     onSelect={(label) => {
                         const selected = speedLevels.find((level) => level.label === label);
-                        if (selected) {
-                            setPlaybackRate(selected.value);
-                        }
+                        if (selected) setPlaybackRate(selected.value);
                     }}
                     options={speedLevels.map((level) => level.label)}
                     isDark={isDark}
                 />
-                <SegmentedItem
+                <FeedMoreSegmentedItem
                     icon={<GalleryVerticalEnd color={textColor} size={24} strokeWidth={1.2} />}
                     label="İzleme Modu"
                     textColor={textColor}
                     borderColor={borderColor}
+                    borderWidth={borderWidth}
                     activeLabel={viewingModes.find((mode) => mode.value === viewingMode)?.label || 'Hızlı'}
                     onSelect={(label) => {
                         const selected = viewingModes.find((mode) => mode.label === label);
-                        if (selected) {
-                            setViewingMode(selected.value);
-                        }
+                        if (selected) setViewingMode(selected.value);
                     }}
                     options={viewingModes.map((mode) => mode.label)}
                     isDark={isDark}
                 />
                 {onEditPress && (
-                    <OptionItem
+                    <FeedMoreOptionItem
                         icon={<Pencil color={textColor} size={24} strokeWidth={1.2} />}
                         label="Düzenle"
                         textColor={textColor}
                         borderColor={borderColor}
-                        onPress={handleEditPress}
+                        borderWidth={borderWidth}
+                        onPress={() => {
+                            onEditPress();
+                            dismiss();
+                        }}
                     />
                 )}
                 {onDeletePress && (
-                    <OptionItem
+                    <FeedMoreOptionItem
                         icon={<Trash2 color={textColor} size={24} strokeWidth={1.2} />}
                         label="Sil"
                         textColor={textColor}
                         borderColor={borderColor}
-                        onPress={handleDeletePress}
+                        borderWidth={borderWidth}
+                        onPress={() => {
+                            onDeletePress();
+                            dismiss();
+                        }}
                     />
                 )}
-                <OptionItem icon={<Flag color={textColor} size={24} strokeWidth={1.2} />} label="Raporla" textColor={textColor} borderColor={borderColor} />
-                <OptionItem
+                <FeedMoreOptionItem
+                    icon={<MessageSquareWarning color={textColor} size={24} strokeWidth={1.2} />}
+                    label="Raporla"
+                    textColor={textColor}
+                    borderColor={borderColor}
+                    borderWidth={borderWidth}
+                />
+                <FeedMoreOptionItem
                     icon={<EyeOff color={textColor} size={24} strokeWidth={1.2} />}
                     label="İlgilenmiyorum"
                     textColor={textColor}
                     borderColor={borderColor}
+                    borderWidth={borderWidth}
                     isLast
                 />
-            </BottomSheetView>
-        </BottomSheet>
-    );
-});
-
-function OptionItem({
-    icon,
-    label,
-    textColor,
-    borderColor,
-    onPress,
-    labelColor,
-    isLast = false,
-}: {
-    icon: React.ReactNode;
-    label: string;
-    textColor: string;
-    labelColor?: string;
-    borderColor: string;
-    onPress?: () => void;
-    isLast?: boolean;
-}) {
-    return (
-        <TouchableOpacity
-            style={[
-                styles.optionItem,
-                { borderBottomColor: borderColor },
-                isLast && styles.optionItemLast,
-            ]}
-            onPress={onPress}
-        >
-            {icon}
-            <Text style={[styles.optionLabel, { color: labelColor || textColor }]}>{label}</Text>
-        </TouchableOpacity>
-    );
-}
-
-function SegmentedItem({
-    icon,
-    label,
-    textColor,
-    borderColor,
-    activeLabel,
-    onSelect,
-    options,
-    isDark,
-    isLast = false,
-}: {
-    icon: React.ReactNode;
-    label: string;
-    textColor: string;
-    borderColor: string;
-    activeLabel: string;
-    onSelect: (label: string) => void;
-    options: string[];
-    isDark: boolean;
-    isLast?: boolean;
-}) {
-    const activeFill = '#FF3B30';
-    const activeText = '#FFFFFF';
-    const groupFill = isDark ? '#2c2c2e' : '#ededf0';
-
-    return (
-        <View
-            style={[
-                styles.optionItem,
-                { borderBottomColor: borderColor },
-                isLast && styles.optionItemLast,
-            ]}
-        >
-            <View style={styles.optionLeft}>
-                {icon}
-                <Text style={[styles.optionLabel, { color: textColor }]}>{label}</Text>
-            </View>
-            <View style={[styles.segmentedGroup, { backgroundColor: groupFill }]}>
-                {options.map((option) => {
-                    const isActive = option === activeLabel;
-                    return (
-                        <TouchableOpacity
-                            key={option}
-                            style={[
-                                styles.segmentedOption,
-                                isActive && { backgroundColor: activeFill },
-                            ]}
-                            onPress={() => onSelect(option)}
-                        >
-                            <Text style={[styles.segmentedText, { color: isActive ? activeText : textColor }]}>
-                                {option}
-                            </Text>
-                        </TouchableOpacity>
-                    );
-                })}
-            </View>
-        </View>
-    );
-}
-
-const styles = StyleSheet.create({
-    contentContainer: {
-        flex: 1,
-        padding: 16,
-    },
-    optionItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 16,
-        borderBottomWidth: 1,
-    },
-    optionItemLast: {
-        borderBottomWidth: 0,
-    },
-    optionLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    optionLabel: {
-        fontSize: 16,
-        marginLeft: 16,
-    },
-    segmentedGroup: {
-        flexDirection: 'row',
-        borderRadius: 12,
-        padding: 2,
-        overflow: 'hidden',
-        marginLeft: 'auto',
-    },
-    segmentedOption: {
-        paddingVertical: 6,
-        paddingHorizontal: 10,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: 12,
-    },
-    segmentedText: {
-        fontSize: 11,
-        fontWeight: '400',
-    },
-    speedIcon: {
-        width: 24,
-        textAlign: 'center',
-        fontSize: 14,
-        fontWeight: '600',
-    },
-});
+            </FeedMoreOptionsSheetBase>
+        );
+    }
+);

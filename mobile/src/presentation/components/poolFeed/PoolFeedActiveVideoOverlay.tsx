@@ -31,11 +31,15 @@ import Animated, {
     useAnimatedStyle,
     SharedValue,
     useSharedValue,
+    useAnimatedReaction,
+    runOnJS,
 } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Pause, RefreshCcw, AlertCircle } from 'lucide-react-native';
 import { isDisabled } from './hooks/usePoolFeedConfig';
+import { useSubtitles } from '../../hooks/useSubtitles';
+import { useSubtitlePreferencesStore } from '../../store/useSubtitlePreferencesStore';
 
 import { Video } from '../../../domain/entities/Video';
 import { PoolFeedActionButtons, PoolFeedActionButtonsRef } from './PoolFeedActionButtons';
@@ -46,6 +50,10 @@ import type { PoolFeedVideoPlayerPoolRef } from './PoolFeedVideoPlayerPool';
 
 const MAX_RETRIES = 3;
 const SCREEN_HEIGHT = Dimensions.get('window').height;
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const SUBTITLE_SIDE_MARGIN = 20;
+const SUBTITLE_MAX_WIDTH = SCREEN_WIDTH - (SUBTITLE_SIDE_MARGIN * 2);
+const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 
 // ============================================================================
 // Types
@@ -128,6 +136,10 @@ export const PoolFeedActiveVideoOverlay = memo(function PoolFeedActiveVideoOverl
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const actionButtonsRef = useRef<PoolFeedActionButtonsRef>(null);
+    const [activeSubtitleText, setActiveSubtitleText] = React.useState<string | null>(null);
+    const [currentTimeSec, setCurrentTimeSec] = React.useState(0);
+    const subtitleAlwaysEnabled = useSubtitlePreferencesStore((state) => state.alwaysEnabled);
+    const subtitleVideoEnabledById = useSubtitlePreferencesStore((state) => state.videoEnabledById);
 
     // Native Thread Delay Logic
     // 0 = Hidden, 1 = Visible
@@ -147,6 +159,77 @@ export const PoolFeedActiveVideoOverlay = memo(function PoolFeedActiveVideoOverl
     const showUiOverlays = !isCleanScreen;
     const showTapIndicator = !!tapIndicator && !hasError;
     const showSeekBar = isPlayable;
+    const shouldShowSubtitlePreference = subtitleAlwaysEnabled || Boolean(subtitleVideoEnabledById[video.id]);
+    const subtitleBottomOffset = Math.max(170, insets.bottom + 150);
+    const { subtitles, getActiveSubtitle } = useSubtitles(shouldShowSubtitlePreference ? video.id : undefined);
+    const subtitlePresentationStyle = React.useMemo<any>(() => {
+        const presentation = subtitles?.presentation;
+        if (!presentation) return null;
+        const left = clamp01(Number(presentation.leftRatio));
+        const top = clamp01(Number(presentation.topRatio));
+        const width = Math.max(0.1, clamp01(Number(presentation.widthRatio)));
+        return {
+            left: `${left * 100}%`,
+            top: `${top * 100}%`,
+            width: `${width * 100}%`,
+            maxWidth: undefined,
+            bottom: undefined,
+        };
+    }, [subtitles?.presentation]);
+    const subtitleTextDynamicStyle = React.useMemo<any>(() => {
+        const style = subtitles?.style;
+        if (!style) return null;
+        const fontSize = Math.max(12, Math.min(42, Number(style.fontSize) || 18));
+        const rawAlign = String(style.textAlign || 'center');
+        const mappedAlign = rawAlign === 'center'
+            ? 'center'
+            : (rawAlign === 'end' || rawAlign === 'right')
+                ? 'right'
+                : 'left';
+        return {
+            fontSize,
+            lineHeight: Math.max(fontSize + 6, Math.round(fontSize * 1.3)),
+            textAlign: mappedAlign,
+        };
+    }, [subtitles?.style]);
+    const subtitleWrapperDynamicStyle = React.useMemo<any>(() => {
+        const showOverlay = subtitles?.style?.showOverlay !== false;
+        if (showOverlay) return null;
+        return {
+            backgroundColor: 'transparent',
+            paddingHorizontal: 0,
+            paddingVertical: 0,
+        };
+    }, [subtitles?.style?.showOverlay]);
+
+    useAnimatedReaction(
+        () => currentTimeSV.value,
+        (nextTime, prevTime) => {
+            if (nextTime === prevTime) return;
+            runOnJS(setCurrentTimeSec)(nextTime);
+        },
+        [currentTimeSV]
+    );
+
+    useEffect(() => {
+        if (!shouldShowSubtitlePreference || !showUiOverlays || !isPlayable) {
+            if (activeSubtitleText !== null) {
+                setActiveSubtitleText(null);
+            }
+            return;
+        }
+        const subtitleAtTime = getActiveSubtitle(currentTimeSec * 1000);
+        if (subtitleAtTime !== activeSubtitleText) {
+            setActiveSubtitleText(subtitleAtTime);
+        }
+    }, [
+        activeSubtitleText,
+        currentTimeSec,
+        getActiveSubtitle,
+        isPlayable,
+        shouldShowSubtitlePreference,
+        showUiOverlays,
+    ]);
 
     // ========================================================================
     // Animated styles
@@ -302,6 +385,16 @@ export const PoolFeedActiveVideoOverlay = memo(function PoolFeedActiveVideoOverl
                                 onCommercialTagPress: () => { },
                             }}
                         />
+                        {shouldShowSubtitlePreference && showUiOverlays && activeSubtitleText && (
+                            <View
+                                style={[styles.subtitleContainer, { bottom: subtitleBottomOffset }, subtitlePresentationStyle]}
+                                pointerEvents="none"
+                            >
+                                <View style={[styles.subtitleWrapper, subtitleWrapperDynamicStyle]}>
+                                    <Text style={[styles.subtitleText, subtitleTextDynamicStyle]}>{activeSubtitleText}</Text>
+                                </View>
+                            </View>
+                        )}
                     </Animated.View>
 
                     {/* Video SeekBar (Bottom) */}
@@ -408,5 +501,26 @@ const styles = StyleSheet.create({
     uiLayer: {
         ...StyleSheet.absoluteFillObject,
         zIndex: 60,
+    },
+    subtitleContainer: {
+        position: 'absolute',
+        left: SUBTITLE_SIDE_MARGIN,
+        maxWidth: SUBTITLE_MAX_WIDTH,
+        zIndex: 80,
+    },
+    subtitleWrapper: {
+        backgroundColor: 'rgba(8, 10, 15, 0.72)',
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+        borderRadius: 8,
+    },
+    subtitleText: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        lineHeight: 20,
+        fontWeight: '400',
+        textShadowColor: 'rgba(0, 0, 0, 0.65)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 2,
     },
 });

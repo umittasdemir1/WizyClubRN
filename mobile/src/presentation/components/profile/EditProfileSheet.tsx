@@ -185,7 +185,7 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
 
     const renderMainView = () => (
       <Animated.View entering={FadeIn} exiting={FadeOut} style={{ flex: 1 }}>
-        <View style={[styles.header, { borderBottomColor: borderColor }]}>
+        <View style={[styles.header, { borderBottomColor: borderColor, borderBottomWidth: modalTheme.separatorWidth }]}>
           <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
             <Text style={{ color: textColor, fontSize: 16 }}>Vazgeç</Text>
           </TouchableOpacity>
@@ -211,26 +211,26 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
             </View>
           </View>
 
-          <View style={[styles.formSection, { borderTopColor: borderColor, borderBottomColor: borderColor }]}>
-            <TouchableOpacity style={[styles.clickableRow, { borderBottomColor: borderColor }]} onPress={() => setActiveSubView('name')}>
+          <View style={[styles.formSection, { borderTopColor: borderColor, borderBottomColor: borderColor, borderTopWidth: modalTheme.separatorWidth, borderBottomWidth: modalTheme.separatorWidth }]}>
+            <TouchableOpacity style={[styles.clickableRow, { borderBottomColor: borderColor, borderBottomWidth: modalTheme.separatorWidth }]} onPress={() => setActiveSubView('name')}>
               <Text style={[styles.label, { color: textColor }]}>Ad</Text>
               <Text style={[styles.valueText, { color: textColor }]} numberOfLines={1}>{tempName}</Text>
               <ChevronRight size={18} color={secondaryTextColor} />
             </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.clickableRow, { borderBottomColor: borderColor }]} onPress={() => setActiveSubView('username')}>
+            <TouchableOpacity style={[styles.clickableRow, { borderBottomColor: borderColor, borderBottomWidth: modalTheme.separatorWidth }]} onPress={() => setActiveSubView('username')}>
               <Text style={[styles.label, { color: textColor }]}>Kullanıcı Adı</Text>
               <Text style={[styles.valueText, { color: textColor }]} numberOfLines={1}>{tempUsername}</Text>
               <ChevronRight size={18} color={secondaryTextColor} />
             </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.clickableRow, { borderBottomColor: borderColor }]} onPress={() => setActiveSubView('bio')}>
+            <TouchableOpacity style={[styles.clickableRow, { borderBottomColor: borderColor, borderBottomWidth: modalTheme.separatorWidth }]} onPress={() => setActiveSubView('bio')}>
               <Text style={[styles.label, { color: textColor }]}>Biyografi</Text>
               <Text style={[styles.valueText, { color: textColor }]} numberOfLines={1}>{tempBio || 'Biyografi ekle'}</Text>
               <ChevronRight size={18} color={secondaryTextColor} />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.clickableRow} onPress={() => setActiveSubView('socialLinks')}>
+            <TouchableOpacity style={[styles.clickableRow, { borderBottomColor: borderColor, borderBottomWidth: modalTheme.separatorWidth }]} onPress={() => setActiveSubView('socialLinks')}>
               <Text style={[styles.label, { color: textColor }]}>Bağlantılar</Text>
               <Text style={[styles.valueText, { color: secondaryTextColor }]}>
                 Düzenle
@@ -244,7 +244,7 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
 
     const renderNameEdit = () => (
       <Animated.View entering={FadeIn} exiting={FadeOut} style={{ flex: 1 }}>
-        <View style={[styles.header, { borderBottomColor: borderColor }]}>
+        <View style={[styles.header, { borderBottomColor: borderColor, borderBottomWidth: modalTheme.separatorWidth }]}>
           <TouchableOpacity onPress={() => setActiveSubView(null)} style={styles.closeButton}>
             <Text style={{ color: textColor, fontSize: 16 }}>İptal</Text>
           </TouchableOpacity>
@@ -260,7 +260,7 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
             Adınızı 30 gün içerisinde yalnızca bir kez değiştirebilirsiniz.
           </Text>
 
-          <View style={[styles.inputWrapper, { borderBottomColor: borderColor }]}>
+          <View style={[styles.inputWrapper, { borderBottomColor: borderColor, borderBottomWidth: modalTheme.separatorWidth }]}>
             <View style={styles.inputContainer}>
               <BottomSheetTextInput
                 style={[styles.subViewInput, { color: textColor }]}
@@ -282,7 +282,7 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
 
     const renderUsernameEdit = () => (
       <Animated.View entering={FadeIn} exiting={FadeOut} style={{ flex: 1 }}>
-        <View style={[styles.header, { borderBottomColor: borderColor }]}>
+        <View style={[styles.header, { borderBottomColor: borderColor, borderBottomWidth: modalTheme.separatorWidth }]}>
           <TouchableOpacity onPress={() => { setActiveSubView(null); setUsernameError(null); }} style={styles.closeButton}>
             <Text style={{ color: textColor, fontSize: 16 }}>İptal</Text>
           </TouchableOpacity>
@@ -298,7 +298,7 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
             Kullanıcı adınızı 90 gün içerisinde yalnızca bir kez değiştirebilirsiniz. Kullanıcı adları yalnızca harf, rakam, alt çizgi ve nokta içerebilir.
           </Text>
 
-          <View style={[styles.inputWrapper, { borderBottomColor: usernameError ? '#FF3B30' : borderColor }]}>
+          <View style={[styles.inputWrapper, { borderBottomColor: usernameError ? '#FF3B30' : borderColor, borderBottomWidth: modalTheme.separatorWidth }]}>
             <View style={styles.inputContainer}>
               <BottomSheetTextInput
                 style={[styles.subViewInput, { color: textColor }]}
@@ -337,7 +337,7 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
 
     const renderBioEdit = () => (
       <Animated.View entering={FadeIn} exiting={FadeOut} style={{ flex: 1 }}>
-        <View style={[styles.header, { borderBottomColor: borderColor }]}>
+        <View style={[styles.header, { borderBottomColor: borderColor, borderBottomWidth: modalTheme.separatorWidth }]}>
           <TouchableOpacity onPress={() => setActiveSubView(null)} style={styles.closeButton}>
             <Text style={{ color: textColor, fontSize: 16 }}>İptal</Text>
           </TouchableOpacity>
@@ -350,7 +350,7 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
         <View style={styles.subViewContent}>
           <Text style={[styles.subViewTitle, { color: secondaryTextColor }]}>Biyografi</Text>
 
-          <View style={[styles.inputWrapper, { borderBottomColor: borderColor }]}>
+          <View style={[styles.inputWrapper, { borderBottomColor: borderColor, borderBottomWidth: modalTheme.separatorWidth }]}>
             <View style={styles.inputContainer}>
               <BottomSheetTextInput
                 style={[styles.subViewInput, { color: textColor, minHeight: 100, textAlignVertical: 'top' }]}
@@ -373,7 +373,7 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
 
     const renderSocialLinksEdit = () => (
       <Animated.View entering={FadeIn} exiting={FadeOut} style={{ flex: 1 }}>
-        <View style={[styles.header, { borderBottomColor: borderColor }]}>
+        <View style={[styles.header, { borderBottomColor: borderColor, borderBottomWidth: modalTheme.separatorWidth }]}>
           <TouchableOpacity onPress={() => setActiveSubView(null)} style={styles.closeButton}>
             <Text style={{ color: textColor, fontSize: 16 }}>İptal</Text>
           </TouchableOpacity>
@@ -384,7 +384,7 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
         </View>
 
         <BottomSheetScrollView contentContainerStyle={[styles.contentContainer, { paddingHorizontal: 16 }]}>
-          <View style={[styles.inputWrapper, { borderBottomColor: borderColor, marginBottom: 20 }]}>
+          <View style={[styles.inputWrapper, { borderBottomColor: borderColor, marginBottom: 20, borderBottomWidth: modalTheme.separatorWidth }]}>
             <Text style={[styles.subViewTitle, { color: secondaryTextColor, marginBottom: 8 }]}>Website</Text>
             <BottomSheetTextInput
               style={[styles.subViewInput, { color: textColor }]}
@@ -396,7 +396,7 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
             />
           </View>
 
-          <View style={[styles.inputWrapper, { borderBottomColor: borderColor, marginBottom: 20 }]}>
+          <View style={[styles.inputWrapper, { borderBottomColor: borderColor, marginBottom: 20, borderBottomWidth: modalTheme.separatorWidth }]}>
             <Text style={[styles.subViewTitle, { color: secondaryTextColor, marginBottom: 8 }]}>Instagram</Text>
             <BottomSheetTextInput
               style={[styles.subViewInput, { color: textColor }]}
@@ -408,7 +408,7 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
             />
           </View>
 
-          <View style={[styles.inputWrapper, { borderBottomColor: borderColor, marginBottom: 20 }]}>
+          <View style={[styles.inputWrapper, { borderBottomColor: borderColor, marginBottom: 20, borderBottomWidth: modalTheme.separatorWidth }]}>
             <Text style={[styles.subViewTitle, { color: secondaryTextColor, marginBottom: 8 }]}>TikTok</Text>
             <BottomSheetTextInput
               style={[styles.subViewInput, { color: textColor }]}
@@ -420,7 +420,7 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
             />
           </View>
 
-          <View style={[styles.inputWrapper, { borderBottomColor: borderColor, marginBottom: 20 }]}>
+          <View style={[styles.inputWrapper, { borderBottomColor: borderColor, marginBottom: 20, borderBottomWidth: modalTheme.separatorWidth }]}>
             <Text style={[styles.subViewTitle, { color: secondaryTextColor, marginBottom: 8 }]}>YouTube</Text>
             <BottomSheetTextInput
               style={[styles.subViewInput, { color: textColor }]}
@@ -432,7 +432,7 @@ export const EditProfileSheet = forwardRef<BottomSheet, EditProfileSheetProps>(
             />
           </View>
 
-          <View style={[styles.inputWrapper, { borderBottomColor: borderColor, marginBottom: 20 }]}>
+          <View style={[styles.inputWrapper, { borderBottomColor: borderColor, marginBottom: 20, borderBottomWidth: modalTheme.separatorWidth }]}>
             <Text style={[styles.subViewTitle, { color: secondaryTextColor, marginBottom: 8 }]}>X (Twitter)</Text>
             <BottomSheetTextInput
               style={[styles.subViewInput, { color: textColor }]}
@@ -508,13 +508,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  formSection: { borderTopWidth: 0.5, borderBottomWidth: 0.5, marginBottom: 30 },
+  formSection: { marginBottom: 30 },
   clickableRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 14,
-    borderBottomWidth: 0.5,
   },
   label: { width: 100, fontSize: 15, fontWeight: '500' },
   valueText: { flex: 1, fontSize: 15 },
@@ -523,7 +522,7 @@ const styles = StyleSheet.create({
   subViewContent: { padding: 16, paddingTop: 24 },
   subViewTitle: { fontSize: 13, fontWeight: '600', textTransform: 'uppercase' },
   subViewDesc: { fontSize: 13, lineHeight: 18, marginBottom: 24 },
-  inputWrapper: { borderBottomWidth: 1, paddingBottom: 4 },
+  inputWrapper: { paddingBottom: 4 },
   inputContainer: { flexDirection: 'row', alignItems: 'center' },
   subViewInput: { flex: 1, fontSize: 16, padding: 0 },
   charCountBottom: { fontSize: 12, marginTop: 4, textAlign: 'right' },
@@ -532,7 +531,7 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 12, marginTop: 4, color: '#FF3B30' },
   linksHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   linksList: { marginTop: 16 },
-  linkRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 0.5 },
+  linkRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
   platformPicker: {
     flexDirection: 'row',
     alignItems: 'center',

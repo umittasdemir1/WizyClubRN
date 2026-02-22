@@ -180,11 +180,6 @@ class HlsService {
 
         for (let i = 0; i < segments; i++) {
             const startTime = i * SEGMENT_DURATION;
-            const spriteFileName = `sprite_${i}.jpg`; // Removed videoId for cleaner path if desired? No keep consistent.
-            // Actually, kept convention `sprite_${videoId}_${i}` in original.
-            // Let's perform a minor cleanup: `sprite_${i}.jpg` is enough if folder is `videos/UUID`.
-            // But let's stick to simple change first: use `outputR2Path`.
-
             const spriteName = `sprite_${videoId}_${i}.jpg`;
             const spritePath = path.join(outputDir, spriteName);
 
@@ -209,12 +204,42 @@ class HlsService {
             const stream = fs.readFileSync(spritePath);
             const r2Key = `${outputR2Path}/${spriteName}`; // USE outputR2Path
 
-            await this.r2.send(new PutObjectCommand({
-                Bucket: this.bucket,
-                Key: r2Key,
-                Body: stream,
-                ContentType: 'image/jpeg'
-            }));
+            const maxAttempts = 3;
+            let uploaded = false;
+            let lastError = null;
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                try {
+                    await this.r2.send(new PutObjectCommand({
+                        Bucket: this.bucket,
+                        Key: r2Key,
+                        Body: stream,
+                        ContentType: 'image/jpeg'
+                    }));
+                    uploaded = true;
+                    break;
+                } catch (error) {
+                    lastError = error;
+                    const cause = error?.cause;
+                    this.logLine(attempt < maxAttempts ? 'WARN' : 'ERR', 'SPRITE', 'Sprite upload attempt failed', {
+                        videoId,
+                        spriteName,
+                        partIndex: i,
+                        attempt,
+                        maxAttempts,
+                        error: error?.message || error,
+                        code: error?.code,
+                        cause: cause?.message || cause,
+                        causeCode: cause?.code,
+                    });
+                    if (attempt < maxAttempts) {
+                        await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
+                    }
+                }
+            }
+
+            if (!uploaded) {
+                throw lastError || new Error(`Sprite upload failed for ${spriteName}`);
+            }
 
             if (i === 0) {
                 firstUrl = `${process.env.R2_PUBLIC_URL}/${r2Key}`;

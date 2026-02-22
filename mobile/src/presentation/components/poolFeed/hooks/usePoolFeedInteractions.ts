@@ -233,7 +233,7 @@ export function usePoolFeedInteractions(options: UseFeedInteractionsOptions): Us
         }
 
         // Open options sheet
-        moreOptionsSheetRef.current?.snapToIndex(0);
+        moreOptionsSheetRef.current?.present?.();
         lastPressXRef.current = null;
     }, [setPlaybackRateViaController, setRateLabel, moreOptionsSheetRef]);
 

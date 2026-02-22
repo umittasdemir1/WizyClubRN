@@ -1,3 +1,4 @@
+const path = require("path");
 const { getDefaultConfig } = require("expo/metro-config");
 
 module.exports = (() => {
@@ -21,6 +22,13 @@ module.exports = (() => {
 
     // Custom resolver to handle ESM .js imports in node_modules
     config.resolver.resolveRequest = (context, moduleName, platform) => {
+        if (moduleName === "lucide-react-native") {
+            return {
+                type: "sourceFile",
+                filePath: path.resolve(__dirname, "node_modules/lucide-react-native/dist/cjs/lucide-react-native.js"),
+            };
+        }
+
         if (moduleName.endsWith(".js") && !moduleName.startsWith("/") && !moduleName.startsWith(".")) {
             // This is for package imports that might have .js extensions internally
         }

@@ -81,7 +81,7 @@ export const DraftActionsSheet = forwardRef<BottomSheet, DraftActionsSheetProps>
           </Text>
 
           <Pressable
-            style={[styles.actionItem, { borderBottomColor: borderColor }]}
+            style={[styles.actionItem, { borderBottomColor: borderColor, borderBottomWidth: modalTheme.separatorWidth }]}
             onPress={handleEdit}
           >
             <Edit3 size={22} color={textColor} />
@@ -91,7 +91,7 @@ export const DraftActionsSheet = forwardRef<BottomSheet, DraftActionsSheetProps>
           </Pressable>
 
           <Pressable
-            style={[styles.actionItem, { borderBottomColor: borderColor }]}
+            style={[styles.actionItem, { borderBottomColor: borderColor, borderBottomWidth: modalTheme.separatorWidth }]}
             onPress={handleShare}
           >
             <Share2 size={22} color={textColor} />
@@ -128,7 +128,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 16,
     paddingVertical: 16,
-    borderBottomWidth: 1,
   },
   actionText: {
     fontSize: 16,

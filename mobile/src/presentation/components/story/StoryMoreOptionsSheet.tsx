@@ -82,6 +82,7 @@ export const StoryMoreOptionsSheet = forwardRef<BottomSheet, StoryMoreOptionsShe
                                 label="Düzenle"
                                 textColor={textColor}
                                 borderColor={borderColor}
+                                borderWidth={modalTheme.separatorWidth}
                                 onPress={() => handlePress(onEditPress)}
                             />
                             <OptionItem
@@ -89,6 +90,7 @@ export const StoryMoreOptionsSheet = forwardRef<BottomSheet, StoryMoreOptionsShe
                                 label="Sil"
                                 textColor={textColor}
                                 borderColor={borderColor}
+                                borderWidth={modalTheme.separatorWidth}
                                 onPress={() => handlePress(onDeletePress)}
                             />
                             <OptionItem
@@ -96,6 +98,7 @@ export const StoryMoreOptionsSheet = forwardRef<BottomSheet, StoryMoreOptionsShe
                                 label="Arşivle"
                                 textColor={textColor}
                                 borderColor={borderColor}
+                                borderWidth={modalTheme.separatorWidth}
                                 onPress={() => handlePress(onArchivePress)}
                             />
                             <OptionItem
@@ -103,6 +106,7 @@ export const StoryMoreOptionsSheet = forwardRef<BottomSheet, StoryMoreOptionsShe
                                 label="Öne Çıkar"
                                 textColor={textColor}
                                 borderColor={borderColor}
+                                borderWidth={modalTheme.separatorWidth}
                                 onPress={() => handlePress(onFeaturePress)}
                                 isLast
                             />
@@ -114,6 +118,7 @@ export const StoryMoreOptionsSheet = forwardRef<BottomSheet, StoryMoreOptionsShe
                                 label="Raporla"
                                 textColor={textColor}
                                 borderColor={borderColor}
+                                borderWidth={modalTheme.separatorWidth}
                                 onPress={() => handlePress(onReportPress)}
                             />
                             <OptionItem
@@ -121,6 +126,7 @@ export const StoryMoreOptionsSheet = forwardRef<BottomSheet, StoryMoreOptionsShe
                                 label="İlgilenmiyorum"
                                 textColor={textColor}
                                 borderColor={borderColor}
+                                borderWidth={modalTheme.separatorWidth}
                                 onPress={() => handlePress(onNotInterestedPress)}
                             />
                             <OptionItem
@@ -128,6 +134,7 @@ export const StoryMoreOptionsSheet = forwardRef<BottomSheet, StoryMoreOptionsShe
                                 label="Engelle"
                                 textColor={textColor}
                                 borderColor={borderColor}
+                                borderWidth={modalTheme.separatorWidth}
                                 onPress={() => handlePress(onBlockPress)}
                                 isLast
                             />
@@ -146,6 +153,7 @@ function OptionItem({
     borderColor,
     onPress,
     isLast = false,
+    borderWidth,
 }: {
     icon: React.ReactNode;
     label: string;
@@ -153,12 +161,13 @@ function OptionItem({
     borderColor: string;
     onPress?: () => void;
     isLast?: boolean;
+    borderWidth?: number;
 }) {
     return (
         <TouchableOpacity
             style={[
                 styles.optionItem,
-                { borderBottomColor: borderColor },
+                { borderBottomColor: borderColor, borderBottomWidth: borderWidth ?? 1 },
                 isLast && styles.optionItemLast,
             ]}
             onPress={onPress}
@@ -178,7 +187,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingVertical: 16,
-        borderBottomWidth: 1,
     },
     optionItemLast: {
         borderBottomWidth: 0,

@@ -5,6 +5,7 @@ import { RotateCcw, Trash2 } from 'lucide-react-native';
 import { supabase } from '../../../core/supabase';
 import { CONFIG } from '../../../core/config';
 import { logVideo, logError, LogCode } from '@/core/services/Logger';
+import { useSurfaceTheme } from '../../hooks/useSurfaceTheme';
 
 interface DeletedContentMenuProps {
     isDark: boolean;
@@ -18,6 +19,8 @@ export const DeletedContentMenu = ({ isDark, isActive }: DeletedContentMenuProps
     const [deletedVideos, setDeletedVideos] = useState<any[]>([]);
     const [deletedStories, setDeletedStories] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const modalTheme = useSurfaceTheme(isDark);
+
     const metaColor = isDark ? '#9a9aa0' : '#6b6b72';
     const textColor = isDark ? '#f2f2f4' : '#121214';
     const separatorColor = isDark ? '#2c2c2e' : '#e6e6ea';
@@ -209,10 +212,10 @@ export const DeletedContentMenu = ({ isDark, isActive }: DeletedContentMenuProps
 
     // ---- Render items ----
     const renderVideoItem = (item: any) => (
-        <View key={item.id} style={[styles.itemContainer, { borderBottomColor: separatorColor }]}>
+        <View key={item.id} style={[styles.itemContainer, { borderBottomColor: separatorColor, borderBottomWidth: modalTheme.separatorWidth }]}>
             <Image
                 source={{ uri: item.thumbnail_url }}
-                style={[styles.thumbnail, { borderColor: thumbnailBorder }]}
+                style={[styles.thumbnail, { borderColor: thumbnailBorder, borderWidth: modalTheme.separatorWidth }]}
                 contentFit="cover"
             />
             <View style={styles.infoContainer}>
@@ -249,10 +252,10 @@ export const DeletedContentMenu = ({ isDark, isActive }: DeletedContentMenuProps
     const renderStoryItem = (item: any) => {
         const hoursLeft = getStoryHoursLeft(item.deleted_at);
         return (
-            <View key={item.id} style={[styles.itemContainer, { borderBottomColor: separatorColor }]}>
+            <View key={item.id} style={[styles.itemContainer, { borderBottomColor: separatorColor, borderBottomWidth: modalTheme.separatorWidth }]}>
                 <Image
                     source={{ uri: item.thumbnail_url }}
-                    style={[styles.thumbnail, { borderColor: thumbnailBorder }]}
+                    style={[styles.thumbnail, { borderColor: thumbnailBorder, borderWidth: modalTheme.separatorWidth }]}
                     contentFit="cover"
                 />
                 <View style={styles.infoContainer}>
@@ -393,14 +396,12 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         paddingVertical: 14,
         alignItems: 'center',
-        borderBottomWidth: 1,
     },
     thumbnail: {
         width: 64,
         height: 88,
         borderRadius: 10,
         backgroundColor: '#333',
-        borderWidth: 1,
     },
     infoContainer: {
         flex: 1,

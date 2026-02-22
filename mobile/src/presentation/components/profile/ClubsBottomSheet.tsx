@@ -44,7 +44,7 @@ export const ClubsBottomSheet = forwardRef<BottomSheet, ClubsBottomSheetProps>(
       >
         <BottomSheetView style={styles.container}>
           {/* Header */}
-          <View style={[styles.header, { borderBottomColor: borderColor }]}>
+          <View style={[styles.header, { borderBottomColor: borderColor, borderBottomWidth: modalTheme.separatorWidth }]}>
             <View>
               <Text style={[styles.title, { color: textColor }]}>İşbirliği Yapılan Markalar</Text>
               <Text style={[styles.subtitle, { color: secondaryColor }]}>
@@ -73,7 +73,7 @@ export const ClubsBottomSheet = forwardRef<BottomSheet, ClubsBottomSheetProps>(
             {clubs.map((club) => (
               <TouchableOpacity
                 key={club.id}
-                style={[styles.clubItem, { backgroundColor: cardBg, borderColor }]}
+                style={[styles.clubItem, { backgroundColor: cardBg, borderColor, borderWidth: modalTheme.separatorWidth }]}
               >
                 <View style={styles.logoContainer}>
                   <Image
@@ -109,7 +109,6 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 20,
     paddingBottom: 15,
-    borderBottomWidth: 1,
   },
   title: {
     fontSize: 20,

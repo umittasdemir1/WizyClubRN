@@ -4,32 +4,27 @@ import {
     Text,
     StyleSheet,
     Pressable,
-    Image,
     Dimensions,
-    FlatList,
-    NativeSyntheticEvent,
-    NativeScrollEvent,
 } from 'react-native';
 import { CameraView, CameraType, FlashMode, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
-import { LinearGradient } from 'expo-linear-gradient';
-import { X, Zap, ZapOff, Cog, RefreshCcw } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { UploadModal } from '../src/presentation/components/upload/UploadModal';
 import { LogCode, logError, logUI } from '@/core/services/Logger';
-import { textShadowStyle } from '@/core/utils/shadow';
+import { useGalleryPickerStore } from '../src/presentation/store/useGalleryPickerStore';
+import { useUploadComposerStore } from '../src/presentation/store/useUploadComposerStore';
+import { CameraControls } from '../src/presentation/components/upload/camera/CameraControls';
+import { ModeSelector, MODES } from '../src/presentation/components/upload/camera/ModeSelector';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-
-const MODES = ['HİKAYE', 'GÖNDERİ', 'TASLAK'];
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const PREVIEW_ITEM_WIDTH = SCREEN_WIDTH;
+const PREVIEW_ASPECT_RATIO_DEFAULT = 16 / 9;
+const PREVIEW_BORDER_RADIUS = 20;
 
 export default function CameraScreen() {
     const insets = useSafeAreaInsets();
     const cameraRef = useRef<any>(null);
-    const modeScrollRef = useRef<FlatList<string>>(null);
-    const isProgrammaticScroll = useRef(false);
 
     const [facing, setFacing] = useState<CameraType>('back');
     const [flash, setFlash] = useState<FlashMode>('off');
@@ -37,12 +32,10 @@ export default function CameraScreen() {
     const [selectedMode, setSelectedMode] = useState('HİKAYE');
     const [lastPhoto, setLastPhoto] = useState<string | null>(null);
     const [modeContainerWidth, setModeContainerWidth] = useState(0);
-    const [modeLayouts, setModeLayouts] = useState<Record<string, { x: number; width: number }>>({});
-    const [modeOffsets, setModeOffsets] = useState<number[]>([]);
 
-    // Upload Modal state
-    const [showUploadModal, setShowUploadModal] = useState(false);
-    const [selectedAssetsForUpload, setSelectedAssetsForUpload] = useState<ImagePicker.ImagePickerAsset[]>([]);
+    // Upload Flow
+    const clearPickedAssets = useGalleryPickerStore((state) => state.clearPickedAssets);
+    const setDraft = useUploadComposerStore((state) => state.setDraft);
 
     // Recording state
     const [isRecording, setIsRecording] = useState(false);
@@ -75,45 +68,6 @@ export default function CameraScreen() {
         setFacing(current => current === 'back' ? 'front' : 'back');
     };
 
-    useEffect(() => {
-        const layoutCount = Object.keys(modeLayouts).length;
-        if (!modeContainerWidth || layoutCount !== MODES.length) return;
-
-        const offsets = MODES.map(mode => {
-            const layout = modeLayouts[mode];
-            return Math.max(0, layout.x + layout.width / 2 - modeContainerWidth / 2);
-        });
-
-        setModeOffsets(offsets);
-
-        const selectedIndex = MODES.indexOf(selectedMode);
-        if (selectedIndex >= 0) {
-            modeScrollRef.current?.scrollToOffset({ offset: offsets[selectedIndex], animated: false });
-        }
-    }, [modeLayouts, modeContainerWidth, selectedMode]);
-
-    const snapModeToCenter = (scrollX: number) => {
-        if (!modeContainerWidth || Object.keys(modeLayouts).length === 0) return;
-
-        let closestMode = selectedMode;
-        let closestDistance = Number.POSITIVE_INFINITY;
-        const centerX = scrollX + modeContainerWidth / 2;
-
-        Object.entries(modeLayouts).forEach(([mode, layout]) => {
-            const itemCenter = layout.x + layout.width / 2;
-            const distance = Math.abs(itemCenter - centerX);
-            if (distance < closestDistance) {
-                closestDistance = distance;
-                closestMode = mode;
-            }
-        });
-
-        // Only update state, let snapToOffsets handle positioning
-        if (closestMode !== selectedMode) {
-            setSelectedMode(closestMode);
-        }
-    };
-
     if (!permission) {
         return <View style={styles.container} />;
     }
@@ -129,18 +83,18 @@ export default function CameraScreen() {
         );
     }
 
-    const openGallery = async () => {
-        const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.All,
-            allowsMultipleSelection: true,
-            selectionLimit: 10,
-            quality: 1,
-        });
+    const resolveCreateMode = () => {
+        if (selectedMode === MODES[0]) return 'story';
+        if (selectedMode === MODES[2]) return 'draft';
+        return 'post';
+    };
 
-        if (!result.canceled) {
-            setSelectedAssetsForUpload(result.assets);
-            setShowUploadModal(true);
-        }
+    const openGallery = () => {
+        clearPickedAssets();
+        router.push({
+            pathname: '/galleryPicker',
+            params: { createMode: resolveCreateMode() },
+        });
     };
 
     const takePicture = async () => {
@@ -148,7 +102,6 @@ export default function CameraScreen() {
             try {
                 const photo = await cameraRef.current.takePictureAsync();
                 logUI(LogCode.CAMERA_CAPTURE, 'Photo captured', { width: photo.width, height: photo.height });
-                // Convert photo to ImagePicker.ImagePickerAsset format
                 const photoAsset: ImagePicker.ImagePickerAsset = {
                     uri: photo.uri,
                     width: photo.width,
@@ -162,69 +115,89 @@ export default function CameraScreen() {
                     exif: null,
                     mimeType: 'image/jpeg'
                 };
-                setSelectedAssetsForUpload([photoAsset]);
-                setShowUploadModal(true);
+                setDraft({
+                    selectedAssets: [photoAsset],
+                    uploadMode: selectedMode === MODES[0] ? 'story' : 'video',
+                    coverAssetIndex: 0,
+                    playbackRate: 1,
+                    videoVolume: 1,
+                    cropRatio: '9:16',
+                    filterPreset: 'none',
+                    qualityPreset: 'medium',
+                    subtitleLanguage: 'auto',
+                    trimStartSec: 0,
+                    trimEndSec: 0,
+                });
+                router.push('/upload-composer');
             } catch (error) {
                 logError(LogCode.CAMERA_ERROR, 'Failed to take picture', error);
             }
         }
     };
 
-    const toggleRecording = async () => {
-        if (!cameraRef.current) return;
+    const startRecording = async () => {
+        if (!cameraRef.current || isRecording) return;
 
-        if (isRecording) {
-            // Stop recording
-            try {
-                cameraRef.current.stopRecording();
-                setIsRecording(false);
-            } catch (error) {
-                logError(LogCode.CAMERA_ERROR, 'Failed to stop recording', error);
-            }
-        } else {
-            // Start recording
-            try {
-                setIsRecording(true);
-                const video = await cameraRef.current.recordAsync();
-                logUI(LogCode.CAMERA_CAPTURE, 'Video recorded', { uri: video.uri });
-                // Convert video to ImagePicker.ImagePickerAsset format
-                const videoAsset: ImagePicker.ImagePickerAsset = {
-                    uri: video.uri,
-                    width: 0,
-                    height: 0,
-                    assetId: undefined,
-                    fileName: undefined,
-                    fileSize: undefined,
-                    type: 'video',
-                    duration: undefined,
-                    base64: null,
-                    exif: null,
-                    mimeType: 'video/mp4'
-                };
-                setSelectedAssetsForUpload([videoAsset]);
-                setShowUploadModal(true);
-                setIsRecording(false);
-            } catch (error) {
-                logError(LogCode.CAMERA_ERROR, 'Failed to record video', error);
-                setIsRecording(false);
-            }
+        try {
+            setIsRecording(true);
+            const video = await cameraRef.current.recordAsync();
+            logUI(LogCode.CAMERA_CAPTURE, 'Video recorded', { uri: video.uri });
+            const videoAsset: ImagePicker.ImagePickerAsset = {
+                uri: video.uri,
+                width: 0,
+                height: 0,
+                assetId: undefined,
+                fileName: undefined,
+                fileSize: undefined,
+                type: 'video',
+                duration: undefined,
+                base64: null,
+                exif: null,
+                mimeType: 'video/mp4'
+            };
+            setDraft({
+                selectedAssets: [videoAsset],
+                uploadMode: 'video',
+                coverAssetIndex: 0,
+                playbackRate: 1,
+                videoVolume: 1,
+                cropRatio: '9:16',
+                filterPreset: 'none',
+                qualityPreset: 'medium',
+                subtitleLanguage: 'auto',
+                trimStartSec: 0,
+                trimEndSec: 0,
+            });
+            router.push('/upload-composer');
+        } catch (error) {
+            logError(LogCode.CAMERA_ERROR, 'Failed to record video', error);
+        } finally {
+            setIsRecording(false);
         }
     };
 
-    const handleCapture = () => {
-        if (selectedMode === 'GÖNDERİ') {
-            toggleRecording();
-        } else {
-            takePicture();
+    const stopRecording = () => {
+        if (!cameraRef.current || !isRecording) return;
+
+        try {
+            cameraRef.current.stopRecording();
+        } catch (error) {
+            logError(LogCode.CAMERA_ERROR, 'Failed to stop recording', error);
+            setIsRecording(false);
         }
+    };
+
+    const handleTapCapture = () => {
+        if (isRecording) return;
+        void takePicture();
     };
 
     return (
         <View style={styles.container}>
             <View style={[styles.statusBarSpacer, { height: insets.top }]} />
-            {/* Camera Preview - Between status bar and bottom bar */}
-            <View style={styles.cameraContainer}>
-                <View style={[styles.cameraInner, { paddingLeft: insets.left, paddingRight: insets.right }]}>
+
+            <View style={styles.viewfinderWrapper}>
+                <View style={styles.cameraContainer}>
                     <CameraView
                         ref={cameraRef}
                         style={styles.camera}
@@ -232,147 +205,31 @@ export default function CameraScreen() {
                         flash={flash}
                     />
 
-                    {/* Top Header - Overlay on Camera with absolute positioning */}
-                    <View style={[styles.topBar, { paddingTop: 12 }]}>
-                        <Pressable onPress={() => router.back()} style={[styles.iconButton, styles.topIconShiftLeft, styles.topBarLeft]}>
-                            <X color="#FFFFFF" size={32} strokeWidth={1.8} />
-                        </Pressable>
-
-                        <View style={styles.topBarCenter}>
-                            {isRecording && (
-                                <View style={styles.recordingIndicator}>
-                                    <View style={styles.recordingDot} />
-                                    <Text style={styles.recordingText}>Kaydediliyor</Text>
-                                </View>
-                            )}
-                            <Pressable onPress={toggleFlash} style={[styles.iconButton, styles.topIconShift]}>
-                                {flash === 'off' ? (
-                                    <ZapOff color="#FFFFFF" size={30} strokeWidth={2} fill="#FFFFFF" />
-                                ) : (
-                                    <Zap color="#FFD60A" size={30} strokeWidth={2} fill="#FFD60A" />
-                                )}
-                            </Pressable>
-                        </View>
-
-                        <Pressable onPress={() => logUI(LogCode.UI_INTERACTION, 'Camera settings button pressed')} style={[styles.iconButton, styles.topIconShiftRight, styles.topBarRight]}>
-                            <Cog color="#FFFFFF" size={30} strokeWidth={1.4} fill="none" />
-                        </Pressable>
-                    </View>
                 </View>
+
+                {/* Overlays moved outside cameraContainer to allow negative positioning without clipping */}
+                <CameraControls
+                    isRecording={isRecording}
+                    flash={flash}
+                    toggleFlash={toggleFlash}
+                    facing={facing}
+                    toggleCameraFacing={toggleCameraFacing}
+                    onTapCapture={handleTapCapture}
+                    onStartRecording={startRecording}
+                    onStopRecording={stopRecording}
+                    openGallery={openGallery}
+                    lastPhoto={lastPhoto}
+                />
+
+                <ModeSelector
+                    selectedMode={selectedMode}
+                    setSelectedMode={setSelectedMode}
+                    modeContainerWidth={modeContainerWidth}
+                    setModeContainerWidth={setModeContainerWidth}
+                />
             </View>
 
-            {/* Bottom Controls - Outside Camera, in Black Area */}
-            <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 36 }]}>
-                {/* Bottom Actions */}
-                <View style={[styles.bottomActions, styles.bottomActionsShift]}>
-                    {/* Gallery Preview */}
-                    <View style={styles.sideSlot}>
-                        <Pressable onPress={openGallery} style={styles.galleryButton}>
-                            {lastPhoto ? (
-                                <Image source={{ uri: lastPhoto }} style={styles.galleryPreview} />
-                            ) : (
-                                <View style={styles.galleryPlaceholder} />
-                            )}
-                        </Pressable>
-                    </View>
-
-                    {/* Capture Button */}
-                    <Pressable onPress={handleCapture} style={[styles.captureButtonOuter, styles.captureButtonShift]}>
-                        <View style={[
-                            styles.captureButtonInner,
-                            isRecording && styles.captureButtonRecording
-                        ]} />
-                    </Pressable>
-
-                    {/* Flip Camera */}
-                    <View style={styles.sideSlot}>
-                        <Pressable onPress={toggleCameraFacing} style={styles.flipButton}>
-                            <RefreshCcw color="#FFFFFF" size={32} strokeWidth={1.8} />
-                        </Pressable>
-                    </View>
-                </View>
-
-                {/* Mode Selector - Aligned with thumbnail top */}
-                <View
-                    style={[styles.modeSelector, styles.modeSelectorOverlay, styles.modeSelectorShift]}
-                    onLayout={(event) => setModeContainerWidth(event.nativeEvent.layout.width)}
-                >
-                    <FlatList
-                        ref={modeScrollRef}
-                        data={MODES}
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        keyExtractor={(item: string) => item}
-                        getItemLayout={(_, index) => ({
-                            length: 100,
-                            offset: 100 * index,
-                            index,
-                        })}
-                        contentContainerStyle={{
-                            paddingHorizontal: modeContainerWidth > 0 ? (modeContainerWidth - 100) / 2 : 50,
-                        }}
-                        snapToInterval={100}
-                        snapToAlignment="start"
-                        decelerationRate="fast"
-                        onScroll={(event: NativeSyntheticEvent<NativeScrollEvent>) => {
-                            if (isProgrammaticScroll.current) return;
-                            const index = Math.round(event.nativeEvent.contentOffset.x / 100);
-                            const clampedIndex = Math.max(0, Math.min(index, MODES.length - 1));
-                            if (MODES[clampedIndex] !== selectedMode) {
-                                setSelectedMode(MODES[clampedIndex]);
-                            }
-                        }}
-                        scrollEventThrottle={16}
-                        renderItem={({ item, index }: { item: string; index: number }) => (
-                            <Pressable
-                                onPress={() => {
-                                    isProgrammaticScroll.current = true;
-                                    setSelectedMode(item);
-                                    modeScrollRef.current?.scrollToIndex({ index, animated: true });
-                                    setTimeout(() => {
-                                        isProgrammaticScroll.current = false;
-                                    }, 300);
-                                }}
-                                style={styles.modeButton}
-                            >
-                                <Text
-                                    style={[
-                                        styles.modeText,
-                                        selectedMode === item ? styles.modeTextActive : styles.modeTextInactive,
-                                    ]}
-                                >
-                                    {item}
-                                </Text>
-                            </Pressable>
-                        )}
-                    />
-                    <LinearGradient
-                        pointerEvents="none"
-                        colors={['#080A0F', 'rgba(0, 0, 0, 0)']}
-                        start={{ x: 0, y: 0.5 }}
-                        end={{ x: 1, y: 0.5 }}
-                        style={[styles.modeFadeEdge, styles.modeFadeLeft]}
-                    />
-                    <LinearGradient
-                        pointerEvents="none"
-                        colors={['rgba(0, 0, 0, 0)', '#080A0F']}
-                        start={{ x: 0, y: 0.5 }}
-                        end={{ x: 1, y: 0.5 }}
-                        style={[styles.modeFadeEdge, styles.modeFadeRight]}
-                    />
-                </View>
-            </View>
-
-            {/* Upload Modal */}
-            <UploadModal
-                isVisible={showUploadModal}
-                onClose={() => {
-                    setShowUploadModal(false);
-                    setSelectedAssetsForUpload([]);
-                }}
-                initialAssets={selectedAssetsForUpload}
-                uploadMode={selectedMode === 'HİKAYE' ? 'story' : 'video'}
-            />
+            <View style={styles.bottomBar} />
         </View>
     );
 }
@@ -382,19 +239,22 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#000',
     },
+    viewfinderWrapper: {
+        width: PREVIEW_ITEM_WIDTH,
+        height: PREVIEW_ITEM_WIDTH * PREVIEW_ASPECT_RATIO_DEFAULT + 120, // Expanded to include the scroll/touch area for ModeSelector
+        alignSelf: 'center',
+        zIndex: 5,
+    },
     cameraContainer: {
-        flex: 1,
-        borderRadius: 16,
+        width: PREVIEW_ITEM_WIDTH,
+        height: PREVIEW_ITEM_WIDTH * PREVIEW_ASPECT_RATIO_DEFAULT,
+        borderRadius: PREVIEW_BORDER_RADIUS,
         overflow: 'hidden',
-        backgroundColor: '#000',
+        backgroundColor: '#1a1a1a',
+        alignSelf: 'center',
     },
     camera: {
         flex: 1,
-        borderRadius: 16,
-    },
-    cameraInner: {
-        flex: 1,
-        backgroundColor: '#000',
     },
     permissionContainer: {
         justifyContent: 'center',
@@ -417,190 +277,12 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
     },
-    topBar: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingBottom: 12,
-        zIndex: 100,
-    },
-    topBarLeft: {
-        position: 'absolute',
-        left: 20,
-    },
-    topBarRight: {
-        position: 'absolute',
-        right: 20,
-    },
-    topBarCenter: {
-        alignItems: 'center',
-    },
-    iconButton: {
-        width: 44,
-        height: 44,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    topIconShift: {
-        transform: [{ translateY: -5 }],
-    },
-    topIconShiftLeft: {
-        transform: [{ translateY: -5 }, { translateX: -10 }],
-    },
-    topIconShiftRight: {
-        transform: [{ translateY: -5 }, { translateX: 10 }],
-    },
     statusBarSpacer: {
         backgroundColor: '#000',
     },
     bottomBar: {
+        flex: 1,
         backgroundColor: '#000',
-        paddingTop: 12,
-        alignItems: 'center',
-        gap: 12,
-        zIndex: 100,
-    },
-    modeSelector: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    modeSelectorOverlay: {
-        position: 'absolute',
-        left: 90,
-        right: 90,
-        top: 0,
-        height: 28,
-        justifyContent: 'center',
-        alignItems: 'center',
-        overflow: 'hidden',
-    },
-    modeSelectorShift: {
-        transform: [{ translateY: 50 }],
-    },
-    modeButton: {
-        width: 100,
-        paddingVertical: 0,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    modeText: {
-        color: 'rgba(255, 255, 255, 0.5)',
-        fontSize: 17,
-        fontWeight: '500',
-    },
-    modeTextInactive: {
-        opacity: 0.8,
-    },
-    modeTextActive: {
-        color: '#FFFFFF',
-        fontSize: 18,
-        fontWeight: '700',
-        ...textShadowStyle('rgba(0, 0, 0, 0.5)', { width: 0, height: 1 }, 2),
-    },
-    modeScrollContent: {
-        alignItems: 'center',
-    },
-    modeFadeEdge: {
-        position: 'absolute',
-        top: 0,
-        bottom: 0,
-        width: 28,
-    },
-    modeFadeLeft: {
-        left: 0,
-    },
-    modeFadeRight: {
-        right: 0,
-    },
-    bottomActions: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-end',
         width: '100%',
-        paddingHorizontal: 24,
-    },
-    bottomActionsShift: {
-        transform: [{ translateY: 10 }],
-    },
-    sideSlot: {
-        width: 84,
-        alignItems: 'center',
-    },
-    galleryButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 6,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: '#9E9E9E',
-        zIndex: 999,
-        transform: [{ translateX: -20 }, { translateY: -15 }],
-    },
-    galleryPreview: {
-        width: '100%',
-        height: '100%',
-    },
-    galleryPlaceholder: {
-        width: '100%',
-        height: '100%',
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    },
-    captureButtonOuter: {
-        width: 78,
-        height: 78,
-        borderRadius: 39,
-        backgroundColor: 'rgba(255, 255, 255, 0.3)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 4,
-        borderColor: '#FFFFFF',
-    },
-    captureButtonShift: {
-        transform: [{ translateY: -65 }],
-    },
-    captureButtonInner: {
-        width: 66,
-        height: 66,
-        borderRadius: 33,
-        backgroundColor: '#FFFFFF',
-    },
-    captureButtonRecording: {
-        backgroundColor: '#FF3B30',
-        borderRadius: 8,
-        width: 32,
-        height: 32,
-    },
-    flipButton: {
-        width: 44,
-        height: 44,
-        justifyContent: 'center',
-        alignItems: 'center',
-        transform: [{ translateX: 20 }, { translateY: -15 }],
-    },
-    recordingIndicator: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        backgroundColor: 'rgba(255, 59, 48, 0.9)',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 20,
-    },
-    recordingDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: '#FFFFFF',
-    },
-    recordingText: {
-        color: '#FFFFFF',
-        fontSize: 14,
-        fontWeight: '600',
     },
 });

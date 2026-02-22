@@ -1,15 +1,15 @@
 
-require('dotenv').config();
+require('dotenv').config({ path: require('path').resolve(__dirname, '..', '.env') });
 const { createClient } = require('@supabase/supabase-js');
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://snpckjrjmwxwgqcqghkl.supabase.co';
-const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNucGNranJqbXd4d2dxY3FnaGtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwODQyMjQsImV4cCI6MjA4MDY2MDIyNH0.Dz-NNN4M_fZePf9EqefUkTITv6yec8KUdKNSEzv3Rw4';
+const supabaseUrl = process.env.SUPABASE_URL;
+const ANON_KEY = process.env.SUPABASE_KEY;
 
 const supabase = createClient(supabaseUrl, ANON_KEY);
 
 async function checkProfileStructure() {
     console.log('Checking profile structure for: wizyclub-official');
-    
+
     const { data, error } = await supabase
         .from('profiles')
         .select('*')

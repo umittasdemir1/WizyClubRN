@@ -277,7 +277,7 @@ export function usePoolFeedActions(options: UseFeedActionsOptions): UseFeedActio
 
     const handleCleanScreen = useCallback(() => {
         setCleanScreen(!isCleanScreen);
-        moreOptionsSheetRef.current?.close();
+        moreOptionsSheetRef.current?.dismiss?.();
         descriptionSheetRef.current?.close();
     }, [isCleanScreen, setCleanScreen, moreOptionsSheetRef, descriptionSheetRef]);
 
@@ -288,12 +288,12 @@ export function usePoolFeedActions(options: UseFeedActionsOptions): UseFeedActio
 
     const handleSheetEdit = useCallback(() => {
         if (!activeVideoId) return;
-        moreOptionsSheetRef.current?.close();
+        moreOptionsSheetRef.current?.dismiss?.();
         openEditScreen(activeVideoId);
     }, [activeVideoId, moreOptionsSheetRef, openEditScreen]);
 
     const handleSheetDelete = useCallback(() => {
-        moreOptionsSheetRef.current?.close();
+        moreOptionsSheetRef.current?.dismiss?.();
         handleDeletePress();
     }, [handleDeletePress, moreOptionsSheetRef]);
 

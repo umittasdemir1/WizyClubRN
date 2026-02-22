@@ -1,5 +1,6 @@
-const SUPABASE_URL = 'https://snpckjrjmwxwgqcqghkl.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNucGNranJqbXd4d2dxY3FnaGtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwODQyMjQsImV4cCI6MjA4MDY2MDIyNH0.Dz-NNN4M_fZePf9EqefUkTITv6yec8KUdKNSEzv3Rw4';
+require('dotenv').config({ path: require('path').resolve(__dirname, '..', '.env') });
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_KEY;
 const PROXY_URL = 'https://wizy-r2-proxy.tasdemir-umit.workers.dev';
 
 async function repair() {

@@ -1,6 +1,7 @@
 {
   "background": {
-    "label": "Genel arka plan",
+    "label": "Genel Arka Plan",
+    "description": "Sayfaların ve ana yüzeylerin varsayılan arka plan rengidir.",
     "light": "#FFFFFF",
     "dark": "#080A0F",
     "usage": [
@@ -12,7 +13,8 @@
     ]
   },
   "videoBackground": {
-    "label": "Video sahne arka planı",
+    "label": "Video Sahne Arka Planı",
+    "description": "Video oynatıcıların ve hikaye ekranlarının zemin rengidir.",
     "light": "#080A0F",
     "dark": "#080A0F",
     "usage": [
@@ -23,7 +25,8 @@
     ]
   },
   "card": {
-    "label": "Kart yüzeyi",
+    "label": "Kart Yüzeyi",
+    "description": "İçerik kartları ve listelerdeki öğelerin arka plan rengidir.",
     "light": "#F2F2F7",
     "dark": "#222222",
     "usage": [
@@ -34,7 +37,8 @@
     ]
   },
   "black": {
-    "label": "Siyah yardımcı renk",
+    "label": "Siyah Yardımcı Renk",
+    "description": "Genellikle karartma ve overlay katmanlarında kullanılan sabit siyahtır.",
     "light": "#080A0F",
     "dark": "#080A0F",
     "usage": [
@@ -42,7 +46,8 @@
     ]
   },
   "border": {
-    "label": "Sınır/çizgi rengi",
+    "label": "Sınır/Çizgi Rengi",
+    "description": "Ayraçlar ve kutu sınırları için kullanılan renk.",
     "light": "#E5E5EA",
     "dark": "#333333",
     "usage": [
@@ -51,7 +56,8 @@
     ]
   },
   "textPrimary": {
-    "label": "Birincil metin",
+    "label": "Birincil Metin",
+    "description": "Başlıklar ve ana içerik metinleri için kullanılır.",
     "light": "#080A0F",
     "dark": "#FFFFFF",
     "usage": [
@@ -63,7 +69,8 @@
     ]
   },
   "textSecondary": {
-    "label": "İkincil metin",
+    "label": "İkincil Metin",
+    "description": "Açıklamalar, alt başlıklar ve daha az önemli metinler için kullanılır.",
     "light": "#8E8E93",
     "dark": "rgba(255, 255, 255, 0.6)",
     "usage": [

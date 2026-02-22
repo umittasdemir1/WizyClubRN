@@ -1,5 +1,5 @@
-import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, type GestureResponderEvent } from 'react-native';
+﻿import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Pressable, Dimensions, type GestureResponderEvent } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { Volume2, VolumeX, MoreVertical } from 'lucide-react-native';
@@ -16,6 +16,7 @@ import { FEED_FLAGS } from './hooks/useInfiniteFeedConfig';
 import { getBufferConfig } from '../../../core/utils/bufferConfig';
 import { shadowStyle } from '@/core/utils/shadow';
 import { PerformanceLogger } from '../../../core/services/PerformanceLogger';
+import { useSubtitles } from '../../hooks/useSubtitles';
 import VideosIcon from '../../../../assets/icons/darkvideos.svg';
 
 const DESCRIPTION_LIMIT = 70;
@@ -35,9 +36,13 @@ const END_GUARD_TOLERANCE_SEC = 1;
 const END_GUARD_MIN_DURATION_SEC = 3;
 const END_GUARD_MIN_PROGRESS_SEC = 1;
 const INACTIVE_RESUME_WINDOW_MS = 3000;
+const ACTIVE_WAKEUP_SEEK_DELAY_MS = 180;
+const ACTIVE_WAKEUP_MIN_PROGRESS_SEC = 0.2;
 const DEFAULT_VIDEO_ASPECT_RATIO = 9 / 16;
 const MIN_VALID_ASPECT_RATIO = 0.2;
 const MAX_VALID_ASPECT_RATIO = 5;
+const SUBTITLE_SIDE_MARGIN = 20;
+const SUBTITLE_MAX_WIDTH = Dimensions.get('window').width - (SUBTITLE_SIDE_MARGIN * 2);
 
 const isNonEmptyString = (value: unknown): value is string =>
     typeof value === 'string' && value.trim().length > 0;
@@ -55,6 +60,7 @@ const isValidAspectRatio = (value: number | null | undefined): value is number =
     Number.isFinite(value) &&
     value >= MIN_VALID_ASPECT_RATIO &&
     value <= MAX_VALID_ASPECT_RATIO;
+const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 
 const getAspectRatioFromDimensions = (width: unknown, height: unknown): number | null => {
     const numericWidth = Number(width);
@@ -103,7 +109,7 @@ const formatRelativeTime = (value?: string) => {
 interface InfiniteFeedCardProps {
     item: VideoEntity;
     index: number;
-    activeIndex: number; // ✅ For calculating distance to reset video
+    activeIndex: number; // âœ… For calculating distance to reset video
     colors: ThemeColors;
     isActive: boolean;
     isPendingActive?: boolean;
@@ -128,6 +134,7 @@ interface InfiniteFeedCardProps {
     isCleanScreen?: boolean;
     resolvedVideoSource?: string | null;
     networkType?: NetInfoStateType | null;
+    shouldShowSubtitle?: boolean;
 }
 
 export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
@@ -158,6 +165,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     isCleanScreen = false,
     resolvedVideoSource = null,
     networkType = null,
+    shouldShowSubtitle = false,
 }: InfiniteFeedCardProps) {
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
     const [playbackSource, setPlaybackSource] = useState<string | null>(null);
@@ -178,8 +186,53 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     const readyFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const inactiveSinceRef = useRef<number | null>(null);
     const inactivePauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const activeWakeupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const hasAppliedActiveWakeupRef = useRef(false);
+    const lastSubtitleTimeMsRef = useRef(0);
 
-    // ✅ FLAG CONTROLS
+    const [activeSubtitleText, setActiveSubtitleText] = useState<string | null>(null);
+    const { subtitles, getActiveSubtitle } = useSubtitles(isActive ? item.id : undefined);
+    const subtitlePresentationStyle = useMemo<any>(() => {
+        const presentation = subtitles?.presentation;
+        if (!presentation) return null;
+        const left = clamp01(Number(presentation.leftRatio));
+        const top = clamp01(Number(presentation.topRatio));
+        const width = Math.max(0.1, clamp01(Number(presentation.widthRatio)));
+        return {
+            left: `${left * 100}%`,
+            top: `${top * 100}%`,
+            width: `${width * 100}%`,
+            maxWidth: undefined,
+            bottom: undefined,
+        };
+    }, [subtitles?.presentation]);
+    const subtitleTextDynamicStyle = useMemo<any>(() => {
+        const style = subtitles?.style;
+        if (!style) return null;
+        const fontSize = Math.max(12, Math.min(42, Number(style.fontSize) || 18));
+        const rawAlign = String(style.textAlign || 'center');
+        const mappedAlign = rawAlign === 'center'
+            ? 'center'
+            : (rawAlign === 'end' || rawAlign === 'right')
+                ? 'right'
+                : 'left';
+        return {
+            fontSize,
+            lineHeight: Math.max(fontSize + 6, Math.round(fontSize * 1.3)),
+            textAlign: mappedAlign,
+        };
+    }, [subtitles?.style]);
+    const subtitleWrapperDynamicStyle = useMemo<any>(() => {
+        const showOverlay = subtitles?.style?.showOverlay !== false;
+        if (showOverlay) return null;
+        return {
+            backgroundColor: 'transparent',
+            paddingHorizontal: 0,
+            paddingVertical: 0,
+        };
+    }, [subtitles?.style?.showOverlay]);
+
+    // âœ… FLAG CONTROLS
     const disableAllUI = FEED_FLAGS.INF_DISABLE_ALL_UI;
     const disableInlineVideo = FEED_FLAGS.INF_DISABLE_INLINE_VIDEO;
     const disableTimeBadge = FEED_FLAGS.INF_DISABLE_TIME_BADGE || disableAllUI || isCleanScreen;
@@ -205,6 +258,11 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         if (!inactivePauseTimerRef.current) return;
         clearTimeout(inactivePauseTimerRef.current);
         inactivePauseTimerRef.current = null;
+    }, []);
+    const clearActiveWakeupTimer = useCallback(() => {
+        if (!activeWakeupTimerRef.current) return;
+        clearTimeout(activeWakeupTimerRef.current);
+        activeWakeupTimerRef.current = null;
     }, []);
 
     const thumbnail = useMemo(() => {
@@ -246,7 +304,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
             minLoadRetryCount: 5,
         };
     }, [effectiveVideoSourceUrl, bufferConfig]);
-    // ✅ Distance-based mount: unmount when 3+ cards away to save resources
+    // âœ… Distance-based mount: unmount when 3+ cards away to save resources
     const distanceFromActive = Math.abs(index - activeIndex);
     const isInMountRange = distanceFromActive <= 2;
     const shouldMountVideo = isVideo && isInMountRange && !disableInlineVideo && !isMeasurement;
@@ -261,7 +319,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     const shouldPlayVideo = isVideo && !disableInlineVideo && !isMeasurement && isActive && !isPaused;
     const hasMedia = isCarousel || isVideo || Boolean(thumbnail);
     const hasThumbnail = Boolean(thumbnail);
-    // ✅ Only gate video visibility BEFORE first frame is seen
+    // âœ… Only gate video visibility BEFORE first frame is seen
     // Once video plays (firstFrameSeenRef=true), NEVER return to thumbnail
     const shouldGateVideoVisibility = !disableThumbnail && hasThumbnail && !firstFrameSeenRef.current;
     const shouldShowBaseThumbnail = hasThumbnail && (!isVideo || !disableThumbnail);
@@ -283,7 +341,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         return DEFAULT_VIDEO_ASPECT_RATIO;
     }, [loadedVideoAspectRatio, mediaVideoAspectRatio, storedAspectRatio, thumbnailAspectRatio]);
 
-    // ✅ [PERF] Stabilize callbacks to prevent InfiniteFeedActions re-renders
+    // âœ… [PERF] Stabilize callbacks to prevent InfiniteFeedActions re-renders
     const handleOpen = useCallback(() => {
         onOpen(item.id, index);
     }, [item.id, index, onOpen]);
@@ -419,6 +477,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     }, []);
 
     const handleVideoProgress = useCallback((event: OnProgressData) => {
+        lastSubtitleTimeMsRef.current = event.currentTime * 1000;
         if (!firstFrameSeenRef.current && event.currentTime >= 0) {
             revealVideoLayer();
         }
@@ -455,7 +514,34 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         if (nextProgressSec === lastReportedProgressSecRef.current) return;
         lastReportedProgressSecRef.current = nextProgressSec;
         setVideoProgressSec(nextProgressSec);
-    }, [isActive, revealVideoLayer]);
+
+        // Sync subtitles
+        if (!shouldShowSubtitle) {
+            if (activeSubtitleText !== null) {
+                setActiveSubtitleText(null);
+            }
+            return;
+        }
+
+        const subtitle = getActiveSubtitle(lastSubtitleTimeMsRef.current);
+        if (subtitle !== activeSubtitleText) {
+            setActiveSubtitleText(subtitle);
+        }
+    }, [activeSubtitleText, getActiveSubtitle, isActive, revealVideoLayer, shouldShowSubtitle]);
+
+    useEffect(() => {
+        if (!shouldShowSubtitle) {
+            if (activeSubtitleText !== null) {
+                setActiveSubtitleText(null);
+            }
+            return;
+        }
+
+        const subtitleNow = getActiveSubtitle(lastSubtitleTimeMsRef.current);
+        if (subtitleNow !== activeSubtitleText) {
+            setActiveSubtitleText(subtitleNow);
+        }
+    }, [activeSubtitleText, getActiveSubtitle, shouldShowSubtitle]);
 
     const handleVideoEnd = useCallback(() => {
         if (!isVideo) return;
@@ -553,6 +639,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         setIsVideoVisible(!initialShouldGate);
         setIsDecodePrewarmDone(false);
         setPlaybackSource(null);
+        setActiveSubtitleText(null);
     }, [clearInactivePauseTimer, clearReadyFallbackTimer, disableThumbnail, hasThumbnail, item.id]);
 
     useEffect(() => {
@@ -565,16 +652,17 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     useEffect(() => () => {
         clearReadyFallbackTimer();
         clearInactivePauseTimer();
-    }, [clearInactivePauseTimer, clearReadyFallbackTimer]);
+        clearActiveWakeupTimer();
+    }, [clearActiveWakeupTimer, clearInactivePauseTimer, clearReadyFallbackTimer]);
 
     useEffect(() => {
         if (!shouldMountVideo) {
             clearReadyFallbackTimer();
-            // ✅ DON'T reset firstFrameSeenRef - once video plays, never show thumbnail
+            // âœ… DON'T reset firstFrameSeenRef - once video plays, never show thumbnail
             if (!firstFrameSeenRef.current) {
                 setIsVideoVisible(!shouldGateVideoVisibility);
             }
-            // ✅ NO automatic state reset - video will restart from 0 on remount anyway
+            // âœ… NO automatic state reset - video will restart from 0 on remount anyway
             return;
         }
 
@@ -622,7 +710,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
             setIsVideoVisible(true);
             return;
         }
-        // ✅ Only show thumbnail for INITIAL load (video never played)
+        // âœ… Only show thumbnail for INITIAL load (video never played)
         // Once firstFrameSeenRef=true, NEVER reset it
         if (!firstFrameSeenRef.current) {
             setIsVideoVisible(false);
@@ -641,18 +729,50 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     }, [clearReadyFallbackTimer, isActive, isDecodePrewarmDone, isVideo]);
 
     useEffect(() => {
+        if (!isVideo || !isActive || !shouldPlayVideo) {
+            clearActiveWakeupTimer();
+            hasAppliedActiveWakeupRef.current = false;
+            return;
+        }
+        if (hasAppliedActiveWakeupRef.current) return;
+
+        clearActiveWakeupTimer();
+        activeWakeupTimerRef.current = setTimeout(() => {
+            activeWakeupTimerRef.current = null;
+            if (!wasActiveRef.current) return;
+            if (hasReachedLoopLimit) return;
+            if (lastReportedProgressSecRef.current > ACTIVE_WAKEUP_MIN_PROGRESS_SEC) return;
+            try {
+                // Android can occasionally miss the first resume edge after feed insertions.
+                // A tiny seek nudges the decoder without visible jump.
+                videoRef.current?.seek?.(0.01);
+                hasAppliedActiveWakeupRef.current = true;
+            } catch {
+                // best effort
+            }
+        }, ACTIVE_WAKEUP_SEEK_DELAY_MS);
+
+        return () => {
+            clearActiveWakeupTimer();
+        };
+    }, [clearActiveWakeupTimer, hasReachedLoopLimit, isActive, isVideo, shouldPlayVideo]);
+
+    useEffect(() => {
         const wasActive = wasActiveRef.current;
 
         if (!isVideo) {
+            clearActiveWakeupTimer();
             wasActiveRef.current = isActive;
             return;
         }
 
         if (!isActive && wasActive) {
+            clearActiveWakeupTimer();
+            hasAppliedActiveWakeupRef.current = false;
             inactiveSinceRef.current = Date.now();
             setIsInactivePauseWindow(true);
             clearInactivePauseTimer();
-            // ✅ 3-second threshold: mark for reset later (when video goes out of view)
+            // âœ… 3-second threshold: mark for reset later (when video goes out of view)
             // Don't seek here - it causes visible jitter
             // The reset will happen in shouldMountVideo=false effect
 
@@ -665,7 +785,8 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         }
 
         if (isActive && !wasActive) {
-            // ✅ Immediately mark video as seen when it becomes active
+            hasAppliedActiveWakeupRef.current = false;
+            // âœ… Immediately mark video as seen when it becomes active
             // This prevents thumbnail from showing on first scroll
             firstFrameSeenRef.current = true;
             setIsVideoVisible(true);
@@ -673,7 +794,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
             const inactiveSince = inactiveSinceRef.current;
             const inactiveDurationMs = inactiveSince == null ? 0 : Date.now() - inactiveSince;
             clearInactivePauseTimer();
-            // ✅ State reset only - NO seek(0) to avoid visible jitter
+            // âœ… State reset only - NO seek(0) to avoid visible jitter
             // Video will start from 0 on next remount automatically
             if (inactiveSince != null && inactiveDurationMs >= INACTIVE_RESUME_WINDOW_MS) {
                 completedLoopCountRef.current = 0;
@@ -686,16 +807,16 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         }
 
         wasActiveRef.current = isActive;
-    }, [clearInactivePauseTimer, isActive, isVideo]);
+    }, [clearActiveWakeupTimer, clearInactivePauseTimer, isActive, isVideo]);
 
-    // ✅ [PERF] Memoize dynamic styles to prevent object reference churn
+    // âœ… [PERF] Memoize dynamic styles to prevent object reference churn
     const effectiveAspectRatio = isCarousel ? CAROUSEL_ASPECT_RATIO : aspectRatio;
     const mediaWrapperStyle = useMemo(() => [
         styles.mediaWrapper,
         { aspectRatio: effectiveAspectRatio }
     ], [effectiveAspectRatio]);
 
-    // ✅ [PERF] Consolidated theme styles - 12 useMemos → 1
+    // âœ… [PERF] Consolidated theme styles - 12 useMemos â†’ 1
     const isDarkTheme = colors.textPrimary.toLowerCase() === '#ffffff';
     const themedStyles = useMemo(() => {
         const cardBg = mixWithWhite(colors.background, 0.03);
@@ -732,7 +853,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         };
     }, [colors.background, colors.textPrimary, colors.textSecondary, disableCardStyle, isDarkTheme]);
 
-    // ✅ [PERF] Only truly dynamic values stay as separate useMemos
+    // âœ… [PERF] Only truly dynamic values stay as separate useMemos
     const videoTimeText = useMemo(() => {
         if (videoDurationDisplaySec == null) return '';
         return `${formatPlaybackClock(videoProgressSec)} | ${formatPlaybackClock(videoDurationDisplaySec)}`;
@@ -774,7 +895,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                             onCarouselTouchStart={onCarouselTouchStart}
                             onCarouselTouchEnd={onCarouselTouchEnd}
                         />
-                        {/* ✅ USER HEADER - Top-left overlay on media */}
+                        {/* âœ… USER HEADER - Top-left overlay on media */}
                         {!disableUserHeader && (
                             <View style={styles.mediaHeaderOverlay}>
                                 <View style={styles.userInfoRow}>
@@ -920,7 +1041,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                             )}
                         </View>
 
-                        {/* ✅ USER HEADER - Top-left overlay on media */}
+                        {/* âœ… USER HEADER - Top-left overlay on media */}
                         {!disableUserHeader && (
                             <View style={styles.mediaHeaderOverlay}>
                                 <View style={styles.userInfoRow}>
@@ -997,11 +1118,18 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                 <Text style={styles.videoTimeBadgeText}>{videoTimeText}</Text>
                             </View>
                         )}
+                        {isVideo && isActive && !isCleanScreen && shouldShowSubtitle && activeSubtitleText && (
+                            <View style={[styles.subtitleContainer, subtitlePresentationStyle]} pointerEvents="none">
+                                <View style={[styles.subtitleWrapper, subtitleWrapperDynamicStyle]}>
+                                    <Text style={[styles.subtitleText, subtitleTextDynamicStyle]}>{activeSubtitleText}</Text>
+                                </View>
+                            </View>
+                        )}
                     </Pressable>
                 )
             ) : null}
 
-            {/* ✅ ACTIONS - Controlled by INF_DISABLE_ACTIONS */}
+            {/* âœ… ACTIONS - Controlled by INF_DISABLE_ACTIONS */}
             {!disableActions && (
                 <View style={styles.cardContent}>
                     <InfiniteFeedActions
@@ -1031,7 +1159,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                 </View>
             )}
 
-            {/* ✅ DESCRIPTION - Controlled by INF_DISABLE_DESCRIPTION */}
+            {/* âœ… DESCRIPTION - Controlled by INF_DISABLE_DESCRIPTION */}
             {showDescriptionBlock && (
                 <View style={styles.cardContent}>
                     <Text style={themedStyles.description} onPress={handleToggleDescription}>
@@ -1060,6 +1188,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                     {showTimeHint && <Text style={themedStyles.timeHint}>{relativeTime}</Text>}
                 </View>
             )}
+
         </>
     );
 
@@ -1217,9 +1346,9 @@ const styles = StyleSheet.create({
     },
     mediaLeftBottomTime: {
         position: 'absolute',
-        left: 12,
-        bottom: 12,
-        zIndex: 3,
+        right: 8,
+        top: 50,
+        zIndex: 6,
     },
     volumeButton: {
         width: 30,
@@ -1314,4 +1443,27 @@ const styles = StyleSheet.create({
         marginLeft: 0,
         marginRight: 0,
     },
+    subtitleContainer: {
+        position: 'absolute',
+        left: SUBTITLE_SIDE_MARGIN,
+        bottom: 12,
+        maxWidth: SUBTITLE_MAX_WIDTH,
+        zIndex: 4,
+    },
+    subtitleWrapper: {
+        backgroundColor: 'rgba(8, 10, 15, 0.72)',
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+        borderRadius: 8,
+    },
+    subtitleText: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        lineHeight: 20,
+        fontWeight: '400',
+        textShadowColor: 'rgba(0, 0, 0, 0.65)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 2,
+    },
 });
+

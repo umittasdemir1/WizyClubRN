@@ -21,8 +21,10 @@ import {
 } from './hooks/usePoolFeedStores';
 import { useUploadStore } from '../../store/useUploadStore';
 import { useInAppBrowserStore } from '../../store/useInAppBrowserStore';
+import { useSubtitlePreferencesStore, type SubtitlePreferenceMode } from '../../store/useSubtitlePreferencesStore';
 import { useStories } from '../../hooks/useStories';
 import { useVideoViewTracking } from '../../hooks/useVideoViewTracking';
+import { CONFIG } from '../../../core/config';
 import type { PoolFeedVideo } from './PoolFeedTypes';
 
 // Modular Hooks & Architecture
@@ -46,6 +48,8 @@ import { isFeedVideoItem } from './utils/PoolFeedUtils';
 import { styles } from './PoolFeedManager.styles';
 
 const AnimatedFlashList = Animated.createAnimatedComponent(FlashList);
+const SUBTITLE_AVAILABILITY_CACHE_TTL_MS = 5 * 60 * 1000;
+const SUBTITLE_AVAILABILITY_PENDING_RETRY_MS = 3000;
 
 // ============================================================================ 
 // Types
@@ -143,10 +147,127 @@ export const PoolFeedManager = ({
     const [rateLabel, setRateLabel] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'stories' | 'foryou'>('foryou');
     const [isCarouselInteracting, setIsCarouselInteracting] = useState(false);
+    const [subtitleAvailabilityByVideoId, setSubtitleAvailabilityByVideoId] = useState<
+        Record<string, { hasSubtitles: boolean; fetchedAt: number; isProcessing?: boolean }>
+    >({});
+    const subtitleAvailabilityRef = useRef(subtitleAvailabilityByVideoId);
+    const subtitleAlwaysEnabled = useSubtitlePreferencesStore((state) => state.alwaysEnabled);
+    const subtitleVideoEnabledById = useSubtitlePreferencesStore((state) => state.videoEnabledById);
+    const setSubtitleSelectionForVideo = useSubtitlePreferencesStore((state) => state.setSelectionForVideo);
 
     const activeVideo = useMemo(() => videos.find((v) => v.id === activeVideoId) || null, [videos, activeVideoId]);
     const isOwnActiveVideo = !!activeVideo && activeVideo.user?.id === user?.id;
     const isActivePlayable = useMemo(() => (activeVideo ? isFeedVideoItem(activeVideo) : false), [activeVideo]);
+
+    useEffect(() => {
+        subtitleAvailabilityRef.current = subtitleAvailabilityByVideoId;
+    }, [subtitleAvailabilityByVideoId]);
+
+    useEffect(() => {
+        if (!activeVideo?.id) return;
+        const videoId = activeVideo.id;
+        const cached = subtitleAvailabilityRef.current[videoId];
+        const now = Date.now();
+
+        if (activeVideo.postType !== 'video') {
+            // Prevent render loops: non-video items should be marked once.
+            if (cached?.hasSubtitles === false) return;
+            setSubtitleAvailabilityByVideoId((prev) => ({
+                ...prev,
+                [videoId]: { hasSubtitles: false, fetchedAt: now, isProcessing: false },
+            }));
+            return;
+        }
+
+        const ttlMs = cached?.isProcessing ? SUBTITLE_AVAILABILITY_PENDING_RETRY_MS : SUBTITLE_AVAILABILITY_CACHE_TTL_MS;
+        if (cached && (now - cached.fetchedAt) < ttlMs) {
+            return;
+        }
+
+        void (async () => {
+            try {
+                const response = await fetch(`${CONFIG.API_URL}/videos/${videoId}/subtitles`);
+                if (!response.ok) {
+                    setSubtitleAvailabilityByVideoId((prev) => {
+                        const prevEntry = prev[videoId];
+                        if (prevEntry?.hasSubtitles === false) return prev;
+                        return {
+                            ...prev,
+                            [videoId]: { hasSubtitles: false, fetchedAt: Date.now(), isProcessing: false },
+                        };
+                    });
+                    return;
+                }
+
+                const payload = await response.json();
+                const rows = Array.isArray(payload?.data) ? payload.data : [];
+                const hasPendingSubtitles = rows.some((row: any) => {
+                    const status = String(row?.status || '').toLowerCase();
+                    return status === 'processing' || status === 'queued' || status === 'pending';
+                });
+                const hasCompletedSubtitles = rows.some((row: any) => {
+                    if (row?.status !== 'completed') return false;
+                    const parsedSegments = typeof row?.segments === 'string'
+                        ? (() => {
+                            try {
+                                return JSON.parse(row.segments);
+                            } catch {
+                                return [];
+                            }
+                        })()
+                        : row?.segments;
+                    const segments = Array.isArray(parsedSegments)
+                        ? parsedSegments
+                        : (Array.isArray(parsedSegments?.segments) ? parsedSegments.segments : []);
+                    return segments.length > 0;
+                });
+
+                setSubtitleAvailabilityByVideoId((prev) => {
+                    const prevEntry = prev[videoId];
+                    const nextProcessing = hasPendingSubtitles && !hasCompletedSubtitles;
+                    if (
+                        prevEntry?.hasSubtitles === hasCompletedSubtitles &&
+                        Boolean(prevEntry?.isProcessing) === nextProcessing
+                    ) {
+                        return prev;
+                    }
+                    return {
+                        ...prev,
+                        [videoId]: {
+                            hasSubtitles: hasCompletedSubtitles,
+                            fetchedAt: Date.now(),
+                            isProcessing: nextProcessing,
+                        },
+                    };
+                });
+            } catch {
+                setSubtitleAvailabilityByVideoId((prev) => {
+                    const prevEntry = prev[videoId];
+                    if (prevEntry?.hasSubtitles === false) return prev;
+                    return {
+                        ...prev,
+                        [videoId]: { hasSubtitles: false, fetchedAt: Date.now(), isProcessing: false },
+                    };
+                });
+            }
+        })();
+    }, [activeVideo?.id, activeVideo?.postType]);
+
+    const showSubtitleOption = useMemo(() => {
+        if (!activeVideo?.id) return false;
+        return Boolean(subtitleAvailabilityByVideoId[activeVideo.id]?.hasSubtitles);
+    }, [activeVideo?.id, subtitleAvailabilityByVideoId]);
+
+    const subtitleMode = useMemo<SubtitlePreferenceMode>(() => {
+        if (!activeVideo?.id) return subtitleAlwaysEnabled ? 'always' : 'off';
+        if (subtitleAlwaysEnabled) return 'always';
+        return subtitleVideoEnabledById[activeVideo.id] ? 'video' : 'off';
+    }, [activeVideo?.id, subtitleAlwaysEnabled, subtitleVideoEnabledById]);
+
+    const handleSubtitleModeChange = useCallback((mode: SubtitlePreferenceMode) => {
+        if (!activeVideo?.id) return;
+        setSubtitleSelectionForVideo(activeVideo.id, mode);
+    }, [activeVideo?.id, setSubtitleSelectionForVideo]);
 
     const isViewTrackingEnabled = Boolean(
         activeVideo?.id &&
@@ -487,6 +608,9 @@ export const PoolFeedManager = ({
                         activeVideo={activeVideo} activeVideoId={activeVideoId}
                         currentUserId={user?.id || null}
                         isOwnActiveVideo={isOwnActiveVideo}
+                        showSubtitleOption={showSubtitleOption}
+                        subtitleMode={subtitleMode}
+                        onSubtitleModeChange={handleSubtitleModeChange}
                         isCleanScreen={isCleanScreen} isSeeking={isSeeking}
                         activeTab={activeTab}
                         showStories={showStories}

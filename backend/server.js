@@ -177,14 +177,40 @@ app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
 // Helper: Upload to R2 with CDN Cache Headers
 async function uploadToR2(filePath, fileName, contentType) {
     const fileStream = fs.readFileSync(filePath);
-    await r2.send(new PutObjectCommand({
-        Bucket: process.env.R2_BUCKET_NAME,
-        Key: fileName,
-        Body: fileStream,
-        ContentType: contentType,
-        CacheControl: 'public, max-age=31536000, immutable', // 1 year CDN cache
-    }));
-    return `${process.env.R2_PUBLIC_URL}/${fileName}`;
+    const maxAttempts = 3;
+    let lastError = null;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            await r2.send(new PutObjectCommand({
+                Bucket: process.env.R2_BUCKET_NAME,
+                Key: fileName,
+                Body: fileStream,
+                ContentType: contentType,
+                CacheControl: 'public, max-age=31536000, immutable', // 1 year CDN cache
+            }));
+            return `${process.env.R2_PUBLIC_URL}/${fileName}`;
+        } catch (error) {
+            lastError = error;
+            const cause = error?.cause;
+            logLine(attempt < maxAttempts ? 'WARN' : 'ERR', 'R2_UPLOAD', 'PutObject failed', {
+                key: fileName,
+                contentType,
+                attempt,
+                maxAttempts,
+                error: error?.message || error,
+                code: error?.code,
+                cause: cause?.message || cause,
+                causeCode: cause?.code,
+            });
+
+            if (attempt < maxAttempts) {
+                await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
+            }
+        }
+    }
+
+    throw lastError;
 }
 
 logLine('BOOT', 'INIT', 'Loading HlsService module');
@@ -193,8 +219,55 @@ logLine('BOOT', 'INIT', 'Initializing HlsService');
 const hlsService = new HlsService(r2, process.env.R2_BUCKET_NAME, { logLine, logBanner });
 logLine('OK', 'INIT', 'HlsService ready');
 
-// 🔥 Upload Progress Tracking
+logLine('BOOT', 'INIT', 'Loading SubtitleService module');
+const SubtitleService = require('./services/SubtitleService');
+logLine('BOOT', 'INIT', 'Initializing SubtitleService');
+const subtitleService = new SubtitleService(supabase, { logLine, logBanner });
+logLine('OK', 'INIT', 'SubtitleService ready', { sttAvailable: subtitleService.isAvailable() });
+
+// ğŸ”¥ Upload Progress Tracking
 const uploadProgress = new Map(); // { uniqueId: { stage: string, percent: number } }
+const subtitleGenerationInProgress = new Set(); // videoId set
+const subtitleGenerationCooldownMs = 30_000;
+const subtitleLastTriggeredAt = new Map(); // videoId -> timestamp
+
+function canTriggerSubtitleGeneration(videoId) {
+    const lastTs = subtitleLastTriggeredAt.get(videoId);
+    if (!lastTs) return true;
+    return (Date.now() - lastTs) > subtitleGenerationCooldownMs;
+}
+
+function triggerSubtitleGeneration(videoId, videoUrl, source, options = {}) {
+    if (!subtitleService.isAvailable()) return false;
+    if (!videoId || !videoUrl) return false;
+    const language = typeof options.language === 'string' && options.language.trim() ? options.language.trim() : 'auto';
+
+    if (subtitleGenerationInProgress.has(videoId)) {
+        logLine('INFO', 'STT', 'Subtitle generation already running, skipping trigger', { videoId, source });
+        return false;
+    }
+
+    if (!canTriggerSubtitleGeneration(videoId)) {
+        logLine('INFO', 'STT', 'Subtitle generation skipped due to cooldown', {
+            videoId,
+            source,
+            cooldownMs: subtitleGenerationCooldownMs,
+        });
+        return false;
+    }
+
+    subtitleGenerationInProgress.add(videoId);
+    subtitleLastTriggeredAt.set(videoId, Date.now());
+
+    subtitleService.processVideoSubtitles(videoId, videoUrl, language)
+        .then(() => logLine('OK', 'STT', 'Subtitle generation completed', { videoId, source, language }))
+        .catch((err) => logLine('ERR', 'STT', 'Subtitle generation failed', { videoId, source, language, error: err?.message || err }))
+        .finally(() => {
+            subtitleGenerationInProgress.delete(videoId);
+        });
+
+    return true;
+}
 
 // Endpoint: Get Upload Progress
 app.get('/upload-progress/:id', (req, res) => {
@@ -205,10 +278,129 @@ app.get('/upload-progress/:id', (req, res) => {
     res.json(progress);
 });
 
+// Endpoint: Preview Subtitles (STT for local file)
+app.post('/stt-preview', upload.fields([
+    { name: 'video', maxCount: 1 },
+    { name: 'audio', maxCount: 1 },
+]), async (req, res) => {
+    const files = req.files || {};
+    const audioFile = Array.isArray(files.audio) ? files.audio[0] : null;
+    const videoFile = Array.isArray(files.video) ? files.video[0] : null;
+    const file = audioFile || videoFile;
+    const inputType = audioFile ? 'audio' : (videoFile ? 'video' : 'none');
+    const language = (req.body.language || 'auto').trim();
+
+    if (!file) {
+        return res.status(400).json({ error: 'No media file provided (audio/video)' });
+    }
+
+    if (!subtitleService.isAvailable()) {
+        if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+        return res.status(503).json({ error: 'Subtitle service is not available (Check configuration)' });
+    }
+
+    logLine('INFO', 'STT_PREVIEW', 'Preview request received', {
+        filename: file.originalname,
+        size: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
+        language,
+        inputType,
+    });
+
+    const tempAudioPath = path.join(os.tmpdir(), `stt_preview_${uuidv4()}.wav`);
+
+    try {
+        if (inputType === 'video') {
+            // Fast-fail when video has no audio stream at all.
+            const metadata = await probeVideoMetadata(file.path);
+            if (!hasAudioStream(metadata)) {
+                logLine('INFO', 'STT_PREVIEW', 'No audio stream detected, skipping STT', {
+                    filename: file.originalname,
+                });
+                return res.json({
+                    success: false,
+                    reason: 'NO_AUDIO_STREAM',
+                    segments: [],
+                    detectedLanguage: null,
+                });
+            }
+
+            // 1. Extract audio from uploaded temp video file
+            await subtitleService.extractAudio(file.path, tempAudioPath);
+        } else {
+            // Audio input already provided by client.
+            fs.copyFileSync(file.path, tempAudioPath);
+        }
+
+        // If extracted/provided audio is too small, treat it as no-audio/near-silent for preview.
+        const audioStats = fs.statSync(tempAudioPath);
+        if (!audioStats?.size || audioStats.size < 16 * 1024) {
+            logLine('INFO', 'STT_PREVIEW', 'Preview audio too small, skipping STT', {
+                filename: file.originalname,
+                inputType,
+                audioBytes: audioStats?.size || 0,
+            });
+            return res.json({
+                success: false,
+                reason: 'AUDIO_TOO_SMALL',
+                segments: [],
+                detectedLanguage: null,
+            });
+        }
+
+        // 2. Transcribe (no hard timeout; wait for provider response)
+        const { segments, detectedLanguage } = await subtitleService.transcribeAudio(tempAudioPath, language);
+
+        logLine('OK', 'STT_PREVIEW', 'Preview completed', {
+            segments: segments?.length || 0,
+            detectedLanguage
+        });
+
+        res.json({
+            success: true,
+            segments,
+            detectedLanguage
+        });
+    } catch (error) {
+        const message = error?.message || 'STT transcription failed';
+        logLine('ERR', 'STT_PREVIEW', 'Preview failed', { error: message });
+        res.status(500).json({ error: message });
+    } finally {
+        // Cleanup
+        if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+        if (fs.existsSync(tempAudioPath)) fs.unlinkSync(tempAudioPath);
+    }
+});
+
 // Helper: Update progress
 function setUploadProgress(id, stage, percent) {
     uploadProgress.set(id, { stage, percent });
     logLine('INFO', 'UPLOAD_PROGRESS', 'Progress update', { id, stage, percent });
+}
+
+function probeVideoMetadata(filePath) {
+    return new Promise((resolve, reject) => {
+        ffmpeg(filePath).ffprobe((err, data) => {
+            if (err) return reject(err);
+            resolve(data || {});
+        });
+    });
+}
+
+function hasAudioStream(metadata) {
+    const streams = Array.isArray(metadata?.streams) ? metadata.streams : [];
+    return streams.some((stream) => stream?.codec_type === 'audio');
+}
+
+async function withTimeout(promise, timeoutMs, timeoutErrorMessage = 'Operation timed out') {
+    let timeoutId;
+    const timeoutPromise = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(timeoutErrorMessage)), timeoutMs);
+    });
+    try {
+        return await Promise.race([promise, timeoutPromise]);
+    } finally {
+        clearTimeout(timeoutId);
+    }
 }
 
 function parseAspectRatioValue(value) {
@@ -355,15 +547,60 @@ async function safeProbeDimensions(inputPath) {
 // Endpoint: HLS Video Upload (Supports Carousels)
 app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
     const files = req.files;
-    const { userId, description, brandName, brandUrl, commercialType } = req.body;
+    const {
+        userId,
+        description,
+        brandName,
+        brandUrl,
+        commercialType,
+        trimStartSec,
+        trimEndSec,
+        qualityPreset,
+        coverIndex,
+        subtitleLanguage,
+        manualSubtitles,
+    } = req.body;
+
+    const parsedCoverIndex = Number.parseInt(String(coverIndex ?? '0'), 10);
+    const safeCoverIndex = Number.isFinite(parsedCoverIndex) && parsedCoverIndex >= 0 ? parsedCoverIndex : 0;
+    const parsedTrimStartSec = Number.parseFloat(String(trimStartSec ?? '0'));
+    const parsedTrimEndSec = Number.parseFloat(String(trimEndSec ?? '0'));
+    const hasTrimRange =
+        Number.isFinite(parsedTrimStartSec) &&
+        Number.isFinite(parsedTrimEndSec) &&
+        parsedTrimStartSec >= 0 &&
+        parsedTrimEndSec > parsedTrimStartSec;
+
+    const normalizedQualityPreset = String(qualityPreset || 'medium').toLowerCase();
+    const qualityMap = {
+        low: { crf: 30, preset: 'veryfast' },
+        medium: { crf: 26, preset: 'veryfast' },
+        high: { crf: 22, preset: 'faster' },
+    };
+    const qualityConfig = qualityMap[normalizedQualityPreset] || qualityMap.medium;
+    const normalizedSubtitleLanguage =
+        typeof subtitleLanguage === 'string' && subtitleLanguage.trim()
+            ? subtitleLanguage.trim()
+            : 'auto';
+    let parsedManualSubtitles = [];
+    if (typeof manualSubtitles === 'string' && manualSubtitles.trim()) {
+        try {
+            const parsed = JSON.parse(manualSubtitles);
+            parsedManualSubtitles = Array.isArray(parsed) ? parsed : [];
+        } catch (error) {
+            logLine('WARN', 'SUBTITLE', 'Failed to parse manualSubtitles payload', {
+                error: error?.message || error,
+            });
+        }
+    }
 
     if (!files || files.length === 0) {
         return res.status(400).json({ error: 'No files provided' });
     }
 
     // Determine is_commercial flag
-    // 'İş Birliği İçermiyor' means is_commercial = false
-    const isCommercial = commercialType && commercialType !== 'İş Birliği İçermiyor';
+    // 'Ä°ÅŸ BirliÄŸi Ä°Ã§ermiyor' means is_commercial = false
+    const isCommercial = commercialType && commercialType !== 'Ä°ÅŸ BirliÄŸi Ä°Ã§ermiyor';
 
     const uniqueId = uuidv4();
     const tempOutputDir = path.join(__dirname, 'temp_uploads');
@@ -376,6 +613,7 @@ app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
         `Post Type  : ${isCarousel ? 'carousel' : 'video'}`,
     ]);
 
+    let phase = 'init';
     try {
         const mediaUrls = [];
         let firstThumbUrl = '';
@@ -390,12 +628,29 @@ app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
             const indexLabel = files.length > 1 ? `_${i}` : '';
             const baseKey = `media/${userId || 'test-user'}/posts/${uniqueId}${indexLabel}`;
             const inputPath = file.path;
+            let sourcePath = inputPath;
 
             setUploadProgress(uniqueId, `item_${i}`, 10 + Math.floor((i / files.length) * 80));
 
             if (isVideo) {
+                phase = `item_${i}_video_probe`;
+                if (files.length === 1 && hasTrimRange) {
+                    const trimmedPath = path.join(tempOutputDir, `trimmed_${uniqueId}_${i}.mp4`);
+                    phase = `item_${i}_trim`;
+                    await new Promise((resolve, reject) => {
+                        ffmpeg(inputPath)
+                            .setStartTime(parsedTrimStartSec)
+                            .setDuration(parsedTrimEndSec - parsedTrimStartSec)
+                            .outputOptions(['-c:v libx264', '-c:a aac', '-movflags +faststart', '-pix_fmt yuv420p'])
+                            .on('end', resolve)
+                            .on('error', reject)
+                            .save(trimmedPath);
+                    });
+                    sourcePath = trimmedPath;
+                }
+
                 const metadata = await new Promise((resolve, reject) => {
-                    ffmpeg(inputPath).ffprobe((err, data) => {
+                    ffmpeg(sourcePath).ffprobe((err, data) => {
                         if (err) reject(err);
                         else resolve(data);
                     });
@@ -405,8 +660,9 @@ app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
                 const duration = parseFloat(metadata.format.duration || 0);
 
                 const processedThumbPath = path.join(tempOutputDir, `thumb_${uniqueId}_${i}.jpg`);
+                phase = `item_${i}_thumb_generate`;
                 await new Promise((resolve, reject) => {
-                    ffmpeg(inputPath)
+                    ffmpeg(sourcePath)
                         .outputOptions(['-q:v 2'])
                         .screenshots({
                             count: 1,
@@ -423,20 +679,28 @@ app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
                 const safeWidth = normalizedSourceDims.width || thumbDims.width || width || 1080;
                 const safeHeight = normalizedSourceDims.height || thumbDims.height || height || 1920;
 
+                phase = `item_${i}_thumb_upload`;
                 const thumbUrl = await uploadToR2(processedThumbPath, `${baseKey}/thumb.jpg`, 'image/jpeg');
-                if (i === 0) firstThumbUrl = thumbUrl;
+                if (i === safeCoverIndex) firstThumbUrl = thumbUrl;
 
                 const optimizedPath = path.join(tempOutputDir, `optimized_${uniqueId}_${i}.mp4`);
+                phase = `item_${i}_video_optimize`;
                 await new Promise((resolve, reject) => {
-                    ffmpeg(inputPath)
+                    ffmpeg(sourcePath)
                         .videoCodec('libx264')
                         .size(safeWidth > 1080 ? '1080x?' : `${safeWidth}x${safeHeight}`)
-                        .outputOptions(['-crf 26', '-preset veryfast', '-movflags +faststart', '-pix_fmt yuv420p'])
+                        .outputOptions([
+                            `-crf ${qualityConfig.crf}`,
+                            `-preset ${qualityConfig.preset}`,
+                            '-movflags +faststart',
+                            '-pix_fmt yuv420p',
+                        ])
                         .on('end', resolve)
                         .on('error', reject)
                         .save(optimizedPath);
                 });
 
+                phase = `item_${i}_video_upload`;
                 const videoUrl = await uploadToR2(optimizedPath, `${baseKey}/master.mp4`, 'video/mp4');
                 const optimizedDims = await safeProbeDimensions(optimizedPath);
                 const outputWidth = optimizedDims.width || safeWidth;
@@ -451,22 +715,27 @@ app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
 
                 let spriteUrl = '';
                 if (i === 0) {
-                    spriteUrl = await hlsService.generateSpriteSheet(inputPath, tempOutputDir, uniqueId, baseKey, duration);
+                    phase = `item_${i}_sprite_generate_upload`;
+                    spriteUrl = await hlsService.generateSpriteSheet(sourcePath, tempOutputDir, uniqueId, baseKey, duration);
+                    logLine('OK', 'SPRITE', 'Sprite sheet uploaded', { uploadId: uniqueId, spriteUrl });
                     firstSpriteUrl = spriteUrl;
                 }
 
                 mediaUrls.push({ url: videoUrl, type: 'video', thumbnail: thumbUrl, sprite: spriteUrl, width: outputWidth, height: outputHeight });
 
                 if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+                if (sourcePath !== inputPath && fs.existsSync(sourcePath)) fs.unlinkSync(sourcePath);
                 if (fs.existsSync(processedThumbPath)) fs.unlinkSync(processedThumbPath);
                 if (fs.existsSync(optimizedPath)) fs.unlinkSync(optimizedPath);
             } else {
+                phase = `item_${i}_image_probe`;
                 const { width, height } = await safeProbeDimensions(inputPath);
                 portraitBase = pickMostPortrait(portraitBase, { width, height });
                 const imageKey = `${baseKey}/image.jpg`;
+                phase = `item_${i}_image_upload`;
                 const imageUrl = await uploadToR2(inputPath, imageKey, file.mimetype);
 
-                if (i === 0) {
+                if (i === safeCoverIndex) {
                     firstThumbUrl = imageUrl;
                 }
 
@@ -480,6 +749,16 @@ app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
             finalHeight = portraitBase.height;
         }
 
+        if (!firstThumbUrl && mediaUrls[safeCoverIndex]?.thumbnail) {
+            firstThumbUrl = mediaUrls[safeCoverIndex].thumbnail;
+        }
+
+        phase = 'db_insert_video';
+        logLine('INFO', 'UPLOAD_DB', 'Inserting uploaded media row', {
+            uploadId: uniqueId,
+            postType: isCarousel ? 'carousel' : 'video',
+            mediaCount: mediaUrls.length,
+        });
         const { data, error } = await supabase
             .from('videos')
             .insert({
@@ -502,11 +781,93 @@ app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
 
         if (error) throw error;
 
+        const uploadedVideo = data[0];
+        if (
+            uploadedVideo &&
+            uploadedVideo.post_type === 'video' &&
+            Array.isArray(parsedManualSubtitles) &&
+            parsedManualSubtitles.length > 0
+        ) {
+            const firstManual = parsedManualSubtitles.find((entry) => Number(entry?.index) === 0) || parsedManualSubtitles[0];
+            const rawSegments = Array.isArray(firstManual?.segments) ? firstManual.segments : [];
+            const normalizedSegments = rawSegments
+                .map((segment) => ({
+                    startMs: Number(segment?.startMs) || 0,
+                    endMs: Number(segment?.endMs) || 0,
+                    text: String(segment?.text || '').trim(),
+                }))
+                .filter((segment) => segment.endMs > segment.startMs && segment.text.length > 0);
+
+            const rawPresentation = firstManual?.presentation;
+            const hasPresentationObject = rawPresentation && typeof rawPresentation === 'object';
+            const normalizedPresentation = hasPresentationObject
+                ? {
+                    leftRatio: Number(rawPresentation.leftRatio) || 0,
+                    topRatio: Number(rawPresentation.topRatio) || 0,
+                    widthRatio: Number(rawPresentation.widthRatio) || 0,
+                    heightRatio: Number(rawPresentation.heightRatio) || 0,
+                }
+                : null;
+            const rawStyle = firstManual?.style;
+            const hasStyleObject = rawStyle && typeof rawStyle === 'object';
+            const allowedAlignments = new Set(['start', 'center', 'end', 'left', 'right']);
+            const normalizedStyle = hasStyleObject
+                ? {
+                    fontSize: Math.max(12, Math.min(42, Number(rawStyle.fontSize) || 18)),
+                    textAlign: allowedAlignments.has(String(rawStyle.textAlign))
+                        ? String(rawStyle.textAlign)
+                        : 'center',
+                    showOverlay: rawStyle.showOverlay !== false,
+                }
+                : null;
+
+            if (normalizedSegments.length > 0) {
+                const segmentsPayload = {
+                    segments: normalizedSegments,
+                    presentation: normalizedPresentation,
+                    style: normalizedStyle,
+                    source: 'manual_upload',
+                };
+                const subtitleLang = typeof firstManual?.language === 'string' && firstManual.language.trim()
+                    ? firstManual.language.trim()
+                    : normalizedSubtitleLanguage;
+
+                const { error: subtitleInsertError } = await supabase
+                    .from('subtitles')
+                    .upsert({
+                        video_id: uploadedVideo.id,
+                        language: subtitleLang,
+                        status: 'completed',
+                        segments: JSON.stringify(segmentsPayload),
+                        error_message: null,
+                        updated_at: new Date().toISOString(),
+                    }, { onConflict: 'video_id,language' });
+
+                if (subtitleInsertError) throw subtitleInsertError;
+
+                logLine('OK', 'SUBTITLE', 'Manual subtitles saved from upload payload', {
+                    videoId: uploadedVideo.id,
+                    language: subtitleLang,
+                    segments: normalizedSegments.length,
+                });
+            }
+        }
+
+        phase = 'response_success';
         setUploadProgress(uniqueId, 'done', 100);
-        res.json({ success: true, data: data[0] });
+        res.json({ success: true, data: uploadedVideo });
 
     } catch (error) {
-        logLine('ERR', 'UPLOAD', 'Upload failed', { error: error?.message || error, uploadId: uniqueId });
+        const cause = error?.cause;
+        logLine('ERR', 'UPLOAD', 'Upload failed', {
+            error: error?.message || error,
+            code: error?.code,
+            cause: cause?.message || cause,
+            causeCode: cause?.code,
+            stack: error?.stack,
+            uploadId: uniqueId,
+            phase,
+        });
         res.status(500).json({ error: error.message });
         if (files) files.forEach(f => { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); });
     }
@@ -645,7 +1006,7 @@ app.post('/upload-story', upload.array('video', 10), async (req, res) => {
             finalHeight = portraitBase.height;
         }
 
-        const isCommercial = commercialType && commercialType !== 'İş Birliği İçermiyor';
+        const isCommercial = commercialType && commercialType !== 'Ä°ÅŸ BirliÄŸi Ä°Ã§ermiyor';
         const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
         const { data, error } = await dbClient.from('stories').insert({
@@ -1154,7 +1515,7 @@ app.delete('/videos/:id', async (req, res) => {
         `Mode: ${force ? 'HARD DELETE (Permanent)' : 'SOFT DELETE (Trash)'}`,
     ]);
 
-    // 🔐 JWT Authentication
+    // ğŸ” JWT Authentication
     const authHeader = req.headers.authorization;
     logLine('INFO', 'DELETE', 'Authorization header check', { present: Boolean(authHeader) });
 
@@ -1795,6 +2156,146 @@ app.post('/drafts/cleanup', async (req, res) => {
     }
 });
 
+// ========================================
+// SUBTITLE ENDPOINTS
+// ========================================
+
+// Get subtitles for a video
+app.get('/videos/:id/subtitles', async (req, res) => {
+    const videoId = req.params.id;
+    const { language } = req.query;
+
+    try {
+        logLine('INFO', 'SUBTITLE', 'Fetching subtitles', { videoId, language: language || 'all' });
+        const subtitles = await subtitleService.getSubtitles(videoId, language || null);
+        res.json({ success: true, data: subtitles });
+    } catch (error) {
+        logLine('ERR', 'SUBTITLE', 'Failed to fetch subtitles', { videoId, error: error?.message || error });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Manually trigger subtitle generation for existing videos
+app.post('/videos/:id/subtitles/generate', async (req, res) => {
+    const videoId = req.params.id;
+    const language = typeof req.body?.language === 'string' && req.body.language.trim()
+        ? req.body.language.trim()
+        : 'auto';
+
+    try {
+        // Check if STT is available
+        if (!subtitleService.isAvailable()) {
+            return res.status(503).json({ error: 'STT service is not configured. Set GOOGLE_APPLICATION_CREDENTIALS and GOOGLE_CLOUD_PROJECT_ID.' });
+        }
+
+        // Get video to find URL
+        const { data: video, error: fetchError } = await supabase
+            .from('videos')
+            .select('id, video_url, post_type')
+            .eq('id', videoId)
+            .single();
+
+        if (fetchError || !video) {
+            return res.status(404).json({ error: 'Video not found' });
+        }
+
+        if (video.post_type !== 'video' || !video.video_url) {
+            return res.status(400).json({ error: 'Only video posts with video_url can generate subtitles' });
+        }
+
+        if (subtitleGenerationInProgress.has(videoId)) {
+            return res.status(409).json({ error: 'Subtitle generation is already in progress for this video' });
+        }
+
+        if (!canTriggerSubtitleGeneration(videoId)) {
+            return res.status(429).json({ error: 'Subtitle generation triggered too frequently. Please wait and try again.' });
+        }
+
+        const { data: processingRow, error: subtitleFetchError } = await supabase
+            .from('subtitles')
+            .select('status, updated_at')
+            .eq('video_id', videoId)
+            .eq('language', 'auto')
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (subtitleFetchError) {
+            logLine('WARN', 'SUBTITLE', 'Could not check existing subtitle status before generation', {
+                videoId,
+                error: subtitleFetchError?.message || subtitleFetchError,
+            });
+        }
+
+        if (processingRow?.status === 'processing') {
+            return res.status(409).json({ error: 'Subtitle generation is already processing in database state' });
+        }
+
+        logLine('INFO', 'SUBTITLE', 'Manual subtitle generation triggered', { videoId });
+
+        const started = triggerSubtitleGeneration(video.id, video.video_url, 'manual-endpoint', { language });
+        if (!started) {
+            return res.status(409).json({ error: 'Subtitle generation could not be started' });
+        }
+
+        res.json({ success: true, message: 'Subtitle generation started', videoId, language });
+    } catch (error) {
+        logLine('ERR', 'SUBTITLE', 'Generate endpoint failed', { videoId, error: error?.message || error });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Update subtitle text/segments for a video (manual correction)
+app.put('/videos/:id/subtitles', async (req, res) => {
+    const videoId = req.params.id;
+    const { subtitleId, language = 'auto', segments } = req.body || {};
+
+    if (!Array.isArray(segments)) {
+        return res.status(400).json({ error: 'segments must be an array' });
+    }
+
+    const normalizedSegments = segments
+        .map((segment) => ({
+            startMs: Number(segment?.startMs) || 0,
+            endMs: Number(segment?.endMs) || 0,
+            text: String(segment?.text || '').trim(),
+        }))
+        .filter((segment) => segment.endMs > segment.startMs && segment.text.length > 0);
+
+    if (normalizedSegments.length === 0) {
+        return res.status(400).json({ error: 'No valid segments provided' });
+    }
+
+    try {
+        let updateQuery = supabase
+            .from('subtitles')
+            .update({
+                segments: JSON.stringify(normalizedSegments),
+                status: 'completed',
+                error_message: null,
+                updated_at: new Date().toISOString(),
+            });
+
+        if (subtitleId) {
+            updateQuery = updateQuery.eq('id', subtitleId);
+        } else {
+            updateQuery = updateQuery.eq('video_id', videoId).eq('language', language);
+        }
+
+        const { data, error } = await updateQuery.select().limit(1).maybeSingle();
+        if (error) throw error;
+
+        if (!data) {
+            return res.status(404).json({ error: 'Subtitle row not found to update' });
+        }
+
+        res.json({ success: true, data });
+    } catch (error) {
+        logLine('ERR', 'SUBTITLE', 'Failed to update subtitles', { videoId, error: error?.message || error });
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.get('/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
@@ -1817,3 +2318,5 @@ app.listen(PORT, '0.0.0.0', () => {
     startStoryCleanupScheduler();
     startDraftCleanupScheduler();
 });
+
+
