@@ -12,12 +12,13 @@ import {
     CircleUserRound,
     Bookmark,
     QrCode,
-    Captions,
 } from 'lucide-react-native';
 import { useSurfaceTheme } from '../../hooks/useSurfaceTheme';
 import { FeedMoreOptionsSheetBase } from '../sheets/FeedMoreOptionsSheetBase';
 import { FeedMoreOptionItem, FeedMoreSegmentedItem } from '../sheets/FeedMoreOptionsSheetItems';
 import { SubtitlePreferenceMode } from '../../store/useSubtitlePreferencesStore';
+import ClosedCaptionsDarkIcon from '../../../../assets/icons/closed-captions-dark.svg';
+import ClosedCaptionsLightIcon from '../../../../assets/icons/closed-captions-light.svg';
 
 interface InfiniteFeedMoreOptionsSheetProps {
     onSavePress?: () => void;
@@ -55,6 +56,7 @@ export const InfiniteFeedMoreOptionsSheet = forwardRef<BottomSheetModal, Infinit
         const textColor = modalTheme.textPrimary;
         const borderColor = modalTheme.sheetBorder;
         const borderWidth = modalTheme.separatorWidth;
+        const ClosedCaptionsIcon = modalTheme.isDark ? ClosedCaptionsDarkIcon : ClosedCaptionsLightIcon;
 
         const optionCount = useMemo(
             () =>
@@ -104,7 +106,7 @@ export const InfiniteFeedMoreOptionsSheet = forwardRef<BottomSheetModal, Infinit
                 </View>
                 {showSubtitleOption ? (
                     <FeedMoreSegmentedItem
-                        icon={<Captions color={textColor} size={24} strokeWidth={1.2} />}
+                        icon={<ClosedCaptionsIcon width={24} height={24} />}
                         label="Altyazı"
                         hint="Videodan oluşturulan otomatik altyazıları gösterir"
                         textColor={textColor}

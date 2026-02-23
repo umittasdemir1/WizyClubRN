@@ -10,13 +10,14 @@ import {
     GalleryVerticalEnd,
     Gauge,
     Pencil,
-    Captions,
 } from 'lucide-react-native';
 import { useBrightnessStore } from '../../store/useBrightnessStore';
 import { useActiveVideoStore } from '../../store/useActiveVideoStore';
 import { useSurfaceTheme } from '../../hooks/useSurfaceTheme';
 import { FeedMoreOptionsSheetBase } from './FeedMoreOptionsSheetBase';
 import { FeedMoreOptionItem, FeedMoreSegmentedItem } from './FeedMoreOptionsSheetItems';
+import ClosedCaptionsDarkIcon from '../../../../assets/icons/closed-captions-dark.svg';
+import ClosedCaptionsLightIcon from '../../../../assets/icons/closed-captions-light.svg';
 
 interface MoreOptionsSheetProps {
     onCleanScreenPress?: () => void;
@@ -49,6 +50,7 @@ export const MoreOptionsSheet = forwardRef<BottomSheetModal, MoreOptionsSheetPro
         const textColor = modalTheme.textPrimary;
         const borderColor = modalTheme.sheetBorder;
         const borderWidth = modalTheme.separatorWidth;
+        const ClosedCaptionsIcon = isDark ? ClosedCaptionsDarkIcon : ClosedCaptionsLightIcon;
 
         const optionCount = useMemo(
             () =>
@@ -108,7 +110,7 @@ export const MoreOptionsSheet = forwardRef<BottomSheetModal, MoreOptionsSheetPro
                 />
                 {showSubtitleOption && (
                     <FeedMoreSegmentedItem
-                        icon={<Captions color={textColor} size={24} strokeWidth={1.2} />}
+                        icon={<ClosedCaptionsIcon width={24} height={24} />}
                         label="Altyazı"
                         hint="Videodan oluşturulan otomatik altyazıları gösterir"
                         textColor={textColor}

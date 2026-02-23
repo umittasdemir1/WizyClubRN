@@ -10,13 +10,18 @@ import Animated, {
 import * as Haptics from 'expo-haptics';
 
 import { textShadowStyle } from '@/core/utils/shadow';
-import { SubtitlePresentation, SubtitleSegment, SubtitleStyle, SubtitleTextAlign } from '@/domain/entities/Subtitle';
+import {
+    DEFAULT_SUBTITLE_STYLE,
+    SUBTITLE_BORDER_RADIUS,
+    SUBTITLE_MIN_HEIGHT,
+    SUBTITLE_SIDE_MARGIN,
+    SUBTITLE_TEXT_BASE_STYLE,
+    getSubtitleWrapperStyle,
+    resolveSubtitleStyle,
+} from '@/core/utils/subtitleOverlay';
+import { SubtitlePresentation, SubtitleSegment, SubtitleStyle } from '@/domain/entities/Subtitle';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const SUBTITLE_SIDE_MARGIN = 20;
-const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = { fontSize: 18, textAlign: 'center', showOverlay: true };
-
-import { resolveSubtitleTextAlign } from '@/core/utils/subtitleUtils';
 
 export const DraggableSubtitleOverlay = ({
     segments,
@@ -62,10 +67,7 @@ export const DraggableSubtitleOverlay = ({
     const [editedText, setEditedText] = useState(activeSegment?.text || '');
     const hasAppliedInitialPresentation = useRef(false);
 
-    const resolvedFontSize = textStyle?.fontSize ?? DEFAULT_SUBTITLE_STYLE.fontSize;
-    const resolvedTextAlign = resolveSubtitleTextAlign(textStyle?.textAlign ?? DEFAULT_SUBTITLE_STYLE.textAlign);
-    const resolvedLineHeight = Math.max(resolvedFontSize + 6, Math.round(resolvedFontSize * 1.3));
-    const isOverlayVisible = (textStyle?.showOverlay ?? DEFAULT_SUBTITLE_STYLE.showOverlay);
+    const resolvedSubtitleStyle = resolveSubtitleStyle(textStyle ?? DEFAULT_SUBTITLE_STYLE);
 
     useEffect(() => {
         if (!isInlineTextEditing) {
@@ -292,9 +294,10 @@ export const DraggableSubtitleOverlay = ({
                     <View
                         style={[
                             styles.subtitleTextOverlayWrapper,
-                            isOverlayVisible
-                                ? styles.subtitleTextOverlayVisible
-                                : styles.subtitleTextOverlayHidden,
+                            getSubtitleWrapperStyle(
+                                resolvedSubtitleStyle.showOverlay,
+                                resolvedSubtitleStyle.overlayVariant
+                            ),
                         ]}
                     >
                         {isInlineTextEditing ? (
@@ -302,10 +305,12 @@ export const DraggableSubtitleOverlay = ({
                                 style={[
                                     styles.subtitleText,
                                     {
-                                        backgroundColor: 'transparent',
-                                        fontSize: resolvedFontSize,
-                                        lineHeight: resolvedLineHeight,
-                                        textAlign: resolvedTextAlign,
+                                        fontSize: resolvedSubtitleStyle.fontSize,
+                                        lineHeight: resolvedSubtitleStyle.lineHeight,
+                                        textAlign: resolvedSubtitleStyle.textAlign,
+                                        color: resolvedSubtitleStyle.textColor,
+                                        fontFamily: resolvedSubtitleStyle.fontFamily,
+                                        fontWeight: resolvedSubtitleStyle.fontWeight,
                                     }
                                 ]}
                                 value={editedText}
@@ -323,9 +328,12 @@ export const DraggableSubtitleOverlay = ({
                                 style={[
                                     styles.subtitleText,
                                     {
-                                        fontSize: resolvedFontSize,
-                                        lineHeight: resolvedLineHeight,
-                                        textAlign: resolvedTextAlign,
+                                        fontSize: resolvedSubtitleStyle.fontSize,
+                                        lineHeight: resolvedSubtitleStyle.lineHeight,
+                                        textAlign: resolvedSubtitleStyle.textAlign,
+                                        color: resolvedSubtitleStyle.textColor,
+                                        fontFamily: resolvedSubtitleStyle.fontFamily,
+                                        fontWeight: resolvedSubtitleStyle.fontWeight,
                                     }
                                 ]}
                             >
@@ -347,29 +355,18 @@ const styles = StyleSheet.create({
         alignSelf: 'center',
         justifyContent: 'center',
         alignItems: 'center',
-        minHeight: 40,
+        minHeight: SUBTITLE_MIN_HEIGHT,
         zIndex: 1000,
         ...textShadowStyle('#000000', { width: 0, height: 1 }, 2),
     },
     subtitleTextOverlayWrapper: {
-        borderRadius: 8,
+        borderRadius: SUBTITLE_BORDER_RADIUS,
         alignSelf: 'stretch',
         position: 'relative',
         maxWidth: SCREEN_WIDTH - (SUBTITLE_SIDE_MARGIN * 2),
     },
-    subtitleTextOverlayVisible: {
-        backgroundColor: 'rgba(0,0,0,0.5)',
-    },
-    subtitleTextOverlayHidden: {
-        backgroundColor: 'transparent',
-    },
     subtitleText: {
-        color: '#FFFFFF',
-        fontSize: 18,
-        fontWeight: '700',
-        textAlign: 'center',
-        paddingHorizontal: 4,
-        paddingVertical: 1,
+        ...SUBTITLE_TEXT_BASE_STYLE,
     },
     guideLineVertical: {
         position: 'absolute',

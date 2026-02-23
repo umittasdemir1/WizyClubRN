@@ -18,10 +18,45 @@ export type SubtitleTextAlign =
     | 'left'
     | 'right';
 
+export type SubtitleFontFamily =
+    | 'system'
+    | 'serif'
+    | 'mono'
+    | 'roboto'
+    | 'openSans'
+    | 'poppins'
+    | 'montserrat'
+    | 'lato'
+    | 'sourceSansPro'
+    | 'inter'
+    | 'raleway'
+    | 'oswald'
+    | 'rubik'
+    | 'ubuntu'
+    | 'bebasNeue'
+    | 'playfairDisplay'
+    | 'pacifico'
+    | 'dancingScript'
+    | 'lobster';
+
+export type SubtitleOverlayVariant =
+    | 'dark'
+    | 'light';
+
+export type SubtitleFontWeight =
+    | '400'
+    | '500'
+    | '600'
+    | '700';
+
 export interface SubtitleStyle {
     fontSize: number;
     textAlign: SubtitleTextAlign;
     showOverlay: boolean;
+    fontFamily?: SubtitleFontFamily;
+    textColor?: string;
+    overlayVariant?: SubtitleOverlayVariant;
+    fontWeight?: SubtitleFontWeight;
 }
 
 export interface SubtitleData {

@@ -3,6 +3,22 @@ import { Stack, useSegments } from 'expo-router';
 import { DefaultTheme, DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { FontAwesome6 } from '@expo/vector-icons';
 import * as Font from 'expo-font';
+import { Roboto_400Regular } from '@expo-google-fonts/roboto';
+import { OpenSans_400Regular } from '@expo-google-fonts/open-sans';
+import { Poppins_400Regular } from '@expo-google-fonts/poppins';
+import { Montserrat_400Regular } from '@expo-google-fonts/montserrat';
+import { Lato_400Regular } from '@expo-google-fonts/lato';
+import { SourceSansPro_400Regular } from '@expo-google-fonts/source-sans-pro';
+import { Inter_400Regular } from '@expo-google-fonts/inter';
+import { Raleway_400Regular } from '@expo-google-fonts/raleway';
+import { Oswald_400Regular } from '@expo-google-fonts/oswald';
+import { Rubik_400Regular } from '@expo-google-fonts/rubik';
+import { Ubuntu_400Regular } from '@expo-google-fonts/ubuntu';
+import { BebasNeue_400Regular } from '@expo-google-fonts/bebas-neue';
+import { PlayfairDisplay_400Regular } from '@expo-google-fonts/playfair-display';
+import { Pacifico_400Regular } from '@expo-google-fonts/pacifico';
+import { DancingScript_400Regular } from '@expo-google-fonts/dancing-script';
+import { Lobster_400Regular } from '@expo-google-fonts/lobster';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
@@ -38,11 +54,30 @@ configureReanimatedLogger({
 SplashScreen.preventAutoHideAsync();
 // Preload vector icon font so profile/header icons render immediately.
 const fontAwesome6Family = (FontAwesome6 as unknown as { font?: Record<string, number> }).font;
-if (fontAwesome6Family) {
-    void Font.loadAsync(fontAwesome6Family).catch(() => {
-        // no-op
-    });
-}
+const subtitleGoogleFonts: Record<string, number> = {
+    SubtitleRoboto: Roboto_400Regular,
+    SubtitleOpenSans: OpenSans_400Regular,
+    SubtitlePoppins: Poppins_400Regular,
+    SubtitleMontserrat: Montserrat_400Regular,
+    SubtitleLato: Lato_400Regular,
+    SubtitleSourceSansPro: SourceSansPro_400Regular,
+    SubtitleInter: Inter_400Regular,
+    SubtitleRaleway: Raleway_400Regular,
+    SubtitleOswald: Oswald_400Regular,
+    SubtitleRubik: Rubik_400Regular,
+    SubtitleUbuntu: Ubuntu_400Regular,
+    SubtitleBebasNeue: BebasNeue_400Regular,
+    SubtitlePlayfairDisplay: PlayfairDisplay_400Regular,
+    SubtitlePacifico: Pacifico_400Regular,
+    SubtitleDancingScript: DancingScript_400Regular,
+    SubtitleLobster: Lobster_400Regular,
+};
+void Font.loadAsync({
+    ...subtitleGoogleFonts,
+    ...(fontAwesome6Family || {}),
+}).catch(() => {
+    // no-op
+});
 
 Notifications.setNotificationHandler({
     handleNotification: async () => ({

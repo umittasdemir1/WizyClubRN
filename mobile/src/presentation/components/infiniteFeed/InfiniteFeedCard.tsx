@@ -17,6 +17,14 @@ import { getBufferConfig } from '../../../core/utils/bufferConfig';
 import { shadowStyle } from '@/core/utils/shadow';
 import { PerformanceLogger } from '../../../core/services/PerformanceLogger';
 import { useSubtitles } from '../../hooks/useSubtitles';
+import {
+    SUBTITLE_BORDER_RADIUS,
+    SUBTITLE_SIDE_MARGIN,
+    SUBTITLE_TEXT_BASE_STYLE,
+    getSubtitlePresentationPercentStyle,
+    getSubtitleWrapperStyle,
+    resolveSubtitleStyle,
+} from '../../../core/utils/subtitleOverlay';
 import VideosIcon from '../../../../assets/icons/darkvideos.svg';
 
 const DESCRIPTION_LIMIT = 70;
@@ -41,7 +49,6 @@ const ACTIVE_WAKEUP_MIN_PROGRESS_SEC = 0.2;
 const DEFAULT_VIDEO_ASPECT_RATIO = 9 / 16;
 const MIN_VALID_ASPECT_RATIO = 0.2;
 const MAX_VALID_ASPECT_RATIO = 5;
-const SUBTITLE_SIDE_MARGIN = 20;
 const SUBTITLE_MAX_WIDTH = Dimensions.get('window').width - (SUBTITLE_SIDE_MARGIN * 2);
 
 const isNonEmptyString = (value: unknown): value is string =>
@@ -60,8 +67,6 @@ const isValidAspectRatio = (value: number | null | undefined): value is number =
     Number.isFinite(value) &&
     value >= MIN_VALID_ASPECT_RATIO &&
     value <= MAX_VALID_ASPECT_RATIO;
-const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
-
 const getAspectRatioFromDimensions = (width: unknown, height: unknown): number | null => {
     const numericWidth = Number(width);
     const numericHeight = Number(height);
@@ -192,45 +197,31 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
 
     const [activeSubtitleText, setActiveSubtitleText] = useState<string | null>(null);
     const { subtitles, getActiveSubtitle } = useSubtitles(isActive ? item.id : undefined);
-    const subtitlePresentationStyle = useMemo<any>(() => {
-        const presentation = subtitles?.presentation;
-        if (!presentation) return null;
-        const left = clamp01(Number(presentation.leftRatio));
-        const top = clamp01(Number(presentation.topRatio));
-        const width = Math.max(0.1, clamp01(Number(presentation.widthRatio)));
-        return {
-            left: `${left * 100}%`,
-            top: `${top * 100}%`,
-            width: `${width * 100}%`,
-            maxWidth: undefined,
-            bottom: undefined,
-        };
+    const subtitlePresentationStyle = useMemo(() => {
+        return getSubtitlePresentationPercentStyle(subtitles?.presentation);
     }, [subtitles?.presentation]);
-    const subtitleTextDynamicStyle = useMemo<any>(() => {
-        const style = subtitles?.style;
-        if (!style) return null;
-        const fontSize = Math.max(12, Math.min(42, Number(style.fontSize) || 18));
-        const rawAlign = String(style.textAlign || 'center');
-        const mappedAlign = rawAlign === 'center'
-            ? 'center'
-            : (rawAlign === 'end' || rawAlign === 'right')
-                ? 'right'
-                : 'left';
+    const resolvedSubtitleStyle = useMemo(() => resolveSubtitleStyle(subtitles?.style), [subtitles?.style]);
+    const subtitleTextDynamicStyle = useMemo(() => {
         return {
-            fontSize,
-            lineHeight: Math.max(fontSize + 6, Math.round(fontSize * 1.3)),
-            textAlign: mappedAlign,
+            fontSize: resolvedSubtitleStyle.fontSize,
+            lineHeight: resolvedSubtitleStyle.lineHeight,
+            textAlign: resolvedSubtitleStyle.textAlign,
+            color: resolvedSubtitleStyle.textColor,
+            fontFamily: resolvedSubtitleStyle.fontFamily,
+            fontWeight: resolvedSubtitleStyle.fontWeight,
         };
-    }, [subtitles?.style]);
-    const subtitleWrapperDynamicStyle = useMemo<any>(() => {
-        const showOverlay = subtitles?.style?.showOverlay !== false;
-        if (showOverlay) return null;
-        return {
-            backgroundColor: 'transparent',
-            paddingHorizontal: 0,
-            paddingVertical: 0,
-        };
-    }, [subtitles?.style?.showOverlay]);
+    }, [
+        resolvedSubtitleStyle.textColor,
+        resolvedSubtitleStyle.fontFamily,
+        resolvedSubtitleStyle.fontWeight,
+        resolvedSubtitleStyle.fontSize,
+        resolvedSubtitleStyle.lineHeight,
+        resolvedSubtitleStyle.textAlign,
+    ]);
+    const subtitleWrapperDynamicStyle = useMemo(
+        () => getSubtitleWrapperStyle(resolvedSubtitleStyle.showOverlay, resolvedSubtitleStyle.overlayVariant),
+        [resolvedSubtitleStyle.showOverlay, resolvedSubtitleStyle.overlayVariant]
+    );
 
     // âœ… FLAG CONTROLS
     const disableAllUI = FEED_FLAGS.INF_DISABLE_ALL_UI;
@@ -1451,19 +1442,9 @@ const styles = StyleSheet.create({
         zIndex: 4,
     },
     subtitleWrapper: {
-        backgroundColor: 'rgba(8, 10, 15, 0.72)',
-        paddingHorizontal: 4,
-        paddingVertical: 1,
-        borderRadius: 8,
+        borderRadius: SUBTITLE_BORDER_RADIUS,
     },
     subtitleText: {
-        color: '#FFFFFF',
-        fontSize: 14,
-        lineHeight: 20,
-        fontWeight: '400',
-        textShadowColor: 'rgba(0, 0, 0, 0.65)',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 2,
+        ...SUBTITLE_TEXT_BASE_STYLE,
     },
 });
-

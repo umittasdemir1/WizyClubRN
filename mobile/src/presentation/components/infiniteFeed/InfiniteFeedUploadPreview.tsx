@@ -39,15 +39,15 @@ export function InfiniteFeedUploadPreview({ borderColor }: { borderColor: string
 
     const hintText = displayProgress >= 95
         ? (isStoryUpload
-            ? '\u00c7ok az kald\u0131, birazdan hikayeni burada g\u00f6receksin...'
-            : '\u00c7ok az kald\u0131, birazdan g\u00f6nderini burada g\u00f6receksin...')
+            ? 'Çok az kaldı, birazdan hikayeni burada göreceksin...'
+            : 'Çok az kaldı, birazdan gönderini burada göreceksin...')
         : (isStoryUpload
-            ? 'Hikayen haz\u0131rlan\u0131yor, uygulamada kalmaya devam et...'
-            : 'G\u00f6nderin haz\u0131rlan\u0131yor, uygulamada kalmaya devam et...');
+            ? 'Hikayen hazırlanıyor, uygulamada kalmaya devam et...'
+            : 'Gönderin hazırlanıyor, uygulamada kalmaya devam et...');
 
     const successTitle = isStoryUpload
-        ? 'Yupp! Hikayen payla\u015f\u0131ld\u0131.'
-        : 'Yupp! G\u00f6nderin payla\u015f\u0131ld\u0131.';
+        ? 'Yupp! Hikayen paylaşıldı.'
+        : 'Yupp! Gönderin paylaşıldı.';
 
     const gradientConfig = getProgressGradient(displayProgress);
 
@@ -67,7 +67,7 @@ export function InfiniteFeedUploadPreview({ borderColor }: { borderColor: string
                         {isSuccess ? (
                             <>
                                 <Text style={styles.successTitleText}>{successTitle}</Text>
-                                <Text style={styles.hintText}>Payla\u015f ve ilk etkile\u015fimi al.</Text>
+                                <Text style={styles.hintText}>Arkadaşlarına göndermek ister misin?</Text>
                             </>
                         ) : (
                             <Text style={styles.hintText}>{hintText}</Text>

@@ -24,11 +24,11 @@ import {
     Plus,
     Play,
     Pause,
-    Captions,
     Tv,
     Scissors,
     ArrowRight,
     TextSelect,
+    CaseSensitive,
     AlignCenter as TextAlignCenter,
     AlignRight as TextAlignEnd,
     AlignLeft as TextAlignStart,
@@ -52,15 +52,25 @@ import Animated, {
 
 import { LogCode, logUI } from '@/core/services/Logger';
 import { textShadowStyle } from '@/core/utils/shadow';
+import {
+    DEFAULT_SUBTITLE_STYLE,
+    SUBTITLE_FONT_MAX,
+    SUBTITLE_FONT_MIN,
+    getNextSubtitleOverlayState,
+    getNextSubtitleTextColor,
+    resolveSubtitleStyle,
+} from '@/core/utils/subtitleOverlay';
 import { useSurfaceTheme } from '../src/presentation/hooks/useSurfaceTheme';
 import { useThemeStore } from '../src/presentation/store/useThemeStore';
 import { useUploadComposerStore, UploadComposerDraft, UploadComposerQuality, UploadComposerSubtitleLanguage } from '../src/presentation/store/useUploadComposerStore';
 import { CONFIG } from '../src/core/config';
-import { SubtitlePresentation, SubtitleSegment, SubtitleStyle, SubtitleTextAlign } from '../src/domain/entities/Subtitle';
+import { SubtitleFontFamily, SubtitleSegment, SubtitleTextAlign } from '../src/domain/entities/Subtitle';
 import { DraggableSubtitleOverlay } from '../src/presentation/components/upload/DraggableSubtitleOverlay';
 import { VideoPlayerPreview } from '../src/presentation/components/upload/VideoPlayerPreview';
 import { SubtitleEditor } from '../src/presentation/components/upload/SubtitleEditor';
+import { SubtitleFontEditor } from '../src/presentation/components/upload/SubtitleFontEditor';
 import { UploadActionButtons } from '../src/presentation/components/upload/UploadActionButtons';
+import ColorWheelIcon from '../assets/icons/color-wheel.svg';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PREVIEW_ITEM_WIDTH = SCREEN_WIDTH;
@@ -68,17 +78,12 @@ const PREVIEW_ITEM_SPACING = 0;
 const PREVIEW_SIDE_PADDING = 0;
 const PREVIEW_ASPECT_RATIO_DEFAULT = 16 / 9;
 const PREVIEW_ASPECT_RATIO_EDIT = 1.2;
-const SUBTITLE_SIDE_MARGIN = 20;
 const SUBTITLE_DELETE_ZONE_HEIGHT = 84;
-const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = { fontSize: 18, textAlign: 'center', showOverlay: true };
-const SUBTITLE_FONT_MIN = 12;
-const SUBTITLE_FONT_MAX = 42;
 const SUBTITLE_FONT_STEP = 2;
+const SUBTITLE_ACTION_ICON_SIZE = 26;
 const SUBTITLE_ALIGN_CYCLE: SubtitleTextAlign[] = ['center', 'end', 'start'];
 const PREVIEW_PROGRESS_COMMIT_INTERVAL_MS = 120;
 const PREVIEW_PROGRESS_MIN_DELTA_MS = 160;
-
-import { resolveSubtitleTextAlign } from '../src/core/utils/subtitleUtils';
 
 function getNextSubtitleAlign(current: SubtitleTextAlign | undefined): SubtitleTextAlign {
     const currentIndex = SUBTITLE_ALIGN_CYCLE.indexOf(current || 'center');
@@ -214,6 +219,7 @@ export default function UploadComposerScreen() {
     const [isDraggingSubtitle, setIsDraggingSubtitle] = useState(false);
     const [isEditingSubtitle, setIsEditingSubtitle] = useState(false);
     const [isSubtitleTextEditing, setIsSubtitleTextEditing] = useState(false);
+    const [isSubtitleFontEditing, setIsSubtitleFontEditing] = useState(false);
 
     const [pendingDeleteSubtitleUri, setPendingDeleteSubtitleUri] = useState<string | null>(null);
     const [isExitConfirmationVisible, setExitConfirmationVisible] = useState(false);
@@ -259,21 +265,31 @@ export default function UploadComposerScreen() {
     const activeAssetSubtitles = activeAssetUri ? (assetSubtitles[activeAssetUri] || []) : [];
     const isCurrentSttLoading = !!activeAssetUri && subtitleSttState[activeAssetUri] === 'loading';
     const isCurrentCaptionRequested = !!activeAssetUri && !!captionRequestedByUri[activeAssetUri];
-    const isSubtitleEditorVisible =
+    const isSubtitleTextEditorVisible =
         activeAsset?.type === 'video' &&
         subtitleLanguage !== 'none' &&
         activeAssetSubtitles.length > 0 &&
         isEditingSubtitle &&
         isSubtitleTextEditing;
+    const isSubtitleFontEditorVisible =
+        activeAsset?.type === 'video' &&
+        subtitleLanguage !== 'none' &&
+        activeAssetSubtitles.length > 0 &&
+        isEditingSubtitle &&
+        isSubtitleFontEditing;
+    const isSubtitleEditorVisible = isSubtitleTextEditorVisible || isSubtitleFontEditorVisible;
     const isSubtitleStylePanelVisible =
         activeAsset?.type === 'video' &&
         subtitleLanguage !== 'none' &&
         activeAssetSubtitles.length > 0 &&
         isEditingSubtitle &&
-        !isSubtitleTextEditing;
+        !isSubtitleTextEditing &&
+        !isSubtitleFontEditing;
+    const shouldHideBottomActions = isSubtitleEditorVisible || isSubtitleStylePanelVisible;
     const activeSubtitleStyle = activeAssetUri
         ? (subtitleStyleCache[activeAssetUri] || DEFAULT_SUBTITLE_STYLE)
         : DEFAULT_SUBTITLE_STYLE;
+    const resolvedActiveSubtitleStyle = resolveSubtitleStyle(activeSubtitleStyle);
     const ActiveAlignIcon = useMemo(() => {
         switch (activeSubtitleStyle.textAlign) {
             case 'center':
@@ -303,8 +319,15 @@ export default function UploadComposerScreen() {
     useEffect(() => {
         if (!isEditingSubtitle) {
             setIsSubtitleTextEditing(false);
+            setIsSubtitleFontEditing(false);
         }
     }, [isEditingSubtitle]);
+
+    useEffect(() => {
+        if (isSubtitleTextEditing && isSubtitleFontEditing) {
+            setIsSubtitleFontEditing(false);
+        }
+    }, [isSubtitleFontEditing, isSubtitleTextEditing]);
 
     useEffect(() => {
         return () => {
@@ -320,6 +343,7 @@ export default function UploadComposerScreen() {
             setIsDraggingSubtitle(false);
             setIsEditingSubtitle(false);
             setIsSubtitleTextEditing(false);
+            setIsSubtitleFontEditing(false);
         }
     }, [isFocused]);
 
@@ -485,9 +509,20 @@ export default function UploadComposerScreen() {
         setIsDraggingSubtitle(false);
         setIsEditingSubtitle(false);
         setIsSubtitleTextEditing(false);
+        setIsSubtitleFontEditing(false);
         setSttStatusMessage(null);
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }, [removeSubtitleData]);
+
+    const handleSelectSubtitleFontFamily = useCallback((fontFamily: SubtitleFontFamily) => {
+        if (!activeAssetUri) return;
+        updateSubtitleStyle(activeAssetUri, {
+            ...activeSubtitleStyle,
+            fontFamily,
+        });
+        setIsSubtitleFontEditing(false);
+        void Haptics.selectionAsync();
+    }, [activeAssetUri, activeSubtitleStyle, updateSubtitleStyle]);
 
     const persistComposerDraft = (overrides: Partial<UploadComposerDraft> = {}) => {
         const previousDraft = useUploadComposerStore.getState().draft;
@@ -631,7 +666,12 @@ export default function UploadComposerScreen() {
                                                         onDragStart={() => setIsDraggingSubtitle(true)}
                                                         onDragEnd={() => setIsDraggingSubtitle(false)}
                                                         onEditingChange={setIsEditingSubtitle}
-                                                        onTextEditingChange={setIsSubtitleTextEditing}
+                                                        onTextEditingChange={(isTextEditing) => {
+                                                            setIsSubtitleTextEditing(isTextEditing);
+                                                            if (isTextEditing) {
+                                                                setIsSubtitleFontEditing(false);
+                                                            }
+                                                        }}
                                                         onUpdateSubtitle={(idx, text) => handleUpdateSubtitle(asset.uri, idx, text)}
                                                         onPresentationChange={(value) => updateSubtitlePresentation(asset.uri, value)}
                                                     />
@@ -648,6 +688,7 @@ export default function UploadComposerScreen() {
                                         {asset.type === 'video' && (
                                             <UploadActionButtons
                                                 insets={insets}
+                                                isDark={isDark}
                                                 isQualityMenuOpen={isQualityMenuOpen}
                                                 setIsQualityMenuOpen={setIsQualityMenuOpen}
                                                 qualityPreset={qualityPreset}
@@ -705,11 +746,12 @@ export default function UploadComposerScreen() {
                                     <Pressable
                                         style={styles.subtitleAlignIconButton}
                                         onPress={() => {
+                                            setIsSubtitleFontEditing(false);
                                             setIsSubtitleTextEditing(true);
                                             void Haptics.selectionAsync();
                                         }}
                                     >
-                                        <TextSelect color="#FFFFFF" size={22} strokeWidth={2.3} />
+                                        <TextSelect color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
                                     </Pressable>
                                     <Pressable
                                         style={styles.subtitleAlignIconButton}
@@ -717,11 +759,11 @@ export default function UploadComposerScreen() {
                                             ...activeSubtitleStyle,
                                             fontSize: Math.max(
                                                 SUBTITLE_FONT_MIN,
-                                                activeSubtitleStyle.fontSize - SUBTITLE_FONT_STEP
+                                                resolvedActiveSubtitleStyle.fontSize - SUBTITLE_FONT_STEP
                                             ),
                                         })}
                                     >
-                                        <AArrowDown color="#FFFFFF" size={22} strokeWidth={2.3} />
+                                        <AArrowDown color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
                                     </Pressable>
                                     <Pressable
                                         style={styles.subtitleAlignIconButton}
@@ -729,11 +771,30 @@ export default function UploadComposerScreen() {
                                             ...activeSubtitleStyle,
                                             fontSize: Math.min(
                                                 SUBTITLE_FONT_MAX,
-                                                activeSubtitleStyle.fontSize + SUBTITLE_FONT_STEP
+                                                resolvedActiveSubtitleStyle.fontSize + SUBTITLE_FONT_STEP
                                             ),
                                         })}
                                     >
-                                        <AArrowUp color="#FFFFFF" size={22} strokeWidth={2.3} />
+                                        <AArrowUp color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
+                                    </Pressable>
+                                    <Pressable
+                                        style={styles.subtitleAlignIconButton}
+                                        onPress={() => {
+                                            setIsSubtitleTextEditing(false);
+                                            setIsSubtitleFontEditing(true);
+                                            void Haptics.selectionAsync();
+                                        }}
+                                    >
+                                        <CaseSensitive color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
+                                    </Pressable>
+                                    <Pressable
+                                        style={styles.subtitleAlignIconButton}
+                                        onPress={() => updateSubtitleStyle(activeAssetUri, {
+                                            ...activeSubtitleStyle,
+                                            textColor: getNextSubtitleTextColor(activeSubtitleStyle.textColor),
+                                        })}
+                                    >
+                                        <ColorWheelIcon width={SUBTITLE_ACTION_ICON_SIZE} height={SUBTITLE_ACTION_ICON_SIZE} />
                                     </Pressable>
                                     <Pressable
                                         style={styles.subtitleAlignIconButton}
@@ -742,19 +803,22 @@ export default function UploadComposerScreen() {
                                             textAlign: getNextSubtitleAlign(activeSubtitleStyle.textAlign),
                                         })}
                                     >
-                                        <ActiveAlignIcon color="#FFFFFF" size={22} strokeWidth={2.3} />
+                                        <ActiveAlignIcon color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
                                     </Pressable>
                                     <Pressable
                                         style={styles.subtitleAlignIconButton}
-                                        onPress={() => updateSubtitleStyle(activeAssetUri, {
-                                            ...activeSubtitleStyle,
-                                            showOverlay: !(activeSubtitleStyle.showOverlay ?? true),
-                                        })}
+                                        onPress={() => {
+                                            const nextOverlayState = getNextSubtitleOverlayState(activeSubtitleStyle);
+                                            updateSubtitleStyle(activeAssetUri, {
+                                                ...activeSubtitleStyle,
+                                                ...nextOverlayState,
+                                            });
+                                        }}
                                     >
-                                        {(activeSubtitleStyle.showOverlay ?? true) ? (
-                                            <SquareMenu color="#FFFFFF" size={22} strokeWidth={2.3} />
+                                        {(resolvedActiveSubtitleStyle.showOverlay) ? (
+                                            <SquareMenu color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
                                         ) : (
-                                            <Menu color="#FFFFFF" size={22} strokeWidth={2.3} />
+                                            <Menu color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
                                         )}
                                     </Pressable>
                                     <Pressable
@@ -764,22 +828,27 @@ export default function UploadComposerScreen() {
                                             setPendingDeleteSubtitleUri(activeAssetUri);
                                         }}
                                     >
-                                        <ListX color="#FFFFFF" size={22} strokeWidth={2.3} />
+                                        <ListX color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
                                     </Pressable>
                                 </View>
                             )}
 
                             <SubtitleEditor
-                                isVisible={isSubtitleEditorVisible}
+                                isVisible={isSubtitleTextEditorVisible}
                                 segments={activeAssetSubtitles}
                                 currentVideoTimeMs={currentVideoTimeMs}
                                 activeAssetUri={activeAssetUri}
                                 onUpdateSubtitle={handleUpdateSubtitle}
                                 setIsEditingSubtitle={setIsEditingSubtitle}
                             />
+                            <SubtitleFontEditor
+                                isVisible={isSubtitleFontEditorVisible}
+                                activeFontFamily={activeSubtitleStyle.fontFamily}
+                                onSelectFontFamily={handleSelectSubtitleFontFamily}
+                            />
                         </View>
 
-                        {!isSubtitleEditorVisible && (
+                        {!shouldHideBottomActions && (
                             <View style={styles.nextButtonContainer}>
                                 {selectedAssets[activePreviewIndex]?.type === 'video' && (
                                     <Pressable
@@ -1024,7 +1093,7 @@ const styles = StyleSheet.create({
         marginTop: 12,
         marginHorizontal: 12,
         flexDirection: 'row',
-        gap: 8,
+        gap: 6,
         alignItems: 'center',
     },
     subtitleAlignIconButton: {

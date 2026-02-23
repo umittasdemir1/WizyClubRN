@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { CONFIG } from '../../core/config';
 import { SubtitleData, SubtitlePresentation, SubtitleSegment, SubtitleStyle } from '../../domain/entities/Subtitle';
+import { normalizeSubtitlePresentation, normalizeSubtitleStyle } from '../../core/utils/subtitleOverlay';
 
 const SUBTITLE_POLL_INTERVAL_MS = 2500;
 const SUBTITLE_POLL_TIMEOUT_MS = 90_000;
@@ -29,25 +30,8 @@ export function useSubtitles(videoId: string | undefined) {
             if (Array.isArray(value)) return { segments: value, presentation: null, style: null };
             if (value && typeof value === 'object') {
                 const rawSegments = Array.isArray(value.segments) ? value.segments : [];
-                const rawPresentation = value.presentation && typeof value.presentation === 'object' ? value.presentation : null;
-                const presentation = rawPresentation
-                    ? {
-                        leftRatio: Number(rawPresentation.leftRatio) || 0,
-                        topRatio: Number(rawPresentation.topRatio) || 0,
-                        widthRatio: Number(rawPresentation.widthRatio) || 0,
-                        heightRatio: Number(rawPresentation.heightRatio) || 0,
-                    }
-                    : null;
-                const rawStyle = value.style && typeof value.style === 'object' ? value.style : null;
-                const style = rawStyle
-                    ? {
-                        fontSize: Math.max(12, Math.min(42, Number(rawStyle.fontSize) || 18)),
-                        textAlign: ['start', 'center', 'end', 'left', 'right'].includes(String(rawStyle.textAlign))
-                            ? String(rawStyle.textAlign) as any
-                            : 'center',
-                        showOverlay: rawStyle.showOverlay !== false,
-                    }
-                    : null;
+                const presentation = normalizeSubtitlePresentation(value.presentation);
+                const style = normalizeSubtitleStyle(value.style);
                 return { segments: rawSegments, presentation, style };
             }
             if (typeof value === 'string') {

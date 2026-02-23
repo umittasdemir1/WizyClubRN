@@ -15,8 +15,18 @@ import {
     UploadComposerFilterPreset,
     useUploadComposerStore
 } from '../src/presentation/store/useUploadComposerStore';
-import { SubtitleTextAlign } from '../src/domain/entities/Subtitle';
 import { textShadowStyle } from '../src/core/utils/shadow';
+import {
+    DEFAULT_SUBTITLE_STYLE,
+    SUBTITLE_BORDER_RADIUS,
+    SUBTITLE_DEFAULT_BOTTOM_OFFSET,
+    SUBTITLE_MIN_HEIGHT,
+    SUBTITLE_SIDE_MARGIN,
+    SUBTITLE_TEXT_BASE_STYLE,
+    getSubtitlePresentationPixelStyle,
+    getSubtitleWrapperStyle,
+    resolveSubtitleStyle,
+} from '../src/core/utils/subtitleOverlay';
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -35,10 +45,6 @@ const FILTER_OPTIONS: Array<{ id: UploadComposerFilterPreset; label: string }> =
     { id: 'cool', label: 'Soguk' },
     { id: 'mono', label: 'Mono' },
 ];
-
-const DEFAULT_SUBTITLE_STYLE = { fontSize: 18, textAlign: 'center' as SubtitleTextAlign, showOverlay: true };
-
-import { resolveSubtitleTextAlign } from '../src/core/utils/subtitleUtils';
 
 const formatSeconds = (value: number) => {
     const safe = Math.max(0, value);
@@ -120,10 +126,7 @@ export default function VideoEditorScreen() {
     const activeSubtitle = activeSubtitleIndex >= 0 ? subtitleSegments[activeSubtitleIndex] : null;
     const subtitlePresentation = subtitlePresentationCache[activeVideo.uri];
     const subtitleStyle = subtitleStyleCache[activeVideo.uri] || DEFAULT_SUBTITLE_STYLE;
-    const subtitleFontSize = subtitleStyle.fontSize ?? DEFAULT_SUBTITLE_STYLE.fontSize;
-    const subtitleLineHeight = Math.max(subtitleFontSize + 6, Math.round(subtitleFontSize * 1.3));
-    const subtitleTextAlign = resolveSubtitleTextAlign(subtitleStyle.textAlign ?? DEFAULT_SUBTITLE_STYLE.textAlign);
-    const isSubtitleOverlayVisible = subtitleStyle.showOverlay ?? DEFAULT_SUBTITLE_STYLE.showOverlay;
+    const resolvedSubtitleStyle = resolveSubtitleStyle(subtitleStyle);
     const previewAspectRatio = CROP_OPTIONS.find((option) => option.id === cropRatio)?.ratio ?? PREVIEW_ASPECT_RATIO_DEFAULT;
     const previewHeight = PREVIEW_ITEM_WIDTH * previewAspectRatio;
     const filterOverlayStyle = (() => {
@@ -133,11 +136,11 @@ export default function VideoEditorScreen() {
         return null;
     })();
 
-    const subtitlePositionStyle = subtitlePresentation ? {
-        left: clamp(previewLayout.width * subtitlePresentation.leftRatio, 0, previewLayout.width),
-        top: clamp(previewLayout.height * subtitlePresentation.topRatio, 0, previewLayout.height),
-        width: clamp(previewLayout.width * subtitlePresentation.widthRatio, 40, previewLayout.width),
-    } : null;
+    const subtitlePositionStyle = getSubtitlePresentationPixelStyle(
+        subtitlePresentation,
+        previewLayout.width,
+        previewLayout.height
+    );
 
     const saveChanges = () => {
         const finalEnd = clamp(resolvedTrimEnd, trimStartSec + 1, maxEndValue);
@@ -242,22 +245,33 @@ export default function VideoEditorScreen() {
                                     style={[
                                         styles.readonlySubtitleOverlay,
                                         subtitlePositionStyle || styles.readonlySubtitleOverlayDefault,
-                                        isSubtitleOverlayVisible && styles.readonlySubtitleOverlayVisible,
-                                        !isSubtitleOverlayVisible && styles.readonlySubtitleOverlayTransparent,
                                     ]}
                                 >
-                                    <Text
+                                    <View
                                         style={[
-                                            styles.readonlySubtitleText,
-                                            {
-                                                fontSize: subtitleFontSize,
-                                                lineHeight: subtitleLineHeight,
-                                                textAlign: subtitleTextAlign,
-                                            },
+                                            styles.readonlySubtitleWrapper,
+                                            getSubtitleWrapperStyle(
+                                                resolvedSubtitleStyle.showOverlay,
+                                                resolvedSubtitleStyle.overlayVariant
+                                            )
                                         ]}
                                     >
-                                        {activeSubtitle.text}
-                                    </Text>
+                                        <Text
+                                            style={[
+                                                styles.readonlySubtitleText,
+                                                {
+                                                    fontSize: resolvedSubtitleStyle.fontSize,
+                                                    lineHeight: resolvedSubtitleStyle.lineHeight,
+                                                    textAlign: resolvedSubtitleStyle.textAlign,
+                                                    color: resolvedSubtitleStyle.textColor,
+                                                    fontFamily: resolvedSubtitleStyle.fontFamily,
+                                                    fontWeight: resolvedSubtitleStyle.fontWeight,
+                                                },
+                                            ]}
+                                        >
+                                            {activeSubtitle.text}
+                                        </Text>
+                                    </View>
                                 </View>
                             </View>
                         )}
@@ -514,27 +528,22 @@ const styles = StyleSheet.create({
     },
     readonlySubtitleOverlay: {
         position: 'absolute',
-        minHeight: 40,
-        borderRadius: 8,
-        paddingHorizontal: 4,
-        paddingVertical: 1,
+        minHeight: SUBTITLE_MIN_HEIGHT,
         justifyContent: 'center',
+        alignItems: 'center',
         ...textShadowStyle('#000000', { width: 0, height: 1 }, 2),
     },
     readonlySubtitleOverlayDefault: {
         alignSelf: 'center',
-        bottom: 120,
-        maxWidth: PREVIEW_ITEM_WIDTH - 40,
+        bottom: SUBTITLE_DEFAULT_BOTTOM_OFFSET,
+        maxWidth: PREVIEW_ITEM_WIDTH - (SUBTITLE_SIDE_MARGIN * 2),
     },
-    readonlySubtitleOverlayTransparent: {
-        backgroundColor: 'transparent',
-    },
-    readonlySubtitleOverlayVisible: {
-        backgroundColor: 'rgba(0,0,0,0.5)',
+    readonlySubtitleWrapper: {
+        borderRadius: SUBTITLE_BORDER_RADIUS,
+        alignSelf: 'stretch',
     },
     readonlySubtitleText: {
-        color: '#FFFFFF',
-        fontWeight: '700',
+        ...SUBTITLE_TEXT_BASE_STYLE,
     },
     section: {
         borderRadius: 12,

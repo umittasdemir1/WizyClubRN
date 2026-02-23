@@ -1,12 +1,15 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { Captions, Scissors } from 'lucide-react-native';
+import { Scissors } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { UploadComposerQuality, UploadComposerSubtitleLanguage } from '../../store/useUploadComposerStore';
+import CaptionsDarkIcon from '../../../../assets/icons/captions-dark.svg';
+import CaptionsLightIcon from '../../../../assets/icons/captions-light.svg';
 
 interface UploadActionButtonsProps {
     insets: { top: number; bottom: number; left: number; right: number };
+    isDark: boolean;
     isQualityMenuOpen: boolean;
     setIsQualityMenuOpen: (isOpen: boolean) => void;
     qualityPreset: UploadComposerQuality;
@@ -24,6 +27,7 @@ interface UploadActionButtonsProps {
 
 export const UploadActionButtons = ({
     insets,
+    isDark,
     isQualityMenuOpen,
     setIsQualityMenuOpen,
     qualityPreset,
@@ -36,6 +40,8 @@ export const UploadActionButtons = ({
     isSttLoading,
     onToggleCaptionsTap,
 }: UploadActionButtonsProps) => {
+    const CaptionsIcon = isDark ? CaptionsDarkIcon : CaptionsLightIcon;
+
     return (
         <View style={[styles.mediaSideActions, { top: insets.top + 70, left: 16 }]}>
             <View>
@@ -86,11 +92,7 @@ export const UploadActionButtons = ({
                     {isSttLoading ? (
                         <ActivityIndicator color="#3A8DFF" size="small" />
                     ) : (
-                        <Captions
-                            color="#FFFFFF"
-                            size={32}
-                            strokeWidth={2}
-                        />
+                        <CaptionsIcon width={32} height={32} />
                     )}
                 </Pressable>
 

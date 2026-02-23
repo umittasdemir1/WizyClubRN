@@ -40,6 +40,14 @@ import { Pause, RefreshCcw, AlertCircle } from 'lucide-react-native';
 import { isDisabled } from './hooks/usePoolFeedConfig';
 import { useSubtitles } from '../../hooks/useSubtitles';
 import { useSubtitlePreferencesStore } from '../../store/useSubtitlePreferencesStore';
+import {
+    SUBTITLE_BORDER_RADIUS,
+    SUBTITLE_SIDE_MARGIN,
+    SUBTITLE_TEXT_BASE_STYLE,
+    getSubtitlePresentationPercentStyle,
+    getSubtitleWrapperStyle,
+    resolveSubtitleStyle,
+} from '../../../core/utils/subtitleOverlay';
 
 import { Video } from '../../../domain/entities/Video';
 import { PoolFeedActionButtons, PoolFeedActionButtonsRef } from './PoolFeedActionButtons';
@@ -51,9 +59,7 @@ import type { PoolFeedVideoPlayerPoolRef } from './PoolFeedVideoPlayerPool';
 const MAX_RETRIES = 3;
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const SUBTITLE_SIDE_MARGIN = 20;
 const SUBTITLE_MAX_WIDTH = SCREEN_WIDTH - (SUBTITLE_SIDE_MARGIN * 2);
-const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 
 // ============================================================================
 // Types
@@ -162,45 +168,31 @@ export const PoolFeedActiveVideoOverlay = memo(function PoolFeedActiveVideoOverl
     const shouldShowSubtitlePreference = subtitleAlwaysEnabled || Boolean(subtitleVideoEnabledById[video.id]);
     const subtitleBottomOffset = Math.max(170, insets.bottom + 150);
     const { subtitles, getActiveSubtitle } = useSubtitles(shouldShowSubtitlePreference ? video.id : undefined);
-    const subtitlePresentationStyle = React.useMemo<any>(() => {
-        const presentation = subtitles?.presentation;
-        if (!presentation) return null;
-        const left = clamp01(Number(presentation.leftRatio));
-        const top = clamp01(Number(presentation.topRatio));
-        const width = Math.max(0.1, clamp01(Number(presentation.widthRatio)));
-        return {
-            left: `${left * 100}%`,
-            top: `${top * 100}%`,
-            width: `${width * 100}%`,
-            maxWidth: undefined,
-            bottom: undefined,
-        };
+    const subtitlePresentationStyle = React.useMemo(() => {
+        return getSubtitlePresentationPercentStyle(subtitles?.presentation);
     }, [subtitles?.presentation]);
-    const subtitleTextDynamicStyle = React.useMemo<any>(() => {
-        const style = subtitles?.style;
-        if (!style) return null;
-        const fontSize = Math.max(12, Math.min(42, Number(style.fontSize) || 18));
-        const rawAlign = String(style.textAlign || 'center');
-        const mappedAlign = rawAlign === 'center'
-            ? 'center'
-            : (rawAlign === 'end' || rawAlign === 'right')
-                ? 'right'
-                : 'left';
+    const resolvedSubtitleStyle = React.useMemo(() => resolveSubtitleStyle(subtitles?.style), [subtitles?.style]);
+    const subtitleTextDynamicStyle = React.useMemo(() => {
         return {
-            fontSize,
-            lineHeight: Math.max(fontSize + 6, Math.round(fontSize * 1.3)),
-            textAlign: mappedAlign,
+            fontSize: resolvedSubtitleStyle.fontSize,
+            lineHeight: resolvedSubtitleStyle.lineHeight,
+            textAlign: resolvedSubtitleStyle.textAlign,
+            color: resolvedSubtitleStyle.textColor,
+            fontFamily: resolvedSubtitleStyle.fontFamily,
+            fontWeight: resolvedSubtitleStyle.fontWeight,
         };
-    }, [subtitles?.style]);
-    const subtitleWrapperDynamicStyle = React.useMemo<any>(() => {
-        const showOverlay = subtitles?.style?.showOverlay !== false;
-        if (showOverlay) return null;
-        return {
-            backgroundColor: 'transparent',
-            paddingHorizontal: 0,
-            paddingVertical: 0,
-        };
-    }, [subtitles?.style?.showOverlay]);
+    }, [
+        resolvedSubtitleStyle.textColor,
+        resolvedSubtitleStyle.fontFamily,
+        resolvedSubtitleStyle.fontWeight,
+        resolvedSubtitleStyle.fontSize,
+        resolvedSubtitleStyle.lineHeight,
+        resolvedSubtitleStyle.textAlign,
+    ]);
+    const subtitleWrapperDynamicStyle = React.useMemo(
+        () => getSubtitleWrapperStyle(resolvedSubtitleStyle.showOverlay, resolvedSubtitleStyle.overlayVariant),
+        [resolvedSubtitleStyle.showOverlay, resolvedSubtitleStyle.overlayVariant]
+    );
 
     useAnimatedReaction(
         () => currentTimeSV.value,
@@ -509,18 +501,9 @@ const styles = StyleSheet.create({
         zIndex: 80,
     },
     subtitleWrapper: {
-        backgroundColor: 'rgba(8, 10, 15, 0.72)',
-        paddingHorizontal: 4,
-        paddingVertical: 1,
-        borderRadius: 8,
+        borderRadius: SUBTITLE_BORDER_RADIUS,
     },
     subtitleText: {
-        color: '#FFFFFF',
-        fontSize: 14,
-        lineHeight: 20,
-        fontWeight: '400',
-        textShadowColor: 'rgba(0, 0, 0, 0.65)',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 2,
+        ...SUBTITLE_TEXT_BASE_STYLE,
     },
 });

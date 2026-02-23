@@ -811,6 +811,29 @@ app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
             const rawStyle = firstManual?.style;
             const hasStyleObject = rawStyle && typeof rawStyle === 'object';
             const allowedAlignments = new Set(['start', 'center', 'end', 'left', 'right']);
+            const allowedFontFamilies = new Set([
+                'system',
+                'serif',
+                'mono',
+                'roboto',
+                'openSans',
+                'poppins',
+                'montserrat',
+                'lato',
+                'sourceSansPro',
+                'inter',
+                'raleway',
+                'oswald',
+                'rubik',
+                'ubuntu',
+                'bebasNeue',
+                'playfairDisplay',
+                'pacifico',
+                'dancingScript',
+                'lobster',
+            ]);
+            const allowedOverlayVariants = new Set(['dark', 'light']);
+            const allowedFontWeights = new Set(['400', '500', '600', '700']);
             const normalizedStyle = hasStyleObject
                 ? {
                     fontSize: Math.max(12, Math.min(42, Number(rawStyle.fontSize) || 18)),
@@ -818,6 +841,18 @@ app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
                         ? String(rawStyle.textAlign)
                         : 'center',
                     showOverlay: rawStyle.showOverlay !== false,
+                    fontFamily: allowedFontFamilies.has(String(rawStyle.fontFamily))
+                        ? String(rawStyle.fontFamily)
+                        : 'system',
+                    textColor: typeof rawStyle.textColor === 'string' && rawStyle.textColor.trim().length > 0
+                        ? rawStyle.textColor.trim()
+                        : '#FFFFFF',
+                    overlayVariant: allowedOverlayVariants.has(String(rawStyle.overlayVariant))
+                        ? String(rawStyle.overlayVariant)
+                        : 'dark',
+                    fontWeight: allowedFontWeights.has(String(rawStyle.fontWeight))
+                        ? String(rawStyle.fontWeight)
+                        : '700',
                 }
                 : null;
 
@@ -2266,11 +2301,85 @@ app.put('/videos/:id/subtitles', async (req, res) => {
         return res.status(400).json({ error: 'No valid segments provided' });
     }
 
+    const parseSubtitlePayload = (value) => {
+        if (Array.isArray(value)) {
+            return {
+                isEnvelope: false,
+                segments: value,
+                presentation: null,
+                style: null,
+                source: null,
+            };
+        }
+
+        if (value && typeof value === 'object') {
+            return {
+                isEnvelope: true,
+                segments: Array.isArray(value.segments) ? value.segments : [],
+                presentation: value.presentation && typeof value.presentation === 'object' ? value.presentation : null,
+                style: value.style && typeof value.style === 'object' ? value.style : null,
+                source: typeof value.source === 'string' ? value.source : null,
+            };
+        }
+
+        if (typeof value === 'string') {
+            try {
+                const parsed = JSON.parse(value);
+                return parseSubtitlePayload(parsed);
+            } catch {
+                return {
+                    isEnvelope: false,
+                    segments: [],
+                    presentation: null,
+                    style: null,
+                    source: null,
+                };
+            }
+        }
+
+        return {
+            isEnvelope: false,
+            segments: [],
+            presentation: null,
+            style: null,
+            source: null,
+        };
+    };
+
     try {
+        let rowQuery = supabase
+            .from('subtitles')
+            .select('id, segments')
+            .limit(1)
+            .maybeSingle();
+
+        if (subtitleId) {
+            rowQuery = rowQuery.eq('id', subtitleId);
+        } else {
+            rowQuery = rowQuery.eq('video_id', videoId).eq('language', language);
+        }
+
+        const { data: existingRow, error: existingRowError } = await rowQuery;
+        if (existingRowError) throw existingRowError;
+
+        if (!existingRow) {
+            return res.status(404).json({ error: 'Subtitle row not found to update' });
+        }
+
+        const existingPayload = parseSubtitlePayload(existingRow.segments);
+        const segmentsToStore = existingPayload.isEnvelope
+            ? {
+                segments: normalizedSegments,
+                presentation: existingPayload.presentation,
+                style: existingPayload.style,
+                source: existingPayload.source || 'manual_edit',
+            }
+            : normalizedSegments;
+
         let updateQuery = supabase
             .from('subtitles')
             .update({
-                segments: JSON.stringify(normalizedSegments),
+                segments: JSON.stringify(segmentsToStore),
                 status: 'completed',
                 error_message: null,
                 updated_at: new Date().toISOString(),
@@ -2318,5 +2427,3 @@ app.listen(PORT, '0.0.0.0', () => {
     startStoryCleanupScheduler();
     startDraftCleanupScheduler();
 });
-
-
