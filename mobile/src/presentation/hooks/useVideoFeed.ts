@@ -44,6 +44,21 @@ interface UseVideoFeedReturn {
     prependVideo: (video: Video) => void;
 }
 
+interface FeedMemoryCacheEntry {
+    videos: Video[];
+    cursor: VideoFeedCursor | null;
+    hasMore: boolean;
+    updatedAt: number;
+}
+
+const FEED_MEMORY_CACHE = new Map<string, FeedMemoryCacheEntry>();
+
+const buildFeedMemoryCacheKey = (
+    userId: string,
+    filterUserId: string | undefined,
+    pageSize: number
+) => `${userId}::${filterUserId || 'all'}::${pageSize}`;
+
 const isFeedVideoItem = (video: Video): boolean => {
     if (video.postType === 'carousel') return false;
     return Boolean(getVideoUrl(video));
@@ -58,25 +73,28 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
     const toggleLikeUseCase = useRef(new ToggleLikeUseCase(interactionRepository)).current;
     const toggleSaveUseCase = useRef(new ToggleSaveUseCase(interactionRepository)).current;
     const toggleFollowUseCase = useRef(new ToggleFollowUseCase(interactionRepository)).current;
+    const safePageSize = Number.isFinite(pageSize) && pageSize > 0 ? Math.floor(pageSize) : 10;
+    const initialUserId = useAuthStore.getState().user?.id || 'anon';
+    const initialFeedCacheKey = buildFeedMemoryCacheKey(initialUserId, filterUserId, safePageSize);
+    const initialFeedCacheEntry = FEED_MEMORY_CACHE.get(initialFeedCacheKey) ?? null;
 
     // State
-    const [videos, setVideos] = useState<Video[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [videos, setVideos] = useState<Video[]>(() => initialFeedCacheEntry?.videos ?? []);
+    const [isLoading, setIsLoading] = useState(() => !initialFeedCacheEntry);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [cursor, setCursor] = useState<VideoFeedCursor | null>(null);
-    const [hasMore, setHasMore] = useState(true);
+    const [cursor, setCursor] = useState<VideoFeedCursor | null>(() => initialFeedCacheEntry?.cursor ?? null);
+    const [hasMore, setHasMore] = useState(() => initialFeedCacheEntry?.hasMore ?? true);
 
     const isMounted = useRef(true);
-    const hasInitialFetch = useRef(false); // Prevent multiple initial fetches
+    const hasInitialFetch = useRef(Boolean(initialFeedCacheEntry)); // Prevent multiple initial fetches
     const pendingLikeVideoIdsRef = useRef<Set<string>>(new Set());
     const pendingSaveVideoIdsRef = useRef<Set<string>>(new Set());
-    const personalizedFeedUserIdRef = useRef<string | null>(null);
+    const personalizedFeedUserIdRef = useRef<string | null>(initialUserId);
 
     // Auth User
     const { user, isInitialized } = useAuthStore();
-    const currentUserId = user?.id || 'anon';
 
     // Social sync: Get following status from global store
     const followingMap = useSocialStore((state) => state.followingMap);
@@ -179,7 +197,17 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
         setVideos((prevVideos) => applyDescriptionOverridesToVideos(prevVideos, descriptionByVideoId));
     }, [descriptionByVideoId]);
 
-    const safePageSize = Number.isFinite(pageSize) && pageSize > 0 ? Math.floor(pageSize) : 10;
+    useEffect(() => {
+        if (!isInitialized) return;
+        const freshUserId = useAuthStore.getState().user?.id || 'anon';
+        const cacheKey = buildFeedMemoryCacheKey(freshUserId, filterUserId, safePageSize);
+        FEED_MEMORY_CACHE.set(cacheKey, {
+            videos,
+            cursor,
+            hasMore,
+            updatedAt: Date.now(),
+        });
+    }, [cursor, filterUserId, hasMore, isInitialized, safePageSize, videos, user?.id]);
 
     const fetchFeed = useCallback(async () => {
         try {
