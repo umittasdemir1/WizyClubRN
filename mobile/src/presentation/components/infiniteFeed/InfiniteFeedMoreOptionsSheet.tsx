@@ -12,7 +12,7 @@ import {
     CircleUserRound,
     Bookmark,
     QrCode,
-    ClosedCaption,
+    Captions,
 } from 'lucide-react-native';
 import { useSurfaceTheme } from '../../hooks/useSurfaceTheme';
 import { FeedMoreOptionsSheetBase } from '../sheets/FeedMoreOptionsSheetBase';
@@ -104,7 +104,7 @@ export const InfiniteFeedMoreOptionsSheet = forwardRef<BottomSheetModal, Infinit
                 </View>
                 {showSubtitleOption ? (
                     <FeedMoreSegmentedItem
-                        icon={<ClosedCaption color={textColor} size={24} strokeWidth={1.2} />}
+                        icon={<Captions color={textColor} size={24} strokeWidth={1.2} />}
                         label="Altyazı"
                         hint="Videodan oluşturulan otomatik altyazıları gösterir"
                         textColor={textColor}

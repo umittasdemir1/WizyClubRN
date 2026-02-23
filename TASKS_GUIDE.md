@@ -42,7 +42,9 @@ bash scripts/setup-ui-alias.sh
 
 ## 4) Dikkat Edilecekler
 
-- `mobile/.env` task ile otomatik olusturulur/guncellenir:
+- Tum key/credential degerleri tek merkezden `/.env` dosyasinda tutulur.
+- `backend/.env` ve `mobile/.env` dosyalari `scripts/sync-env.sh` ile root `/.env` dosyasindan otomatik uretilir.
+- Task'lar `EXPO_PUBLIC_API_URL` degerini root `/.env` icinde guncelleyip `mobile/.env` dosyasini yeniden uretir:
   - `EV` seciminde: `scripts/sync-mobile-env.sh home`
   - `IS` seciminde: `scripts/sync-mobile-env.sh work` (ngrok 4040 API)
 - Istersen kalici degerler icin `mobile/.env.home` ve `mobile/.env.work` kullanabilirsin.

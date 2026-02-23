@@ -3,9 +3,11 @@ set -euo pipefail
 
 MODE="${1:-}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_ENV_FILE="$ROOT_DIR/.env"
 MOBILE_ENV_FILE="$ROOT_DIR/mobile/.env"
 HOME_ENV_FILE="$ROOT_DIR/mobile/.env.home"
 WORK_ENV_FILE="$ROOT_DIR/mobile/.env.work"
+SYNC_ENV_SCRIPT="$ROOT_DIR/scripts/sync-env.sh"
 DEFAULT_HOME_URL="http://192.168.0.138:3000"
 
 extract_api_url() {
@@ -68,8 +70,41 @@ wait_for_ngrok_https_url() {
 
 write_mobile_env() {
     local api_url="$1"
-    printf 'EXPO_PUBLIC_API_URL=%s\n' "$api_url" > "$MOBILE_ENV_FILE"
-    echo "[env] mobile/.env updated -> EXPO_PUBLIC_API_URL=$api_url"
+    local temp_file="${ROOT_ENV_FILE}.tmp"
+
+    if [[ ! -f "$ROOT_ENV_FILE" ]]; then
+        echo "[env] ERROR: root .env missing at $ROOT_ENV_FILE" >&2
+        echo "[env] Create root .env from .env.example first." >&2
+        exit 1
+    fi
+
+    if [[ ! -x "$SYNC_ENV_SCRIPT" ]]; then
+        echo "[env] ERROR: sync script missing or not executable: $SYNC_ENV_SCRIPT" >&2
+        exit 1
+    fi
+
+    if [[ -f "$ROOT_ENV_FILE" ]]; then
+        awk -v api_url="$api_url" '
+            BEGIN { updated = 0 }
+            /^EXPO_PUBLIC_API_URL=/ {
+                print "EXPO_PUBLIC_API_URL=" api_url
+                updated = 1
+                next
+            }
+            { print }
+            END {
+                if (!updated) {
+                    print "EXPO_PUBLIC_API_URL=" api_url
+                }
+            }
+        ' "$ROOT_ENV_FILE" > "$temp_file"
+        mv "$temp_file" "$ROOT_ENV_FILE"
+    fi
+
+    "$SYNC_ENV_SCRIPT" mobile
+
+    echo "[env] root .env updated -> EXPO_PUBLIC_API_URL=$api_url"
+    echo "[env] mobile/.env regenerated from root .env"
 }
 
 resolve_home_url() {

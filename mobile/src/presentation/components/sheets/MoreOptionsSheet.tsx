@@ -10,7 +10,7 @@ import {
     GalleryVerticalEnd,
     Gauge,
     Pencil,
-    ClosedCaption,
+    Captions,
 } from 'lucide-react-native';
 import { useBrightnessStore } from '../../store/useBrightnessStore';
 import { useActiveVideoStore } from '../../store/useActiveVideoStore';
@@ -108,7 +108,7 @@ export const MoreOptionsSheet = forwardRef<BottomSheetModal, MoreOptionsSheetPro
                 />
                 {showSubtitleOption && (
                     <FeedMoreSegmentedItem
-                        icon={<ClosedCaption color={textColor} size={24} strokeWidth={1.2} />}
+                        icon={<Captions color={textColor} size={24} strokeWidth={1.2} />}
                         label="Altyazı"
                         hint="Videodan oluşturulan otomatik altyazıları gösterir"
                         textColor={textColor}
