@@ -1,6 +1,19 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
-import type { SubtitleFontFamily } from '../../../domain/entities/Subtitle';
+import { Image } from 'expo-image';
+import {
+    AlignCenter as TextAlignCenter,
+    AlignLeft as TextAlignStart,
+    AlignRight as TextAlignEnd,
+    AArrowDown,
+    AArrowUp,
+    Menu,
+    SquareMenu,
+    TextSelect,
+    CaseSensitive,
+    ListX,
+} from 'lucide-react-native';
+import type { SubtitleFontFamily, SubtitleTextAlign } from '../../../domain/entities/Subtitle';
 import { resolveSubtitleFontFamily } from '../../../core/utils/subtitleOverlay';
 
 interface SubtitleFontOption {
@@ -11,11 +24,26 @@ interface SubtitleFontOption {
 interface SubtitleFontEditorProps {
     isVisible: boolean;
     activeFontFamily?: SubtitleFontFamily;
+    activeTextAlign?: SubtitleTextAlign;
+    showOverlay?: boolean;
     onSelectFontFamily: (fontFamily: SubtitleFontFamily) => void;
+    onDecreaseFontSize: () => void;
+    onIncreaseFontSize: () => void;
+    onCycleTextColor: () => void;
+    onCycleTextAlign: () => void;
+    onToggleOverlay: () => void;
+    onOpenTextEditor: () => void;
+    onOpenFontEditor: () => void;
+    onDeleteSubtitle: () => void;
+    panelHeight?: number;
+    bottomInset?: number;
 }
 
+const SUBTITLE_ACTION_ICON_SIZE = 26;
+const ColorWheelIconAsset = require('../../../../assets/icons/color-wheel');
+
 const FONT_OPTIONS: SubtitleFontOption[] = [
-    { value: 'system', label: 'Sistem' },
+    { value: 'system', label: 'Classic' },
     { value: 'serif', label: 'Serif' },
     { value: 'mono', label: 'Mono' },
     { value: 'roboto', label: 'Roboto' },
@@ -36,8 +64,6 @@ const FONT_OPTIONS: SubtitleFontOption[] = [
     { value: 'lobster', label: 'Lobster' },
 ];
 
-const SAMPLE_TEXT = 'Altyazi gorunumu';
-
 function getSafeFontFamily(value?: SubtitleFontFamily): SubtitleFontFamily {
     if (value && FONT_OPTIONS.some((option) => option.value === value)) {
         return value;
@@ -45,123 +71,217 @@ function getSafeFontFamily(value?: SubtitleFontFamily): SubtitleFontFamily {
     return 'system';
 }
 
+function getActiveAlignIcon(activeTextAlign?: SubtitleTextAlign) {
+    switch (activeTextAlign) {
+        case 'center':
+            return TextAlignCenter;
+        case 'end':
+        case 'right':
+            return TextAlignEnd;
+        case 'start':
+        case 'left':
+            return TextAlignStart;
+        default:
+            return TextAlignCenter;
+    }
+}
+
+function renderSubtitleColorWheelIcon() {
+    const resolvedIcon = (ColorWheelIconAsset as { default?: unknown })?.default ?? ColorWheelIconAsset;
+
+    if (typeof resolvedIcon === 'function') {
+        const SvgIcon = resolvedIcon as React.ComponentType<{ width?: number; height?: number }>;
+        return <SvgIcon width={SUBTITLE_ACTION_ICON_SIZE} height={SUBTITLE_ACTION_ICON_SIZE} />;
+    }
+
+    return (
+        <Image
+            source={resolvedIcon as any}
+            style={styles.subtitleColorWheelIcon}
+            contentFit="contain"
+        />
+    );
+}
+
 export const SubtitleFontEditor = ({
     isVisible,
     activeFontFamily,
+    activeTextAlign,
+    showOverlay = true,
     onSelectFontFamily,
+    onDecreaseFontSize,
+    onIncreaseFontSize,
+    onCycleTextColor,
+    onCycleTextAlign,
+    onToggleOverlay,
+    onOpenTextEditor,
+    onOpenFontEditor,
+    onDeleteSubtitle,
+    panelHeight,
+    bottomInset = 0,
 }: SubtitleFontEditorProps) => {
     if (!isVisible) return null;
 
     const selectedFontFamily = getSafeFontFamily(activeFontFamily);
+    const ActiveAlignIcon = getActiveAlignIcon(activeTextAlign);
 
     return (
-        <View style={styles.subtitleEditorPanel}>
-            <View style={styles.subtitleEditorHeaderRow}>
-                <Text style={[styles.subtitleEditorHeaderText, { width: 96 }]}>Font</Text>
-                <Text style={[styles.subtitleEditorHeaderText, { flex: 1, paddingLeft: 4 }]}>Onizleme</Text>
+        <View style={[styles.subtitleEditorPanel, panelHeight ? { height: panelHeight } : null]}>
+            <View style={styles.typographyControlsRow}>
+                <Pressable style={styles.typographyIconButton} onPress={onDecreaseFontSize}>
+                    <AArrowDown color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
+                </Pressable>
+                <Pressable style={styles.typographyIconButton} onPress={onIncreaseFontSize}>
+                    <AArrowUp color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
+                </Pressable>
+                <Pressable style={styles.typographyIconButton} onPress={onCycleTextColor}>
+                    {renderSubtitleColorWheelIcon()}
+                </Pressable>
+                <Pressable style={styles.typographyIconButton} onPress={onCycleTextAlign}>
+                    <ActiveAlignIcon color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
+                </Pressable>
+                <Pressable style={styles.typographyIconButton} onPress={onToggleOverlay}>
+                    {showOverlay ? (
+                        <SquareMenu color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
+                    ) : (
+                        <Menu color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
+                    )}
+                </Pressable>
             </View>
             <ScrollView
                 style={styles.subtitleEditorList}
+                contentContainerStyle={[
+                    styles.subtitleEditorGrid,
+                    styles.subtitleEditorGridContent,
+                ]}
                 nestedScrollEnabled
                 keyboardShouldPersistTaps="handled"
             >
-                {FONT_OPTIONS.map((option, idx) => {
+                {FONT_OPTIONS.map((option) => {
                     const isActiveOption = option.value === selectedFontFamily;
+                    const resolvedFontFamily = resolveSubtitleFontFamily(option.value);
                     return (
                         <Pressable
                             key={option.value}
                             style={[
-                                styles.subtitleEditorRow,
-                                isActiveOption && styles.subtitleEditorRowActive,
-                                idx === FONT_OPTIONS.length - 1 && { borderBottomWidth: 0 },
+                                styles.subtitleFontCard,
+                                isActiveOption && styles.subtitleFontCardActive,
                             ]}
                             onPress={() => onSelectFontFamily(option.value)}
                         >
-                            <View style={styles.subtitleEditorTimeBadge}>
-                                <Text style={styles.subtitleEditorTime}>{option.label}</Text>
-                            </View>
-                            <View style={styles.subtitleEditorInputWrapper}>
-                                <Text
-                                    style={[
-                                        styles.subtitleEditorInput,
-                                        { fontFamily: resolveSubtitleFontFamily(option.value) },
-                                    ]}
-                                >
-                                    {SAMPLE_TEXT}
-                                </Text>
-                            </View>
+                            <Text
+                                numberOfLines={1}
+                                style={[
+                                    styles.subtitleFontLabel,
+                                    { fontFamily: resolvedFontFamily },
+                                ]}
+                            >
+                                {option.label}
+                            </Text>
                         </Pressable>
                     );
                 })}
             </ScrollView>
+            <View style={[styles.subtitleBottomNavRow, { paddingBottom: Math.max(bottomInset, 10) }]}>
+                <Pressable style={styles.subtitleBottomNavButton} onPress={onOpenTextEditor}>
+                    <TextSelect color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
+                </Pressable>
+                <Pressable
+                    style={[styles.subtitleBottomNavButton, styles.subtitleBottomNavButtonActive]}
+                    onPress={onOpenFontEditor}
+                >
+                    <CaseSensitive color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
+                </Pressable>
+                <Pressable style={styles.subtitleBottomNavButton} onPress={onDeleteSubtitle}>
+                    <ListX color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
+                </Pressable>
+            </View>
         </View>
     );
 };
 
 const styles = StyleSheet.create({
     subtitleEditorPanel: {
-        height: 380,
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
+        height: 270,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
         overflow: 'hidden',
         borderTopWidth: 1,
-        borderTopColor: 'rgba(255,255,255,0.15)',
-        backgroundColor: '#080A0F',
+        borderTopColor: 'transparent',
+        backgroundColor: '#1E1E1E',
         zIndex: 100,
-    },
-    subtitleEditorHeaderRow: {
-        flexDirection: 'row',
-        paddingHorizontal: 20,
-        paddingTop: 16,
-        paddingBottom: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.1)',
-    },
-    subtitleEditorHeaderText: {
-        color: 'rgba(255,255,255,0.6)',
-        fontSize: 13,
-        fontWeight: '600',
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
     },
     subtitleEditorList: {
         flex: 1,
     },
-    subtitleEditorRow: {
+    typographyControlsRow: {
+        marginTop: 10,
+        marginHorizontal: 12,
+        marginBottom: 4,
         flexDirection: 'row',
-        paddingHorizontal: 20,
-        paddingVertical: 14,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.08)',
-        alignItems: 'flex-start',
+        gap: 6,
+        alignItems: 'center',
     },
-    subtitleEditorRowActive: {
-        backgroundColor: 'rgba(255,255,255,0.06)',
-    },
-    subtitleEditorTimeBadge: {
-        width: 96,
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        paddingVertical: 4,
-        paddingHorizontal: 8,
-        borderRadius: 6,
-        marginTop: 2,
-    },
-    subtitleEditorTime: {
-        color: '#FFFFFF',
-        fontSize: 12,
-        fontWeight: '600',
-        textAlign: 'center',
-    },
-    subtitleEditorInputWrapper: {
-        flex: 1,
-        paddingLeft: 12,
+    typographyIconButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        alignItems: 'center',
         justifyContent: 'center',
     },
-    subtitleEditorInput: {
+    subtitleColorWheelIcon: {
+        width: SUBTITLE_ACTION_ICON_SIZE,
+        height: SUBTITLE_ACTION_ICON_SIZE,
+    },
+    subtitleEditorGrid: {
+        paddingHorizontal: 12,
+        paddingTop: 10,
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+    },
+    subtitleEditorGridContent: {
+        paddingBottom: 8,
+    },
+    subtitleFontCard: {
+        width: '31.5%',
+        minHeight: 56,
+        marginBottom: 8,
+        borderRadius: 10,
+        paddingHorizontal: 8,
+        paddingVertical: 8,
+        backgroundColor: 'rgba(255,255,255,0.09)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    subtitleFontCardActive: {
+        borderWidth: 2,
+        borderColor: 'rgba(255,255,255,0.95)',
+    },
+    subtitleFontLabel: {
         color: '#FFFFFF',
         fontSize: 15,
-        lineHeight: 22,
-        padding: 0,
-        minHeight: 22,
+        lineHeight: 20,
+        textAlign: 'center',
+    },
+    subtitleBottomNavRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-around',
+        paddingHorizontal: 12,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255,255,255,0.1)',
+        backgroundColor: 'rgba(255,255,255,0.02)',
+    },
+    subtitleBottomNavButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    subtitleBottomNavButtonActive: {
+        backgroundColor: 'rgba(255,255,255,0.14)',
     },
 });

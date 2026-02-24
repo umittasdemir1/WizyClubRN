@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput } from 'react-native';
-import { BlurView } from 'expo-blur';
+import { View, Text, StyleSheet, ScrollView, TextInput, Pressable } from 'react-native';
+import { TextSelect, CaseSensitive, ListX } from 'lucide-react-native';
 import { SubtitleSegment } from '../../../domain/entities/Subtitle';
 
 // A simple utility to format ms to mm:ss
@@ -17,8 +17,15 @@ interface SubtitleEditorProps {
     currentVideoTimeMs: number;
     activeAssetUri: string;
     onUpdateSubtitle: (uri: string, segmentIndex: number, newText: string) => void;
+    onOpenTextEditor: () => void;
+    onOpenFontEditor: () => void;
+    onDeleteSubtitle: () => void;
     setIsEditingSubtitle: (isEditing: boolean) => void;
+    panelHeight?: number;
+    bottomInset?: number;
 }
+
+const SUBTITLE_ACTION_ICON_SIZE = 26;
 
 export const SubtitleEditor = ({
     isVisible,
@@ -26,18 +33,24 @@ export const SubtitleEditor = ({
     currentVideoTimeMs,
     activeAssetUri,
     onUpdateSubtitle,
+    onOpenTextEditor,
+    onOpenFontEditor,
+    onDeleteSubtitle,
     setIsEditingSubtitle,
+    panelHeight,
+    bottomInset = 0,
 }: SubtitleEditorProps) => {
     if (!isVisible) return null;
 
     return (
-        <View style={styles.subtitleEditorPanel}>
+        <View style={[styles.subtitleEditorPanel, panelHeight ? { height: panelHeight } : null]}>
             <View style={styles.subtitleEditorHeaderRow}>
                 <Text style={[styles.subtitleEditorHeaderText, { width: 96 }]}>Süre</Text>
                 <Text style={[styles.subtitleEditorHeaderText, { flex: 1, paddingLeft: 4 }]}>Metin</Text>
             </View>
             <ScrollView
                 style={styles.subtitleEditorList}
+                contentContainerStyle={styles.subtitleEditorListContent}
                 nestedScrollEnabled
                 keyboardShouldPersistTaps="handled"
             >
@@ -72,6 +85,20 @@ export const SubtitleEditor = ({
                     );
                 })}
             </ScrollView>
+            <View style={[styles.subtitleBottomNavRow, { paddingBottom: Math.max(bottomInset, 10) }]}>
+                <Pressable
+                    style={[styles.subtitleBottomNavButton, styles.subtitleBottomNavButtonActive]}
+                    onPress={onOpenTextEditor}
+                >
+                    <TextSelect color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
+                </Pressable>
+                <Pressable style={styles.subtitleBottomNavButton} onPress={onOpenFontEditor}>
+                    <CaseSensitive color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
+                </Pressable>
+                <Pressable style={styles.subtitleBottomNavButton} onPress={onDeleteSubtitle}>
+                    <ListX color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
+                </Pressable>
+            </View>
         </View>
     );
 };
@@ -79,12 +106,12 @@ export const SubtitleEditor = ({
 const styles = StyleSheet.create({
     subtitleEditorPanel: {
         height: 380,
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
         overflow: 'hidden',
         borderTopWidth: 1,
-        borderTopColor: 'rgba(255,255,255,0.15)',
-        backgroundColor: '#080A0F',
+        borderTopColor: 'transparent',
+        backgroundColor: '#1E1E1E',
         zIndex: 100,
     },
     subtitleEditorHeaderRow: {
@@ -104,6 +131,9 @@ const styles = StyleSheet.create({
     },
     subtitleEditorList: {
         flex: 1,
+    },
+    subtitleEditorListContent: {
+        paddingBottom: 8,
     },
     subtitleEditorRow: {
         flexDirection: 'row',
@@ -141,5 +171,25 @@ const styles = StyleSheet.create({
         lineHeight: 22,
         padding: 0,
         minHeight: 22,
+    },
+    subtitleBottomNavRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-around',
+        paddingHorizontal: 12,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255,255,255,0.1)',
+        backgroundColor: 'rgba(255,255,255,0.02)',
+    },
+    subtitleBottomNavButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    subtitleBottomNavButtonActive: {
+        backgroundColor: 'rgba(255,255,255,0.14)',
     },
 });

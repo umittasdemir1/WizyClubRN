@@ -263,14 +263,30 @@ export function getSubtitlePresentationPercentStyle(
 export function getSubtitlePresentationPixelStyle(
     presentation: SubtitlePresentation | null | undefined,
     containerWidth: number,
-    containerHeight: number
+    containerHeight: number,
+    options?: {
+        measuredSubtitleHeight?: number;
+        bottomPadding?: number;
+    }
 ): ViewStyle | null {
     const safePresentation = normalizeSubtitlePresentation(presentation);
     if (!safePresentation) return null;
+    if (!(containerWidth > 0) || !(containerHeight > 0)) return null;
+
+    const measuredSubtitleHeight = Math.max(0, Number(options?.measuredSubtitleHeight) || 0);
+    const bottomPadding = Math.max(0, Number(options?.bottomPadding) || 0);
+    const rawTop = clamp(containerHeight * safePresentation.topRatio, 0, containerHeight);
+    const maxTopByMeasuredHeight = Math.max(0, containerHeight - measuredSubtitleHeight - bottomPadding);
+    const top = measuredSubtitleHeight > 0
+        ? Math.min(rawTop, maxTopByMeasuredHeight)
+        : rawTop;
+
     return {
         left: clamp(containerWidth * safePresentation.leftRatio, 0, containerWidth),
-        top: clamp(containerHeight * safePresentation.topRatio, 0, containerHeight),
+        top,
         width: clamp(containerWidth * safePresentation.widthRatio, 1, containerWidth),
+        maxWidth: undefined,
+        bottom: undefined,
     };
 }
 

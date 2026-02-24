@@ -1,3 +1,4 @@
+const fs = require("fs");
 const path = require("path");
 const { getDefaultConfig } = require("expo/metro-config");
 
@@ -22,6 +23,27 @@ module.exports = (() => {
 
     // Custom resolver to handle ESM .js imports in node_modules
     config.resolver.resolveRequest = (context, moduleName, platform) => {
+        const isRelativeOrAbsolutePath =
+            moduleName.startsWith("./") || moduleName.startsWith("../") || moduleName.startsWith("/");
+        const hasExplicitExtension = path.extname(moduleName).length > 0;
+        const looksLikeAssetsPath =
+            moduleName.includes("/assets/") ||
+            moduleName.startsWith("./assets/") ||
+            moduleName.startsWith("../assets/");
+
+        if (isRelativeOrAbsolutePath && !hasExplicitExtension && looksLikeAssetsPath) {
+            const originDir = path.dirname(context.originModulePath);
+            const absoluteBasePath = path.resolve(originDir, moduleName);
+            const extensionPriority = ["svg", ...resolver.assetExts.filter((ext) => ext !== "svg")];
+
+            for (const ext of extensionPriority) {
+                const absoluteCandidatePath = `${absoluteBasePath}.${ext}`;
+                if (fs.existsSync(absoluteCandidatePath)) {
+                    return context.resolveRequest(context, `${moduleName}.${ext}`, platform);
+                }
+            }
+        }
+
         if (moduleName === "lucide-react-native") {
             return {
                 type: "sourceFile",

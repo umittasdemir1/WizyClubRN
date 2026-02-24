@@ -22,6 +22,8 @@ import {
 import { SubtitlePresentation, SubtitleSegment, SubtitleStyle } from '@/domain/entities/Subtitle';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const SUBTITLE_BASE_BOTTOM_OFFSET = 120;
+const SUBTITLE_BOTTOM_LIMIT = 60;
 
 export const DraggableSubtitleOverlay = ({
     segments,
@@ -66,9 +68,14 @@ export const DraggableSubtitleOverlay = ({
     const [isInlineTextEditing, setIsInlineTextEditing] = useState(false);
     const [editedText, setEditedText] = useState(activeSegment?.text || '');
     const hasAppliedInitialPresentation = useRef(false);
+    const lastAppliedLayoutRef = useRef<{ cw: number; ch: number; w: number; h: number }>({
+        cw: 0,
+        ch: 0,
+        w: 0,
+        h: 0,
+    });
 
     const resolvedSubtitleStyle = resolveSubtitleStyle(textStyle ?? DEFAULT_SUBTITLE_STYLE);
-
     useEffect(() => {
         if (!isInlineTextEditing) {
             setEditedText(activeSegment?.text || '');
@@ -84,6 +91,19 @@ export const DraggableSubtitleOverlay = ({
     const SNAP_THRESHOLD = 8;
     const context = useSharedValue({ x: 0, y: 0, w: 0, h: 0 });
 
+    const applyPresentationLayout = useCallback((cw: number, ch: number, measuredW: number, measuredH: number) => {
+        if (!presentation) return;
+        const targetLeft = cw * presentation.leftRatio;
+        const targetTop = ch * presentation.topRatio;
+        const rawX = targetLeft - ((cw - measuredW) / 2);
+        const maxOffsetByWidth = Math.max(0, ((cw - measuredW) / 2) - SUBTITLE_SIDE_MARGIN);
+        translateX.value = Math.max(-maxOffsetByWidth, Math.min(maxOffsetByWidth, rawX));
+        const computedY = targetTop - (ch - SUBTITLE_BASE_BOTTOM_OFFSET - measuredH);
+        translateY.value = Math.min(computedY, SUBTITLE_BOTTOM_LIMIT);
+        lastAppliedLayoutRef.current = { cw, ch, w: measuredW, h: measuredH };
+        hasAppliedInitialPresentation.current = true;
+    }, [presentation, translateX, translateY]);
+
     const emitPresentation = useCallback(() => {
         if (!onPresentationChange) return;
         const cw = containerWidth.value;
@@ -93,7 +113,8 @@ export const DraggableSubtitleOverlay = ({
         if (!cw || !ch || !w || !h) return;
 
         const left = ((cw - w) / 2) + translateX.value;
-        const top = (ch - 120 - h) + translateY.value;
+        const clampedY = Math.min(translateY.value, SUBTITLE_BOTTOM_LIMIT);
+        const top = (ch - SUBTITLE_BASE_BOTTOM_OFFSET - h) + clampedY;
         const leftRatio = Math.max(0, Math.min(1, left / cw));
         const topRatio = Math.max(0, Math.min(1, top / ch));
         const widthRatio = Math.max(0.05, Math.min(1, w / cw));
@@ -158,13 +179,12 @@ export const DraggableSubtitleOverlay = ({
                 lastSnapX.value = false;
             }
 
-            const initialCenterYFromTop = containerHeight.value - 120 - boxHeight.value / 2;
+            const initialCenterYFromTop = containerHeight.value - SUBTITLE_BASE_BOTTOM_OFFSET - boxHeight.value / 2;
             const targetCenterOffset = (containerHeight.value / 2) - initialCenterYFromTop;
 
-            const maxTranslateY = 80;
-            const isAtBottomLimit = absoluteY >= maxTranslateY;
+            const isAtBottomLimit = absoluteY >= SUBTITLE_BOTTOM_LIMIT;
             showBoundaryY.value = isAtBottomLimit;
-            const clampedY = Math.min(absoluteY, maxTranslateY);
+            const clampedY = Math.min(absoluteY, SUBTITLE_BOTTOM_LIMIT);
 
             if (Math.abs(clampedY - targetCenterOffset) < SNAP_THRESHOLD) {
                 translateY.value = targetCenterOffset;
@@ -235,6 +255,26 @@ export const DraggableSubtitleOverlay = ({
                 const ch = e.nativeEvent.layout.height;
                 containerWidth.value = cw;
                 containerHeight.value = ch;
+
+                const hasContainerLayoutChanged =
+                    Math.abs(cw - lastAppliedLayoutRef.current.cw) > 0.5 ||
+                    Math.abs(ch - lastAppliedLayoutRef.current.ch) > 0.5;
+                const hasSubtitleSizeChanged =
+                    Math.abs(boxWidth.value - lastAppliedLayoutRef.current.w) > 0.5 ||
+                    Math.abs(boxHeight.value - lastAppliedLayoutRef.current.h) > 0.5;
+
+                if (
+                    presentation &&
+                    boxWidth.value > 0 &&
+                    boxHeight.value > 0 &&
+                    (
+                        !hasAppliedInitialPresentation.current ||
+                        hasContainerLayoutChanged ||
+                        hasSubtitleSizeChanged
+                    )
+                ) {
+                    applyPresentationLayout(cw, ch, boxWidth.value, boxHeight.value);
+                }
             }}
         >
             <Animated.View
@@ -254,7 +294,7 @@ export const DraggableSubtitleOverlay = ({
             <Animated.View
                 style={[
                     styles.guideLineBoundaryHorizontal,
-                    { bottom: 40 },
+                    { bottom: SUBTITLE_BOTTOM_LIMIT },
                     boundaryYStyle
                 ]}
             />
@@ -268,7 +308,10 @@ export const DraggableSubtitleOverlay = ({
 
             <GestureDetector gesture={Gesture.Race(dragGesture, tapGesture)}>
                 <Animated.View
-                    style={[styles.subtitleOverlay, animatedStyle]}
+                    style={[
+                        styles.subtitleOverlay,
+                        animatedStyle
+                    ]}
                     collapsable={false}
                     onLayout={(event) => {
                         const measuredW = Math.max(1, event.nativeEvent.layout.width);
@@ -276,19 +319,28 @@ export const DraggableSubtitleOverlay = ({
                         boxWidth.value = measuredW;
                         boxHeight.value = measuredH;
 
-                        if (!hasAppliedInitialPresentation.current && presentation) {
-                            const cw = containerWidth.value || SCREEN_WIDTH;
-                            const ch = containerHeight.value || (SCREEN_WIDTH * (16 / 9));
-                            const targetLeft = cw * presentation.leftRatio;
-                            const targetTop = ch * presentation.topRatio;
-                            const rawX = targetLeft - ((cw - measuredW) / 2);
-                            const maxOffsetByWidth = Math.max(0, ((cw - measuredW) / 2) - SUBTITLE_SIDE_MARGIN);
-                            translateX.value = Math.max(-maxOffsetByWidth, Math.min(maxOffsetByWidth, rawX));
-                            translateY.value = targetTop - (ch - 120 - measuredH);
-                        }
+                        const cw = containerWidth.value || SCREEN_WIDTH;
+                        const ch = containerHeight.value || (SCREEN_WIDTH * (16 / 9));
+                        const hasContainerLayoutChanged =
+                            Math.abs(cw - lastAppliedLayoutRef.current.cw) > 0.5 ||
+                            Math.abs(ch - lastAppliedLayoutRef.current.ch) > 0.5;
+                        const hasSubtitleSizeChanged =
+                            Math.abs(measuredW - lastAppliedLayoutRef.current.w) > 0.5 ||
+                            Math.abs(measuredH - lastAppliedLayoutRef.current.h) > 0.5;
 
-                        hasAppliedInitialPresentation.current = true;
-                        emitPresentation();
+                        if (
+                            presentation &&
+                            (
+                                !hasAppliedInitialPresentation.current ||
+                                hasContainerLayoutChanged ||
+                                hasSubtitleSizeChanged
+                            )
+                        ) {
+                            applyPresentationLayout(cw, ch, measuredW, measuredH);
+                        }
+                        if (!presentation) {
+                            emitPresentation();
+                        }
                     }}
                 >
                     <View
@@ -351,7 +403,7 @@ export const DraggableSubtitleOverlay = ({
 const styles = StyleSheet.create({
     subtitleOverlay: {
         position: 'absolute',
-        bottom: 120,
+        bottom: SUBTITLE_BASE_BOTTOM_OFFSET,
         alignSelf: 'center',
         justifyContent: 'center',
         alignItems: 'center',

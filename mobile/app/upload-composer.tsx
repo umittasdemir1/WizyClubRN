@@ -27,16 +27,6 @@ import {
     Tv,
     Scissors,
     ArrowRight,
-    TextSelect,
-    CaseSensitive,
-    AlignCenter as TextAlignCenter,
-    AlignRight as TextAlignEnd,
-    AlignLeft as TextAlignStart,
-    Menu,
-    SquareMenu,
-    AArrowUp,
-    AArrowDown,
-    ListX,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
@@ -70,17 +60,22 @@ import { VideoPlayerPreview } from '../src/presentation/components/upload/VideoP
 import { SubtitleEditor } from '../src/presentation/components/upload/SubtitleEditor';
 import { SubtitleFontEditor } from '../src/presentation/components/upload/SubtitleFontEditor';
 import { UploadActionButtons } from '../src/presentation/components/upload/UploadActionButtons';
-import ColorWheelIcon from '../assets/icons/color-wheel.svg';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PREVIEW_ITEM_WIDTH = SCREEN_WIDTH;
 const PREVIEW_ITEM_SPACING = 0;
 const PREVIEW_SIDE_PADDING = 0;
 const PREVIEW_ASPECT_RATIO_DEFAULT = 16 / 9;
-const PREVIEW_ASPECT_RATIO_EDIT = 1.2;
+const PREVIEW_BASE_HEIGHT = PREVIEW_ITEM_WIDTH * PREVIEW_ASPECT_RATIO_DEFAULT;
+const PREVIEW_SCALE_WHEN_SUBTITLE_EDITOR_OPEN = 0.56;
+const PREVIEW_MENU_GAP_WHEN_SUBTITLE_EDITOR_OPEN = 20;
+const PREVIEW_TOP_GAP_WHEN_SUBTITLE_EDITOR_OPEN = 20;
+const PREVIEW_TOP_SHIFT_WHEN_SUBTITLE_EDITOR_OPEN =
+    (PREVIEW_TOP_GAP_WHEN_SUBTITLE_EDITOR_OPEN -
+        (PREVIEW_BASE_HEIGHT * (1 - PREVIEW_SCALE_WHEN_SUBTITLE_EDITOR_OPEN)) / 2) /
+    PREVIEW_SCALE_WHEN_SUBTITLE_EDITOR_OPEN;
 const SUBTITLE_DELETE_ZONE_HEIGHT = 84;
 const SUBTITLE_FONT_STEP = 2;
-const SUBTITLE_ACTION_ICON_SIZE = 26;
 const SUBTITLE_ALIGN_CYCLE: SubtitleTextAlign[] = ['center', 'end', 'start'];
 const PREVIEW_PROGRESS_COMMIT_INTERVAL_MS = 120;
 const PREVIEW_PROGRESS_MIN_DELTA_MS = 160;
@@ -258,7 +253,23 @@ export default function UploadComposerScreen() {
     const bgColor = modalTheme.fullScreenBackground;
     const textColor = modalTheme.textPrimary;
     const scrollRef = useRef<ScrollView>(null);
-    const previewHeight = useSharedValue(PREVIEW_ITEM_WIDTH * PREVIEW_ASPECT_RATIO_DEFAULT);
+    const previewScale = useSharedValue(1);
+    const previewTranslateY = useSharedValue(0);
+    const previewOpacity = useSharedValue(1);
+    const previewMarginBottom = useSharedValue(0);
+    const previewCompensationToKeepMenuGap =
+        PREVIEW_MENU_GAP_WHEN_SUBTITLE_EDITOR_OPEN -
+        (PREVIEW_BASE_HEIGHT * (1 - PREVIEW_SCALE_WHEN_SUBTITLE_EDITOR_OPEN)) / 2 +
+        (PREVIEW_SCALE_WHEN_SUBTITLE_EDITOR_OPEN * PREVIEW_TOP_SHIFT_WHEN_SUBTITLE_EDITOR_OPEN);
+    const previewHeightWhenSubtitleEditorOpen = PREVIEW_BASE_HEIGHT * PREVIEW_SCALE_WHEN_SUBTITLE_EDITOR_OPEN;
+    const subtitleEditorPagePanelHeight = Math.max(
+        220,
+        SCREEN_HEIGHT -
+            insets.top -
+            PREVIEW_TOP_GAP_WHEN_SUBTITLE_EDITOR_OPEN -
+            previewHeightWhenSubtitleEditorOpen -
+            PREVIEW_MENU_GAP_WHEN_SUBTITLE_EDITOR_OPEN
+    );
 
     const activeAsset = selectedAssets[activePreviewIndex];
     const activeAssetUri = activeAsset?.uri || '';
@@ -278,42 +289,34 @@ export default function UploadComposerScreen() {
         isEditingSubtitle &&
         isSubtitleFontEditing;
     const isSubtitleEditorVisible = isSubtitleTextEditorVisible || isSubtitleFontEditorVisible;
-    const isSubtitleStylePanelVisible =
-        activeAsset?.type === 'video' &&
-        subtitleLanguage !== 'none' &&
-        activeAssetSubtitles.length > 0 &&
-        isEditingSubtitle &&
-        !isSubtitleTextEditing &&
-        !isSubtitleFontEditing;
-    const shouldHideBottomActions = isSubtitleEditorVisible || isSubtitleStylePanelVisible;
+    const shouldHideBottomActions = isSubtitleEditorVisible;
     const activeSubtitleStyle = activeAssetUri
         ? (subtitleStyleCache[activeAssetUri] || DEFAULT_SUBTITLE_STYLE)
         : DEFAULT_SUBTITLE_STYLE;
     const resolvedActiveSubtitleStyle = resolveSubtitleStyle(activeSubtitleStyle);
-    const ActiveAlignIcon = useMemo(() => {
-        switch (activeSubtitleStyle.textAlign) {
-            case 'center':
-                return TextAlignCenter;
-            case 'end':
-            case 'right':
-                return TextAlignEnd;
-            case 'start':
-            case 'left':
-                return TextAlignStart;
-            default:
-                return TextAlignCenter;
-        }
-    }, [activeSubtitleStyle.textAlign]);
 
     useEffect(() => {
-        previewHeight.value = withTiming(
-            PREVIEW_ITEM_WIDTH * (isSubtitleEditorVisible ? PREVIEW_ASPECT_RATIO_EDIT : PREVIEW_ASPECT_RATIO_DEFAULT),
+        previewScale.value = withTiming(
+            isSubtitleEditorVisible ? PREVIEW_SCALE_WHEN_SUBTITLE_EDITOR_OPEN : 1,
             { duration: 220 }
         );
-    }, [isSubtitleEditorVisible, previewHeight]);
+        previewTranslateY.value = withTiming(
+            isSubtitleEditorVisible ? PREVIEW_TOP_SHIFT_WHEN_SUBTITLE_EDITOR_OPEN : 0,
+            { duration: 220 }
+        );
+        previewMarginBottom.value = withTiming(
+            isSubtitleEditorVisible ? previewCompensationToKeepMenuGap : 0,
+            { duration: 220 }
+        );
+        // Fade through transition to mask occasional heavy-frame jumps.
+        previewOpacity.value = 0.88;
+        previewOpacity.value = withTiming(1, { duration: 220 });
+    }, [isSubtitleEditorVisible, previewCompensationToKeepMenuGap, previewMarginBottom, previewOpacity, previewScale, previewTranslateY]);
 
     const previewContainerAnimatedStyle = useAnimatedStyle(() => ({
-        height: previewHeight.value,
+        transform: [{ scale: previewScale.value }, { translateY: previewTranslateY.value }],
+        opacity: previewOpacity.value,
+        marginBottom: previewMarginBottom.value,
     }));
 
     useEffect(() => {
@@ -328,6 +331,13 @@ export default function UploadComposerScreen() {
             setIsSubtitleFontEditing(false);
         }
     }, [isSubtitleFontEditing, isSubtitleTextEditing]);
+
+    useEffect(() => {
+        if (isSubtitleEditorVisible) {
+            setIsQualityMenuOpen(false);
+            setIsCaptionsMenuOpen(false);
+        }
+    }, [isSubtitleEditorVisible]);
 
     useEffect(() => {
         return () => {
@@ -373,6 +383,10 @@ export default function UploadComposerScreen() {
 
         if (currentState === 'ready') {
             setSttStatusMessage(null);
+            setIsEditingSubtitle(true);
+            setIsSubtitleFontEditing(false);
+            setIsSubtitleTextEditing(true);
+            setSubtitleLanguage((prev) => (prev === 'none' ? 'auto' : prev));
             setCaptionRequestedByUri((prev) => ({ ...prev, [activeAssetUri]: false }));
             return;
         }
@@ -520,8 +534,49 @@ export default function UploadComposerScreen() {
             ...activeSubtitleStyle,
             fontFamily,
         });
-        setIsSubtitleFontEditing(false);
         void Haptics.selectionAsync();
+    }, [activeAssetUri, activeSubtitleStyle, updateSubtitleStyle]);
+    const handleDecreaseSubtitleFontSize = useCallback(() => {
+        if (!activeAssetUri) return;
+        updateSubtitleStyle(activeAssetUri, {
+            ...activeSubtitleStyle,
+            fontSize: Math.max(
+                SUBTITLE_FONT_MIN,
+                resolvedActiveSubtitleStyle.fontSize - SUBTITLE_FONT_STEP
+            ),
+        });
+    }, [activeAssetUri, activeSubtitleStyle, resolvedActiveSubtitleStyle.fontSize, updateSubtitleStyle]);
+    const handleIncreaseSubtitleFontSize = useCallback(() => {
+        if (!activeAssetUri) return;
+        updateSubtitleStyle(activeAssetUri, {
+            ...activeSubtitleStyle,
+            fontSize: Math.min(
+                SUBTITLE_FONT_MAX,
+                resolvedActiveSubtitleStyle.fontSize + SUBTITLE_FONT_STEP
+            ),
+        });
+    }, [activeAssetUri, activeSubtitleStyle, resolvedActiveSubtitleStyle.fontSize, updateSubtitleStyle]);
+    const handleCycleSubtitleTextColor = useCallback(() => {
+        if (!activeAssetUri) return;
+        updateSubtitleStyle(activeAssetUri, {
+            ...activeSubtitleStyle,
+            textColor: getNextSubtitleTextColor(activeSubtitleStyle.textColor),
+        });
+    }, [activeAssetUri, activeSubtitleStyle, updateSubtitleStyle]);
+    const handleCycleSubtitleTextAlign = useCallback(() => {
+        if (!activeAssetUri) return;
+        updateSubtitleStyle(activeAssetUri, {
+            ...activeSubtitleStyle,
+            textAlign: getNextSubtitleAlign(activeSubtitleStyle.textAlign),
+        });
+    }, [activeAssetUri, activeSubtitleStyle, updateSubtitleStyle]);
+    const handleToggleSubtitleOverlay = useCallback(() => {
+        if (!activeAssetUri) return;
+        const nextOverlayState = getNextSubtitleOverlayState(activeSubtitleStyle);
+        updateSubtitleStyle(activeAssetUri, {
+            ...activeSubtitleStyle,
+            ...nextOverlayState,
+        });
     }, [activeAssetUri, activeSubtitleStyle, updateSubtitleStyle]);
 
     const persistComposerDraft = (overrides: Partial<UploadComposerDraft> = {}) => {
@@ -606,14 +661,16 @@ export default function UploadComposerScreen() {
                 >
                     <View style={{ height: insets.top, backgroundColor: bgColor }} />
 
-                    <Pressable
-                        onPress={handleClose}
-                        style={[styles.floatingCloseButton, { top: insets.top + 15, left: 16 }]}
-                    >
-                        <BlurView intensity={30} tint="dark" style={styles.blurContainer}>
-                            <X color="#FFFFFF" size={28} strokeWidth={2} />
-                        </BlurView>
-                    </Pressable>
+                    {!isSubtitleEditorVisible && (
+                        <Pressable
+                            onPress={handleClose}
+                            style={[styles.floatingCloseButton, { top: insets.top + 15, left: 16 }]}
+                        >
+                            <BlurView intensity={30} tint="dark" style={styles.blurContainer}>
+                                <X color="#FFFFFF" size={28} strokeWidth={2} />
+                            </BlurView>
+                        </Pressable>
+                    )}
 
                     {(isQualityMenuOpen || isCaptionsMenuOpen) && (
                         <Pressable
@@ -627,6 +684,7 @@ export default function UploadComposerScreen() {
 
                     <ScrollView
                         style={styles.content}
+                        scrollEnabled={!isSubtitleEditorVisible}
                         showsVerticalScrollIndicator={false}
                     >
                         <View style={styles.previewSection}>
@@ -640,90 +698,111 @@ export default function UploadComposerScreen() {
                                 contentContainerStyle={{ paddingHorizontal: PREVIEW_SIDE_PADDING }}
                             >
                                 {selectedAssets.map((asset, index) => (
-                                    <Animated.View
+                                    <View
                                         key={asset.uri || index}
-                                        style={[
-                                            styles.previewContainer,
-                                            { width: PREVIEW_ITEM_WIDTH },
-                                            previewContainerAnimatedStyle
-                                        ]}
+                                        style={[styles.previewPage, { width: PREVIEW_ITEM_WIDTH }]}
                                     >
-                                        {asset.type === 'video' ? (
-                                            <View style={{ flex: 1 }}>
-                                                <VideoPlayerPreview
-                                                    uri={asset.uri}
-                                                    isActive={activePreviewIndex === index}
-                                                    isMuted={isMuted}
-                                                    isPaused={!isFocused || isDraggingSubtitle || isEditingSubtitle}
-                                                    onProgress={handlePreviewProgress}
-                                                />
-                                                {assetSubtitles[asset.uri] && subtitleLanguage !== 'none' && (
-                                                    <DraggableSubtitleOverlay
-                                                        segments={assetSubtitles[asset.uri]}
-                                                        presentation={subtitlePresentationCache[asset.uri]}
-                                                        textStyle={subtitleStyleCache[asset.uri] || DEFAULT_SUBTITLE_STYLE}
-                                                        currentTimeMs={currentVideoTimeMs}
-                                                        onDragStart={() => setIsDraggingSubtitle(true)}
-                                                        onDragEnd={() => setIsDraggingSubtitle(false)}
-                                                        onEditingChange={setIsEditingSubtitle}
-                                                        onTextEditingChange={(isTextEditing) => {
-                                                            setIsSubtitleTextEditing(isTextEditing);
-                                                            if (isTextEditing) {
-                                                                setIsSubtitleFontEditing(false);
-                                                            }
-                                                        }}
-                                                        onUpdateSubtitle={(idx, text) => handleUpdateSubtitle(asset.uri, idx, text)}
-                                                        onPresentationChange={(value) => updateSubtitlePresentation(asset.uri, value)}
+                                        <Animated.View
+                                            style={[
+                                                styles.previewContainer,
+                                                {
+                                                    width: PREVIEW_ITEM_WIDTH,
+                                                    height: PREVIEW_BASE_HEIGHT,
+                                                },
+                                                previewContainerAnimatedStyle
+                                            ]}
+                                        >
+                                            {asset.type === 'video' ? (
+                                                <View style={{ flex: 1 }}>
+                                                    <VideoPlayerPreview
+                                                        uri={asset.uri}
+                                                        isActive={activePreviewIndex === index}
+                                                        isMuted={isMuted}
+                                                        isPaused={!isFocused || isDraggingSubtitle || isEditingSubtitle}
+                                                        onProgress={handlePreviewProgress}
                                                     />
-                                                )}
-                                            </View>
-                                        ) : (
-                                            <Image
-                                                source={{ uri: asset.uri }}
-                                                style={styles.previewMedia}
-                                                contentFit="cover"
-                                            />
-                                        )}
+                                                    {assetSubtitles[asset.uri] && subtitleLanguage !== 'none' && (
+                                                        <DraggableSubtitleOverlay
+                                                            segments={assetSubtitles[asset.uri]}
+                                                            presentation={subtitlePresentationCache[asset.uri]}
+                                                            textStyle={subtitleStyleCache[asset.uri] || DEFAULT_SUBTITLE_STYLE}
+                                                            currentTimeMs={currentVideoTimeMs}
+                                                            onDragStart={() => setIsDraggingSubtitle(true)}
+                                                            onDragEnd={() => setIsDraggingSubtitle(false)}
+                                                            onEditingChange={(isEditing) => {
+                                                                setIsEditingSubtitle(isEditing);
+                                                                if (isEditing) {
+                                                                    setIsSubtitleTextEditing(true);
+                                                                    setIsSubtitleFontEditing(false);
+                                                                } else {
+                                                                    setIsSubtitleTextEditing(false);
+                                                                    setIsSubtitleFontEditing(false);
+                                                                }
+                                                            }}
+                                                            onTextEditingChange={(isTextEditing) => {
+                                                                if (isTextEditing) {
+                                                                    setIsSubtitleTextEditing(true);
+                                                                    setIsSubtitleFontEditing(false);
+                                                                }
+                                                            }}
+                                                            onUpdateSubtitle={(idx, text) => handleUpdateSubtitle(asset.uri, idx, text)}
+                                                            onPresentationChange={(value) => updateSubtitlePresentation(asset.uri, value)}
+                                                        />
+                                                    )}
+                                                </View>
+                                            ) : (
+                                                <Image
+                                                    source={{ uri: asset.uri }}
+                                                    style={styles.previewMedia}
+                                                    contentFit="cover"
+                                                />
+                                            )}
 
-                                        {asset.type === 'video' && (
-                                            <UploadActionButtons
-                                                insets={insets}
-                                                isDark={isDark}
-                                                isQualityMenuOpen={isQualityMenuOpen}
-                                                setIsQualityMenuOpen={setIsQualityMenuOpen}
-                                                qualityPreset={qualityPreset}
-                                                setQualityPreset={setQualityPreset}
-                                                isCaptionsMenuOpen={isCaptionsMenuOpen}
-                                                setIsCaptionsMenuOpen={setIsCaptionsMenuOpen}
-                                                subtitleLanguage={subtitleLanguage}
-                                                setSubtitleLanguage={setSubtitleLanguage}
-                                                hasSubtitles={!!assetSubtitles[asset.uri]}
-                                                isSttLoading={captionRequestedByUri[asset.uri] && subtitleSttState[asset.uri] === 'loading'}
-                                                onToggleCaptionsTap={() => {
-                                                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                                    const activeUri = selectedAssets[activePreviewIndex].uri;
-                                                    if (!assetSubtitles[activeUri]) {
-                                                        setCaptionRequestedByUri((prev) => ({ ...prev, [activeUri]: true }));
-                                                        void generateSubtitles(activePreviewIndex, {
-                                                            forceRetry: subtitleSttState[activeUri] === 'no_audio',
-                                                        });
-                                                    } else {
-                                                        setIsCaptionsMenuOpen(!isCaptionsMenuOpen);
-                                                    }
-                                                    setIsQualityMenuOpen(false);
-                                                }}
-                                            />
-                                        )}
+                                            {asset.type === 'video' && !isSubtitleEditorVisible && (
+                                                <UploadActionButtons
+                                                    insets={insets}
+                                                    isDark={isDark}
+                                                    isQualityMenuOpen={isQualityMenuOpen}
+                                                    setIsQualityMenuOpen={setIsQualityMenuOpen}
+                                                    qualityPreset={qualityPreset}
+                                                    setQualityPreset={setQualityPreset}
+                                                    isCaptionsMenuOpen={isCaptionsMenuOpen}
+                                                    setIsCaptionsMenuOpen={setIsCaptionsMenuOpen}
+                                                    subtitleLanguage={subtitleLanguage}
+                                                    setSubtitleLanguage={setSubtitleLanguage}
+                                                    hasSubtitles={!!assetSubtitles[asset.uri]}
+                                                    isSttLoading={captionRequestedByUri[asset.uri] && subtitleSttState[asset.uri] === 'loading'}
+                                                    onToggleCaptionsTap={() => {
+                                                        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                                        const activeUri = selectedAssets[activePreviewIndex].uri;
+                                                        if (!assetSubtitles[activeUri]) {
+                                                            setSubtitleLanguage((prev) => (prev === 'none' ? 'auto' : prev));
+                                                            setCaptionRequestedByUri((prev) => ({ ...prev, [activeUri]: true }));
+                                                            void generateSubtitles(activePreviewIndex, {
+                                                                forceRetry: subtitleSttState[activeUri] === 'no_audio',
+                                                            });
+                                                        } else {
+                                                            setIsEditingSubtitle(true);
+                                                            setIsSubtitleFontEditing(false);
+                                                            setIsSubtitleTextEditing(true);
+                                                            setSubtitleLanguage((prev) => (prev === 'none' ? 'auto' : prev));
+                                                            setIsCaptionsMenuOpen(false);
+                                                        }
+                                                        setIsQualityMenuOpen(false);
+                                                    }}
+                                                />
+                                            )}
 
-                                        {selectedAssets.length > 1 && (
-                                            <Pressable
-                                                style={styles.removeAssetBtn}
-                                                onPress={() => removeAsset(index)}
-                                            >
-                                                <Trash2 color="#FFF" size={20} />
-                                            </Pressable>
-                                        )}
-                                    </Animated.View>
+                                            {selectedAssets.length > 1 && (
+                                                <Pressable
+                                                    style={styles.removeAssetBtn}
+                                                    onPress={() => removeAsset(index)}
+                                                >
+                                                    <Trash2 color="#FFF" size={20} />
+                                                </Pressable>
+                                            )}
+                                        </Animated.View>
+                                    </View>
                                 ))}
                             </ScrollView>
 
@@ -741,96 +820,15 @@ export default function UploadComposerScreen() {
                                 </View>
                             )}
 
-                            {isSubtitleStylePanelVisible && (
-                                <View style={styles.subtitleQuickControlsRow}>
-                                    <Pressable
-                                        style={styles.subtitleAlignIconButton}
-                                        onPress={() => {
-                                            setIsSubtitleFontEditing(false);
-                                            setIsSubtitleTextEditing(true);
-                                            void Haptics.selectionAsync();
-                                        }}
-                                    >
-                                        <TextSelect color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
-                                    </Pressable>
-                                    <Pressable
-                                        style={styles.subtitleAlignIconButton}
-                                        onPress={() => updateSubtitleStyle(activeAssetUri, {
-                                            ...activeSubtitleStyle,
-                                            fontSize: Math.max(
-                                                SUBTITLE_FONT_MIN,
-                                                resolvedActiveSubtitleStyle.fontSize - SUBTITLE_FONT_STEP
-                                            ),
-                                        })}
-                                    >
-                                        <AArrowDown color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
-                                    </Pressable>
-                                    <Pressable
-                                        style={styles.subtitleAlignIconButton}
-                                        onPress={() => updateSubtitleStyle(activeAssetUri, {
-                                            ...activeSubtitleStyle,
-                                            fontSize: Math.min(
-                                                SUBTITLE_FONT_MAX,
-                                                resolvedActiveSubtitleStyle.fontSize + SUBTITLE_FONT_STEP
-                                            ),
-                                        })}
-                                    >
-                                        <AArrowUp color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
-                                    </Pressable>
-                                    <Pressable
-                                        style={styles.subtitleAlignIconButton}
-                                        onPress={() => {
-                                            setIsSubtitleTextEditing(false);
-                                            setIsSubtitleFontEditing(true);
-                                            void Haptics.selectionAsync();
-                                        }}
-                                    >
-                                        <CaseSensitive color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
-                                    </Pressable>
-                                    <Pressable
-                                        style={styles.subtitleAlignIconButton}
-                                        onPress={() => updateSubtitleStyle(activeAssetUri, {
-                                            ...activeSubtitleStyle,
-                                            textColor: getNextSubtitleTextColor(activeSubtitleStyle.textColor),
-                                        })}
-                                    >
-                                        <ColorWheelIcon width={SUBTITLE_ACTION_ICON_SIZE} height={SUBTITLE_ACTION_ICON_SIZE} />
-                                    </Pressable>
-                                    <Pressable
-                                        style={styles.subtitleAlignIconButton}
-                                        onPress={() => updateSubtitleStyle(activeAssetUri, {
-                                            ...activeSubtitleStyle,
-                                            textAlign: getNextSubtitleAlign(activeSubtitleStyle.textAlign),
-                                        })}
-                                    >
-                                        <ActiveAlignIcon color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
-                                    </Pressable>
-                                    <Pressable
-                                        style={styles.subtitleAlignIconButton}
-                                        onPress={() => {
-                                            const nextOverlayState = getNextSubtitleOverlayState(activeSubtitleStyle);
-                                            updateSubtitleStyle(activeAssetUri, {
-                                                ...activeSubtitleStyle,
-                                                ...nextOverlayState,
-                                            });
-                                        }}
-                                    >
-                                        {(resolvedActiveSubtitleStyle.showOverlay) ? (
-                                            <SquareMenu color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
-                                        ) : (
-                                            <Menu color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
-                                        )}
-                                    </Pressable>
-                                    <Pressable
-                                        style={styles.subtitleAlignIconButton}
-                                        onPress={() => {
-                                            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                            setPendingDeleteSubtitleUri(activeAssetUri);
-                                        }}
-                                    >
-                                        <ListX color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
-                                    </Pressable>
-                                </View>
+                            {isSubtitleEditorVisible && (
+                                <Pressable
+                                    style={styles.subtitleEditorDismissArea}
+                                    onPress={() => {
+                                        setIsEditingSubtitle(false);
+                                        setIsSubtitleTextEditing(false);
+                                        setIsSubtitleFontEditing(false);
+                                    }}
+                                />
                             )}
 
                             <SubtitleEditor
@@ -839,12 +837,51 @@ export default function UploadComposerScreen() {
                                 currentVideoTimeMs={currentVideoTimeMs}
                                 activeAssetUri={activeAssetUri}
                                 onUpdateSubtitle={handleUpdateSubtitle}
+                                onOpenTextEditor={() => {
+                                    setIsSubtitleFontEditing(false);
+                                    setIsSubtitleTextEditing(true);
+                                    void Haptics.selectionAsync();
+                                }}
+                                onOpenFontEditor={() => {
+                                    setIsSubtitleTextEditing(false);
+                                    setIsSubtitleFontEditing(true);
+                                    void Haptics.selectionAsync();
+                                }}
+                                onDeleteSubtitle={() => {
+                                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                    setPendingDeleteSubtitleUri(activeAssetUri);
+                                }}
                                 setIsEditingSubtitle={setIsEditingSubtitle}
+                                panelHeight={subtitleEditorPagePanelHeight}
+                                bottomInset={insets.bottom}
                             />
                             <SubtitleFontEditor
                                 isVisible={isSubtitleFontEditorVisible}
                                 activeFontFamily={activeSubtitleStyle.fontFamily}
+                                activeTextAlign={activeSubtitleStyle.textAlign}
+                                showOverlay={resolvedActiveSubtitleStyle.showOverlay}
                                 onSelectFontFamily={handleSelectSubtitleFontFamily}
+                                onDecreaseFontSize={handleDecreaseSubtitleFontSize}
+                                onIncreaseFontSize={handleIncreaseSubtitleFontSize}
+                                onCycleTextColor={handleCycleSubtitleTextColor}
+                                onCycleTextAlign={handleCycleSubtitleTextAlign}
+                                onToggleOverlay={handleToggleSubtitleOverlay}
+                                onOpenTextEditor={() => {
+                                    setIsSubtitleFontEditing(false);
+                                    setIsSubtitleTextEditing(true);
+                                    void Haptics.selectionAsync();
+                                }}
+                                onOpenFontEditor={() => {
+                                    setIsSubtitleTextEditing(false);
+                                    setIsSubtitleFontEditing(true);
+                                    void Haptics.selectionAsync();
+                                }}
+                                onDeleteSubtitle={() => {
+                                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                    setPendingDeleteSubtitleUri(activeAssetUri);
+                                }}
+                                panelHeight={subtitleEditorPagePanelHeight}
+                                bottomInset={insets.bottom}
                             />
                         </View>
 
@@ -930,6 +967,10 @@ const styles = StyleSheet.create({
     },
     previewSection: {
         width: SCREEN_WIDTH,
+    },
+    previewPage: {
+        alignItems: 'center',
+        justifyContent: 'flex-start',
     },
     previewContainer: {
         borderRadius: 20,
@@ -1089,19 +1130,13 @@ const styles = StyleSheet.create({
         height: 6,
         borderRadius: 3,
     },
-    subtitleQuickControlsRow: {
-        marginTop: 12,
-        marginHorizontal: 12,
-        flexDirection: 'row',
-        gap: 6,
-        alignItems: 'center',
-    },
-    subtitleAlignIconButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        alignItems: 'center',
-        justifyContent: 'center',
+    subtitleEditorDismissArea: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: PREVIEW_BASE_HEIGHT,
+        zIndex: 10,
     },
     nextButtonContainer: {
         width: '100%',

@@ -1,9 +1,6 @@
 import React from 'react';
-import { StyleSheet, Dimensions } from 'react-native';
+import { StyleSheet } from 'react-native';
 import Video from 'react-native-video';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const PREVIEW_ASPECT_RATIO_DEFAULT = 16 / 9;
 
 interface VideoPlayerProps {
     uri: string;
@@ -34,8 +31,8 @@ export const VideoPlayerPreview = ({ uri, isActive, isMuted, isPaused = false, o
 
 const styles = StyleSheet.create({
     previewMedia: {
-        width: SCREEN_WIDTH,
-        height: SCREEN_WIDTH * PREVIEW_ASPECT_RATIO_DEFAULT,
+        width: '100%',
+        height: '100%',
         backgroundColor: '#000000',
     },
 });

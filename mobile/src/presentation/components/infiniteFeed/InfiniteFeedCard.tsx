@@ -1,5 +1,5 @@
 ﻿import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, Dimensions, type GestureResponderEvent } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Dimensions, type GestureResponderEvent, type LayoutChangeEvent } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { Volume2, VolumeX, MoreVertical } from 'lucide-react-native';
@@ -21,7 +21,7 @@ import {
     SUBTITLE_BORDER_RADIUS,
     SUBTITLE_SIDE_MARGIN,
     SUBTITLE_TEXT_BASE_STYLE,
-    getSubtitlePresentationPercentStyle,
+    getSubtitlePresentationPixelStyle,
     getSubtitleWrapperStyle,
     resolveSubtitleStyle,
 } from '../../../core/utils/subtitleOverlay';
@@ -50,6 +50,7 @@ const DEFAULT_VIDEO_ASPECT_RATIO = 9 / 16;
 const MIN_VALID_ASPECT_RATIO = 0.2;
 const MAX_VALID_ASPECT_RATIO = 5;
 const SUBTITLE_MAX_WIDTH = Dimensions.get('window').width - (SUBTITLE_SIDE_MARGIN * 2);
+const SUBTITLE_BOTTOM_SAFE_PADDING = 60;
 
 const isNonEmptyString = (value: unknown): value is string =>
     typeof value === 'string' && value.trim().length > 0;
@@ -196,10 +197,25 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     const lastSubtitleTimeMsRef = useRef(0);
 
     const [activeSubtitleText, setActiveSubtitleText] = useState<string | null>(null);
+    const [subtitleLayoutBounds, setSubtitleLayoutBounds] = useState({ width: 0, height: 0 });
+    const [subtitleMeasuredHeight, setSubtitleMeasuredHeight] = useState(0);
     const { subtitles, getActiveSubtitle } = useSubtitles(isActive ? item.id : undefined);
     const subtitlePresentationStyle = useMemo(() => {
-        return getSubtitlePresentationPercentStyle(subtitles?.presentation);
-    }, [subtitles?.presentation]);
+        return getSubtitlePresentationPixelStyle(
+            subtitles?.presentation,
+            subtitleLayoutBounds.width,
+            subtitleLayoutBounds.height,
+            {
+                measuredSubtitleHeight: subtitleMeasuredHeight,
+                bottomPadding: SUBTITLE_BOTTOM_SAFE_PADDING,
+            }
+        );
+    }, [
+        subtitles?.presentation,
+        subtitleLayoutBounds.width,
+        subtitleLayoutBounds.height,
+        subtitleMeasuredHeight,
+    ]);
     const resolvedSubtitleStyle = useMemo(() => resolveSubtitleStyle(subtitles?.style), [subtitles?.style]);
     const subtitleTextDynamicStyle = useMemo(() => {
         return {
@@ -872,6 +888,19 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     const showTimeHint = !isCleanScreen && relativeTime.length > 0;
 
     const showFollowButton = !item.user?.isFollowing && item.user?.id !== currentUserId;
+    const handleSubtitleContainerLayout = useCallback((event: LayoutChangeEvent) => {
+        const { width, height } = event.nativeEvent.layout;
+        setSubtitleLayoutBounds((prev) => {
+            if (Math.abs(prev.width - width) < 0.5 && Math.abs(prev.height - height) < 0.5) {
+                return prev;
+            }
+            return { width, height };
+        });
+    }, []);
+    const handleSubtitleWrapperLayout = useCallback((event: LayoutChangeEvent) => {
+        const nextHeight = event.nativeEvent.layout.height;
+        setSubtitleMeasuredHeight((prev) => (Math.abs(prev - nextHeight) < 0.5 ? prev : nextHeight));
+    }, []);
 
     const cardBody = (
         <>
@@ -943,6 +972,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                 ) : (
                     <Pressable
                         style={mediaWrapperStyle}
+                        onLayout={handleSubtitleContainerLayout}
                     >
                         <View
                             style={styles.videoContainer}
@@ -1111,7 +1141,10 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                         )}
                         {isVideo && isActive && !isCleanScreen && shouldShowSubtitle && activeSubtitleText && (
                             <View style={[styles.subtitleContainer, subtitlePresentationStyle]} pointerEvents="none">
-                                <View style={[styles.subtitleWrapper, subtitleWrapperDynamicStyle]}>
+                                <View
+                                    style={[styles.subtitleWrapper, subtitleWrapperDynamicStyle]}
+                                    onLayout={handleSubtitleWrapperLayout}
+                                >
                                     <Text style={[styles.subtitleText, subtitleTextDynamicStyle]}>{activeSubtitleText}</Text>
                                 </View>
                             </View>

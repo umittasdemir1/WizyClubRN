@@ -26,6 +26,7 @@ import {
     StyleSheet,
     Pressable,
     Dimensions,
+    type LayoutChangeEvent,
 } from 'react-native';
 import Animated, {
     useAnimatedStyle,
@@ -44,7 +45,7 @@ import {
     SUBTITLE_BORDER_RADIUS,
     SUBTITLE_SIDE_MARGIN,
     SUBTITLE_TEXT_BASE_STYLE,
-    getSubtitlePresentationPercentStyle,
+    getSubtitlePresentationPixelStyle,
     getSubtitleWrapperStyle,
     resolveSubtitleStyle,
 } from '../../../core/utils/subtitleOverlay';
@@ -60,6 +61,7 @@ const MAX_RETRIES = 3;
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const SUBTITLE_MAX_WIDTH = SCREEN_WIDTH - (SUBTITLE_SIDE_MARGIN * 2);
+const SUBTITLE_BOTTOM_SAFE_PADDING = 60;
 
 // ============================================================================
 // Types
@@ -144,6 +146,8 @@ export const PoolFeedActiveVideoOverlay = memo(function PoolFeedActiveVideoOverl
     const actionButtonsRef = useRef<PoolFeedActionButtonsRef>(null);
     const [activeSubtitleText, setActiveSubtitleText] = React.useState<string | null>(null);
     const [currentTimeSec, setCurrentTimeSec] = React.useState(0);
+    const [subtitleLayoutBounds, setSubtitleLayoutBounds] = React.useState({ width: 0, height: 0 });
+    const [subtitleMeasuredHeight, setSubtitleMeasuredHeight] = React.useState(0);
     const subtitleAlwaysEnabled = useSubtitlePreferencesStore((state) => state.alwaysEnabled);
     const subtitleVideoEnabledById = useSubtitlePreferencesStore((state) => state.videoEnabledById);
 
@@ -169,8 +173,16 @@ export const PoolFeedActiveVideoOverlay = memo(function PoolFeedActiveVideoOverl
     const subtitleBottomOffset = Math.max(170, insets.bottom + 150);
     const { subtitles, getActiveSubtitle } = useSubtitles(shouldShowSubtitlePreference ? video.id : undefined);
     const subtitlePresentationStyle = React.useMemo(() => {
-        return getSubtitlePresentationPercentStyle(subtitles?.presentation);
-    }, [subtitles?.presentation]);
+        return getSubtitlePresentationPixelStyle(
+            subtitles?.presentation,
+            subtitleLayoutBounds.width,
+            subtitleLayoutBounds.height,
+            {
+                measuredSubtitleHeight: subtitleMeasuredHeight,
+                bottomPadding: SUBTITLE_BOTTOM_SAFE_PADDING,
+            }
+        );
+    }, [subtitles?.presentation, subtitleLayoutBounds.width, subtitleLayoutBounds.height, subtitleMeasuredHeight]);
     const resolvedSubtitleStyle = React.useMemo(() => resolveSubtitleStyle(subtitles?.style), [subtitles?.style]);
     const subtitleTextDynamicStyle = React.useMemo(() => {
         return {
@@ -267,6 +279,19 @@ export const PoolFeedActiveVideoOverlay = memo(function PoolFeedActiveVideoOverl
     const triggerLikeAnimation = useCallback(() => {
         actionButtonsRef.current?.animateLike();
     }, []);
+    const handleSubtitleContainerLayout = useCallback((event: LayoutChangeEvent) => {
+        const { width, height } = event.nativeEvent.layout;
+        setSubtitleLayoutBounds((prev) => {
+            if (Math.abs(prev.width - width) < 0.5 && Math.abs(prev.height - height) < 0.5) {
+                return prev;
+            }
+            return { width, height };
+        });
+    }, []);
+    const handleSubtitleWrapperLayout = useCallback((event: LayoutChangeEvent) => {
+        const nextHeight = event.nativeEvent.layout.height;
+        setSubtitleMeasuredHeight((prev) => (Math.abs(prev - nextHeight) < 0.5 ? prev : nextHeight));
+    }, []);
 
     // ========================================================================
     // Render
@@ -340,6 +365,7 @@ export const PoolFeedActiveVideoOverlay = memo(function PoolFeedActiveVideoOverl
                         uiOpacityStyle
                     ]}
                     pointerEvents={isSeeking ? 'none' : 'box-none'}
+                    onLayout={handleSubtitleContainerLayout}
                 >
                     {/* UI Content - Fades out during scroll for performance */}
                     <Animated.View style={[StyleSheet.absoluteFill, contentOpacityStyle]} pointerEvents="box-none">
@@ -382,7 +408,10 @@ export const PoolFeedActiveVideoOverlay = memo(function PoolFeedActiveVideoOverl
                                 style={[styles.subtitleContainer, { bottom: subtitleBottomOffset }, subtitlePresentationStyle]}
                                 pointerEvents="none"
                             >
-                                <View style={[styles.subtitleWrapper, subtitleWrapperDynamicStyle]}>
+                                <View
+                                    style={[styles.subtitleWrapper, subtitleWrapperDynamicStyle]}
+                                    onLayout={handleSubtitleWrapperLayout}
+                                >
                                     <Text style={[styles.subtitleText, subtitleTextDynamicStyle]}>{activeSubtitleText}</Text>
                                 </View>
                             </View>
