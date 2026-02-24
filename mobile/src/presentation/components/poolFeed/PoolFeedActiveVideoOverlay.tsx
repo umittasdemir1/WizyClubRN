@@ -42,6 +42,7 @@ import { isDisabled } from './hooks/usePoolFeedConfig';
 import { useSubtitles } from '../../hooks/useSubtitles';
 import { useSubtitlePreferencesStore } from '../../store/useSubtitlePreferencesStore';
 import {
+    applySubtitleTextCase,
     SUBTITLE_BORDER_RADIUS,
     SUBTITLE_SIDE_MARGIN,
     SUBTITLE_TEXT_BASE_STYLE,
@@ -184,6 +185,10 @@ export const PoolFeedActiveVideoOverlay = memo(function PoolFeedActiveVideoOverl
         );
     }, [subtitles?.presentation, subtitleLayoutBounds.width, subtitleLayoutBounds.height, subtitleMeasuredHeight]);
     const resolvedSubtitleStyle = React.useMemo(() => resolveSubtitleStyle(subtitles?.style), [subtitles?.style]);
+    const formattedSubtitleText = React.useMemo(
+        () => applySubtitleTextCase(activeSubtitleText || '', subtitles?.style?.textCase),
+        [activeSubtitleText, subtitles?.style?.textCase]
+    );
     const subtitleTextDynamicStyle = React.useMemo(() => {
         return {
             fontSize: resolvedSubtitleStyle.fontSize,
@@ -412,7 +417,7 @@ export const PoolFeedActiveVideoOverlay = memo(function PoolFeedActiveVideoOverl
                                     style={[styles.subtitleWrapper, subtitleWrapperDynamicStyle]}
                                     onLayout={handleSubtitleWrapperLayout}
                                 >
-                                    <Text style={[styles.subtitleText, subtitleTextDynamicStyle]}>{activeSubtitleText}</Text>
+                                    <Text style={[styles.subtitleText, subtitleTextDynamicStyle]}>{formattedSubtitleText}</Text>
                                 </View>
                             </View>
                         )}

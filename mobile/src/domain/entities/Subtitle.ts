@@ -49,6 +49,13 @@ export type SubtitleFontWeight =
     | '600'
     | '700';
 
+export type SubtitleTextCase =
+    | 'original'
+    | 'upper'
+    | 'lower'
+    | 'title'
+    | 'sentence';
+
 export interface SubtitleStyle {
     fontSize: number;
     textAlign: SubtitleTextAlign;
@@ -57,6 +64,7 @@ export interface SubtitleStyle {
     textColor?: string;
     overlayVariant?: SubtitleOverlayVariant;
     fontWeight?: SubtitleFontWeight;
+    textCase?: SubtitleTextCase;
 }
 
 export interface SubtitleData {

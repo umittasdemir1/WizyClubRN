@@ -47,7 +47,6 @@ import {
     SUBTITLE_FONT_MAX,
     SUBTITLE_FONT_MIN,
     getNextSubtitleOverlayState,
-    getNextSubtitleTextColor,
     resolveSubtitleStyle,
 } from '@/core/utils/subtitleOverlay';
 import { useSurfaceTheme } from '../src/presentation/hooks/useSurfaceTheme';
@@ -265,10 +264,10 @@ export default function UploadComposerScreen() {
     const subtitleEditorPagePanelHeight = Math.max(
         220,
         SCREEN_HEIGHT -
-            insets.top -
-            PREVIEW_TOP_GAP_WHEN_SUBTITLE_EDITOR_OPEN -
-            previewHeightWhenSubtitleEditorOpen -
-            PREVIEW_MENU_GAP_WHEN_SUBTITLE_EDITOR_OPEN
+        insets.top -
+        PREVIEW_TOP_GAP_WHEN_SUBTITLE_EDITOR_OPEN -
+        previewHeightWhenSubtitleEditorOpen -
+        PREVIEW_MENU_GAP_WHEN_SUBTITLE_EDITOR_OPEN
     );
 
     const activeAsset = selectedAssets[activePreviewIndex];
@@ -556,12 +555,13 @@ export default function UploadComposerScreen() {
             ),
         });
     }, [activeAssetUri, activeSubtitleStyle, resolvedActiveSubtitleStyle.fontSize, updateSubtitleStyle]);
-    const handleCycleSubtitleTextColor = useCallback(() => {
+    const handleSelectSubtitleTextColor = useCallback((color: string) => {
         if (!activeAssetUri) return;
         updateSubtitleStyle(activeAssetUri, {
             ...activeSubtitleStyle,
-            textColor: getNextSubtitleTextColor(activeSubtitleStyle.textColor),
+            textColor: color,
         });
+        void Haptics.selectionAsync();
     }, [activeAssetUri, activeSubtitleStyle, updateSubtitleStyle]);
     const handleCycleSubtitleTextAlign = useCallback(() => {
         if (!activeAssetUri) return;
@@ -577,6 +577,14 @@ export default function UploadComposerScreen() {
             ...activeSubtitleStyle,
             ...nextOverlayState,
         });
+    }, [activeAssetUri, activeSubtitleStyle, updateSubtitleStyle]);
+    const handleSelectSubtitleTextCase = useCallback((textCase: 'upper' | 'lower' | 'title') => {
+        if (!activeAssetUri) return;
+        updateSubtitleStyle(activeAssetUri, {
+            ...activeSubtitleStyle,
+            textCase,
+        });
+        void Haptics.selectionAsync();
     }, [activeAssetUri, activeSubtitleStyle, updateSubtitleStyle]);
 
     const persistComposerDraft = (overrides: Partial<UploadComposerDraft> = {}) => {
@@ -859,11 +867,14 @@ export default function UploadComposerScreen() {
                                 isVisible={isSubtitleFontEditorVisible}
                                 activeFontFamily={activeSubtitleStyle.fontFamily}
                                 activeTextAlign={activeSubtitleStyle.textAlign}
+                                activeTextCase={activeSubtitleStyle.textCase}
+                                activeTextColor={activeSubtitleStyle.textColor}
                                 showOverlay={resolvedActiveSubtitleStyle.showOverlay}
                                 onSelectFontFamily={handleSelectSubtitleFontFamily}
+                                onSelectTextCase={handleSelectSubtitleTextCase}
                                 onDecreaseFontSize={handleDecreaseSubtitleFontSize}
                                 onIncreaseFontSize={handleIncreaseSubtitleFontSize}
-                                onCycleTextColor={handleCycleSubtitleTextColor}
+                                onSelectTextColor={handleSelectSubtitleTextColor}
                                 onCycleTextAlign={handleCycleSubtitleTextAlign}
                                 onToggleOverlay={handleToggleSubtitleOverlay}
                                 onOpenTextEditor={() => {
@@ -879,6 +890,11 @@ export default function UploadComposerScreen() {
                                 onDeleteSubtitle={() => {
                                     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                                     setPendingDeleteSubtitleUri(activeAssetUri);
+                                }}
+                                onCloseEditor={() => {
+                                    setIsEditingSubtitle(false);
+                                    setIsSubtitleTextEditing(false);
+                                    setIsSubtitleFontEditing(false);
                                 }}
                                 panelHeight={subtitleEditorPagePanelHeight}
                                 bottomInset={insets.bottom}

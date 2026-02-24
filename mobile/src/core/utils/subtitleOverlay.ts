@@ -5,6 +5,7 @@ import type {
     SubtitleOverlayVariant,
     SubtitlePresentation,
     SubtitleStyle,
+    SubtitleTextCase,
     SubtitleTextAlign,
 } from '../../domain/entities/Subtitle';
 import { resolveSubtitleTextAlign } from './subtitleUtils';
@@ -58,6 +59,7 @@ export const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
     textColor: '#FFFFFF',
     overlayVariant: 'dark',
     fontWeight: '700',
+    textCase: 'original',
 };
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
@@ -82,6 +84,13 @@ const isValidSubtitleFontWeight = (value: string): value is SubtitleFontWeight =
     value === '500' ||
     value === '600' ||
     value === '700';
+
+const isValidSubtitleTextCase = (value: string): value is SubtitleTextCase =>
+    value === 'original' ||
+    value === 'upper' ||
+    value === 'lower' ||
+    value === 'title' ||
+    value === 'sentence';
 
 const isScriptSubtitleFontFamily = (value: SubtitleFontFamily): boolean =>
     value === 'pacifico' ||
@@ -208,6 +217,10 @@ export function normalizeSubtitleStyle(value: unknown): SubtitleStyle | null {
     const fontWeight = isValidSubtitleFontWeight(rawFontWeight)
         ? rawFontWeight
         : DEFAULT_SUBTITLE_STYLE.fontWeight!;
+    const rawTextCase = String(raw.textCase || DEFAULT_SUBTITLE_STYLE.textCase);
+    const textCase = isValidSubtitleTextCase(rawTextCase)
+        ? rawTextCase
+        : DEFAULT_SUBTITLE_STYLE.textCase!;
     const textColor = typeof raw.textColor === 'string' && raw.textColor.trim().length > 0
         ? raw.textColor
         : DEFAULT_SUBTITLE_STYLE.textColor!;
@@ -224,7 +237,75 @@ export function normalizeSubtitleStyle(value: unknown): SubtitleStyle | null {
         textColor,
         overlayVariant,
         fontWeight,
+        textCase,
     };
+}
+
+const LETTER_PATTERN = /[A-Za-zÇĞİÖŞÜçğıöşü]/;
+
+function isLetterChar(value: string): boolean {
+    return LETTER_PATTERN.test(value);
+}
+
+export function applySubtitleTextCase(text: string, textCase?: SubtitleTextCase): string {
+    if (!text) return text;
+    const nextCase = textCase || DEFAULT_SUBTITLE_STYLE.textCase!;
+
+    if (nextCase === 'upper') {
+        return text.toLocaleUpperCase('tr-TR');
+    }
+    if (nextCase === 'lower') {
+        return text.toLocaleLowerCase('tr-TR');
+    }
+    if (nextCase === 'title') {
+        const chars = Array.from(text.toLocaleLowerCase('tr-TR'));
+        let newWord = true;
+        let result = '';
+
+        for (const ch of chars) {
+            if (/\s/.test(ch)) {
+                newWord = true;
+                result += ch;
+                continue;
+            }
+
+            if (newWord && isLetterChar(ch)) {
+                result += ch.toLocaleUpperCase('tr-TR');
+                newWord = false;
+                continue;
+            }
+
+            result += ch;
+            if (isLetterChar(ch)) {
+                newWord = false;
+            }
+        }
+
+        return result;
+    }
+    if (nextCase === 'sentence') {
+        const chars = Array.from(text.toLocaleLowerCase('tr-TR'));
+        let shouldCapitalize = true;
+        let result = '';
+
+        for (const ch of chars) {
+            if (shouldCapitalize && isLetterChar(ch)) {
+                result += ch.toLocaleUpperCase('tr-TR');
+                shouldCapitalize = false;
+                continue;
+            }
+
+            result += ch;
+
+            if (ch === '.' || ch === '!' || ch === '?') {
+                shouldCapitalize = true;
+            }
+        }
+
+        return result;
+    }
+
+    return text;
 }
 
 export function normalizeSubtitlePresentation(value: unknown): SubtitlePresentation | null {

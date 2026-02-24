@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, Pressable } from 'react-native';
-import { TextSelect, CaseSensitive, ListX } from 'lucide-react-native';
 import { SubtitleSegment } from '../../../domain/entities/Subtitle';
+import { SubtitleBottomNav } from './SubtitleBottomNav';
 
 // A simple utility to format ms to mm:ss
 const formatMs = (ms: number) => {
@@ -24,8 +24,6 @@ interface SubtitleEditorProps {
     panelHeight?: number;
     bottomInset?: number;
 }
-
-const SUBTITLE_ACTION_ICON_SIZE = 26;
 
 export const SubtitleEditor = ({
     isVisible,
@@ -61,8 +59,8 @@ export const SubtitleEditor = ({
                             key={`${segment.startMs}-${segment.endMs}-${idx}`}
                             style={[
                                 styles.subtitleEditorRow,
+                                { zIndex: 100 },
                                 isActiveSegment && styles.subtitleEditorRowActive,
-                                idx === segments.length - 1 && { borderBottomWidth: 0 }
                             ]}
                         >
                             <View style={styles.subtitleEditorTimeBadge}>
@@ -85,20 +83,13 @@ export const SubtitleEditor = ({
                     );
                 })}
             </ScrollView>
-            <View style={[styles.subtitleBottomNavRow, { paddingBottom: Math.max(bottomInset, 10) }]}>
-                <Pressable
-                    style={[styles.subtitleBottomNavButton, styles.subtitleBottomNavButtonActive]}
-                    onPress={onOpenTextEditor}
-                >
-                    <TextSelect color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
-                </Pressable>
-                <Pressable style={styles.subtitleBottomNavButton} onPress={onOpenFontEditor}>
-                    <CaseSensitive color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
-                </Pressable>
-                <Pressable style={styles.subtitleBottomNavButton} onPress={onDeleteSubtitle}>
-                    <ListX color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
-                </Pressable>
-            </View>
+            <SubtitleBottomNav
+                activeTab='text'
+                onOpenTextEditor={onOpenTextEditor}
+                onOpenFontEditor={onOpenFontEditor}
+                onDeleteSubtitle={onDeleteSubtitle}
+                bottomInset={bottomInset}
+            />
         </View>
     );
 };
@@ -106,21 +97,18 @@ export const SubtitleEditor = ({
 const styles = StyleSheet.create({
     subtitleEditorPanel: {
         height: 380,
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        overflow: 'hidden',
+        borderTopLeftRadius: 14,
+        borderTopRightRadius: 14,
         borderTopWidth: 1,
         borderTopColor: 'transparent',
-        backgroundColor: '#1E1E1E',
-        zIndex: 100,
+        backgroundColor: 'transparent',
+        zIndex: 9999,
     },
     subtitleEditorHeaderRow: {
         flexDirection: 'row',
         paddingHorizontal: 20,
         paddingTop: 16,
         paddingBottom: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.1)',
     },
     subtitleEditorHeaderText: {
         color: 'rgba(255,255,255,0.6)',
@@ -131,6 +119,7 @@ const styles = StyleSheet.create({
     },
     subtitleEditorList: {
         flex: 1,
+        zIndex: 50,
     },
     subtitleEditorListContent: {
         paddingBottom: 8,
@@ -139,8 +128,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         paddingHorizontal: 20,
         paddingVertical: 14,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.08)',
         alignItems: 'flex-start',
     },
     subtitleEditorRowActive: {
@@ -172,24 +159,5 @@ const styles = StyleSheet.create({
         padding: 0,
         minHeight: 22,
     },
-    subtitleBottomNavRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-around',
-        paddingHorizontal: 12,
-        paddingTop: 8,
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(255,255,255,0.1)',
-        backgroundColor: 'rgba(255,255,255,0.02)',
-    },
-    subtitleBottomNavButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    subtitleBottomNavButtonActive: {
-        backgroundColor: 'rgba(255,255,255,0.14)',
-    },
 });
+

@@ -11,6 +11,7 @@ import * as Haptics from 'expo-haptics';
 
 import { textShadowStyle } from '@/core/utils/shadow';
 import {
+    applySubtitleTextCase,
     DEFAULT_SUBTITLE_STYLE,
     SUBTITLE_BORDER_RADIUS,
     SUBTITLE_MIN_HEIGHT,
@@ -76,6 +77,10 @@ export const DraggableSubtitleOverlay = ({
     });
 
     const resolvedSubtitleStyle = resolveSubtitleStyle(textStyle ?? DEFAULT_SUBTITLE_STYLE);
+    const displayedSubtitleText = applySubtitleTextCase(
+        activeSegment?.text || '',
+        textStyle?.textCase
+    );
     useEffect(() => {
         if (!isInlineTextEditing) {
             setEditedText(activeSegment?.text || '');
@@ -389,7 +394,7 @@ export const DraggableSubtitleOverlay = ({
                                     }
                                 ]}
                             >
-                                {activeSegment.text}
+                                {displayedSubtitleText}
                             </Text>
                         )}
                     </View>
