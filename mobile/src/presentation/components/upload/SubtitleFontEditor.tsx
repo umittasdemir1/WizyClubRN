@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, useWindowDimensions } from 'react-native';
 import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import { Image } from 'expo-image';
 import {
@@ -8,14 +8,24 @@ import {
     AlignRight as TextAlignEnd,
     AArrowDown,
     AArrowUp,
-    Menu,
-    SquareMenu,
     Type as TypeIcon,
     X,
 } from 'lucide-react-native';
-import type { SubtitleFontFamily, SubtitleTextAlign, SubtitleTextCase } from '../../../domain/entities/Subtitle';
+import type {
+    SubtitleFontFamily,
+    SubtitleOverlayVariant,
+    SubtitleTextAlign,
+    SubtitleTextCase,
+} from '../../../domain/entities/Subtitle';
 import { resolveSubtitleFontFamily } from '../../../core/utils/subtitleOverlay';
 import { SubtitleBottomNav } from './SubtitleBottomNav';
+import NoBgBorderIcon from '../../../../assets/icons/nobgborder.svg';
+import TransparentBgIcon from '../../../../assets/icons/transparentbg.svg';
+import WhiteBgIcon from '../../../../assets/icons/whitebg.svg';
+import WhiteBgBorderIcon from '../../../../assets/icons/whitebgborder.svg';
+import DarkBgIcon from '../../../../assets/icons/darkbg.svg';
+import DarkBgBorderIcon from '../../../../assets/icons/darkbgborder.svg';
+import TextStyleIcon from '../../../../assets/icons/textstyle.svg';
 
 interface SubtitleFontOption {
     value: SubtitleFontFamily;
@@ -28,6 +38,7 @@ interface SubtitleFontEditorProps {
     activeTextAlign?: SubtitleTextAlign;
     activeTextCase?: SubtitleTextCase;
     showOverlay?: boolean;
+    overlayVariant?: SubtitleOverlayVariant;
     activeTextColor?: string;
     onSelectFontFamily: (fontFamily: SubtitleFontFamily) => void;
     onSelectTextCase: (textCase: 'upper' | 'lower' | 'title') => void;
@@ -45,6 +56,14 @@ interface SubtitleFontEditorProps {
 }
 
 const SUBTITLE_ACTION_ICON_SIZE = 26;
+const TEXT_COLOR_SWATCH_SIZE = 26;
+const TEXT_COLOR_SWATCH_GAP = 8;
+const TEXT_COLOR_INITIAL_VISIBLE_COUNT = 10; // selected + 9 colors
+const TEXT_COLOR_DIVIDER_WIDTH = 20;
+const TEXT_COLOR_INITIAL_VISIBLE_WIDTH =
+    (TEXT_COLOR_SWATCH_SIZE * TEXT_COLOR_INITIAL_VISIBLE_COUNT)
+    + (TEXT_COLOR_SWATCH_GAP * (TEXT_COLOR_INITIAL_VISIBLE_COUNT - 1))
+    + TEXT_COLOR_DIVIDER_WIDTH;
 const ColorWheelIconAsset = require('../../../../assets/icons/color-wheel');
 
 const FONT_OPTIONS: SubtitleFontOption[] = [
@@ -137,12 +156,31 @@ function renderSubtitleColorWheelIcon() {
     );
 }
 
+function renderOverlayToggleIcon(overlayVariant: SubtitleOverlayVariant) {
+    switch (overlayVariant) {
+        case 'light':
+            return <WhiteBgIcon width={SUBTITLE_ACTION_ICON_SIZE} height={SUBTITLE_ACTION_ICON_SIZE} />;
+        case 'transparent':
+            return <TransparentBgIcon width={SUBTITLE_ACTION_ICON_SIZE} height={SUBTITLE_ACTION_ICON_SIZE} />;
+        case 'lightBorder':
+            return <WhiteBgBorderIcon width={SUBTITLE_ACTION_ICON_SIZE} height={SUBTITLE_ACTION_ICON_SIZE} />;
+        case 'dark':
+            return <DarkBgIcon width={SUBTITLE_ACTION_ICON_SIZE} height={SUBTITLE_ACTION_ICON_SIZE} />;
+        case 'darkBorder':
+            return <DarkBgBorderIcon width={SUBTITLE_ACTION_ICON_SIZE} height={SUBTITLE_ACTION_ICON_SIZE} />;
+        case 'noneBorder':
+        default:
+            return <NoBgBorderIcon width={SUBTITLE_ACTION_ICON_SIZE} height={SUBTITLE_ACTION_ICON_SIZE} />;
+    }
+}
+
 export const SubtitleFontEditor = ({
     isVisible,
     activeFontFamily,
     activeTextAlign,
     activeTextCase,
     showOverlay = true,
+    overlayVariant,
     activeTextColor,
     onSelectFontFamily,
     onSelectTextCase,
@@ -153,11 +191,11 @@ export const SubtitleFontEditor = ({
     onToggleOverlay,
     onOpenTextEditor,
     onOpenFontEditor,
-    onCloseEditor,
     onDeleteSubtitle,
     panelHeight,
     bottomInset = 0,
 }: SubtitleFontEditorProps) => {
+    const { width: windowWidth } = useWindowDimensions();
     const [isTextCaseMenuOpen, setIsTextCaseMenuOpen] = React.useState(false);
     const [isFontMenuOpen, setIsFontMenuOpen] = React.useState(true);
     const [isColorPaletteOpen, setIsColorPaletteOpen] = React.useState(false);
@@ -177,6 +215,23 @@ export const SubtitleFontEditor = ({
     const selectedTextCase = activeTextCase === 'upper' || activeTextCase === 'lower' || activeTextCase === 'title'
         ? activeTextCase
         : 'title';
+    const normalizedActiveColor = String(activeTextColor || '').toLowerCase();
+    const selectedColor = (TEXT_COLOR_OPTIONS as readonly string[]).find(
+        (color) => color.toLowerCase() === normalizedActiveColor,
+    );
+    const orderedColorOptions = selectedColor
+        ? [selectedColor, ...(TEXT_COLOR_OPTIONS as readonly string[])]
+        : (TEXT_COLOR_OPTIONS as readonly string[]);
+    const activeOverlayVariant = showOverlay
+        ? (overlayVariant || 'dark')
+        : 'noneBorder';
+    const paletteVisibleWidth = Math.max(
+        180,
+        Math.min(
+            TEXT_COLOR_INITIAL_VISIBLE_WIDTH,
+            windowWidth - 12 - 12 - 8 - 28,
+        ),
+    );
 
     return (
         <View
@@ -189,30 +244,50 @@ export const SubtitleFontEditor = ({
             <View style={styles.typographyControlsArea}>
                 {isColorPaletteOpen && (
                     <View style={styles.textColorPaletteWrapper} pointerEvents="auto">
-                        <GHScrollView
-                            horizontal
-                            nestedScrollEnabled
-                            directionalLockEnabled
-                            showsHorizontalScrollIndicator={false}
-                            keyboardShouldPersistTaps="always"
-                            contentContainerStyle={styles.textColorPalette}
-                        >
-                            {(TEXT_COLOR_OPTIONS as readonly string[]).map((item, index) => {
-                                const isSelected = String(activeTextColor || '').toLowerCase() === item.toLowerCase();
-                                return (
-                                    <Pressable
-                                        key={item}
-                                        style={[
-                                            styles.textColorSwatch,
-                                            { backgroundColor: item },
-                                            index !== TEXT_COLOR_OPTIONS.length - 1 && styles.textColorSwatchSpacing,
-                                            isSelected && styles.textColorSwatchActive,
-                                        ]}
-                                        onPress={() => onSelectTextColor(item)}
-                                    />
-                                );
-                            })}
-                        </GHScrollView>
+                        <View style={styles.textColorPaletteRow}>
+                            <GHScrollView
+                                style={[styles.textColorPaletteScroll, { width: paletteVisibleWidth }]}
+                                horizontal
+                                nestedScrollEnabled
+                                directionalLockEnabled
+                                showsHorizontalScrollIndicator={false}
+                                keyboardShouldPersistTaps="always"
+                                contentContainerStyle={styles.textColorPalette}
+                            >
+                                {orderedColorOptions.map((item, index) => {
+                                    const isSelectedColor = normalizedActiveColor === item.toLowerCase();
+                                    const isFirstItem = index === 0;
+                                    const shouldShowDivider = Boolean(selectedColor) && isFirstItem;
+                                    const shouldScaleAsActive = isSelectedColor && (!selectedColor || !isFirstItem);
+                                    return (
+                                        <React.Fragment key={`${item}-${index}`}>
+                                            <Pressable
+                                                style={[
+                                                    styles.textColorSwatch,
+                                                    { backgroundColor: item },
+                                                    index !== orderedColorOptions.length - 1
+                                                    && !shouldShowDivider
+                                                    && styles.textColorSwatchSpacing,
+                                                    shouldScaleAsActive && styles.textColorSwatchActive,
+                                                ]}
+                                                onPress={() => onSelectTextColor(item)}
+                                            />
+                                            {shouldShowDivider && (
+                                                <View style={styles.textColorDividerContainer}>
+                                                    <Text style={styles.textColorDivider}>|</Text>
+                                                </View>
+                                            )}
+                                        </React.Fragment>
+                                    );
+                                })}
+                            </GHScrollView>
+                            <Pressable
+                                style={[styles.typographyIconButton, styles.closeButton, styles.textColorPaletteCloseButton]}
+                                onPress={() => setIsColorPaletteOpen(false)}
+                            >
+                                <X color="#FFFFFF" size={18} strokeWidth={1.5} />
+                            </Pressable>
+                        </View>
                     </View>
                 )}
                 <View style={styles.typographyControlsRow}>
@@ -232,11 +307,7 @@ export const SubtitleFontEditor = ({
                         <ActiveAlignIcon color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
                     </Pressable>
                     <Pressable style={styles.typographyIconButton} onPress={onToggleOverlay}>
-                        {showOverlay ? (
-                            <SquareMenu color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
-                        ) : (
-                            <Menu color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
-                        )}
+                        {renderOverlayToggleIcon(activeOverlayVariant)}
                     </Pressable>
                     <Pressable
                         style={styles.typographyIconButton}
@@ -246,7 +317,7 @@ export const SubtitleFontEditor = ({
                             setIsColorPaletteOpen(false);
                         }}
                     >
-                        <Text style={styles.textCaseTriggerText}>Ee</Text>
+                        <TextStyleIcon width={SUBTITLE_ACTION_ICON_SIZE} height={SUBTITLE_ACTION_ICON_SIZE} />
                     </Pressable>
                     <Pressable
                         style={styles.typographyIconButton}
@@ -257,10 +328,6 @@ export const SubtitleFontEditor = ({
                         }}
                     >
                         <TypeIcon color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
-                    </Pressable>
-                    <View style={styles.controlsSpacer} />
-                    <Pressable style={[styles.typographyIconButton, styles.closeButton]} onPress={onCloseEditor}>
-                        <X color="#FFFFFF" size={18} strokeWidth={1.5} />
                     </Pressable>
                 </View>
             </View>
@@ -356,7 +423,7 @@ const styles = StyleSheet.create({
         marginHorizontal: 12,
         marginBottom: 4,
         flexDirection: 'row',
-        gap: 4,
+        justifyContent: 'space-between',
         alignItems: 'center',
     },
     textColorPaletteWrapper: {
@@ -369,22 +436,44 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         zIndex: 120,
     },
+    textColorPaletteRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    textColorPaletteScroll: {
+        flexGrow: 0,
+    },
     textColorPalette: {
         paddingVertical: 4,
         paddingHorizontal: 2,
     },
     textColorSwatch: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
+        width: TEXT_COLOR_SWATCH_SIZE,
+        height: TEXT_COLOR_SWATCH_SIZE,
+        borderRadius: TEXT_COLOR_SWATCH_SIZE / 2,
         borderWidth: 2,
         borderColor: '#FFFFFF',
     },
     textColorSwatchActive: {
-        borderWidth: 3,
+        transform: [{ scale: 1.18 }],
     },
     textColorSwatchSpacing: {
-        marginRight: 8,
+        marginRight: TEXT_COLOR_SWATCH_GAP,
+    },
+    textColorDividerContainer: {
+        width: TEXT_COLOR_DIVIDER_WIDTH,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    textColorDivider: {
+        color: '#FFFFFF',
+        fontSize: 18,
+        lineHeight: 30,
+        opacity: 0.9,
+        transform: [{ translateY: -3 }],
+    },
+    textColorPaletteCloseButton: {
+        marginLeft: 8,
     },
     typographyIconButton: {
         width: 38,
@@ -393,20 +482,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    controlsSpacer: {
-        flex: 1,
-    },
     closeButton: {
         width: 28,
         height: 28,
         borderRadius: 8,
         backgroundColor: 'rgba(255,255,255,0.09)',
-    },
-    textCaseTriggerText: {
-        color: '#FFFFFF',
-        fontSize: 24,
-        fontWeight: '700',
-        lineHeight: 26,
     },
     textCaseRow: {
         marginHorizontal: 12,

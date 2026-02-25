@@ -98,7 +98,11 @@ export const DraggableSubtitleOverlay = ({
 
     const applyPresentationLayout = useCallback((cw: number, ch: number, measuredW: number, measuredH: number) => {
         if (!presentation) return;
-        const targetLeft = cw * presentation.leftRatio;
+        const savedWidthRatio = Number(presentation.widthRatio) > 0
+            ? Number(presentation.widthRatio)
+            : (measuredW / Math.max(cw, 1));
+        const targetCenterX = cw * (presentation.leftRatio + (savedWidthRatio / 2));
+        const targetLeft = targetCenterX - (measuredW / 2);
         const targetTop = ch * presentation.topRatio;
         const rawX = targetLeft - ((cw - measuredW) / 2);
         const maxOffsetByWidth = Math.max(0, ((cw - measuredW) / 2) - SUBTITLE_SIDE_MARGIN);

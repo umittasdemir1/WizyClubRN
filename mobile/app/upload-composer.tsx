@@ -870,6 +870,7 @@ export default function UploadComposerScreen() {
                                 activeTextCase={activeSubtitleStyle.textCase}
                                 activeTextColor={activeSubtitleStyle.textColor}
                                 showOverlay={resolvedActiveSubtitleStyle.showOverlay}
+                                overlayVariant={activeSubtitleStyle.overlayVariant}
                                 onSelectFontFamily={handleSelectSubtitleFontFamily}
                                 onSelectTextCase={handleSelectSubtitleTextCase}
                                 onDecreaseFontSize={handleDecreaseSubtitleFontSize}

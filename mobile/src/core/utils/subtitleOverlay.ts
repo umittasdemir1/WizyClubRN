@@ -17,10 +17,11 @@ export const SUBTITLE_WIDTH_RATIO_MIN = 0.05;
 export const SUBTITLE_DEFAULT_BOTTOM_OFFSET = 120;
 export const SUBTITLE_PADDING_HORIZONTAL = 4;
 export const SUBTITLE_PADDING_VERTICAL = 2;
-export const SUBTITLE_BORDER_RADIUS = 0;
+export const SUBTITLE_BORDER_RADIUS = 8;
 export const SUBTITLE_MIN_HEIGHT = 40;
-export const SUBTITLE_OVERLAY_BACKGROUND_DARK = 'rgba(0,0,0,0.5)';
-export const SUBTITLE_OVERLAY_BACKGROUND_LIGHT = 'rgba(255,255,255,0.7)';
+export const SUBTITLE_OVERLAY_BACKGROUND_DARK = '#000000';
+export const SUBTITLE_OVERLAY_BACKGROUND_LIGHT = '#FFFFFF';
+export const SUBTITLE_OVERLAY_BACKGROUND_TRANSPARENT = 'rgba(255,255,255,0.35)';
 export const SUBTITLE_TEXT_COLOR_PRESETS = [
     '#FFFFFF',
     '#FFE066',
@@ -57,7 +58,7 @@ export const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
     showOverlay: true,
     fontFamily: 'system',
     textColor: '#FFFFFF',
-    overlayVariant: 'dark',
+    overlayVariant: 'noneBorder',
     fontWeight: '700',
     textCase: 'original',
 };
@@ -76,8 +77,12 @@ const isValidSubtitleFontFamily = (value: string): value is SubtitleFontFamily =
     (SUBTITLE_FONT_FAMILY_ORDER as readonly string[]).includes(value);
 
 const isValidSubtitleOverlayVariant = (value: string): value is SubtitleOverlayVariant =>
+    value === 'noneBorder' ||
+    value === 'transparent' ||
     value === 'dark' ||
-    value === 'light';
+    value === 'light' ||
+    value === 'lightBorder' ||
+    value === 'darkBorder';
 
 const isValidSubtitleFontWeight = (value: string): value is SubtitleFontWeight =>
     value === '400' ||
@@ -375,11 +380,45 @@ export function getSubtitleWrapperStyle(
     showOverlay: boolean,
     overlayVariant: SubtitleOverlayVariant = DEFAULT_SUBTITLE_STYLE.overlayVariant!
 ): ViewStyle {
+    const effectiveOverlayVariant = !showOverlay && overlayVariant !== 'noneBorder'
+        ? 'noneBorder'
+        : overlayVariant;
+
+    if (effectiveOverlayVariant === 'noneBorder') {
+        return { backgroundColor: 'transparent' };
+    }
+    if (effectiveOverlayVariant === 'transparent') {
+        return {
+            backgroundColor: SUBTITLE_OVERLAY_BACKGROUND_TRANSPARENT,
+        };
+    }
+    if (effectiveOverlayVariant === 'light') {
+        return {
+            backgroundColor: SUBTITLE_OVERLAY_BACKGROUND_LIGHT,
+        };
+    }
+    if (effectiveOverlayVariant === 'lightBorder') {
+        return {
+            backgroundColor: SUBTITLE_OVERLAY_BACKGROUND_LIGHT,
+            borderWidth: 1,
+            borderColor: '#000000',
+        };
+    }
+    if (effectiveOverlayVariant === 'dark') {
+        return {
+            backgroundColor: SUBTITLE_OVERLAY_BACKGROUND_DARK,
+        };
+    }
+    if (effectiveOverlayVariant === 'darkBorder') {
+        return {
+            backgroundColor: SUBTITLE_OVERLAY_BACKGROUND_DARK,
+            borderWidth: 1,
+            borderColor: '#FFFFFF',
+        };
+    }
     if (showOverlay) {
         return {
-            backgroundColor: overlayVariant === 'light'
-                ? SUBTITLE_OVERLAY_BACKGROUND_LIGHT
-                : SUBTITLE_OVERLAY_BACKGROUND_DARK
+            backgroundColor: SUBTITLE_OVERLAY_BACKGROUND_DARK
         };
     }
     return { backgroundColor: 'transparent' };
@@ -406,19 +445,27 @@ export function getNextSubtitleTextColor(current?: string): string {
 
 export function getNextSubtitleOverlayState(
     style?: SubtitleStyle | null
-): Pick<SubtitleStyle, 'showOverlay' | 'overlayVariant'> {
-    const showOverlay = style?.showOverlay !== false;
+): Pick<SubtitleStyle, 'showOverlay' | 'overlayVariant' | 'textColor'> {
     const overlayVariant = isValidSubtitleOverlayVariant(String(style?.overlayVariant || ''))
         ? style!.overlayVariant!
-        : DEFAULT_SUBTITLE_STYLE.overlayVariant!;
+        : (style?.showOverlay === false ? 'noneBorder' : DEFAULT_SUBTITLE_STYLE.overlayVariant!);
 
-    if (!showOverlay) {
-        return { showOverlay: true, overlayVariant: 'dark' };
+    if (overlayVariant === 'noneBorder') {
+        return { showOverlay: true, overlayVariant: 'transparent' };
+    }
+    if (overlayVariant === 'transparent') {
+        return { showOverlay: true, overlayVariant: 'light', textColor: '#000000' };
+    }
+    if (overlayVariant === 'light') {
+        return { showOverlay: true, overlayVariant: 'lightBorder', textColor: '#000000' };
+    }
+    if (overlayVariant === 'lightBorder') {
+        return { showOverlay: true, overlayVariant: 'dark', textColor: '#FFFFFF' };
     }
     if (overlayVariant === 'dark') {
-        return { showOverlay: true, overlayVariant: 'light' };
+        return { showOverlay: true, overlayVariant: 'darkBorder', textColor: '#FFFFFF' };
     }
-    return { showOverlay: false, overlayVariant: 'dark' };
+    return { showOverlay: true, overlayVariant: 'noneBorder' };
 }
 
 export const SUBTITLE_TEXT_BASE_STYLE: TextStyle = {

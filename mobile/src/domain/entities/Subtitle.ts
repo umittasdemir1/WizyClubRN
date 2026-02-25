@@ -40,8 +40,12 @@ export type SubtitleFontFamily =
     | 'lobster';
 
 export type SubtitleOverlayVariant =
+    | 'noneBorder'
+    | 'transparent'
     | 'dark'
-    | 'light';
+    | 'light'
+    | 'lightBorder'
+    | 'darkBorder';
 
 export type SubtitleFontWeight =
     | '400'

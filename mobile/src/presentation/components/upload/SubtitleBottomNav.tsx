@@ -19,7 +19,7 @@ export const SubtitleBottomNav = ({
     onDeleteSubtitle,
     bottomInset = 0,
 }: SubtitleBottomNavProps) => {
-    const safeAreaBottom = Math.min(Math.max(0, bottomInset), 4);
+    void bottomInset;
 
     return (
         <View style={styles.subtitleBottomNavContainer}>
@@ -46,27 +46,27 @@ export const SubtitleBottomNav = ({
                     <ListX color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
                 </Pressable>
             </View>
-            <View style={{ height: safeAreaBottom }} />
         </View>
     );
 };
 
 const styles = StyleSheet.create({
     subtitleBottomNavContainer: {
+        height: 34,
         borderTopWidth: 1,
         borderTopColor: 'rgba(255,255,255,0.1)',
         backgroundColor: 'transparent',
-        paddingTop: 2,
+        paddingTop: 8,
+        zIndex: 10000,
+        elevation: 100,
     },
     subtitleBottomNavRow: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-around',
         paddingHorizontal: 12,
-        paddingVertical: 0,
-        height: 20,
-        transform: [{ translateY: 18 }],
-        zIndex: 9999,
+        transform: [{ translateY: 16 }],
     },
     subtitleBottomNavButton: {
         width: 44,
