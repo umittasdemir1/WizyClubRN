@@ -6,31 +6,27 @@ import {
     AlignCenter as TextAlignCenter,
     AlignLeft as TextAlignStart,
     AlignRight as TextAlignEnd,
-    AArrowDown,
-    AArrowUp,
-    Type as TypeIcon,
+    CaseSensitive,
     X,
 } from 'lucide-react-native';
 import type {
     SubtitleFontFamily,
-    SubtitleOverlayVariant,
     SubtitleTextAlign,
     SubtitleTextCase,
 } from '../../../domain/entities/Subtitle';
 import { resolveSubtitleFontFamily } from '../../../core/utils/subtitleOverlay';
-import { SubtitleBottomNav } from './SubtitleBottomNav';
-import NoBgBorderIcon from '../../../../assets/icons/nobgborder.svg';
-import TransparentBgIcon from '../../../../assets/icons/transparentbg.svg';
-import WhiteBgIcon from '../../../../assets/icons/whitebg.svg';
-import WhiteBgBorderIcon from '../../../../assets/icons/whitebgborder.svg';
-import DarkBgIcon from '../../../../assets/icons/darkbg.svg';
-import DarkBgBorderIcon from '../../../../assets/icons/darkbgborder.svg';
-import TextStyleIcon from '../../../../assets/icons/textstyle.svg';
+import OverlayCloseIcon from '../../../../assets/icons/overlayclose.svg';
+import OverlayOpenIcon from '../../../../assets/icons/overlayopen.svg';
+import ADownIcon from '../../../../assets/icons/a_down.svg';
+import AUpIcon from '../../../../assets/icons/a_up.svg';
+import TypeIcon from '../../../../assets/icons/type.svg';
 
 interface SubtitleFontOption {
     value: SubtitleFontFamily;
     label: string;
 }
+
+type TypographyControl = 'textColor' | 'overlayColor' | 'textCase' | 'font';
 
 interface SubtitleFontEditorProps {
     isVisible: boolean;
@@ -38,24 +34,21 @@ interface SubtitleFontEditorProps {
     activeTextAlign?: SubtitleTextAlign;
     activeTextCase?: SubtitleTextCase;
     showOverlay?: boolean;
-    overlayVariant?: SubtitleOverlayVariant;
     activeTextColor?: string;
+    activeOverlayColor?: string;
     onSelectFontFamily: (fontFamily: SubtitleFontFamily) => void;
     onSelectTextCase: (textCase: 'upper' | 'lower' | 'title') => void;
     onDecreaseFontSize: () => void;
     onIncreaseFontSize: () => void;
     onSelectTextColor: (color: string) => void;
+    onSelectOverlayColor: (color: string) => void;
     onCycleTextAlign: () => void;
     onToggleOverlay: () => void;
-    onOpenTextEditor: () => void;
-    onOpenFontEditor: () => void;
-    onCloseEditor: () => void;
-    onDeleteSubtitle: () => void;
-    panelHeight?: number;
-    bottomInset?: number;
+    onRequestPausePreview: () => void;
 }
 
 const SUBTITLE_ACTION_ICON_SIZE = 26;
+const SUBTITLE_PALETTE_BG_COLOR = '#080A0F';
 const TEXT_COLOR_SWATCH_SIZE = 26;
 const TEXT_COLOR_SWATCH_GAP = 8;
 const TEXT_COLOR_INITIAL_VISIBLE_COUNT = 10; // selected + 9 colors
@@ -88,10 +81,10 @@ const FONT_OPTIONS: SubtitleFontOption[] = [
     { value: 'lobster', label: 'Lobster' },
 ];
 
-const TEXT_CASE_OPTIONS: Array<{ value: 'upper' | 'lower' | 'title'; token: 'EE' | 'ee' | 'Ee' }> = [
-    { value: 'upper', token: 'EE' },
-    { value: 'lower', token: 'ee' },
-    { value: 'title', token: 'Ee' },
+const TEXT_CASE_OPTIONS: Array<{ value: 'upper' | 'lower' | 'title'; token: 'AA' | 'aa' | 'Aa' }> = [
+    { value: 'upper', token: 'AA' },
+    { value: 'lower', token: 'aa' },
+    { value: 'title', token: 'Aa' },
 ];
 
 const TEXT_COLOR_OPTIONS = [
@@ -156,22 +149,11 @@ function renderSubtitleColorWheelIcon() {
     );
 }
 
-function renderOverlayToggleIcon(overlayVariant: SubtitleOverlayVariant) {
-    switch (overlayVariant) {
-        case 'light':
-            return <WhiteBgIcon width={SUBTITLE_ACTION_ICON_SIZE} height={SUBTITLE_ACTION_ICON_SIZE} />;
-        case 'transparent':
-            return <TransparentBgIcon width={SUBTITLE_ACTION_ICON_SIZE} height={SUBTITLE_ACTION_ICON_SIZE} />;
-        case 'lightBorder':
-            return <WhiteBgBorderIcon width={SUBTITLE_ACTION_ICON_SIZE} height={SUBTITLE_ACTION_ICON_SIZE} />;
-        case 'dark':
-            return <DarkBgIcon width={SUBTITLE_ACTION_ICON_SIZE} height={SUBTITLE_ACTION_ICON_SIZE} />;
-        case 'darkBorder':
-            return <DarkBgBorderIcon width={SUBTITLE_ACTION_ICON_SIZE} height={SUBTITLE_ACTION_ICON_SIZE} />;
-        case 'noneBorder':
-        default:
-            return <NoBgBorderIcon width={SUBTITLE_ACTION_ICON_SIZE} height={SUBTITLE_ACTION_ICON_SIZE} />;
+function renderOverlayToggleIcon(showOverlay: boolean) {
+    if (showOverlay) {
+        return <OverlayOpenIcon width={SUBTITLE_ACTION_ICON_SIZE} height={SUBTITLE_ACTION_ICON_SIZE} />;
     }
+    return <OverlayCloseIcon width={SUBTITLE_ACTION_ICON_SIZE} height={SUBTITLE_ACTION_ICON_SIZE} />;
 }
 
 export const SubtitleFontEditor = ({
@@ -180,33 +162,53 @@ export const SubtitleFontEditor = ({
     activeTextAlign,
     activeTextCase,
     showOverlay = true,
-    overlayVariant,
     activeTextColor,
+    activeOverlayColor,
     onSelectFontFamily,
     onSelectTextCase,
     onDecreaseFontSize,
     onIncreaseFontSize,
     onSelectTextColor,
+    onSelectOverlayColor,
     onCycleTextAlign,
     onToggleOverlay,
-    onOpenTextEditor,
-    onOpenFontEditor,
-    onDeleteSubtitle,
-    panelHeight,
-    bottomInset = 0,
+    onRequestPausePreview,
 }: SubtitleFontEditorProps) => {
     const { width: windowWidth } = useWindowDimensions();
     const [isTextCaseMenuOpen, setIsTextCaseMenuOpen] = React.useState(false);
     const [isFontMenuOpen, setIsFontMenuOpen] = React.useState(true);
-    const [isColorPaletteOpen, setIsColorPaletteOpen] = React.useState(false);
+    const [colorPaletteTarget, setColorPaletteTarget] = React.useState<'text' | 'overlay' | null>(null);
+    const [activeControl, setActiveControl] = React.useState<TypographyControl>('font');
+
+    const handleOverlayControlPress = React.useCallback(() => {
+        onRequestPausePreview();
+        setActiveControl('overlayColor');
+        if (!showOverlay) {
+            onToggleOverlay();
+            setColorPaletteTarget('overlay');
+            return;
+        }
+        if (colorPaletteTarget === 'overlay') {
+            setColorPaletteTarget(null);
+            onToggleOverlay();
+            return;
+        }
+        setColorPaletteTarget('overlay');
+    }, [colorPaletteTarget, onRequestPausePreview, onToggleOverlay, showOverlay]);
 
     React.useEffect(() => {
         if (!isVisible) {
             setIsTextCaseMenuOpen(false);
             setIsFontMenuOpen(true);
-            setIsColorPaletteOpen(false);
+            setColorPaletteTarget(null);
+            setActiveControl('font');
         }
     }, [isVisible]);
+    React.useEffect(() => {
+        if (!showOverlay && colorPaletteTarget === 'overlay') {
+            setColorPaletteTarget(null);
+        }
+    }, [colorPaletteTarget, showOverlay]);
 
     if (!isVisible) return null;
 
@@ -215,16 +217,21 @@ export const SubtitleFontEditor = ({
     const selectedTextCase = activeTextCase === 'upper' || activeTextCase === 'lower' || activeTextCase === 'title'
         ? activeTextCase
         : 'title';
-    const normalizedActiveColor = String(activeTextColor || '').toLowerCase();
+    const activeTypographyControl = colorPaletteTarget === 'text'
+        ? 'textColor'
+        : colorPaletteTarget === 'overlay'
+            ? 'overlayColor'
+            : isTextCaseMenuOpen
+                ? 'textCase'
+                : activeControl;
+    const activePaletteColor = colorPaletteTarget === 'overlay' ? activeOverlayColor : activeTextColor;
+    const normalizedActiveColor = String(activePaletteColor || '').toLowerCase();
     const selectedColor = (TEXT_COLOR_OPTIONS as readonly string[]).find(
         (color) => color.toLowerCase() === normalizedActiveColor,
     );
     const orderedColorOptions = selectedColor
         ? [selectedColor, ...(TEXT_COLOR_OPTIONS as readonly string[])]
         : (TEXT_COLOR_OPTIONS as readonly string[]);
-    const activeOverlayVariant = showOverlay
-        ? (overlayVariant || 'dark')
-        : 'noneBorder';
     const paletteVisibleWidth = Math.max(
         180,
         Math.min(
@@ -237,13 +244,12 @@ export const SubtitleFontEditor = ({
         <View
             style={[
                 styles.subtitleEditorPanel,
-                panelHeight ? { height: panelHeight } : null,
-                isColorPaletteOpen && styles.subtitleEditorPanelPaletteOpen,
             ]}
         >
             <View style={styles.typographyControlsArea}>
-                {isColorPaletteOpen && (
+                {colorPaletteTarget && (
                     <View style={styles.textColorPaletteWrapper} pointerEvents="auto">
+                        <View style={styles.textColorPaletteBlur}>
                         <View style={styles.textColorPaletteRow}>
                             <GHScrollView
                                 style={[styles.textColorPaletteScroll, { width: paletteVisibleWidth }]}
@@ -270,7 +276,13 @@ export const SubtitleFontEditor = ({
                                                     && styles.textColorSwatchSpacing,
                                                     shouldScaleAsActive && styles.textColorSwatchActive,
                                                 ]}
-                                                onPress={() => onSelectTextColor(item)}
+                                                onPress={() => {
+                                                    if (colorPaletteTarget === 'overlay') {
+                                                        onSelectOverlayColor(item);
+                                                        return;
+                                                    }
+                                                    onSelectTextColor(item);
+                                                }}
                                             />
                                             {shouldShowDivider && (
                                                 <View style={styles.textColorDividerContainer}>
@@ -283,51 +295,75 @@ export const SubtitleFontEditor = ({
                             </GHScrollView>
                             <Pressable
                                 style={[styles.typographyIconButton, styles.closeButton, styles.textColorPaletteCloseButton]}
-                                onPress={() => setIsColorPaletteOpen(false)}
+                                onPress={() => setColorPaletteTarget(null)}
                             >
                                 <X color="#FFFFFF" size={18} strokeWidth={1.5} />
                             </Pressable>
+                        </View>
                         </View>
                     </View>
                 )}
                 <View style={styles.typographyControlsRow}>
                     <Pressable style={styles.typographyIconButton} onPress={onDecreaseFontSize}>
-                        <AArrowDown color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
+                        <ADownIcon width={SUBTITLE_ACTION_ICON_SIZE} height={SUBTITLE_ACTION_ICON_SIZE} />
                     </Pressable>
                     <Pressable style={styles.typographyIconButton} onPress={onIncreaseFontSize}>
-                        <AArrowUp color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
+                        <AUpIcon width={SUBTITLE_ACTION_ICON_SIZE} height={SUBTITLE_ACTION_ICON_SIZE} />
                     </Pressable>
                     <Pressable
-                        style={styles.typographyIconButton}
-                        onPress={() => setIsColorPaletteOpen((prev) => !prev)}
+                        style={[
+                            styles.typographyIconButton,
+                            activeTypographyControl === 'textColor' && styles.typographyIconButtonActive,
+                        ]}
+                        onPress={() => {
+                            onRequestPausePreview();
+                            setActiveControl('textColor');
+                            setColorPaletteTarget((prev) => (prev === 'text' ? null : 'text'));
+                        }}
                     >
                         {renderSubtitleColorWheelIcon()}
                     </Pressable>
                     <Pressable style={styles.typographyIconButton} onPress={onCycleTextAlign}>
                         <ActiveAlignIcon color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
                     </Pressable>
-                    <Pressable style={styles.typographyIconButton} onPress={onToggleOverlay}>
-                        {renderOverlayToggleIcon(activeOverlayVariant)}
+                    <Pressable
+                        style={[
+                            styles.typographyIconButton,
+                            activeTypographyControl === 'overlayColor' && styles.typographyIconButtonActive,
+                        ]}
+                        onPress={handleOverlayControlPress}
+                    >
+                        {renderOverlayToggleIcon(showOverlay)}
                     </Pressable>
                     <Pressable
-                        style={styles.typographyIconButton}
+                        style={[
+                            styles.typographyIconButton,
+                            activeTypographyControl === 'textCase' && styles.typographyIconButtonActive,
+                        ]}
                         onPress={() => {
+                            onRequestPausePreview();
+                            setActiveControl('textCase');
                             setIsTextCaseMenuOpen(true);
                             setIsFontMenuOpen(false);
-                            setIsColorPaletteOpen(false);
+                            setColorPaletteTarget(null);
                         }}
                     >
-                        <TextStyleIcon width={SUBTITLE_ACTION_ICON_SIZE} height={SUBTITLE_ACTION_ICON_SIZE} />
+                        <CaseSensitive color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
                     </Pressable>
                     <Pressable
-                        style={styles.typographyIconButton}
+                        style={[
+                            styles.typographyIconButton,
+                            activeTypographyControl === 'font' && styles.typographyIconButtonActive,
+                        ]}
                         onPress={() => {
+                            onRequestPausePreview();
+                            setActiveControl('font');
                             setIsFontMenuOpen(true);
                             setIsTextCaseMenuOpen(false);
-                            setIsColorPaletteOpen(false);
+                            setColorPaletteTarget(null);
                         }}
                     >
-                        <TypeIcon color="#FFFFFF" size={SUBTITLE_ACTION_ICON_SIZE} strokeWidth={2.3} />
+                        <TypeIcon width={SUBTITLE_ACTION_ICON_SIZE} height={SUBTITLE_ACTION_ICON_SIZE} />
                     </Pressable>
                 </View>
             </View>
@@ -342,7 +378,10 @@ export const SubtitleFontEditor = ({
                                     styles.textCaseCard,
                                     isSelected && styles.textCaseCardActive,
                                 ]}
-                                onPress={() => onSelectTextCase(option.value)}
+                                onPress={() => {
+                                    onRequestPausePreview();
+                                    onSelectTextCase(option.value);
+                                }}
                             >
                                 <Text style={styles.textCaseCardText}>{option.token}</Text>
                             </Pressable>
@@ -370,7 +409,10 @@ export const SubtitleFontEditor = ({
                                     styles.subtitleFontCard,
                                     isActiveOption && styles.subtitleFontCardActive,
                                 ]}
-                                onPress={() => onSelectFontFamily(option.value)}
+                                onPress={() => {
+                                    onRequestPausePreview();
+                                    onSelectFontFamily(option.value);
+                                }}
                             >
                                 <Text
                                     numberOfLines={1}
@@ -388,28 +430,14 @@ export const SubtitleFontEditor = ({
             ) : (
                 <View style={styles.subtitleEditorList} />
             )}
-            <SubtitleBottomNav
-                activeTab='font'
-                onOpenTextEditor={onOpenTextEditor}
-                onOpenFontEditor={onOpenFontEditor}
-                onDeleteSubtitle={onDeleteSubtitle}
-                bottomInset={bottomInset}
-            />
         </View>
     );
 };
 
 const styles = StyleSheet.create({
     subtitleEditorPanel: {
-        height: 270,
-        borderTopLeftRadius: 14,
-        borderTopRightRadius: 14,
-        borderTopWidth: 1,
-        borderTopColor: 'transparent',
+        flex: 1,
         backgroundColor: 'transparent',
-        zIndex: 9999,
-    },
-    subtitleEditorPanelPaletteOpen: {
         overflow: 'visible',
     },
     subtitleEditorList: {
@@ -417,6 +445,8 @@ const styles = StyleSheet.create({
     },
     typographyControlsArea: {
         position: 'relative',
+        overflow: 'visible',
+        zIndex: 10001,
     },
     typographyControlsRow: {
         marginTop: 10,
@@ -428,13 +458,22 @@ const styles = StyleSheet.create({
     },
     textColorPaletteWrapper: {
         position: 'absolute',
-        left: 12,
-        right: 12,
-        top: 0,
-        transform: [{ translateY: -42 }],
-        height: 40,
+        left: 0,
+        right: 0,
+        bottom: '100%',
+        marginBottom: 4,
+        zIndex: 10001,
+        borderRadius: 14,
+        backgroundColor: SUBTITLE_PALETTE_BG_COLOR,
+    },
+    textColorPaletteBlur: {
+        height: 48,
+        width: '100%',
+        paddingHorizontal: 12,
         justifyContent: 'center',
-        zIndex: 120,
+        borderRadius: 14,
+        overflow: 'hidden',
+        backgroundColor: SUBTITLE_PALETTE_BG_COLOR,
     },
     textColorPaletteRow: {
         flexDirection: 'row',
@@ -481,6 +520,10 @@ const styles = StyleSheet.create({
         borderRadius: 19,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    typographyIconButtonActive: {
+        backgroundColor: 'rgba(255,255,255,0.14)',
+        borderRadius: 12,
     },
     closeButton: {
         width: 28,

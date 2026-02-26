@@ -252,7 +252,7 @@ export default function VideoEditorScreen() {
                                             styles.readonlySubtitleWrapper,
                                             getSubtitleWrapperStyle(
                                                 resolvedSubtitleStyle.showOverlay,
-                                                resolvedSubtitleStyle.overlayVariant
+                                                resolvedSubtitleStyle.overlayColor
                                             )
                                         ]}
                                     >

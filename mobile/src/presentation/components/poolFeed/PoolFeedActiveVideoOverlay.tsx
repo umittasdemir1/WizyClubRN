@@ -207,8 +207,8 @@ export const PoolFeedActiveVideoOverlay = memo(function PoolFeedActiveVideoOverl
         resolvedSubtitleStyle.textAlign,
     ]);
     const subtitleWrapperDynamicStyle = React.useMemo(
-        () => getSubtitleWrapperStyle(resolvedSubtitleStyle.showOverlay, resolvedSubtitleStyle.overlayVariant),
-        [resolvedSubtitleStyle.showOverlay, resolvedSubtitleStyle.overlayVariant]
+        () => getSubtitleWrapperStyle(resolvedSubtitleStyle.showOverlay, resolvedSubtitleStyle.overlayColor),
+        [resolvedSubtitleStyle.showOverlay, resolvedSubtitleStyle.overlayColor]
     );
 
     useAnimatedReaction(

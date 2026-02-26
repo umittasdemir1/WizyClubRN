@@ -832,8 +832,22 @@ app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
                 'dancingScript',
                 'lobster',
             ]);
-            const allowedOverlayVariants = new Set(['dark', 'light']);
+            const overlayVariantByLower = new Map([
+                ['noneborder', 'noneBorder'],
+                ['nobgborder', 'noneBorder'],
+                ['transparent', 'transparent'],
+                ['transparentbg', 'transparent'],
+                ['dark', 'dark'],
+                ['darkbg', 'dark'],
+                ['light', 'light'],
+                ['whitebg', 'light'],
+                ['lightborder', 'lightBorder'],
+                ['whitebgborder', 'lightBorder'],
+                ['darkborder', 'darkBorder'],
+                ['darkbgborder', 'darkBorder'],
+            ]);
             const allowedFontWeights = new Set(['400', '500', '600', '700']);
+            const allowedTextCases = new Set(['original', 'upper', 'lower', 'title', 'sentence']);
             const normalizedStyle = hasStyleObject
                 ? {
                     fontSize: Math.max(12, Math.min(42, Number(rawStyle.fontSize) || 18)),
@@ -847,12 +861,18 @@ app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
                     textColor: typeof rawStyle.textColor === 'string' && rawStyle.textColor.trim().length > 0
                         ? rawStyle.textColor.trim()
                         : '#FFFFFF',
-                    overlayVariant: allowedOverlayVariants.has(String(rawStyle.overlayVariant))
-                        ? String(rawStyle.overlayVariant)
-                        : 'dark',
+                    overlayColor: typeof rawStyle.overlayColor === 'string' && rawStyle.overlayColor.trim().length > 0
+                        ? rawStyle.overlayColor.trim()
+                        : '#FFFFFF',
+                    overlayVariant:
+                        overlayVariantByLower.get(String(rawStyle.overlayVariant || '').trim().toLowerCase())
+                        || 'noneBorder',
                     fontWeight: allowedFontWeights.has(String(rawStyle.fontWeight))
                         ? String(rawStyle.fontWeight)
                         : '700',
+                    textCase: allowedTextCases.has(String(rawStyle.textCase))
+                        ? String(rawStyle.textCase)
+                        : 'original',
                 }
                 : null;
 

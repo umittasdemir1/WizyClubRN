@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { Scissors } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { UploadComposerQuality, UploadComposerSubtitleLanguage } from '../../store/useUploadComposerStore';
 import CaptionsDarkIcon from '../../../../assets/icons/captions-dark.svg';
@@ -125,10 +124,6 @@ export const UploadActionButtons = ({
                     </BlurView>
                 )}
             </View>
-
-            <Pressable style={styles.sideActionItem}>
-                <Scissors color="#FFFFFF" size={32} strokeWidth={2} />
-            </Pressable>
         </View>
     );
 };

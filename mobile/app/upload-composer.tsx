@@ -6,42 +6,27 @@ import {
     Pressable,
     Dimensions,
     ScrollView,
-    Platform,
-    KeyboardAvoidingView,
     ActivityIndicator,
     Modal,
     TouchableOpacity,
-    TextInput,
+    Keyboard,
 } from 'react-native';
 import { Image } from 'expo-image';
-import Video from 'react-native-video';
 import { router } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
     X,
     Trash2,
-    Plus,
-    Play,
-    Pause,
-    Tv,
-    Scissors,
     ArrowRight,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
 import { SystemBars } from 'react-native-edge-to-edge';
-import { GestureDetector, Gesture, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Audio as CompressorAudio } from 'react-native-compressor';
-import Animated, {
-    useSharedValue,
-    useAnimatedStyle,
-    withTiming,
-    runOnJS
-} from 'react-native-reanimated';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
-import { LogCode, logUI } from '@/core/services/Logger';
-import { textShadowStyle } from '@/core/utils/shadow';
 import {
     DEFAULT_SUBTITLE_STYLE,
     SUBTITLE_FONT_MAX,
@@ -53,31 +38,38 @@ import { useSurfaceTheme } from '../src/presentation/hooks/useSurfaceTheme';
 import { useThemeStore } from '../src/presentation/store/useThemeStore';
 import { useUploadComposerStore, UploadComposerDraft, UploadComposerQuality, UploadComposerSubtitleLanguage } from '../src/presentation/store/useUploadComposerStore';
 import { CONFIG } from '../src/core/config';
-import { SubtitleFontFamily, SubtitleSegment, SubtitleTextAlign } from '../src/domain/entities/Subtitle';
+import { SubtitleFontFamily, SubtitleSegment, SubtitleStyle, SubtitleTextAlign } from '../src/domain/entities/Subtitle';
 import { DraggableSubtitleOverlay } from '../src/presentation/components/upload/DraggableSubtitleOverlay';
 import { VideoPlayerPreview } from '../src/presentation/components/upload/VideoPlayerPreview';
-import { SubtitleEditor } from '../src/presentation/components/upload/SubtitleEditor';
-import { SubtitleFontEditor } from '../src/presentation/components/upload/SubtitleFontEditor';
+import { SubtitleEditorInline, SubtitleEditorTab } from '../src/presentation/components/upload/SubtitleEditorInline';
 import { UploadActionButtons } from '../src/presentation/components/upload/UploadActionButtons';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PREVIEW_ITEM_WIDTH = SCREEN_WIDTH;
-const PREVIEW_ITEM_SPACING = 0;
 const PREVIEW_SIDE_PADDING = 0;
 const PREVIEW_ASPECT_RATIO_DEFAULT = 16 / 9;
 const PREVIEW_BASE_HEIGHT = PREVIEW_ITEM_WIDTH * PREVIEW_ASPECT_RATIO_DEFAULT;
-const PREVIEW_SCALE_WHEN_SUBTITLE_EDITOR_OPEN = 0.56;
-const PREVIEW_MENU_GAP_WHEN_SUBTITLE_EDITOR_OPEN = 20;
+const PREVIEW_SCALE_WHEN_SUBTITLE_EDITOR_OPEN = 0.5;
+const PREVIEW_SCALE_WHEN_SUBTITLE_EDITOR_TEXT_KEYBOARD_OPEN = 0.44;
+const PREVIEW_MENU_GAP_WHEN_SUBTITLE_EDITOR_OPEN = 48;
 const PREVIEW_TOP_GAP_WHEN_SUBTITLE_EDITOR_OPEN = 20;
-const PREVIEW_TOP_SHIFT_WHEN_SUBTITLE_EDITOR_OPEN =
-    (PREVIEW_TOP_GAP_WHEN_SUBTITLE_EDITOR_OPEN -
-        (PREVIEW_BASE_HEIGHT * (1 - PREVIEW_SCALE_WHEN_SUBTITLE_EDITOR_OPEN)) / 2) /
-    PREVIEW_SCALE_WHEN_SUBTITLE_EDITOR_OPEN;
-const SUBTITLE_DELETE_ZONE_HEIGHT = 84;
+const SUBTITLE_PANEL_EXTRA_HEIGHT = 92;
 const SUBTITLE_FONT_STEP = 2;
 const SUBTITLE_ALIGN_CYCLE: SubtitleTextAlign[] = ['center', 'end', 'start'];
 const PREVIEW_PROGRESS_COMMIT_INTERVAL_MS = 120;
-const PREVIEW_PROGRESS_MIN_DELTA_MS = 160;
+const PREVIEW_PROGRESS_MIN_DELTA_MS = 120;
+const PREVIEW_PROGRESS_COMMIT_INTERVAL_MS_EDITOR = 34;
+const PREVIEW_PROGRESS_MIN_DELTA_MS_EDITOR = 34;
+const PREVIEW_TRANSITION_DURATION_MS = 220;
+const PREVIEW_TRANSITION_KEYBOARD_DURATION_MS = 260;
+const PREVIEW_TRANSITION_EASING = Easing.bezier(0.22, 1, 0.36, 1);
+const MAX_SUBTITLE_HISTORY_STEPS = 120;
+
+interface SubtitleEditHistorySnapshot {
+    uri: string;
+    segments: SubtitleSegment[] | null;
+    style: SubtitleStyle | null;
+}
 
 function getNextSubtitleAlign(current: SubtitleTextAlign | undefined): SubtitleTextAlign {
     const currentIndex = SUBTITLE_ALIGN_CYCLE.indexOf(current || 'center');
@@ -212,14 +204,19 @@ export default function UploadComposerScreen() {
     const [currentVideoTimeMs, setCurrentVideoTimeMs] = useState(0);
     const [isDraggingSubtitle, setIsDraggingSubtitle] = useState(false);
     const [isEditingSubtitle, setIsEditingSubtitle] = useState(false);
-    const [isSubtitleTextEditing, setIsSubtitleTextEditing] = useState(false);
-    const [isSubtitleFontEditing, setIsSubtitleFontEditing] = useState(false);
+    const [isSubtitlePreviewPlaying, setIsSubtitlePreviewPlaying] = useState(false);
+    const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+    const [previewSeekRequest, setPreviewSeekRequest] = useState<{ uri: string; positionMs: number; token: number } | null>(null);
+    const [subtitleEditorTab, setSubtitleEditorTab] = useState<SubtitleEditorTab | null>(null);
+    const [subtitleUndoStack, setSubtitleUndoStack] = useState<SubtitleEditHistorySnapshot[]>([]);
+    const [subtitleRedoStack, setSubtitleRedoStack] = useState<SubtitleEditHistorySnapshot[]>([]);
 
     const [pendingDeleteSubtitleUri, setPendingDeleteSubtitleUri] = useState<string | null>(null);
     const [isExitConfirmationVisible, setExitConfirmationVisible] = useState(false);
     const sttStatusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const progressCommitTsRef = useRef(0);
     const committedVideoTimeRef = useRef(0);
+    const isApplyingSubtitleHistoryRef = useRef(false);
 
     useEffect(() => {
         if (!draft) return;
@@ -227,6 +224,15 @@ export default function UploadComposerScreen() {
         setQualityPreset(draft.qualityPreset || 'medium');
         setSubtitleLanguage(draft.subtitleLanguage || 'auto');
     }, [draft]);
+    useEffect(() => {
+        const onShow = Keyboard.addListener('keyboardDidShow', () => setIsKeyboardVisible(true));
+        const onHide = Keyboard.addListener('keyboardDidHide', () => setIsKeyboardVisible(false));
+
+        return () => {
+            onShow.remove();
+            onHide.remove();
+        };
+    }, []);
 
     // Derived Subtitles from Cache (Single Source of Truth)
     const assetSubtitles = useMemo(() => {
@@ -250,29 +256,23 @@ export default function UploadComposerScreen() {
     }, [selectedAssets, initialAssets, qualityPreset, subtitleLanguage, assetSubtitles]);
 
     const bgColor = modalTheme.fullScreenBackground;
-    const textColor = modalTheme.textPrimary;
     const scrollRef = useRef<ScrollView>(null);
     const previewScale = useSharedValue(1);
     const previewTranslateY = useSharedValue(0);
-    const previewOpacity = useSharedValue(1);
     const previewMarginBottom = useSharedValue(0);
-    const previewCompensationToKeepMenuGap =
-        PREVIEW_MENU_GAP_WHEN_SUBTITLE_EDITOR_OPEN -
-        (PREVIEW_BASE_HEIGHT * (1 - PREVIEW_SCALE_WHEN_SUBTITLE_EDITOR_OPEN)) / 2 +
-        (PREVIEW_SCALE_WHEN_SUBTITLE_EDITOR_OPEN * PREVIEW_TOP_SHIFT_WHEN_SUBTITLE_EDITOR_OPEN);
-    const previewHeightWhenSubtitleEditorOpen = PREVIEW_BASE_HEIGHT * PREVIEW_SCALE_WHEN_SUBTITLE_EDITOR_OPEN;
-    const subtitleEditorPagePanelHeight = Math.max(
-        220,
-        SCREEN_HEIGHT -
-        insets.top -
-        PREVIEW_TOP_GAP_WHEN_SUBTITLE_EDITOR_OPEN -
-        previewHeightWhenSubtitleEditorOpen -
-        PREVIEW_MENU_GAP_WHEN_SUBTITLE_EDITOR_OPEN
-    );
 
     const activeAsset = selectedAssets[activePreviewIndex];
     const activeAssetUri = activeAsset?.uri || '';
     const activeAssetSubtitles = activeAssetUri ? (assetSubtitles[activeAssetUri] || []) : [];
+    const activeAssetDurationMs = Math.max(0, Number(activeAsset?.duration) || 0);
+    const subtitleDerivedDurationMs = activeAssetSubtitles.reduce((maxDuration, segment) => (
+        Math.max(maxDuration, Number(segment?.endMs) || 0)
+    ), 0);
+    const activeVideoTotalDurationMs = Math.max(
+        activeAssetDurationMs,
+        subtitleDerivedDurationMs,
+        currentVideoTimeMs,
+    );
     const isCurrentSttLoading = !!activeAssetUri && subtitleSttState[activeAssetUri] === 'loading';
     const isCurrentCaptionRequested = !!activeAssetUri && !!captionRequestedByUri[activeAssetUri];
     const isSubtitleTextEditorVisible =
@@ -280,14 +280,46 @@ export default function UploadComposerScreen() {
         subtitleLanguage !== 'none' &&
         activeAssetSubtitles.length > 0 &&
         isEditingSubtitle &&
-        isSubtitleTextEditing;
+        subtitleEditorTab === 'text';
     const isSubtitleFontEditorVisible =
         activeAsset?.type === 'video' &&
         subtitleLanguage !== 'none' &&
         activeAssetSubtitles.length > 0 &&
         isEditingSubtitle &&
-        isSubtitleFontEditing;
+        subtitleEditorTab === 'font';
     const isSubtitleEditorVisible = isSubtitleTextEditorVisible || isSubtitleFontEditorVisible;
+    const isKeyboardCompactedSubtitlePreview = isSubtitleTextEditorVisible && isKeyboardVisible;
+    const previewTransitionConfig = useMemo(() => ({
+        duration: isKeyboardCompactedSubtitlePreview
+            ? PREVIEW_TRANSITION_KEYBOARD_DURATION_MS
+            : PREVIEW_TRANSITION_DURATION_MS,
+        easing: PREVIEW_TRANSITION_EASING,
+    }), [isKeyboardCompactedSubtitlePreview]);
+    const previewScaleWhenSubtitleEditorOpen = isKeyboardCompactedSubtitlePreview
+        ? PREVIEW_SCALE_WHEN_SUBTITLE_EDITOR_TEXT_KEYBOARD_OPEN
+        : PREVIEW_SCALE_WHEN_SUBTITLE_EDITOR_OPEN;
+    const previewTopShiftWhenSubtitleEditorOpen =
+        (PREVIEW_TOP_GAP_WHEN_SUBTITLE_EDITOR_OPEN -
+            (PREVIEW_BASE_HEIGHT * (1 - previewScaleWhenSubtitleEditorOpen)) / 2) /
+        previewScaleWhenSubtitleEditorOpen;
+    const previewCompensationToKeepMenuGap =
+        PREVIEW_MENU_GAP_WHEN_SUBTITLE_EDITOR_OPEN -
+        (PREVIEW_BASE_HEIGHT * (1 - previewScaleWhenSubtitleEditorOpen)) / 2 +
+        (previewScaleWhenSubtitleEditorOpen * previewTopShiftWhenSubtitleEditorOpen);
+    const previewHeightWhenSubtitleEditorOpen = PREVIEW_BASE_HEIGHT * previewScaleWhenSubtitleEditorOpen;
+    const subtitleEditorPanelBaseHeight =
+        SCREEN_HEIGHT -
+        insets.top -
+        PREVIEW_TOP_GAP_WHEN_SUBTITLE_EDITOR_OPEN -
+        previewHeightWhenSubtitleEditorOpen -
+        PREVIEW_MENU_GAP_WHEN_SUBTITLE_EDITOR_OPEN;
+    const subtitleEditorPanelHeight = Math.max(
+        360,
+        Math.min(
+            SCREEN_HEIGHT - insets.top - 8,
+            subtitleEditorPanelBaseHeight + SUBTITLE_PANEL_EXTRA_HEIGHT,
+        ),
+    );
     const shouldHideBottomActions = isSubtitleEditorVisible;
     const activeSubtitleStyle = activeAssetUri
         ? (subtitleStyleCache[activeAssetUri] || DEFAULT_SUBTITLE_STYLE)
@@ -296,40 +328,47 @@ export default function UploadComposerScreen() {
 
     useEffect(() => {
         previewScale.value = withTiming(
-            isSubtitleEditorVisible ? PREVIEW_SCALE_WHEN_SUBTITLE_EDITOR_OPEN : 1,
-            { duration: 220 }
+            isSubtitleEditorVisible ? previewScaleWhenSubtitleEditorOpen : 1,
+            previewTransitionConfig
         );
         previewTranslateY.value = withTiming(
-            isSubtitleEditorVisible ? PREVIEW_TOP_SHIFT_WHEN_SUBTITLE_EDITOR_OPEN : 0,
-            { duration: 220 }
+            isSubtitleEditorVisible ? previewTopShiftWhenSubtitleEditorOpen : 0,
+            previewTransitionConfig
         );
         previewMarginBottom.value = withTiming(
             isSubtitleEditorVisible ? previewCompensationToKeepMenuGap : 0,
-            { duration: 220 }
+            previewTransitionConfig
         );
-        // Fade through transition to mask occasional heavy-frame jumps.
-        previewOpacity.value = 0.88;
-        previewOpacity.value = withTiming(1, { duration: 220 });
-    }, [isSubtitleEditorVisible, previewCompensationToKeepMenuGap, previewMarginBottom, previewOpacity, previewScale, previewTranslateY]);
+    }, [
+        isSubtitleEditorVisible,
+        previewCompensationToKeepMenuGap,
+        previewMarginBottom,
+        previewScale,
+        previewScaleWhenSubtitleEditorOpen,
+        previewTransitionConfig,
+        previewTopShiftWhenSubtitleEditorOpen,
+        previewTranslateY,
+    ]);
 
     const previewContainerAnimatedStyle = useAnimatedStyle(() => ({
         transform: [{ scale: previewScale.value }, { translateY: previewTranslateY.value }],
-        opacity: previewOpacity.value,
         marginBottom: previewMarginBottom.value,
     }));
 
     useEffect(() => {
         if (!isEditingSubtitle) {
-            setIsSubtitleTextEditing(false);
-            setIsSubtitleFontEditing(false);
+            setSubtitleEditorTab(null);
         }
     }, [isEditingSubtitle]);
-
     useEffect(() => {
-        if (isSubtitleTextEditing && isSubtitleFontEditing) {
-            setIsSubtitleFontEditing(false);
+        setSubtitleUndoStack([]);
+        setSubtitleRedoStack([]);
+    }, [activeAssetUri]);
+    useEffect(() => {
+        if (!isSubtitleEditorVisible) {
+            setIsSubtitlePreviewPlaying(false);
         }
-    }, [isSubtitleFontEditing, isSubtitleTextEditing]);
+    }, [isSubtitleEditorVisible]);
 
     useEffect(() => {
         if (isSubtitleEditorVisible) {
@@ -337,6 +376,13 @@ export default function UploadComposerScreen() {
             setIsCaptionsMenuOpen(false);
         }
     }, [isSubtitleEditorVisible]);
+
+    useEffect(() => {
+        if (!isEditingSubtitle) return;
+        if (isSubtitleEditorVisible) return;
+        setIsEditingSubtitle(false);
+        setSubtitleEditorTab(null);
+    }, [isEditingSubtitle, isSubtitleEditorVisible]);
 
     useEffect(() => {
         return () => {
@@ -351,24 +397,106 @@ export default function UploadComposerScreen() {
             // Returning from stacked screens (e.g. video-editor) should always resume preview playback.
             setIsDraggingSubtitle(false);
             setIsEditingSubtitle(false);
-            setIsSubtitleTextEditing(false);
-            setIsSubtitleFontEditing(false);
+            setIsSubtitlePreviewPlaying(false);
+            setSubtitleEditorTab(null);
         }
     }, [isFocused]);
 
     const handlePreviewProgress = useCallback((nextTimeMs: number) => {
+        const commitIntervalMs = isSubtitleEditorVisible
+            ? PREVIEW_PROGRESS_COMMIT_INTERVAL_MS_EDITOR
+            : PREVIEW_PROGRESS_COMMIT_INTERVAL_MS;
+        const minDeltaMs = isSubtitleEditorVisible
+            ? PREVIEW_PROGRESS_MIN_DELTA_MS_EDITOR
+            : PREVIEW_PROGRESS_MIN_DELTA_MS;
         const now = Date.now();
         const previous = committedVideoTimeRef.current;
-        const movedBackwards = nextTimeMs + PREVIEW_PROGRESS_MIN_DELTA_MS < previous;
-        const movedEnough = Math.abs(nextTimeMs - previous) >= PREVIEW_PROGRESS_MIN_DELTA_MS;
-        const dueByTime = now - progressCommitTsRef.current >= PREVIEW_PROGRESS_COMMIT_INTERVAL_MS;
+        const movedBackwards = nextTimeMs + minDeltaMs < previous;
+        const movedEnough = Math.abs(nextTimeMs - previous) >= minDeltaMs;
+        const dueByTime = now - progressCommitTsRef.current >= commitIntervalMs;
 
         if (!movedBackwards && !movedEnough && !dueByTime) return;
 
         committedVideoTimeRef.current = nextTimeMs;
         progressCommitTsRef.current = now;
         setCurrentVideoTimeMs(nextTimeMs);
-    }, []);
+    }, [isSubtitleEditorVisible]);
+    const handleSelectSubtitleSegmentStartMs = useCallback((startMs: number) => {
+        if (!activeAssetUri) return;
+        const nextMs = Math.max(0, Math.floor(startMs || 0));
+        const now = Date.now();
+        committedVideoTimeRef.current = nextMs;
+        progressCommitTsRef.current = now;
+        setCurrentVideoTimeMs(nextMs);
+        setPreviewSeekRequest((previous) => ({
+            uri: activeAssetUri,
+            positionMs: nextMs,
+            token: (previous?.token || 0) + 1,
+        }));
+    }, [activeAssetUri]);
+    const captureSubtitleHistorySnapshot = useCallback((uri: string): SubtitleEditHistorySnapshot => {
+        const segments = subtitleCache[uri]?.segments;
+        const style = subtitleStyleCache[uri];
+        return {
+            uri,
+            segments: segments ? segments.map((segment) => ({ ...segment })) : null,
+            style: style ? { ...style } : null,
+        };
+    }, [subtitleCache, subtitleStyleCache]);
+    const applySubtitleHistorySnapshot = useCallback((snapshot: SubtitleEditHistorySnapshot) => {
+        if (!snapshot?.uri) return;
+        isApplyingSubtitleHistoryRef.current = true;
+        try {
+            if (snapshot.segments) {
+                updateSubtitleCache(snapshot.uri, snapshot.segments.map((segment) => ({ ...segment })));
+            }
+            updateSubtitleStyle(snapshot.uri, snapshot.style ? { ...snapshot.style } : { ...DEFAULT_SUBTITLE_STYLE });
+        } finally {
+            isApplyingSubtitleHistoryRef.current = false;
+        }
+    }, [updateSubtitleCache, updateSubtitleStyle]);
+    const recordSubtitleHistory = useCallback((uri: string) => {
+        if (!uri || isApplyingSubtitleHistoryRef.current) return;
+        const snapshot = captureSubtitleHistorySnapshot(uri);
+        setSubtitleUndoStack((previous) => {
+            const next = [...previous, snapshot];
+            if (next.length > MAX_SUBTITLE_HISTORY_STEPS) next.shift();
+            return next;
+        });
+        setSubtitleRedoStack([]);
+    }, [captureSubtitleHistorySnapshot]);
+    const canUndoSubtitleChange = subtitleUndoStack.length > 0;
+    const canRedoSubtitleChange = subtitleRedoStack.length > 0;
+    const handleSubtitleUndo = useCallback(() => {
+        if (!activeAssetUri || subtitleUndoStack.length === 0) return;
+
+        const targetSnapshot = subtitleUndoStack[subtitleUndoStack.length - 1];
+        const currentSnapshot = captureSubtitleHistorySnapshot(activeAssetUri);
+        applySubtitleHistorySnapshot(targetSnapshot);
+        setSubtitleUndoStack((previous) => previous.slice(0, -1));
+        setSubtitleRedoStack((previous) => {
+            const next = [...previous, currentSnapshot];
+            if (next.length > MAX_SUBTITLE_HISTORY_STEPS) next.shift();
+            return next;
+        });
+        setIsSubtitlePreviewPlaying(false);
+        void Haptics.selectionAsync();
+    }, [activeAssetUri, applySubtitleHistorySnapshot, captureSubtitleHistorySnapshot, subtitleUndoStack]);
+    const handleSubtitleRedo = useCallback(() => {
+        if (!activeAssetUri || subtitleRedoStack.length === 0) return;
+
+        const targetSnapshot = subtitleRedoStack[subtitleRedoStack.length - 1];
+        const currentSnapshot = captureSubtitleHistorySnapshot(activeAssetUri);
+        applySubtitleHistorySnapshot(targetSnapshot);
+        setSubtitleRedoStack((previous) => previous.slice(0, -1));
+        setSubtitleUndoStack((previous) => {
+            const next = [...previous, currentSnapshot];
+            if (next.length > MAX_SUBTITLE_HISTORY_STEPS) next.shift();
+            return next;
+        });
+        setIsSubtitlePreviewPlaying(false);
+        void Haptics.selectionAsync();
+    }, [activeAssetUri, applySubtitleHistorySnapshot, captureSubtitleHistorySnapshot, subtitleRedoStack]);
 
     useEffect(() => {
         if (!activeAssetUri) return;
@@ -383,8 +511,7 @@ export default function UploadComposerScreen() {
         if (currentState === 'ready') {
             setSttStatusMessage(null);
             setIsEditingSubtitle(true);
-            setIsSubtitleFontEditing(false);
-            setIsSubtitleTextEditing(true);
+            setSubtitleEditorTab('text');
             setSubtitleLanguage((prev) => (prev === 'none' ? 'auto' : prev));
             setCaptionRequestedByUri((prev) => ({ ...prev, [activeAssetUri]: false }));
             return;
@@ -510,8 +637,13 @@ export default function UploadComposerScreen() {
         if (!segments) return;
 
         const newSegments = [...segments];
-        newSegments[segmentIndex] = { ...newSegments[segmentIndex], text: newText };
+        const targetSegment = newSegments[segmentIndex];
+        if (!targetSegment) return;
+        if (targetSegment.text === newText) return;
 
+        newSegments[segmentIndex] = { ...targetSegment, text: newText };
+
+        recordSubtitleHistory(uri);
         updateSubtitleCache(uri, newSegments);
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     };
@@ -521,71 +653,98 @@ export default function UploadComposerScreen() {
         setCaptionRequestedByUri((prev) => ({ ...prev, [uri]: false }));
         setIsDraggingSubtitle(false);
         setIsEditingSubtitle(false);
-        setIsSubtitleTextEditing(false);
-        setIsSubtitleFontEditing(false);
+        setSubtitleEditorTab(null);
         setSttStatusMessage(null);
+        if (uri === activeAssetUri) {
+            setSubtitleUndoStack([]);
+            setSubtitleRedoStack([]);
+        }
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }, [removeSubtitleData]);
+    }, [activeAssetUri, removeSubtitleData]);
 
     const handleSelectSubtitleFontFamily = useCallback((fontFamily: SubtitleFontFamily) => {
         if (!activeAssetUri) return;
+        if (activeSubtitleStyle.fontFamily === fontFamily) return;
+        recordSubtitleHistory(activeAssetUri);
         updateSubtitleStyle(activeAssetUri, {
             ...activeSubtitleStyle,
             fontFamily,
         });
         void Haptics.selectionAsync();
-    }, [activeAssetUri, activeSubtitleStyle, updateSubtitleStyle]);
+    }, [activeAssetUri, activeSubtitleStyle, recordSubtitleHistory, updateSubtitleStyle]);
     const handleDecreaseSubtitleFontSize = useCallback(() => {
         if (!activeAssetUri) return;
+        const nextFontSize = Math.max(
+            SUBTITLE_FONT_MIN,
+            resolvedActiveSubtitleStyle.fontSize - SUBTITLE_FONT_STEP
+        );
+        if (nextFontSize === resolvedActiveSubtitleStyle.fontSize) return;
+        recordSubtitleHistory(activeAssetUri);
         updateSubtitleStyle(activeAssetUri, {
             ...activeSubtitleStyle,
-            fontSize: Math.max(
-                SUBTITLE_FONT_MIN,
-                resolvedActiveSubtitleStyle.fontSize - SUBTITLE_FONT_STEP
-            ),
+            fontSize: nextFontSize,
         });
-    }, [activeAssetUri, activeSubtitleStyle, resolvedActiveSubtitleStyle.fontSize, updateSubtitleStyle]);
+    }, [activeAssetUri, activeSubtitleStyle, recordSubtitleHistory, resolvedActiveSubtitleStyle.fontSize, updateSubtitleStyle]);
     const handleIncreaseSubtitleFontSize = useCallback(() => {
         if (!activeAssetUri) return;
+        const nextFontSize = Math.min(
+            SUBTITLE_FONT_MAX,
+            resolvedActiveSubtitleStyle.fontSize + SUBTITLE_FONT_STEP
+        );
+        if (nextFontSize === resolvedActiveSubtitleStyle.fontSize) return;
+        recordSubtitleHistory(activeAssetUri);
         updateSubtitleStyle(activeAssetUri, {
             ...activeSubtitleStyle,
-            fontSize: Math.min(
-                SUBTITLE_FONT_MAX,
-                resolvedActiveSubtitleStyle.fontSize + SUBTITLE_FONT_STEP
-            ),
+            fontSize: nextFontSize,
         });
-    }, [activeAssetUri, activeSubtitleStyle, resolvedActiveSubtitleStyle.fontSize, updateSubtitleStyle]);
+    }, [activeAssetUri, activeSubtitleStyle, recordSubtitleHistory, resolvedActiveSubtitleStyle.fontSize, updateSubtitleStyle]);
     const handleSelectSubtitleTextColor = useCallback((color: string) => {
         if (!activeAssetUri) return;
+        if ((activeSubtitleStyle.textColor || '').toLowerCase() === color.toLowerCase()) return;
+        recordSubtitleHistory(activeAssetUri);
         updateSubtitleStyle(activeAssetUri, {
             ...activeSubtitleStyle,
             textColor: color,
         });
         void Haptics.selectionAsync();
-    }, [activeAssetUri, activeSubtitleStyle, updateSubtitleStyle]);
+    }, [activeAssetUri, activeSubtitleStyle, recordSubtitleHistory, updateSubtitleStyle]);
+    const handleSelectSubtitleOverlayColor = useCallback((color: string) => {
+        if (!activeAssetUri) return;
+        if ((activeSubtitleStyle.overlayColor || '').toLowerCase() === color.toLowerCase()) return;
+        recordSubtitleHistory(activeAssetUri);
+        updateSubtitleStyle(activeAssetUri, {
+            ...activeSubtitleStyle,
+            overlayColor: color,
+        });
+        void Haptics.selectionAsync();
+    }, [activeAssetUri, activeSubtitleStyle, recordSubtitleHistory, updateSubtitleStyle]);
     const handleCycleSubtitleTextAlign = useCallback(() => {
         if (!activeAssetUri) return;
+        recordSubtitleHistory(activeAssetUri);
         updateSubtitleStyle(activeAssetUri, {
             ...activeSubtitleStyle,
             textAlign: getNextSubtitleAlign(activeSubtitleStyle.textAlign),
         });
-    }, [activeAssetUri, activeSubtitleStyle, updateSubtitleStyle]);
+    }, [activeAssetUri, activeSubtitleStyle, recordSubtitleHistory, updateSubtitleStyle]);
     const handleToggleSubtitleOverlay = useCallback(() => {
         if (!activeAssetUri) return;
+        recordSubtitleHistory(activeAssetUri);
         const nextOverlayState = getNextSubtitleOverlayState(activeSubtitleStyle);
         updateSubtitleStyle(activeAssetUri, {
             ...activeSubtitleStyle,
             ...nextOverlayState,
         });
-    }, [activeAssetUri, activeSubtitleStyle, updateSubtitleStyle]);
+    }, [activeAssetUri, activeSubtitleStyle, recordSubtitleHistory, updateSubtitleStyle]);
     const handleSelectSubtitleTextCase = useCallback((textCase: 'upper' | 'lower' | 'title') => {
         if (!activeAssetUri) return;
+        if ((activeSubtitleStyle.textCase || 'original') === textCase) return;
+        recordSubtitleHistory(activeAssetUri);
         updateSubtitleStyle(activeAssetUri, {
             ...activeSubtitleStyle,
             textCase,
         });
         void Haptics.selectionAsync();
-    }, [activeAssetUri, activeSubtitleStyle, updateSubtitleStyle]);
+    }, [activeAssetUri, activeSubtitleStyle, recordSubtitleHistory, updateSubtitleStyle]);
 
     const persistComposerDraft = (overrides: Partial<UploadComposerDraft> = {}) => {
         const previousDraft = useUploadComposerStore.getState().draft;
@@ -642,6 +801,7 @@ export default function UploadComposerScreen() {
             committedVideoTimeRef.current = 0;
             progressCommitTsRef.current = 0;
             setCurrentVideoTimeMs(0);
+            setPreviewSeekRequest(null);
         }
     };
 
@@ -663,10 +823,7 @@ export default function UploadComposerScreen() {
                     }}
                 />
 
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                    style={styles.container}
-                >
+                <View style={styles.container}>
                     <View style={{ height: insets.top, backgroundColor: bgColor }} />
 
                     {!isSubtitleEditorVisible && (
@@ -717,7 +874,7 @@ export default function UploadComposerScreen() {
                                                     width: PREVIEW_ITEM_WIDTH,
                                                     height: PREVIEW_BASE_HEIGHT,
                                                 },
-                                                previewContainerAnimatedStyle
+                                                previewContainerAnimatedStyle,
                                             ]}
                                         >
                                             {asset.type === 'video' ? (
@@ -726,7 +883,9 @@ export default function UploadComposerScreen() {
                                                         uri={asset.uri}
                                                         isActive={activePreviewIndex === index}
                                                         isMuted={isMuted}
-                                                        isPaused={!isFocused || isDraggingSubtitle || isEditingSubtitle}
+                                                        isPaused={!isFocused || isDraggingSubtitle || (isEditingSubtitle && !isSubtitlePreviewPlaying)}
+                                                        progressUpdateIntervalMs={isSubtitleEditorVisible ? 34 : 90}
+                                                        seekRequest={previewSeekRequest?.uri === asset.uri ? previewSeekRequest : null}
                                                         onProgress={handlePreviewProgress}
                                                     />
                                                     {assetSubtitles[asset.uri] && subtitleLanguage !== 'none' && (
@@ -735,22 +894,21 @@ export default function UploadComposerScreen() {
                                                             presentation={subtitlePresentationCache[asset.uri]}
                                                             textStyle={subtitleStyleCache[asset.uri] || DEFAULT_SUBTITLE_STYLE}
                                                             currentTimeMs={currentVideoTimeMs}
+                                                            isEditingSessionActive={isEditingSubtitle}
                                                             onDragStart={() => setIsDraggingSubtitle(true)}
                                                             onDragEnd={() => setIsDraggingSubtitle(false)}
                                                             onEditingChange={(isEditing) => {
                                                                 setIsEditingSubtitle(isEditing);
                                                                 if (isEditing) {
-                                                                    setIsSubtitleTextEditing(true);
-                                                                    setIsSubtitleFontEditing(false);
+                                                                    setSubtitleEditorTab('text');
                                                                 } else {
-                                                                    setIsSubtitleTextEditing(false);
-                                                                    setIsSubtitleFontEditing(false);
+                                                                    setSubtitleEditorTab(null);
                                                                 }
                                                             }}
                                                             onTextEditingChange={(isTextEditing) => {
                                                                 if (isTextEditing) {
-                                                                    setIsSubtitleTextEditing(true);
-                                                                    setIsSubtitleFontEditing(false);
+                                                                    setIsEditingSubtitle(true);
+                                                                    setSubtitleEditorTab('text');
                                                                 }
                                                             }}
                                                             onUpdateSubtitle={(idx, text) => handleUpdateSubtitle(asset.uri, idx, text)}
@@ -791,8 +949,7 @@ export default function UploadComposerScreen() {
                                                             });
                                                         } else {
                                                             setIsEditingSubtitle(true);
-                                                            setIsSubtitleFontEditing(false);
-                                                            setIsSubtitleTextEditing(true);
+                                                            setSubtitleEditorTab('text');
                                                             setSubtitleLanguage((prev) => (prev === 'none' ? 'auto' : prev));
                                                             setIsCaptionsMenuOpen(false);
                                                         }
@@ -827,79 +984,6 @@ export default function UploadComposerScreen() {
                                     ))}
                                 </View>
                             )}
-
-                            {isSubtitleEditorVisible && (
-                                <Pressable
-                                    style={styles.subtitleEditorDismissArea}
-                                    onPress={() => {
-                                        setIsEditingSubtitle(false);
-                                        setIsSubtitleTextEditing(false);
-                                        setIsSubtitleFontEditing(false);
-                                    }}
-                                />
-                            )}
-
-                            <SubtitleEditor
-                                isVisible={isSubtitleTextEditorVisible}
-                                segments={activeAssetSubtitles}
-                                currentVideoTimeMs={currentVideoTimeMs}
-                                activeAssetUri={activeAssetUri}
-                                onUpdateSubtitle={handleUpdateSubtitle}
-                                onOpenTextEditor={() => {
-                                    setIsSubtitleFontEditing(false);
-                                    setIsSubtitleTextEditing(true);
-                                    void Haptics.selectionAsync();
-                                }}
-                                onOpenFontEditor={() => {
-                                    setIsSubtitleTextEditing(false);
-                                    setIsSubtitleFontEditing(true);
-                                    void Haptics.selectionAsync();
-                                }}
-                                onDeleteSubtitle={() => {
-                                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                    setPendingDeleteSubtitleUri(activeAssetUri);
-                                }}
-                                setIsEditingSubtitle={setIsEditingSubtitle}
-                                panelHeight={subtitleEditorPagePanelHeight}
-                                bottomInset={insets.bottom}
-                            />
-                            <SubtitleFontEditor
-                                isVisible={isSubtitleFontEditorVisible}
-                                activeFontFamily={activeSubtitleStyle.fontFamily}
-                                activeTextAlign={activeSubtitleStyle.textAlign}
-                                activeTextCase={activeSubtitleStyle.textCase}
-                                activeTextColor={activeSubtitleStyle.textColor}
-                                showOverlay={resolvedActiveSubtitleStyle.showOverlay}
-                                overlayVariant={activeSubtitleStyle.overlayVariant}
-                                onSelectFontFamily={handleSelectSubtitleFontFamily}
-                                onSelectTextCase={handleSelectSubtitleTextCase}
-                                onDecreaseFontSize={handleDecreaseSubtitleFontSize}
-                                onIncreaseFontSize={handleIncreaseSubtitleFontSize}
-                                onSelectTextColor={handleSelectSubtitleTextColor}
-                                onCycleTextAlign={handleCycleSubtitleTextAlign}
-                                onToggleOverlay={handleToggleSubtitleOverlay}
-                                onOpenTextEditor={() => {
-                                    setIsSubtitleFontEditing(false);
-                                    setIsSubtitleTextEditing(true);
-                                    void Haptics.selectionAsync();
-                                }}
-                                onOpenFontEditor={() => {
-                                    setIsSubtitleTextEditing(false);
-                                    setIsSubtitleFontEditing(true);
-                                    void Haptics.selectionAsync();
-                                }}
-                                onDeleteSubtitle={() => {
-                                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                    setPendingDeleteSubtitleUri(activeAssetUri);
-                                }}
-                                onCloseEditor={() => {
-                                    setIsEditingSubtitle(false);
-                                    setIsSubtitleTextEditing(false);
-                                    setIsSubtitleFontEditing(false);
-                                }}
-                                panelHeight={subtitleEditorPagePanelHeight}
-                                bottomInset={insets.bottom}
-                            />
                         </View>
 
                         {!shouldHideBottomActions && (
@@ -922,6 +1006,64 @@ export default function UploadComposerScreen() {
                             </View>
                         )}
                     </ScrollView>
+
+                    {isSubtitleEditorVisible && (
+                        <SubtitleEditorInline
+                            activeTab={subtitleEditorTab || 'text'}
+                            panelHeight={subtitleEditorPanelHeight}
+                            segments={activeAssetSubtitles}
+                            currentVideoTimeMs={currentVideoTimeMs}
+                            totalVideoDurationMs={activeVideoTotalDurationMs}
+                            activeAssetUri={activeAssetUri}
+                            setIsEditingSubtitle={setIsEditingSubtitle}
+                            onUpdateSubtitle={handleUpdateSubtitle}
+                            onSelectSegmentStartMs={handleSelectSubtitleSegmentStartMs}
+                            onOpenTextEditor={() => {
+                                setIsEditingSubtitle(true);
+                                setSubtitleEditorTab('text');
+                                void Haptics.selectionAsync();
+                            }}
+                            onOpenFontEditor={() => {
+                                setIsEditingSubtitle(true);
+                                setSubtitleEditorTab('font');
+                                void Haptics.selectionAsync();
+                            }}
+                            onDeleteSubtitle={() => {
+                                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                setPendingDeleteSubtitleUri(activeAssetUri);
+                            }}
+                            onRequestClose={() => {
+                                setIsEditingSubtitle(false);
+                                setSubtitleEditorTab(null);
+                            }}
+                            canUndo={canUndoSubtitleChange}
+                            canRedo={canRedoSubtitleChange}
+                            onUndo={handleSubtitleUndo}
+                            onRedo={handleSubtitleRedo}
+                            isPreviewPlaying={isSubtitlePreviewPlaying}
+                            onTogglePreviewPlayback={() => {
+                                setIsSubtitlePreviewPlaying((prev) => !prev);
+                                void Haptics.selectionAsync();
+                            }}
+                            onPausePreview={() => {
+                                setIsSubtitlePreviewPlaying(false);
+                            }}
+                            activeFontFamily={activeSubtitleStyle.fontFamily}
+                            activeTextAlign={activeSubtitleStyle.textAlign}
+                            activeTextCase={activeSubtitleStyle.textCase}
+                            activeTextColor={resolvedActiveSubtitleStyle.textColor}
+                            activeOverlayColor={resolvedActiveSubtitleStyle.overlayColor}
+                            showOverlay={resolvedActiveSubtitleStyle.showOverlay}
+                            onSelectFontFamily={handleSelectSubtitleFontFamily}
+                            onSelectTextCase={handleSelectSubtitleTextCase}
+                            onDecreaseFontSize={handleDecreaseSubtitleFontSize}
+                            onIncreaseFontSize={handleIncreaseSubtitleFontSize}
+                            onSelectTextColor={handleSelectSubtitleTextColor}
+                            onSelectOverlayColor={handleSelectSubtitleOverlayColor}
+                            onCycleTextAlign={handleCycleSubtitleTextAlign}
+                            onToggleOverlay={handleToggleSubtitleOverlay}
+                        />
+                    )}
 
                     {(isCurrentCaptionRequested && isCurrentSttLoading) || !!sttStatusMessage ? (
                         <View style={[styles.sttStatusPill, { top: insets.top + 18 }]}>
@@ -955,7 +1097,7 @@ export default function UploadComposerScreen() {
                             }
                         }}
                     />
-                </KeyboardAvoidingView>
+                </View>
             </View>
         </GestureHandlerRootView>
     );
@@ -1064,77 +1206,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    subtitleEditorPanel: {
-        marginTop: 14,
-        marginHorizontal: 16,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.15)',
-        overflow: 'hidden',
-        maxHeight: 280,
-    },
-    subtitleEditorHeaderRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(0,0,0,0.4)',
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.1)',
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-    },
-    subtitleEditorHeaderText: {
-        color: 'rgba(255,255,255,0.6)',
-        fontSize: 13,
-        fontWeight: '600',
-        lineHeight: 18,
-    },
-    subtitleEditorList: {
-        maxHeight: 230,
-        backgroundColor: 'rgba(0,0,0,0.2)',
-    },
-    subtitleEditorRow: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.06)',
-        gap: 12,
-    },
-    subtitleEditorRowActive: {
-        backgroundColor: 'rgba(58,141,255,0.1)',
-    },
-    subtitleEditorTimeBadge: {
-        width: 86,
-        paddingVertical: 4,
-        paddingHorizontal: 8,
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        borderRadius: 6,
-        alignItems: 'center',
-        marginTop: 2,
-    },
-    subtitleEditorTime: {
-        color: '#FFFFFF',
-        fontSize: 11,
-        fontWeight: '700',
-        lineHeight: 14,
-    },
-    subtitleEditorInputWrapper: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.35)',
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
-        minHeight: 40,
-    },
-    subtitleEditorInput: {
-        flex: 1,
-        color: '#FFFFFF',
-        fontSize: 14,
-        lineHeight: 20,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-    },
     pagination: {
         flexDirection: 'row',
         justifyContent: 'center',
@@ -1146,14 +1217,6 @@ const styles = StyleSheet.create({
         width: 6,
         height: 6,
         borderRadius: 3,
-    },
-    subtitleEditorDismissArea: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        height: PREVIEW_BASE_HEIGHT,
-        zIndex: 10,
     },
     nextButtonContainer: {
         width: '100%',

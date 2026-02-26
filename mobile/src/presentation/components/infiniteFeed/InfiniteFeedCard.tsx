@@ -21,6 +21,7 @@ import {
     SUBTITLE_BORDER_RADIUS,
     SUBTITLE_SIDE_MARGIN,
     SUBTITLE_TEXT_BASE_STYLE,
+    applySubtitleTextCase,
     getSubtitlePresentationPixelStyle,
     getSubtitleWrapperStyle,
     resolveSubtitleStyle,
@@ -235,8 +236,12 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         resolvedSubtitleStyle.textAlign,
     ]);
     const subtitleWrapperDynamicStyle = useMemo(
-        () => getSubtitleWrapperStyle(resolvedSubtitleStyle.showOverlay, resolvedSubtitleStyle.overlayVariant),
-        [resolvedSubtitleStyle.showOverlay, resolvedSubtitleStyle.overlayVariant]
+        () => getSubtitleWrapperStyle(resolvedSubtitleStyle.showOverlay, resolvedSubtitleStyle.overlayColor),
+        [resolvedSubtitleStyle.showOverlay, resolvedSubtitleStyle.overlayColor]
+    );
+    const formattedSubtitleText = useMemo(
+        () => applySubtitleTextCase(activeSubtitleText || '', subtitles?.style?.textCase),
+        [activeSubtitleText, subtitles?.style?.textCase]
     );
 
     // âœ… FLAG CONTROLS
@@ -1145,7 +1150,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                     style={[styles.subtitleWrapper, subtitleWrapperDynamicStyle]}
                                     onLayout={handleSubtitleWrapperLayout}
                                 >
-                                    <Text style={[styles.subtitleText, subtitleTextDynamicStyle]}>{activeSubtitleText}</Text>
+                                    <Text style={[styles.subtitleText, subtitleTextDynamicStyle]}>{formattedSubtitleText}</Text>
                                 </View>
                             </View>
                         )}

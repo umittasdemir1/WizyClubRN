@@ -66,6 +66,7 @@ export interface SubtitleStyle {
     showOverlay: boolean;
     fontFamily?: SubtitleFontFamily;
     textColor?: string;
+    overlayColor?: string;
     overlayVariant?: SubtitleOverlayVariant;
     fontWeight?: SubtitleFontWeight;
     textCase?: SubtitleTextCase;

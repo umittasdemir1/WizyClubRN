@@ -57,7 +57,8 @@ export const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
     textAlign: 'center',
     showOverlay: true,
     fontFamily: 'system',
-    textColor: '#FFFFFF',
+    textColor: '#080A0F',
+    overlayColor: '#FFFFFF',
     overlayVariant: 'noneBorder',
     fontWeight: '700',
     textCase: 'original',
@@ -102,6 +103,14 @@ const isScriptSubtitleFontFamily = (value: SubtitleFontFamily): boolean =>
     value === 'dancingScript' ||
     value === 'lobster';
 
+function resolveTextColorForOverlay(
+    showOverlay: boolean,
+    fallbackColor: string
+): string {
+    void showOverlay;
+    return fallbackColor;
+}
+
 export interface ResolvedSubtitleStyle {
     fontSize: number;
     lineHeight: number;
@@ -109,6 +118,7 @@ export interface ResolvedSubtitleStyle {
     showOverlay: boolean;
     fontFamily: string | undefined;
     textColor: string;
+    overlayColor: string;
     overlayVariant: SubtitleOverlayVariant;
     fontWeight?: SubtitleFontWeight;
 }
@@ -172,34 +182,39 @@ export function resolveSubtitleStyle(style?: SubtitleStyle | null): ResolvedSubt
     const fontFamily = isValidSubtitleFontFamily(String(style?.fontFamily || ''))
         ? (style?.fontFamily as SubtitleFontFamily)
         : DEFAULT_SUBTITLE_STYLE.fontFamily!;
-    const fontWeight = isValidSubtitleFontWeight(String(style?.fontWeight || ''))
+    const requestedFontWeight = isValidSubtitleFontWeight(String(style?.fontWeight || ''))
         ? (style?.fontWeight as SubtitleFontWeight)
         : DEFAULT_SUBTITLE_STYLE.fontWeight!;
     const overlayVariant = isValidSubtitleOverlayVariant(String(style?.overlayVariant || ''))
         ? (style?.overlayVariant as SubtitleOverlayVariant)
         : DEFAULT_SUBTITLE_STYLE.overlayVariant!;
-    const textColor = typeof style?.textColor === 'string' && style.textColor.trim().length > 0
+    const showOverlay = style?.showOverlay !== false;
+    const fallbackTextColor = typeof style?.textColor === 'string' && style.textColor.trim().length > 0
         ? style.textColor
         : DEFAULT_SUBTITLE_STYLE.textColor!;
+    const fallbackOverlayColor = typeof style?.overlayColor === 'string' && style.overlayColor.trim().length > 0
+        ? style.overlayColor
+        : DEFAULT_SUBTITLE_STYLE.overlayColor!;
+    const textColor = resolveTextColorForOverlay(showOverlay, fallbackTextColor);
 
-    const shouldApplyFontWeight =
-        fontFamily === 'system' ||
-        fontFamily === 'serif' ||
-        fontFamily === 'mono';
     const usesScriptMetrics = isScriptSubtitleFontFamily(fontFamily);
     const lineHeight = usesScriptMetrics
         ? Math.max(fontSize + 10, Math.round(fontSize * 1.5))
         : Math.max(fontSize + 7, Math.round(fontSize * 1.35));
 
+    const resolvedFontFamily = resolveSubtitleFontFamily(fontFamily);
+    const shouldApplyFontWeight = !resolvedFontFamily?.startsWith('Subtitle');
+
     return {
         fontSize,
         lineHeight,
         textAlign: resolveSubtitleTextAlign(domainTextAlign),
-        showOverlay: style?.showOverlay !== false,
-        fontFamily: resolveSubtitleFontFamily(fontFamily),
+        showOverlay,
+        fontFamily: resolvedFontFamily,
         textColor,
+        overlayColor: fallbackOverlayColor,
         overlayVariant,
-        fontWeight: shouldApplyFontWeight ? fontWeight : undefined,
+        fontWeight: shouldApplyFontWeight ? requestedFontWeight : undefined,
     };
 }
 
@@ -226,9 +241,14 @@ export function normalizeSubtitleStyle(value: unknown): SubtitleStyle | null {
     const textCase = isValidSubtitleTextCase(rawTextCase)
         ? rawTextCase
         : DEFAULT_SUBTITLE_STYLE.textCase!;
-    const textColor = typeof raw.textColor === 'string' && raw.textColor.trim().length > 0
+    const showOverlay = raw.showOverlay !== false;
+    const fallbackTextColor = typeof raw.textColor === 'string' && raw.textColor.trim().length > 0
         ? raw.textColor
         : DEFAULT_SUBTITLE_STYLE.textColor!;
+    const overlayColor = typeof raw.overlayColor === 'string' && raw.overlayColor.trim().length > 0
+        ? raw.overlayColor
+        : DEFAULT_SUBTITLE_STYLE.overlayColor!;
+    const textColor = resolveTextColorForOverlay(showOverlay, fallbackTextColor);
 
     return {
         fontSize: clamp(
@@ -237,9 +257,10 @@ export function normalizeSubtitleStyle(value: unknown): SubtitleStyle | null {
             SUBTITLE_FONT_MAX
         ),
         textAlign,
-        showOverlay: raw.showOverlay !== false,
+        showOverlay,
         fontFamily,
         textColor,
+        overlayColor,
         overlayVariant,
         fontWeight,
         textCase,
@@ -376,52 +397,21 @@ export function getSubtitlePresentationPixelStyle(
     };
 }
 
-export function getSubtitleWrapperStyle(
-    showOverlay: boolean,
-    overlayVariant: SubtitleOverlayVariant = DEFAULT_SUBTITLE_STYLE.overlayVariant!
-): ViewStyle {
-    const effectiveOverlayVariant = !showOverlay && overlayVariant !== 'noneBorder'
-        ? 'noneBorder'
-        : overlayVariant;
-
-    if (effectiveOverlayVariant === 'noneBorder') {
-        return { backgroundColor: 'transparent' };
-    }
-    if (effectiveOverlayVariant === 'transparent') {
-        return {
-            backgroundColor: SUBTITLE_OVERLAY_BACKGROUND_TRANSPARENT,
-        };
-    }
-    if (effectiveOverlayVariant === 'light') {
-        return {
-            backgroundColor: SUBTITLE_OVERLAY_BACKGROUND_LIGHT,
-        };
-    }
-    if (effectiveOverlayVariant === 'lightBorder') {
-        return {
-            backgroundColor: SUBTITLE_OVERLAY_BACKGROUND_LIGHT,
-            borderWidth: 1,
-            borderColor: '#000000',
-        };
-    }
-    if (effectiveOverlayVariant === 'dark') {
-        return {
-            backgroundColor: SUBTITLE_OVERLAY_BACKGROUND_DARK,
-        };
-    }
-    if (effectiveOverlayVariant === 'darkBorder') {
-        return {
-            backgroundColor: SUBTITLE_OVERLAY_BACKGROUND_DARK,
-            borderWidth: 1,
-            borderColor: '#FFFFFF',
-        };
-    }
+export function getSubtitleWrapperStyle(showOverlay: boolean, overlayColor?: string): ViewStyle {
+    const baseWrapperStyle: ViewStyle = {
+        borderRadius: SUBTITLE_BORDER_RADIUS,
+        overflow: 'hidden',
+    };
+    const resolvedOverlayColor = typeof overlayColor === 'string' && overlayColor.trim().length > 0
+        ? overlayColor
+        : DEFAULT_SUBTITLE_STYLE.overlayColor || SUBTITLE_OVERLAY_BACKGROUND_LIGHT;
     if (showOverlay) {
         return {
-            backgroundColor: SUBTITLE_OVERLAY_BACKGROUND_DARK
+            ...baseWrapperStyle,
+            backgroundColor: resolvedOverlayColor
         };
     }
-    return { backgroundColor: 'transparent' };
+    return { ...baseWrapperStyle, backgroundColor: 'transparent' };
 }
 
 export function getNextSubtitleFontFamily(current?: SubtitleFontFamily): SubtitleFontFamily {
@@ -445,27 +435,23 @@ export function getNextSubtitleTextColor(current?: string): string {
 
 export function getNextSubtitleOverlayState(
     style?: SubtitleStyle | null
-): Pick<SubtitleStyle, 'showOverlay' | 'overlayVariant' | 'textColor'> {
-    const overlayVariant = isValidSubtitleOverlayVariant(String(style?.overlayVariant || ''))
-        ? style!.overlayVariant!
-        : (style?.showOverlay === false ? 'noneBorder' : DEFAULT_SUBTITLE_STYLE.overlayVariant!);
-
-    if (overlayVariant === 'noneBorder') {
-        return { showOverlay: true, overlayVariant: 'transparent' };
+): Pick<SubtitleStyle, 'showOverlay' | 'overlayVariant' | 'textColor' | 'overlayColor'> {
+    const isOverlayOpen = style?.showOverlay !== false;
+    if (isOverlayOpen) {
+        return { showOverlay: false, overlayVariant: 'noneBorder' };
     }
-    if (overlayVariant === 'transparent') {
-        return { showOverlay: true, overlayVariant: 'light', textColor: '#000000' };
+    const currentOverlayColor = typeof style?.overlayColor === 'string' ? style.overlayColor.trim() : '';
+    if (!currentOverlayColor) {
+        return {
+            showOverlay: true,
+            overlayVariant: 'light',
+            overlayColor: '#FFFFFF',
+        };
     }
-    if (overlayVariant === 'light') {
-        return { showOverlay: true, overlayVariant: 'lightBorder', textColor: '#000000' };
-    }
-    if (overlayVariant === 'lightBorder') {
-        return { showOverlay: true, overlayVariant: 'dark', textColor: '#FFFFFF' };
-    }
-    if (overlayVariant === 'dark') {
-        return { showOverlay: true, overlayVariant: 'darkBorder', textColor: '#FFFFFF' };
-    }
-    return { showOverlay: true, overlayVariant: 'noneBorder' };
+    return {
+        showOverlay: true,
+        overlayVariant: 'light',
+    };
 }
 
 export const SUBTITLE_TEXT_BASE_STYLE: TextStyle = {

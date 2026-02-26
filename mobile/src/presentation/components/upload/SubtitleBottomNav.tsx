@@ -19,10 +19,19 @@ export const SubtitleBottomNav = ({
     onDeleteSubtitle,
     bottomInset = 0,
 }: SubtitleBottomNavProps) => {
-    void bottomInset;
+    const safeAreaInset = Math.max(0, bottomInset);
 
     return (
-        <View style={styles.subtitleBottomNavContainer}>
+        <View
+            style={[
+                styles.subtitleBottomNavContainer,
+                {
+                    height: 50 + safeAreaInset,
+                    paddingTop: 8,
+                    paddingBottom: safeAreaInset + 2,
+                },
+            ]}
+        >
             <View style={styles.subtitleBottomNavRow}>
                 <Pressable
                     style={[
@@ -52,11 +61,8 @@ export const SubtitleBottomNav = ({
 
 const styles = StyleSheet.create({
     subtitleBottomNavContainer: {
-        height: 34,
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(255,255,255,0.1)',
-        backgroundColor: 'transparent',
-        paddingTop: 8,
+        borderTopWidth: 0,
+        backgroundColor: '#080A0F',
         zIndex: 10000,
         elevation: 100,
     },
@@ -66,12 +72,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-around',
         paddingHorizontal: 12,
-        transform: [{ translateY: 16 }],
     },
     subtitleBottomNavButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 12,
+        width: 48,
+        height: 48,
+        borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
     },

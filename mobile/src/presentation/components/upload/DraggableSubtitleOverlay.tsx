@@ -31,6 +31,7 @@ export const DraggableSubtitleOverlay = ({
     presentation,
     textStyle,
     currentTimeMs,
+    isEditingSessionActive = false,
     onDragStart,
     onDragEnd,
     onEditingChange,
@@ -42,6 +43,7 @@ export const DraggableSubtitleOverlay = ({
     presentation?: SubtitlePresentation | null,
     textStyle?: SubtitleStyle | null,
     currentTimeMs: number,
+    isEditingSessionActive?: boolean,
     onDragStart?: () => void,
     onDragEnd?: () => void,
     onEditingChange?: (isEditing: boolean) => void,
@@ -49,7 +51,14 @@ export const DraggableSubtitleOverlay = ({
     onUpdateSubtitle?: (index: number, newText: string) => void,
     onPresentationChange?: (value: SubtitlePresentation) => void,
 }) => {
-    const activeIndex = segments.findIndex(s => currentTimeMs >= s.startMs && currentTimeMs <= s.endMs);
+    const activeIndex = segments.findIndex((segment, index) => {
+        const isLastSegment = index === segments.length - 1;
+        const isWithinStart = currentTimeMs >= segment.startMs;
+        const isWithinEnd = isLastSegment
+            ? currentTimeMs <= segment.endMs
+            : currentTimeMs < segment.endMs;
+        return isWithinStart && isWithinEnd;
+    });
     const activeSegment = activeIndex !== -1 ? segments[activeIndex] : null;
 
     const translateX = useSharedValue(0);
@@ -65,9 +74,11 @@ export const DraggableSubtitleOverlay = ({
     const showBoundaryY = useSharedValue(false);
     const lastSnapX = useSharedValue(false);
     const lastSnapY = useSharedValue(false);
-    const [showTextSelectAction, setShowTextSelectAction] = useState(false);
     const [isInlineTextEditing, setIsInlineTextEditing] = useState(false);
     const [editedText, setEditedText] = useState(activeSegment?.text || '');
+    const inlineEditTargetIndexRef = useRef<number | null>(null);
+    const inlineEditTargetBoundsRef = useRef<{ startMs: number; endMs: number } | null>(null);
+    const inlineEditOriginalTextRef = useRef('');
     const hasAppliedInitialPresentation = useRef(false);
     const lastAppliedLayoutRef = useRef<{ cw: number; ch: number; w: number; h: number }>({
         cw: 0,
@@ -87,11 +98,72 @@ export const DraggableSubtitleOverlay = ({
         }
     }, [activeSegment?.text, isInlineTextEditing]);
 
-    const commitInlineSubtitleEdit = () => {
-        if (onUpdateSubtitle && activeIndex !== -1 && editedText !== activeSegment?.text) {
-            onUpdateSubtitle(activeIndex, editedText);
+    useEffect(() => {
+        if (isEditingSessionActive) return;
+        if (!isEditing && !isInlineTextEditing) return;
+        isEditingSV.value = false;
+        inlineEditTargetIndexRef.current = null;
+        inlineEditTargetBoundsRef.current = null;
+        inlineEditOriginalTextRef.current = '';
+        setIsEditing(false);
+        setIsInlineTextEditing(false);
+        if (onEditingChange) onEditingChange(false);
+        if (onTextEditingChange) onTextEditingChange(false);
+    }, [isEditing, isEditingSV, isEditingSessionActive, isInlineTextEditing, onEditingChange, onTextEditingChange]);
+
+    const beginInlineSubtitleEdit = useCallback((segmentIndex: number) => {
+        if (segmentIndex < 0 || segmentIndex >= segments.length) return;
+        const target = segments[segmentIndex];
+        inlineEditTargetIndexRef.current = segmentIndex;
+        inlineEditTargetBoundsRef.current = { startMs: target.startMs, endMs: target.endMs };
+        inlineEditOriginalTextRef.current = target.text;
+        setEditedText(target.text);
+        setIsInlineTextEditing(true);
+        if (onTextEditingChange) onTextEditingChange(true);
+    }, [onTextEditingChange, segments]);
+
+    const commitInlineSubtitleEdit = useCallback(() => {
+        if (!onUpdateSubtitle) return;
+        const initialIndex = inlineEditTargetIndexRef.current;
+        const initialBounds = inlineEditTargetBoundsRef.current;
+        if (initialIndex === null || initialIndex < 0) return;
+
+        const nextText = editedText;
+        const originalText = inlineEditOriginalTextRef.current;
+        if (nextText === originalText) return;
+
+        let targetIndex = -1;
+        const segmentAtInitialIndex = segments[initialIndex];
+        if (
+            segmentAtInitialIndex &&
+            initialBounds &&
+            segmentAtInitialIndex.startMs === initialBounds.startMs &&
+            segmentAtInitialIndex.endMs === initialBounds.endMs
+        ) {
+            targetIndex = initialIndex;
         }
-    };
+        if (targetIndex === -1 && initialBounds) {
+            targetIndex = segments.findIndex(
+                (segment) =>
+                    segment.startMs === initialBounds.startMs &&
+                    segment.endMs === initialBounds.endMs
+            );
+        }
+        if (targetIndex !== -1) {
+            onUpdateSubtitle(targetIndex, nextText);
+        }
+    }, [editedText, onUpdateSubtitle, segments]);
+
+    const closeInlineSubtitleEdit = useCallback((shouldCommit: boolean) => {
+        if (shouldCommit) {
+            commitInlineSubtitleEdit();
+        }
+        inlineEditTargetIndexRef.current = null;
+        inlineEditTargetBoundsRef.current = null;
+        inlineEditOriginalTextRef.current = '';
+        setIsInlineTextEditing(false);
+        if (onTextEditingChange) onTextEditingChange(false);
+    }, [commitInlineSubtitleEdit, onTextEditingChange]);
 
     const SNAP_THRESHOLD = 8;
     const context = useSharedValue({ x: 0, y: 0, w: 0, h: 0 });
@@ -140,15 +212,12 @@ export const DraggableSubtitleOverlay = ({
             }
 
             if (isEditing) {
-                runOnJS(setShowTextSelectAction)(true);
-                runOnJS(setIsInlineTextEditing)(true);
-                runOnJS(setEditedText)(activeSegment?.text || '');
+                runOnJS(beginInlineSubtitleEdit)(activeIndex);
             } else {
                 const nextValue = !isEditingSV.value;
                 isEditingSV.value = nextValue;
                 runOnJS(setIsEditing)(nextValue);
                 if (!nextValue) {
-                    runOnJS(setShowTextSelectAction)(false);
                     runOnJS(setIsInlineTextEditing)(false);
                     if (onTextEditingChange) runOnJS(onTextEditingChange)(false);
                 }
@@ -222,12 +291,10 @@ export const DraggableSubtitleOverlay = ({
             'worklet';
             if (isEditingSV.value) {
                 if (isInlineTextEditing) {
-                    runOnJS(commitInlineSubtitleEdit)();
-                    runOnJS(setIsInlineTextEditing)(false);
+                    runOnJS(closeInlineSubtitleEdit)(true);
                 } else {
                     isEditingSV.value = false;
                     runOnJS(setIsEditing)(false);
-                    runOnJS(setShowTextSelectAction)(false);
                     if (onEditingChange) runOnJS(onEditingChange)(false);
                     if (onTextEditingChange) runOnJS(onTextEditingChange)(false);
                 }
@@ -357,7 +424,7 @@ export const DraggableSubtitleOverlay = ({
                             styles.subtitleTextOverlayWrapper,
                             getSubtitleWrapperStyle(
                                 resolvedSubtitleStyle.showOverlay,
-                                resolvedSubtitleStyle.overlayVariant
+                                resolvedSubtitleStyle.overlayColor
                             ),
                         ]}
                     >
@@ -379,8 +446,7 @@ export const DraggableSubtitleOverlay = ({
                                 autoFocus
                                 multiline
                                 onBlur={() => {
-                                    commitInlineSubtitleEdit();
-                                    setIsInlineTextEditing(false);
+                                    closeInlineSubtitleEdit(true);
                                 }}
                             />
                         ) : (
