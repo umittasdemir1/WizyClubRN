@@ -7,7 +7,7 @@ import Animated, {
     Easing,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Pause, Play, Redo2, Undo2 } from 'lucide-react-native';
+import { Maximize, Pause, Play, Redo2, Undo2 } from 'lucide-react-native';
 import type {
     SubtitleFontFamily,
     SubtitleSegment,
@@ -19,6 +19,8 @@ import { SubtitleFontEditor } from './SubtitleFontEditor';
 import { SubtitleBottomNav } from './SubtitleBottomNav';
 
 export type SubtitleEditorTab = 'text' | 'font';
+const HISTORY_ICON_ACTIVE_COLOR = '#FFFFFF';
+const HISTORY_ICON_DISABLED_COLOR = '#8E8E93';
 
 interface SubtitleEditorInlineProps {
     activeTab: SubtitleEditorTab;
@@ -38,6 +40,7 @@ interface SubtitleEditorInlineProps {
     canRedo: boolean;
     onUndo: () => void;
     onRedo: () => void;
+    onOpenExpandedEditor: () => void;
     isPreviewPlaying: boolean;
     onTogglePreviewPlayback: () => void;
     onPausePreview: () => void;
@@ -75,6 +78,7 @@ export const SubtitleEditorInline = ({
     canRedo,
     onUndo,
     onRedo,
+    onOpenExpandedEditor,
     isPreviewPlaying,
     onTogglePreviewPlayback,
     onPausePreview,
@@ -150,7 +154,11 @@ export const SubtitleEditorInline = ({
                                 disabled={!canUndo}
                                 hitSlop={10}
                             >
-                                <Undo2 color={canUndo ? '#FFFFFF' : 'rgba(255,255,255,0.34)'} size={16} strokeWidth={2.2} />
+                                <Undo2
+                                    color={canUndo ? HISTORY_ICON_ACTIVE_COLOR : HISTORY_ICON_DISABLED_COLOR}
+                                    size={16}
+                                    strokeWidth={2.2}
+                                />
                             </Pressable>
                             <Pressable
                                 style={styles.historyActionButton}
@@ -158,7 +166,22 @@ export const SubtitleEditorInline = ({
                                 disabled={!canRedo}
                                 hitSlop={10}
                             >
-                                <Redo2 color={canRedo ? '#FFFFFF' : 'rgba(255,255,255,0.34)'} size={16} strokeWidth={2.2} />
+                                <Redo2
+                                    color={canRedo ? HISTORY_ICON_ACTIVE_COLOR : HISTORY_ICON_DISABLED_COLOR}
+                                    size={16}
+                                    strokeWidth={2.2}
+                                />
+                            </Pressable>
+                            <Pressable
+                                style={styles.historyActionButton}
+                                onPress={onOpenExpandedEditor}
+                                hitSlop={10}
+                            >
+                                <Maximize
+                                    color={HISTORY_ICON_ACTIVE_COLOR}
+                                    size={16}
+                                    strokeWidth={2.2}
+                                />
                             </Pressable>
                         </View>
                     </View>

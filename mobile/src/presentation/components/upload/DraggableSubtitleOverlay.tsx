@@ -175,11 +175,14 @@ export const DraggableSubtitleOverlay = ({
             : (measuredW / Math.max(cw, 1));
         const targetCenterX = cw * (presentation.leftRatio + (savedWidthRatio / 2));
         const targetLeft = targetCenterX - (measuredW / 2);
-        const targetTop = ch * presentation.topRatio;
+        const savedHeightRatio = Number(presentation.heightRatio) > 0
+            ? Number(presentation.heightRatio)
+            : (measuredH / Math.max(ch, 1));
+        const targetBottom = ch * (presentation.topRatio + savedHeightRatio);
         const rawX = targetLeft - ((cw - measuredW) / 2);
         const maxOffsetByWidth = Math.max(0, ((cw - measuredW) / 2) - SUBTITLE_SIDE_MARGIN);
         translateX.value = Math.max(-maxOffsetByWidth, Math.min(maxOffsetByWidth, rawX));
-        const computedY = targetTop - (ch - SUBTITLE_BASE_BOTTOM_OFFSET - measuredH);
+        const computedY = targetBottom - (ch - SUBTITLE_BASE_BOTTOM_OFFSET);
         translateY.value = Math.min(computedY, SUBTITLE_BOTTOM_LIMIT);
         lastAppliedLayoutRef.current = { cw, ch, w: measuredW, h: measuredH };
         hasAppliedInitialPresentation.current = true;

@@ -18,6 +18,7 @@ const GRID_GAP = 2;
 const NUM_COLUMNS = 3;
 export const CELL_WIDTH = Math.floor((SCREEN_WIDTH - GRID_GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS);
 export const CELL_HEIGHT = Math.round(CELL_WIDTH * (4 / 3));
+const THUMB_SIZE = CELL_WIDTH * 2;
 
 interface MediaGridProps {
     assets: MediaLibrary.Asset[];
@@ -55,9 +56,10 @@ export const MediaGrid = ({
             numColumns={NUM_COLUMNS}
             contentContainerStyle={{ paddingTop: 8, paddingBottom: insets.bottom + 24 }}
             columnWrapperStyle={styles.row}
-            initialNumToRender={24}
-            maxToRenderPerBatch={24}
-            windowSize={7}
+            initialNumToRender={12}
+            maxToRenderPerBatch={9}
+            windowSize={5}
+            updateCellsBatchingPeriod={50}
             removeClippedSubviews={true}
             getItemLayout={(_, index) => ({
                 length: CELL_HEIGHT + GRID_GAP,
@@ -94,7 +96,14 @@ export const MediaGrid = ({
                         delayLongPress={220}
                         style={styles.cell}
                     >
-                        <Image source={{ uri: item.uri }} style={styles.image} contentFit="cover" transition={0} />
+                        <Image
+                            source={{ uri: item.uri, width: THUMB_SIZE, height: THUMB_SIZE }}
+                            style={styles.image}
+                            contentFit="cover"
+                            transition={0}
+                            recyclingKey={item.id}
+                            cachePolicy="memory-disk"
+                        />
                         {item.mediaType === 'video' ? (
                             <View style={styles.durationBadge}>
                                 <Text style={styles.durationBadgeText}>{formatDuration(item.duration)}</Text>

@@ -136,12 +136,15 @@ export function useSubtitles(videoId: string | undefined) {
 
     const getActiveSubtitle = useCallback((currentTimeMs: number): string | null => {
         if (!subtitles || !subtitles.segments) return null;
-
-        const activeSegment = subtitles.segments.find(
-            (s: SubtitleSegment) => currentTimeMs >= s.startMs && currentTimeMs <= s.endMs
-        );
-
-        return activeSegment ? activeSegment.text : null;
+        const activeIndex = subtitles.segments.findIndex((segment: SubtitleSegment, index: number) => {
+            const isLastSegment = index === subtitles.segments.length - 1;
+            const isWithinStart = currentTimeMs >= segment.startMs;
+            const isWithinEnd = isLastSegment
+                ? currentTimeMs <= segment.endMs
+                : currentTimeMs < segment.endMs;
+            return isWithinStart && isWithinEnd;
+        });
+        return activeIndex === -1 ? null : subtitles.segments[activeIndex].text;
     }, [subtitles]);
 
     return {

@@ -4,6 +4,7 @@ import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, MoreVertical } from 'lucide-react-native';
 import { Avatar } from '../shared/Avatar';
+import { RichTextLabel } from '../shared/RichTextLabel';
 import { Video } from '../../../domain/entities/Video';
 import { logSheet, LogCode } from '@/core/services/Logger';
 import { useSurfaceTheme } from '../../hooks/useSurfaceTheme';
@@ -111,9 +112,7 @@ export const DescriptionSheet = forwardRef<BottomSheet, DescriptionSheetProps>(
         <BottomSheetScrollView
           contentContainerStyle={{ paddingBottom: insets.bottom + 40, paddingHorizontal: 20 }}
         >
-          <Text style={[styles.description, { color: textPrimary }]}>
-            {video?.description}
-          </Text>
+          <RichTextLabel text={video?.description} style={[styles.description, { color: textPrimary }]} />
         </BottomSheetScrollView>
       </BottomSheet>
     );

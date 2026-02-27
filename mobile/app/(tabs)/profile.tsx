@@ -1155,7 +1155,7 @@ export default function ProfileScreen() {
           </View>
         </View>
       </View>
-      <SwipeWrapper enableLeft={false} onSwipeRight={() => router.push('/notifications')} edgeOnly={true}>
+      <SwipeWrapper enableLeft={false} onSwipeRight={() => router.navigate('/videos')} edgeOnly={true}>
         <Animated.ScrollView
           style={{ marginTop: headerOffset }}
           showsVerticalScrollIndicator={false}

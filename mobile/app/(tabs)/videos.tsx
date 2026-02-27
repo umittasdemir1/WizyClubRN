@@ -3,9 +3,12 @@ import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import { useActiveVideoStore } from '../../src/presentation/store/useActiveVideoStore';
 import { useCallback, useEffect, useState } from 'react';
 import { useFocusEffect, useIsFocused, useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 import { InteractionManager } from 'react-native';
+import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrapper';
 
 export default function VideosScreen() {
+    const router = useRouter();
     const navigation = useNavigation<any>();
     const isFocused = useIsFocused();
     const [videosReselectTrigger, setVideosReselectTrigger] = useState(0);
@@ -61,6 +64,11 @@ export default function VideosScreen() {
     }, [isFocused, navigation]);
 
     return (
+        <SwipeWrapper
+            onSwipeRight={() => router.navigate('/deals')}
+            onSwipeLeft={() => router.navigate('/profile')}
+            edgeOnly={true}
+        >
         <PoolFeedManager
             videos={videos}
             isLoading={isLoading}
@@ -80,5 +88,6 @@ export default function VideosScreen() {
             showStories={true}
             homeReselectTrigger={videosReselectTrigger}
         />
+        </SwipeWrapper>
     );
 }

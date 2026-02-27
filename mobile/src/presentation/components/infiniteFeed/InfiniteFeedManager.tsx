@@ -27,6 +27,7 @@ import { useThemeStore } from '../../store/useThemeStore';
 import { DARK_COLORS, LIGHT_COLORS } from '../../../core/constants';
 import { getVideoUrl } from '../../../core/utils/videoUrl';
 import type { InfiniteFeedVideo } from './InfiniteFeedVideoTypes';
+import { SwipeWrapper } from '../shared/SwipeWrapper';
 import { InfiniteFeedHeader, FeedTab } from './InfiniteFeedHeader';
 import { InfiniteFeedCard } from './InfiniteFeedCard';
 import { InfiniteFeedMoreOptionsSheet } from './InfiniteFeedMoreOptionsSheet';
@@ -142,6 +143,8 @@ export function InfiniteFeedManager({
     const [subtitleAvailabilityByVideoId, setSubtitleAvailabilityByVideoId] = useState<
         Record<string, { hasSubtitles: boolean; fetchedAt: number; isProcessing?: boolean }>
     >({});
+    const videosRef = useRef(videos);
+    const subtitleAvailabilityRef = useRef(subtitleAvailabilityByVideoId);
 
     // ✅ [PERF] Batched state - 4 states → 1 (reduces 4 re-renders to 1)
     interface FeedActiveState {
@@ -221,6 +224,14 @@ export function InfiniteFeedManager({
         }, [isDark])
     );
 
+    useEffect(() => {
+        videosRef.current = videos;
+    }, [videos]);
+
+    useEffect(() => {
+        subtitleAvailabilityRef.current = subtitleAvailabilityByVideoId;
+    }, [subtitleAvailabilityByVideoId]);
+
     const handleOpenVideo = useCallback((id: string, index: number) => {
         const now = Date.now();
         const lock = openVideoLockRef.current;
@@ -282,12 +293,11 @@ export function InfiniteFeedManager({
     }, [openInAppBrowser, toggleShop, videos]);
 
     const handleOpenMoreOptions = useCallback((videoId: string) => {
-        const selectedVideo = videos.find((video) => video.id === videoId);
-        if (!selectedVideo) return;
-
         setSelectedMoreVideoId(videoId);
-        setIsMoreSheetOpen(true);
         moreOptionsSheetRef.current?.present();
+
+        const selectedVideo = videosRef.current.find((video) => video.id === videoId);
+        if (!selectedVideo) return;
 
         if (selectedVideo.postType !== 'video') {
             setSubtitleAvailabilityByVideoId((prev) => (
@@ -298,7 +308,7 @@ export function InfiniteFeedManager({
             return;
         }
 
-        const cachedEntry = subtitleAvailabilityByVideoId[videoId];
+        const cachedEntry = subtitleAvailabilityRef.current[videoId];
         const now = Date.now();
         const ttlMs = cachedEntry?.isProcessing ? SUBTITLE_AVAILABILITY_PENDING_RETRY_MS : SUBTITLE_AVAILABILITY_CACHE_TTL_MS;
         const isCacheFresh = cachedEntry && (now - cachedEntry.fetchedAt) < ttlMs;
@@ -351,7 +361,7 @@ export function InfiniteFeedManager({
                 }));
             }
         })();
-    }, [subtitleAvailabilityByVideoId, videos]);
+    }, []);
 
     const handleMoreSheetDelete = useCallback(() => {
         const selectedVideo = videos.find((video) => video.id === selectedMoreVideoId);
@@ -1214,6 +1224,11 @@ export function InfiniteFeedManager({
     );
 
     return (
+        <SwipeWrapper
+            onSwipeRight={() => router.push('/upload')}
+            onSwipeLeft={() => router.navigate('/explore')}
+            edgeOnly={true}
+        >
         <View style={[styles.container, { backgroundColor: themeColors.background }]}>
             <FlashListAny
                 ref={listRef}
@@ -1243,7 +1258,10 @@ export function InfiniteFeedManager({
                         colors={themeColors}
                         insetTop={insets.top}
                         onUploadPress={() => router.push('/upload')}
-                        onCreateStoryPress={() => router.push('/storyUpload')}
+                        onCreateStoryPress={() => router.push({
+                            pathname: '/upload',
+                            params: { storyOnly: '1' },
+                        })}
                         onNotificationPress={() => router.push('/notifications')}
                         storyUsers={storyUsers}
                         onStoryAvatarPress={handleStoryAvatarPress}
@@ -1284,7 +1302,10 @@ export function InfiniteFeedManager({
                 {isMoreSheetOpen && !isMoreDeleteConfirmationVisible ? (
                     <Pressable
                         style={styles.sheetDismissOverlay}
-                        onPress={() => moreOptionsSheetRef.current?.dismiss()}
+                        onPress={() => {
+                            setIsMoreSheetOpen(false);
+                            moreOptionsSheetRef.current?.dismiss();
+                        }}
                     />
                 ) : null}
                 <InfiniteFeedMoreOptionsSheet
@@ -1310,5 +1331,6 @@ export function InfiniteFeedManager({
                 />
             </View>
         </View>
+        </SwipeWrapper>
     );
 }

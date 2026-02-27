@@ -374,6 +374,7 @@ export function getSubtitlePresentationPixelStyle(
     options?: {
         measuredSubtitleHeight?: number;
         bottomPadding?: number;
+        verticalAnchor?: 'top' | 'bottom';
     }
 ): ViewStyle | null {
     const safePresentation = normalizeSubtitlePresentation(presentation);
@@ -382,11 +383,28 @@ export function getSubtitlePresentationPixelStyle(
 
     const measuredSubtitleHeight = Math.max(0, Number(options?.measuredSubtitleHeight) || 0);
     const bottomPadding = Math.max(0, Number(options?.bottomPadding) || 0);
-    const rawTop = clamp(containerHeight * safePresentation.topRatio, 0, containerHeight);
-    const maxTopByMeasuredHeight = Math.max(0, containerHeight - measuredSubtitleHeight - bottomPadding);
+    const bottomEdge = clamp(
+        containerHeight * (safePresentation.topRatio + safePresentation.heightRatio),
+        0,
+        containerHeight,
+    );
+    const maxBottom = containerHeight - bottomPadding;
+    const clampedBottom = Math.min(bottomEdge, maxBottom);
+    const verticalAnchor = options?.verticalAnchor === 'bottom' ? 'bottom' : 'top';
+
+    if (verticalAnchor === 'bottom') {
+        return {
+            left: clamp(containerWidth * safePresentation.leftRatio, 0, containerWidth),
+            bottom: clamp(containerHeight - clampedBottom, 0, containerHeight),
+            width: clamp(containerWidth * safePresentation.widthRatio, 1, containerWidth),
+            maxWidth: undefined,
+            top: undefined,
+        };
+    }
+
     const top = measuredSubtitleHeight > 0
-        ? Math.min(rawTop, maxTopByMeasuredHeight)
-        : rawTop;
+        ? Math.max(0, clampedBottom - measuredSubtitleHeight)
+        : clamp(containerHeight * safePresentation.topRatio, 0, containerHeight);
 
     return {
         left: clamp(containerWidth * safePresentation.leftRatio, 0, containerWidth),

@@ -378,9 +378,10 @@ export default function ExploreScreen() {
     if (showSkeleton) {
         return (
             <SwipeWrapper
-                onSwipeLeft={previewItem ? undefined : () => router.push('/deals')}
-                onSwipeRight={previewItem ? undefined : () => router.push('/')}
-                edgeOnly={!!previewItem}
+                onSwipeLeft={previewItem ? undefined : () => router.navigate('/deals')}
+                onSwipeRight={previewItem ? undefined : () => router.navigate('/')}
+                edgeOnly={true}
+                disabled={!!previewItem}
             >
                 <View style={[styles.container, { backgroundColor: bgBody }]}>
                     <TrendingHeader
@@ -405,9 +406,10 @@ export default function ExploreScreen() {
     return (
         <>
             <SwipeWrapper
-                onSwipeLeft={previewItem ? undefined : () => router.push('/deals')}
-                onSwipeRight={previewItem ? undefined : () => router.push('/')}
-                edgeOnly={!!previewItem}
+                onSwipeLeft={previewItem ? undefined : () => router.navigate('/deals')}
+                onSwipeRight={previewItem ? undefined : () => router.navigate('/')}
+                edgeOnly={true}
+                disabled={!!previewItem}
             >
                 <View style={[styles.container, { backgroundColor: bgBody }]}>
                     <Animated.ScrollView

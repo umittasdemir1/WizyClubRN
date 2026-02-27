@@ -1,8 +1,11 @@
+import { useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Video } from '../../../domain/entities/Video';
 import { StoryRingAvatar } from '../shared/StoryRingAvatar';
 import { VerifiedBadge } from '../shared/VerifiedBadge';
+import { RichTextLabel } from '../shared/RichTextLabel';
+import { stripRichTextTags, truncateRichTextByVisibleLength } from '../../../core/utils/richText';
 import { textShadowStyle } from '@/core/utils/shadow';
 import { isDisabled } from './hooks/usePoolFeedConfig';
 
@@ -27,6 +30,7 @@ interface PoolFeedMetadataLayerProps {
 const BASE_BOTTOM_POSITION = 80; // Aligned exactly with seekbar center (80px touch area / 2)
 const SAFE_AREA_OFFSET = 0; // No extra offset needed as seekbar is also at 0
 const EMPTY_METADATA_OFFSET = 30;
+const DESCRIPTION_PREVIEW_LIMIT = 70;
 
 export function PoolFeedMetadataLayer({
     data,
@@ -43,7 +47,11 @@ export function PoolFeedMetadataLayer({
     const showFollowButton = !video.user.isFollowing && video.user.id !== currentUserId;
 
     // Check if description exists and is not empty
-    const hasDescription = video.description && video.description.trim().length > 0;
+    const hasDescription = stripRichTextTags(video.description).trim().length > 0;
+    const descriptionPreview = useMemo(
+        () => truncateRichTextByVisibleLength(video.description, DESCRIPTION_PREVIEW_LIMIT),
+        [video.description]
+    );
     const shouldShiftUserRow = !hasDescription && !video.isCommercial;
     const effectiveBottom = shouldShiftUserRow ? Math.max(0, bottom - EMPTY_METADATA_OFFSET) : bottom;
 
@@ -106,10 +114,8 @@ export function PoolFeedMetadataLayer({
                     hitSlop={{ top: 10, bottom: 10, left: 0, right: 0 }}
                 >
                     <Text style={styles.descriptionText}>
-                        {video.description.length > 70
-                            ? video.description.substring(0, 70)
-                            : video.description}
-                        {video.description.length > 70 && (
+                        <RichTextLabel text={descriptionPreview.text} />
+                        {descriptionPreview.isTruncated && (
                             <Text style={styles.readMoreInline}>
                                 {'...Daha fazla'}
                             </Text>
@@ -201,9 +207,6 @@ const styles = StyleSheet.create({
     },
     readMoreInline: {
         color: 'rgba(255,255,255,0.8)',
-    },
-    readMoreIconWrapper: {
-        marginLeft: 2,
     },
     commercialTag: {
         position: 'absolute',

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
     Alert,
     Modal,
@@ -14,6 +14,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, ChevronRight, PlusCircle, Tag, Users, X } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { SystemBars } from 'react-native-edge-to-edge';
+import { RichEditor, actions } from 'react-native-pell-rich-editor';
+import AiIcon from '../assets/icons/ai.svg';
 import { useThemeStore } from '../src/presentation/store/useThemeStore';
 import { useSurfaceTheme } from '../src/presentation/hooks/useSurfaceTheme';
 import { useUploadComposerStore } from '../src/presentation/store/useUploadComposerStore';
@@ -24,6 +26,7 @@ import { useStoryStore } from '../src/presentation/store/useStoryStore';
 import { CONFIG } from '../src/core/config';
 import { supabase } from '../src/core/supabase';
 import { LogCode, logData, logError } from '@/core/services/Logger';
+import { stripRichTextTags } from '../src/core/utils/richText';
 
 const COMMERCIAL_TYPES = [
     'İş Birliği İçermiyor',
@@ -38,6 +41,58 @@ const COMMERCIAL_TYPES = [
     'Kendi Markam',
 ];
 
+const DESCRIPTION_MAX_LENGTH = 2200;
+const EDITOR_FONT_SIZE = 15;
+const EDITOR_LINE_HEIGHT = 21;
+const HTML_NAMED_ENTITIES: Record<string, string> = {
+    '&nbsp;': ' ',
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#39;': "'",
+};
+const DESCRIPTION_TAG_ACTION = {
+    b: actions.setBold,
+    i: actions.setItalic,
+    u: actions.setUnderline,
+} as const;
+
+const decodeHtmlEntities = (input: string): string =>
+    input
+        .replace(/&#x([0-9a-f]+);/gi, (_, value: string) => {
+            const parsed = Number.parseInt(value, 16);
+            return Number.isNaN(parsed) ? '' : String.fromCodePoint(parsed);
+        })
+        .replace(/&#(\d+);/g, (_, value: string) => {
+            const parsed = Number.parseInt(value, 10);
+            return Number.isNaN(parsed) ? '' : String.fromCodePoint(parsed);
+        })
+        .replace(/&nbsp;|&amp;|&lt;|&gt;|&quot;|&#39;/g, (entity) => HTML_NAMED_ENTITIES[entity] ?? entity);
+
+const normalizeRichEditorHtml = (inputHtml: string): string => {
+    if (!inputHtml) return '';
+
+    let nextValue = inputHtml;
+    nextValue = nextValue.replace(/\r/g, '');
+    nextValue = nextValue.replace(/<(\/?)strong\b[^>]*>/gi, '<$1b>');
+    nextValue = nextValue.replace(/<(\/?)em\b[^>]*>/gi, '<$1i>');
+    nextValue = nextValue.replace(/<(\/?)ins\b[^>]*>/gi, '<$1u>');
+    nextValue = nextValue.replace(/<(\/?)b\b[^>]*>/gi, '<$1b>');
+    nextValue = nextValue.replace(/<(\/?)i\b[^>]*>/gi, '<$1i>');
+    nextValue = nextValue.replace(/<(\/?)u\b[^>]*>/gi, '<$1u>');
+    nextValue = nextValue.replace(/<br\s*\/?>/gi, '\n');
+    nextValue = nextValue.replace(/<\/(div|p|li|blockquote|h[1-6])>/gi, '\n');
+    nextValue = nextValue.replace(/<(div|p|li|blockquote|h[1-6])\b[^>]*>/gi, '');
+    nextValue = nextValue.replace(/<\/?span\b[^>]*>/gi, '');
+    nextValue = nextValue.replace(/<(?!\/?(b|i|u)\b)[^>]+>/gi, '');
+    nextValue = decodeHtmlEntities(nextValue).replace(/\u200B/g, '');
+    nextValue = nextValue.replace(/\n{3,}/g, '\n\n');
+    nextValue = nextValue.replace(/^\n+|\n+$/g, '');
+
+    return nextValue;
+};
+
 export default function UploadDetailsScreen() {
     const insets = useSafeAreaInsets();
     const isDark = useThemeStore((state) => state.isDark);
@@ -51,8 +106,17 @@ export default function UploadDetailsScreen() {
     const subtitlePresentationCache = useUploadComposerStore((state) => state.subtitlePresentationCache);
     const subtitleStyleCache = useUploadComposerStore((state) => state.subtitleStyleCache);
     const clearDraft = useUploadComposerStore((state) => state.clearDraft);
+    const descriptionEditorRef = useRef<RichEditor | null>(null);
+    const descriptionHtmlRef = useRef('');
+    const descriptionToolbarRegisteredRef = useRef(false);
+    const descriptionFocusedRef = useRef(false);
 
     const [description, setDescription] = useState('');
+    const [formatButtonState, setFormatButtonState] = useState({
+        bold: false,
+        italic: false,
+        underline: false,
+    });
     const [tags, setTags] = useState<string[]>([]);
     const [commercialType, setCommercialType] = useState<string | null>(null);
     const [brandName, setBrandName] = useState('');
@@ -68,6 +132,8 @@ export default function UploadDetailsScreen() {
     const subtextColor = modalTheme.textSecondary;
     const borderColor = modalTheme.sheetBorder;
     const inputBg = modalTheme.inputBackground;
+    const selectedFormatButtonBg = isDark ? '#3A3A3A' : '#E6E6E6';
+    const selectedFormatButtonBorder = isDark ? '#5A5A5A' : '#C9C9C9';
 
     const title = useMemo(() => {
         if (!draft) return 'Gönderi Oluştur';
@@ -88,6 +154,69 @@ export default function UploadDetailsScreen() {
     const handleClubsSelect = () => {
         Alert.alert('Bilgi', 'CLUB seçimi sonraki adımda bağlanacak.');
     };
+
+    const handleDescriptionChange = useCallback((nextHtml: string) => {
+        const normalized = normalizeRichEditorHtml(nextHtml);
+        if (stripRichTextTags(normalized).length > DESCRIPTION_MAX_LENGTH) {
+            requestAnimationFrame(() => {
+                descriptionEditorRef.current?.setContentHTML(descriptionHtmlRef.current);
+            });
+            return;
+        }
+
+        descriptionHtmlRef.current = nextHtml;
+        setDescription(normalized);
+    }, []);
+
+    const handleDescriptionToolbarStateChange = useCallback((items: Array<string | { type: string; value: string }>) => {
+        const activeItems = new Set<string>();
+        items.forEach((item) => {
+            if (typeof item === 'string') {
+                activeItems.add(item);
+                return;
+            }
+            activeItems.add(item.type);
+            if (typeof item.value === 'string') activeItems.add(item.value);
+        });
+
+        setFormatButtonState({
+            bold: activeItems.has(actions.setBold),
+            italic: activeItems.has(actions.setItalic),
+            underline: activeItems.has(actions.setUnderline),
+        });
+    }, []);
+
+    const handleDescriptionEditorInitialized = useCallback(() => {
+        if (descriptionToolbarRegisteredRef.current) return;
+        const editor = descriptionEditorRef.current;
+        if (!editor) return;
+
+        editor.registerToolbar(handleDescriptionToolbarStateChange);
+        descriptionToolbarRegisteredRef.current = true;
+    }, [handleDescriptionToolbarStateChange]);
+
+    const handleApplyDescriptionStyle = useCallback((tag: keyof typeof DESCRIPTION_TAG_ACTION) => {
+        const editor = descriptionEditorRef.current;
+        if (!editor) return;
+
+        const action = DESCRIPTION_TAG_ACTION[tag];
+        if (!action) return;
+
+        (editor as any)?.showAndroidKeyboard?.();
+        editor.sendAction(action, 'result');
+
+        if (descriptionFocusedRef.current) {
+            requestAnimationFrame(() => editor.focusContentEditor());
+        }
+    }, []);
+
+    const handleDescriptionEditorFocus = useCallback(() => {
+        descriptionFocusedRef.current = true;
+    }, []);
+
+    const handleDescriptionEditorBlur = useCallback(() => {
+        descriptionFocusedRef.current = false;
+    }, []);
 
     const handleSaveDraft = async () => {
         if (!draft?.selectedAssets?.length) {
@@ -290,17 +419,82 @@ export default function UploadDetailsScreen() {
                 <View style={styles.headerRight} />
             </View>
 
-            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+            <ScrollView
+                style={styles.scrollView}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+            >
                 <View style={[styles.descriptionSection, { backgroundColor: inputBg }]}>
-                    <TextInput
-                        style={[styles.descriptionInput, { color: textColor }]}
+                    <RichEditor
+                        ref={descriptionEditorRef}
+                        style={styles.descriptionEditor}
+                        initialHeight={120}
                         placeholder="Bir açıklama yaz ve konu etiketleri ekle..."
-                        placeholderTextColor={subtextColor}
-                        value={description}
-                        onChangeText={setDescription}
-                        multiline
-                        maxLength={2200}
+                        editorInitializedCallback={handleDescriptionEditorInitialized}
+                        onChange={handleDescriptionChange}
+                        onFocus={handleDescriptionEditorFocus}
+                        onBlur={handleDescriptionEditorBlur}
+                        styleWithCSS={false}
+                        defaultParagraphSeparator="div"
+                        pasteAsPlainText={false}
+                        editorStyle={{
+                            backgroundColor: 'transparent',
+                            color: textColor,
+                            caretColor: '#0A84FF',
+                            placeholderColor: subtextColor,
+                            contentCSSText: `
+                                font-size: ${EDITOR_FONT_SIZE}px;
+                                line-height: ${EDITOR_LINE_HEIGHT}px;
+                                white-space: pre-wrap;
+                                word-break: break-word;
+                                margin: 0;
+                                padding: 0;
+                            `,
+                        }}
                     />
+                </View>
+                <View style={styles.formatToolbarContainer}>
+                    <View style={styles.formatToolbar}>
+                        <Pressable
+                            style={[
+                                styles.formatButton,
+                                { borderColor },
+                                formatButtonState.bold && {
+                                    backgroundColor: selectedFormatButtonBg,
+                                    borderColor: selectedFormatButtonBorder,
+                                },
+                            ]}
+                            onPress={() => handleApplyDescriptionStyle('b')}
+                        >
+                            <Text style={[styles.formatButtonText, { color: textColor, fontWeight: '700' }]}>B</Text>
+                        </Pressable>
+                        <Pressable
+                            style={[
+                                styles.formatButton,
+                                { borderColor },
+                                formatButtonState.italic && {
+                                    backgroundColor: selectedFormatButtonBg,
+                                    borderColor: selectedFormatButtonBorder,
+                                },
+                            ]}
+                            onPress={() => handleApplyDescriptionStyle('i')}
+                        >
+                            <Text style={[styles.formatButtonText, { color: textColor, fontStyle: 'italic' }]}>I</Text>
+                        </Pressable>
+                        <Pressable
+                            style={[
+                                styles.formatButton,
+                                { borderColor },
+                                formatButtonState.underline && {
+                                    backgroundColor: selectedFormatButtonBg,
+                                    borderColor: selectedFormatButtonBorder,
+                                },
+                            ]}
+                            onPress={() => handleApplyDescriptionStyle('u')}
+                        >
+                            <Text style={[styles.formatButtonText, { color: textColor, textDecorationLine: 'underline' }]}>U</Text>
+                        </Pressable>
+                    </View>
                 </View>
 
                 <View style={styles.section}>
@@ -350,7 +544,7 @@ export default function UploadDetailsScreen() {
 
                     <View style={[styles.menuItem, { borderBottomColor: 'transparent' }]}>
                         <View style={styles.menuItemLeft}>
-                            <Text style={styles.aiIcon}>🤖</Text>
+                            <AiIcon width={28} height={28} />
                             <View style={{ flex: 1 }}>
                                 <Text style={[styles.menuItemText, { color: textColor }]}>Yapay zeka etiketi ekle</Text>
                                 <Text style={[styles.aiDescription, { color: subtextColor }]}>
@@ -461,7 +655,15 @@ const styles = StyleSheet.create({
     headerTitle: { fontSize: 24, fontWeight: '600', letterSpacing: 0.3, textAlign: 'center' },
     scrollView: { flex: 1 },
     descriptionSection: { marginHorizontal: 20, marginTop: 12, borderRadius: 12, padding: 12 },
-    descriptionInput: { minHeight: 120, textAlignVertical: 'top', fontSize: 15, lineHeight: 21 },
+    descriptionEditor: {
+        minHeight: 120,
+        fontSize: EDITOR_FONT_SIZE,
+        lineHeight: EDITOR_LINE_HEIGHT,
+    },
+    formatToolbarContainer: { marginHorizontal: 20, marginTop: 8 },
+    formatToolbar: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    formatButton: { minWidth: 34, height: 32, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+    formatButtonText: { fontSize: 16 },
     section: { marginTop: 14 },
     tagsScroll: { paddingHorizontal: 20 },
     tagChip: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, paddingHorizontal: 10, height: 34, borderRadius: 17, marginRight: 8, gap: 6 },
@@ -475,7 +677,6 @@ const styles = StyleSheet.create({
     menuItemRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     selectedValueText: { fontSize: 13, maxWidth: 160 },
     requiredStar: { color: '#FF3B30', fontWeight: '700' },
-    aiIcon: { fontSize: 18 },
     aiDescription: { marginTop: 2, fontSize: 12, lineHeight: 16 },
     bottomButtons: { flexDirection: 'row', gap: 12, paddingHorizontal: 20, paddingTop: 12, borderTopWidth: 1 },
     draftButton: { flex: 1, height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },

@@ -124,7 +124,7 @@ export const InfiniteStoryBar = memo(function InfiniteStoryBar({
                                 onCreatePress={onCreateStoryPress}
                                 onPress={() => {
                                     if (!item.hasStory) {
-                                        // If current user has no story, open story upload
+                                        // If current user has no story, open upload camera in story-only mode
                                         if (isCurrentUser && onCreateStoryPress) {
                                             onCreateStoryPress();
                                         }

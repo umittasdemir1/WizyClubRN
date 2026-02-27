@@ -139,7 +139,10 @@ export default function VideoEditorScreen() {
     const subtitlePositionStyle = getSubtitlePresentationPixelStyle(
         subtitlePresentation,
         previewLayout.width,
-        previewLayout.height
+        previewLayout.height,
+        {
+            verticalAnchor: 'bottom',
+        }
     );
 
     const saveChanges = () => {

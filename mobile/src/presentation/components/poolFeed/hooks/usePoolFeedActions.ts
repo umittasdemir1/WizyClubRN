@@ -16,6 +16,7 @@ import { isDisabled } from './usePoolFeedConfig';
 import { Video } from '../../../../domain/entities/Video';
 import { useActiveVideoStore } from '../../../store/useActiveVideoStore';
 import { LogCode, logError } from '../../../../core/services/Logger';
+import { stripRichTextTags } from '../../../../core/utils/richText';
 
 // ============================================================================
 // Types
@@ -227,7 +228,8 @@ export function usePoolFeedActions(options: UseFeedActionsOptions): UseFeedActio
         if (!activeVideo) return;
 
         const shareUrl = `wizyclub://video/${activeVideo.id}`;
-        const message = activeVideo.description ? `${activeVideo.description}\n${shareUrl}` : shareUrl;
+        const cleanDescription = stripRichTextTags(activeVideo.description);
+        const message = cleanDescription ? `${cleanDescription}\n${shareUrl}` : shareUrl;
 
         const wasPaused = useActiveVideoStore.getState().isPaused;
         wasPlayingBeforeShareRef.current = !wasPaused;

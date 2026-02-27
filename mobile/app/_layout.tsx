@@ -206,6 +206,14 @@ function RootNavigator() {
                 {/* Main app screens */}
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                 <Stack.Screen
+                    name="upload"
+                    options={{
+                        animation: 'fade',
+                        animationDuration: 200,
+                        headerShown: false,
+                    }}
+                />
+                <Stack.Screen
                     name="story/[id]"
                     options={{
                         presentation: 'transparentModal',

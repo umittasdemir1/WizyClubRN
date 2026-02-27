@@ -35,9 +35,9 @@ import { MediaGrid, CELL_WIDTH, CELL_HEIGHT } from '../src/presentation/componen
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const GRID_GAP = 2;
 const NUM_COLUMNS = 3;
-const PAGE_SIZE = 48;
+const PAGE_SIZE = 30;
 const MAX_SELECTION = 10;
-const CACHE_TTL_MS = 60 * 1000;
+const CACHE_TTL_MS = 5 * 60 * 1000;
 
 
 
@@ -173,7 +173,7 @@ export default function GalleryPickerScreen() {
                 first: PAGE_SIZE,
                 after: reset ? undefined : (afterCursor ?? undefined),
                 mediaType: mediaTypes,
-                sortBy: [[MediaLibrary.SortBy.creationTime, false]],
+                sortBy: [[MediaLibrary.SortBy.modificationTime, false]],
             });
 
             const nextAssets = reset ? result.assets : [...assets, ...result.assets];
@@ -202,25 +202,27 @@ export default function GalleryPickerScreen() {
 
         const cached = getFilterCache(mediaFilter);
         const isFresh = !!cached && (Date.now() - cached.updatedAt) < CACHE_TTL_MS;
-        if (cached?.assets?.length) {
+        const hasCachedAssets = !!cached?.assets?.length;
+
+        if (hasCachedAssets) {
             setAssets(cached.assets);
             setAfterCursor(cached.endCursor);
             setHasNextPage(cached.hasNextPage);
             setIsLoading(false);
             if (isFresh) return;
+        } else {
+            setAssets([]);
+            setAfterCursor(null);
+            setHasNextPage(true);
+            setIsLoading(true);
         }
-
-        setAssets([]);
-        setAfterCursor(null);
-        setHasNextPage(true);
-        setIsLoading(true);
 
         void (async () => {
             try {
                 const result = await MediaLibrary.getAssetsAsync({
                     first: PAGE_SIZE,
                     mediaType: mediaTypes,
-                    sortBy: [[MediaLibrary.SortBy.creationTime, false]],
+                    sortBy: [[MediaLibrary.SortBy.modificationTime, false]],
                 });
                 const nextCursor = result.endCursor ?? null;
                 const nextHasNext = result.hasNextPage;

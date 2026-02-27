@@ -21,6 +21,7 @@ import { useVideoEditStore, applyDescriptionOverridesToVideos } from '../store/u
 import { useResolvedVideoCounters } from './useResolvedVideoCounters';
 import { isVideoCacheDisabled } from '../../core/utils/videoCacheToggle';
 import { getVideoUrl } from '../../core/utils/videoUrl';
+import { stripRichTextTags } from '../../core/utils/richText';
 import { FEED_DATA_CONFIG } from '../config/feedDataConfig';
 import { queryClient, QUERY_KEYS } from '../../core/query/queryClient';
 
@@ -579,7 +580,8 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
         if (!video) return;
 
         const shareUrl = `wizyclub://video/${videoId}`;
-        const message = video.description ? `${video.description}\n${shareUrl}` : shareUrl;
+        const cleanDescription = stripRichTextTags(video.description);
+        const message = cleanDescription ? `${cleanDescription}\n${shareUrl}` : shareUrl;
 
         try {
             await Share.share({ message, url: shareUrl });

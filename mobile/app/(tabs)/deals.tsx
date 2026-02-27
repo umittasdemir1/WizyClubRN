@@ -101,8 +101,9 @@ export default function DealsScreen() {
 
     return (
         <SwipeWrapper
-            onSwipeLeft={() => router.push('/notifications')}
-            onSwipeRight={() => router.push('/explore')}
+            onSwipeLeft={() => router.navigate('/videos')}
+            onSwipeRight={() => router.navigate('/explore')}
+            edgeOnly={true}
         >
             <View style={[styles.container, { backgroundColor: bgBody }]}>
                 <Animated.ScrollView

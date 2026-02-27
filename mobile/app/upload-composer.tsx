@@ -42,6 +42,7 @@ import { SubtitleFontFamily, SubtitleSegment, SubtitleStyle, SubtitleTextAlign }
 import { DraggableSubtitleOverlay } from '../src/presentation/components/upload/DraggableSubtitleOverlay';
 import { VideoPlayerPreview } from '../src/presentation/components/upload/VideoPlayerPreview';
 import { SubtitleEditorInline, SubtitleEditorTab } from '../src/presentation/components/upload/SubtitleEditorInline';
+import { SubtitlePreviewControls } from '../src/presentation/components/upload/SubtitleEditorExpanded';
 import { UploadActionButtons } from '../src/presentation/components/upload/UploadActionButtons';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -208,6 +209,7 @@ export default function UploadComposerScreen() {
     const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
     const [previewSeekRequest, setPreviewSeekRequest] = useState<{ uri: string; positionMs: number; token: number } | null>(null);
     const [subtitleEditorTab, setSubtitleEditorTab] = useState<SubtitleEditorTab | null>(null);
+    const [isSubtitleEditorExpanded, setIsSubtitleEditorExpanded] = useState(false);
     const [subtitleUndoStack, setSubtitleUndoStack] = useState<SubtitleEditHistorySnapshot[]>([]);
     const [subtitleRedoStack, setSubtitleRedoStack] = useState<SubtitleEditHistorySnapshot[]>([]);
 
@@ -326,21 +328,22 @@ export default function UploadComposerScreen() {
         : DEFAULT_SUBTITLE_STYLE;
     const resolvedActiveSubtitleStyle = resolveSubtitleStyle(activeSubtitleStyle);
 
+    const shouldScalePreview = isSubtitleEditorVisible && !isSubtitleEditorExpanded;
     useEffect(() => {
         previewScale.value = withTiming(
-            isSubtitleEditorVisible ? previewScaleWhenSubtitleEditorOpen : 1,
+            shouldScalePreview ? previewScaleWhenSubtitleEditorOpen : 1,
             previewTransitionConfig
         );
         previewTranslateY.value = withTiming(
-            isSubtitleEditorVisible ? previewTopShiftWhenSubtitleEditorOpen : 0,
+            shouldScalePreview ? previewTopShiftWhenSubtitleEditorOpen : 0,
             previewTransitionConfig
         );
         previewMarginBottom.value = withTiming(
-            isSubtitleEditorVisible ? previewCompensationToKeepMenuGap : 0,
+            shouldScalePreview ? previewCompensationToKeepMenuGap : 0,
             previewTransitionConfig
         );
     }, [
-        isSubtitleEditorVisible,
+        shouldScalePreview,
         previewCompensationToKeepMenuGap,
         previewMarginBottom,
         previewScale,
@@ -367,6 +370,11 @@ export default function UploadComposerScreen() {
     useEffect(() => {
         if (!isSubtitleEditorVisible) {
             setIsSubtitlePreviewPlaying(false);
+        }
+    }, [isSubtitleEditorVisible]);
+    useEffect(() => {
+        if (!isSubtitleEditorVisible) {
+            setIsSubtitleEditorExpanded(false);
         }
     }, [isSubtitleEditorVisible]);
 
@@ -398,6 +406,7 @@ export default function UploadComposerScreen() {
             setIsDraggingSubtitle(false);
             setIsEditingSubtitle(false);
             setIsSubtitlePreviewPlaying(false);
+            setIsSubtitleEditorExpanded(false);
             setSubtitleEditorTab(null);
         }
     }, [isFocused]);
@@ -653,6 +662,7 @@ export default function UploadComposerScreen() {
         setCaptionRequestedByUri((prev) => ({ ...prev, [uri]: false }));
         setIsDraggingSubtitle(false);
         setIsEditingSubtitle(false);
+        setIsSubtitleEditorExpanded(false);
         setSubtitleEditorTab(null);
         setSttStatusMessage(null);
         if (uri === activeAssetUri) {
@@ -878,12 +888,19 @@ export default function UploadComposerScreen() {
                                             ]}
                                         >
                                             {asset.type === 'video' ? (
-                                                <View style={{ flex: 1 }}>
+                                                <View
+                                                    collapsable={false}
+                                                    style={{ flex: 1 }}
+                                                >
                                                     <VideoPlayerPreview
                                                         uri={asset.uri}
                                                         isActive={activePreviewIndex === index}
                                                         isMuted={isMuted}
-                                                        isPaused={!isFocused || isDraggingSubtitle || (isEditingSubtitle && !isSubtitlePreviewPlaying)}
+                                                        isPaused={
+                                                            !isFocused
+                                                            || isDraggingSubtitle
+                                                            || (isEditingSubtitle && !isSubtitlePreviewPlaying)
+                                                        }
                                                         progressUpdateIntervalMs={isSubtitleEditorVisible ? 34 : 90}
                                                         seekRequest={previewSeekRequest?.uri === asset.uri ? previewSeekRequest : null}
                                                         onProgress={handlePreviewProgress}
@@ -1007,7 +1024,7 @@ export default function UploadComposerScreen() {
                         )}
                     </ScrollView>
 
-                    {isSubtitleEditorVisible && (
+                    {isSubtitleEditorVisible && !isSubtitleEditorExpanded && (
                         <SubtitleEditorInline
                             activeTab={subtitleEditorTab || 'text'}
                             panelHeight={subtitleEditorPanelHeight}
@@ -1034,12 +1051,17 @@ export default function UploadComposerScreen() {
                             }}
                             onRequestClose={() => {
                                 setIsEditingSubtitle(false);
+                                setIsSubtitleEditorExpanded(false);
                                 setSubtitleEditorTab(null);
                             }}
                             canUndo={canUndoSubtitleChange}
                             canRedo={canRedoSubtitleChange}
                             onUndo={handleSubtitleUndo}
                             onRedo={handleSubtitleRedo}
+                            onOpenExpandedEditor={() => {
+                                setIsSubtitleEditorExpanded(true);
+                                void Haptics.selectionAsync();
+                            }}
                             isPreviewPlaying={isSubtitlePreviewPlaying}
                             onTogglePreviewPlayback={() => {
                                 setIsSubtitlePreviewPlaying((prev) => !prev);
@@ -1062,6 +1084,32 @@ export default function UploadComposerScreen() {
                             onSelectOverlayColor={handleSelectSubtitleOverlayColor}
                             onCycleTextAlign={handleCycleSubtitleTextAlign}
                             onToggleOverlay={handleToggleSubtitleOverlay}
+                        />
+                    )}
+                    {isSubtitleEditorExpanded && (
+                        <SubtitlePreviewControls
+                            topOffset={insets.top + PREVIEW_BASE_HEIGHT + 12}
+                            isPlaying={isSubtitlePreviewPlaying}
+                            currentTimeMs={currentVideoTimeMs}
+                            totalDurationMs={activeVideoTotalDurationMs}
+                            onTogglePlayback={() => {
+                                setIsSubtitlePreviewPlaying((prev) => !prev);
+                                void Haptics.selectionAsync();
+                            }}
+                            onSeek={handleSelectSubtitleSegmentStartMs}
+                            onMinimize={() => {
+                                setIsSubtitleEditorExpanded(false);
+                                void Haptics.selectionAsync();
+                            }}
+                            onContinueEditing={() => {
+                                setIsSubtitleEditorExpanded(false);
+                                void Haptics.selectionAsync();
+                            }}
+                            onNext={() => {
+                                setIsSubtitleEditorExpanded(false);
+                                setIsEditingSubtitle(false);
+                                setSubtitleEditorTab(null);
+                            }}
                         />
                     )}
 

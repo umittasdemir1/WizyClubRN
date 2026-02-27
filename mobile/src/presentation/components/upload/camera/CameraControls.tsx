@@ -16,6 +16,7 @@ interface CameraBottomControlsProps {
     onStopRecording: () => void;
     openGallery: () => void;
     lastPhoto: string | null;
+    allowLongPressRecord?: boolean;
 }
 
 export const CameraControls = ({
@@ -29,6 +30,7 @@ export const CameraControls = ({
     onStopRecording,
     openGallery,
     lastPhoto,
+    allowLongPressRecord = true,
 }: CameraBottomControlsProps) => {
     const isLongPressCapture = useRef(false);
     const suppressNextTap = useRef(false);
@@ -85,12 +87,14 @@ export const CameraControls = ({
                         onTapCapture();
                     }}
                     onLongPress={() => {
+                        if (!allowLongPressRecord) return;
                         isLongPressCapture.current = true;
                         suppressNextTap.current = true;
                         onStartRecording();
                     }}
                     delayLongPress={220}
                     onPressOut={() => {
+                        if (!allowLongPressRecord) return;
                         if (!isLongPressCapture.current) return;
                         isLongPressCapture.current = false;
                         onStopRecording();

@@ -5,11 +5,12 @@ import {
     StyleSheet,
     Pressable,
     Dimensions,
+    InteractionManager,
 } from 'react-native';
 import { CameraView, CameraType, FlashMode, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LogCode, logError, logUI } from '@/core/services/Logger';
 import { useGalleryPickerStore } from '../src/presentation/store/useGalleryPickerStore';
@@ -25,11 +26,13 @@ const PREVIEW_BORDER_RADIUS = 20;
 export default function CameraScreen() {
     const insets = useSafeAreaInsets();
     const cameraRef = useRef<any>(null);
+    const { storyOnly } = useLocalSearchParams<{ storyOnly?: string | string[] }>();
+    const isStoryOnlyEntry = Array.isArray(storyOnly) ? storyOnly[0] === '1' : storyOnly === '1';
 
     const [facing, setFacing] = useState<CameraType>('back');
     const [flash, setFlash] = useState<FlashMode>('off');
     const [permission, requestPermission] = useCameraPermissions();
-    const [selectedMode, setSelectedMode] = useState('HİKAYE');
+    const [selectedMode, setSelectedMode] = useState(MODES[0]);
     const [lastPhoto, setLastPhoto] = useState<string | null>(null);
     const [modeContainerWidth, setModeContainerWidth] = useState(0);
 
@@ -40,15 +43,15 @@ export default function CameraScreen() {
     // Recording state
     const [isRecording, setIsRecording] = useState(false);
 
-    // Get last photo from gallery for preview
+    // Get last photo from gallery for preview — deferred until transition completes
     useEffect(() => {
-        (async () => {
+        const task = InteractionManager.runAfterInteractions(async () => {
             const { status } = await MediaLibrary.requestPermissionsAsync();
             if (status === 'granted') {
                 try {
                     const albums = await MediaLibrary.getAssetsAsync({
                         first: 1,
-                        sortBy: [[MediaLibrary.SortBy.creationTime, false]],
+                        sortBy: [[MediaLibrary.SortBy.modificationTime, false]],
                     });
                     if (albums.assets.length > 0) {
                         setLastPhoto(albums.assets[0].uri);
@@ -57,8 +60,16 @@ export default function CameraScreen() {
                     logError(LogCode.MEDIA_PICKER_ERROR, 'Failed to fetch last photo', error);
                 }
             }
-        })();
+        });
+        return () => task.cancel();
     }, []);
+
+    useEffect(() => {
+        if (!isStoryOnlyEntry) return;
+        if (selectedMode !== MODES[0]) {
+            setSelectedMode(MODES[0]);
+        }
+    }, [isStoryOnlyEntry, selectedMode]);
 
     const toggleFlash = () => {
         setFlash(current => current === 'off' ? 'on' : 'off');
@@ -84,7 +95,7 @@ export default function CameraScreen() {
     }
 
     const resolveCreateMode = () => {
-        if (selectedMode === MODES[0]) return 'story';
+        if (isStoryOnlyEntry || selectedMode === MODES[0]) return 'story';
         if (selectedMode === MODES[2]) return 'draft';
         return 'post';
     };
@@ -117,7 +128,7 @@ export default function CameraScreen() {
                 };
                 setDraft({
                     selectedAssets: [photoAsset],
-                    uploadMode: selectedMode === MODES[0] ? 'story' : 'video',
+                    uploadMode: isStoryOnlyEntry || selectedMode === MODES[0] ? 'story' : 'video',
                     coverAssetIndex: 0,
                     playbackRate: 1,
                     videoVolume: 1,
@@ -157,7 +168,7 @@ export default function CameraScreen() {
             };
             setDraft({
                 selectedAssets: [videoAsset],
-                uploadMode: 'video',
+                uploadMode: isStoryOnlyEntry ? 'story' : 'video',
                 coverAssetIndex: 0,
                 playbackRate: 1,
                 videoVolume: 1,
@@ -219,14 +230,21 @@ export default function CameraScreen() {
                     onStopRecording={stopRecording}
                     openGallery={openGallery}
                     lastPhoto={lastPhoto}
+                    allowLongPressRecord={!isStoryOnlyEntry}
                 />
 
-                <ModeSelector
-                    selectedMode={selectedMode}
-                    setSelectedMode={setSelectedMode}
-                    modeContainerWidth={modeContainerWidth}
-                    setModeContainerWidth={setModeContainerWidth}
-                />
+                {isStoryOnlyEntry ? (
+                    <View style={styles.storyOnlyModeLabelContainer}>
+                        <Text style={styles.storyOnlyModeLabel}>{MODES[0]}</Text>
+                    </View>
+                ) : (
+                    <ModeSelector
+                        selectedMode={selectedMode}
+                        setSelectedMode={setSelectedMode}
+                        modeContainerWidth={modeContainerWidth}
+                        setModeContainerWidth={setModeContainerWidth}
+                    />
+                )}
             </View>
 
             <View style={styles.bottomBar} />
@@ -284,5 +302,20 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#000',
         width: '100%',
+    },
+    storyOnlyModeLabelContainer: {
+        position: 'absolute',
+        left: 90,
+        right: 90,
+        bottom: 42,
+        height: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    storyOnlyModeLabel: {
+        color: '#FFFFFF',
+        fontSize: 18,
+        fontWeight: '700',
+        letterSpacing: 0.3,
     },
 });

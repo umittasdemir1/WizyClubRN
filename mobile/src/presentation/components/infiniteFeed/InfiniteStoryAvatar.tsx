@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Plus } from 'lucide-react-native';
 import { StoryRingAvatar } from '../shared/StoryRingAvatar';
 
-const AVATAR_SIZE = 64;
+const AVATAR_SIZE = 72;
 const THICKNESS = 1.5;
 const GAP = 1.5;
 const RING_SIZE = AVATAR_SIZE + (THICKNESS * 2) + (GAP * 2);

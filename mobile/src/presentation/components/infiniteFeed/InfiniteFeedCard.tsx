@@ -11,6 +11,7 @@ import { InfiniteFeedActions } from './InfiniteFeedActions';
 import { InfiniteCarouselLayer } from './InfiniteCarouselLayer';
 import { VerifiedBadge } from '../shared/VerifiedBadge';
 import { StoryRingAvatar } from '../shared/StoryRingAvatar';
+import { RichTextLabel } from '../shared/RichTextLabel';
 import { ThemeColors } from './InfiniteFeedTypes';
 import { FEED_FLAGS } from './hooks/useInfiniteFeedConfig';
 import { getBufferConfig } from '../../../core/utils/bufferConfig';
@@ -26,6 +27,7 @@ import {
     getSubtitleWrapperStyle,
     resolveSubtitleStyle,
 } from '../../../core/utils/subtitleOverlay';
+import { getRichTextVisibleLength, stripRichTextTags, truncateRichTextByVisibleLength } from '../../../core/utils/richText';
 import VideosIcon from '../../../../assets/icons/darkvideos.svg';
 
 const DESCRIPTION_LIMIT = 70;
@@ -199,7 +201,6 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
 
     const [activeSubtitleText, setActiveSubtitleText] = useState<string | null>(null);
     const [subtitleLayoutBounds, setSubtitleLayoutBounds] = useState({ width: 0, height: 0 });
-    const [subtitleMeasuredHeight, setSubtitleMeasuredHeight] = useState(0);
     const { subtitles, getActiveSubtitle } = useSubtitles(isActive ? item.id : undefined);
     const subtitlePresentationStyle = useMemo(() => {
         return getSubtitlePresentationPixelStyle(
@@ -207,16 +208,16 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
             subtitleLayoutBounds.width,
             subtitleLayoutBounds.height,
             {
-                measuredSubtitleHeight: subtitleMeasuredHeight,
                 bottomPadding: SUBTITLE_BOTTOM_SAFE_PADDING,
+                verticalAnchor: 'bottom',
             }
         );
     }, [
         subtitles?.presentation,
         subtitleLayoutBounds.width,
         subtitleLayoutBounds.height,
-        subtitleMeasuredHeight,
     ]);
+    const subtitlePositionStyle = subtitlePresentationStyle ?? styles.subtitleContainerFallback;
     const resolvedSubtitleStyle = useMemo(() => resolveSubtitleStyle(subtitles?.style), [subtitles?.style]);
     const subtitleTextDynamicStyle = useMemo(() => {
         return {
@@ -876,18 +877,19 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         return item.brandName ? `${commercialTypeLabel} | ${item.brandName}` : commercialTypeLabel;
     }, [item.brandName, item.commercialType, item.isCommercial]);
 
-    const descriptionValue = item.description?.trim() ?? '';
-    const hasDescription = descriptionValue.length > 0;
-    const canToggleDescription = descriptionValue.length > DESCRIPTION_LIMIT;
+    const descriptionValue = item.description ?? '';
+    const hasDescription = stripRichTextTags(descriptionValue).trim().length > 0;
+    const descriptionVisibleLength = getRichTextVisibleLength(descriptionValue);
+    const canToggleDescription = descriptionVisibleLength > DESCRIPTION_LIMIT;
     const handleToggleDescription = useCallback(() => {
         if (!canToggleDescription) return;
-        setIsDescriptionExpanded(prev => !prev);
+        setIsDescriptionExpanded((prev) => !prev);
     }, [canToggleDescription]);
+    const displayDescription = useMemo(() => {
+        if (isDescriptionExpanded || !canToggleDescription) return descriptionValue;
+        return truncateRichTextByVisibleLength(descriptionValue, DESCRIPTION_LIMIT).text;
+    }, [canToggleDescription, descriptionValue, isDescriptionExpanded]);
     const displayName = item.user?.username || item.user?.fullName || 'wizyclub';
-    const truncatedDescription =
-        isDescriptionExpanded || !canToggleDescription
-            ? descriptionValue
-            : descriptionValue.substring(0, DESCRIPTION_LIMIT);
     const relativeTime = useMemo(() => formatRelativeTime(item.createdAt), [item.createdAt]);
     const showDescriptionBlock = !disableDescription && hasDescription;
     const showTimeHint = !isCleanScreen && relativeTime.length > 0;
@@ -902,11 +904,6 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
             return { width, height };
         });
     }, []);
-    const handleSubtitleWrapperLayout = useCallback((event: LayoutChangeEvent) => {
-        const nextHeight = event.nativeEvent.layout.height;
-        setSubtitleMeasuredHeight((prev) => (Math.abs(prev - nextHeight) < 0.5 ? prev : nextHeight));
-    }, []);
-
     const cardBody = (
         <>
             {/* MEDIA - Video or Image */}
@@ -968,7 +965,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                     event.stopPropagation?.();
                                     handleMore();
                                 }}
-                                hitSlop={10}
+                                hitSlop={14}
                             >
                                 <MoreVertical size={22} color="#FFFFFF" strokeWidth={2.4} />
                             </Pressable>
@@ -1115,7 +1112,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                     event.stopPropagation?.();
                                     handleMore();
                                 }}
-                                hitSlop={10}
+                                hitSlop={14}
                             >
                                 <MoreVertical size={22} color="#FFFFFF" strokeWidth={2.4} />
                             </Pressable>
@@ -1145,11 +1142,8 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                             </View>
                         )}
                         {isVideo && isActive && !isCleanScreen && shouldShowSubtitle && activeSubtitleText && (
-                            <View style={[styles.subtitleContainer, subtitlePresentationStyle]} pointerEvents="none">
-                                <View
-                                    style={[styles.subtitleWrapper, subtitleWrapperDynamicStyle]}
-                                    onLayout={handleSubtitleWrapperLayout}
-                                >
+                            <View style={[styles.subtitleContainer, subtitlePositionStyle]} pointerEvents="none">
+                                <View style={[styles.subtitleWrapper, subtitleWrapperDynamicStyle]}>
                                     <Text style={[styles.subtitleText, subtitleTextDynamicStyle]}>{formattedSubtitleText}</Text>
                                 </View>
                             </View>
@@ -1193,26 +1187,14 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                 <View style={styles.cardContent}>
                     <Text style={themedStyles.description} onPress={handleToggleDescription}>
                         <Text style={themedStyles.displayName} onPress={handleProfilePress}>{displayName}</Text>
-                        {hasDescription ? (
-                            <>
-                                {' '}
-                                {truncatedDescription}
-                                {!isDescriptionExpanded && canToggleDescription && (
-                                    <Text
-                                        style={themedStyles.readMore}
-                                    >
-                                        {'...daha fazla'}
-                                    </Text>
-                                )}
-                                {isDescriptionExpanded && canToggleDescription && (
-                                    <Text
-                                        style={themedStyles.readMore}
-                                    >
-                                        {' daha az'}
-                                    </Text>
-                                )}
-                            </>
-                        ) : null}
+                        {hasDescription ? ' ' : null}
+                        {hasDescription ? <RichTextLabel text={displayDescription} /> : null}
+                        {!isDescriptionExpanded && canToggleDescription && (
+                            <Text style={themedStyles.readMore}>{'...daha fazla'}</Text>
+                        )}
+                        {isDescriptionExpanded && canToggleDescription && (
+                            <Text style={themedStyles.readMore}>{' daha az'}</Text>
+                        )}
                     </Text>
                     {showTimeHint && <Text style={themedStyles.timeHint}>{relativeTime}</Text>}
                 </View>
@@ -1298,7 +1280,7 @@ const styles = StyleSheet.create({
         fontWeight: '400',
     },
     readMore: {
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: '500',
     },
     displayName: {
@@ -1357,9 +1339,9 @@ const styles = StyleSheet.create({
         zIndex: 6,
     },
     moreButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: 'transparent',
@@ -1475,9 +1457,11 @@ const styles = StyleSheet.create({
     subtitleContainer: {
         position: 'absolute',
         left: SUBTITLE_SIDE_MARGIN,
-        bottom: 12,
         maxWidth: SUBTITLE_MAX_WIDTH,
         zIndex: 4,
+    },
+    subtitleContainerFallback: {
+        bottom: 12,
     },
     subtitleWrapper: {
         borderRadius: SUBTITLE_BORDER_RADIUS,

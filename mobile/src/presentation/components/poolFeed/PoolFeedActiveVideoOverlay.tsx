@@ -148,7 +148,6 @@ export const PoolFeedActiveVideoOverlay = memo(function PoolFeedActiveVideoOverl
     const [activeSubtitleText, setActiveSubtitleText] = React.useState<string | null>(null);
     const [currentTimeSec, setCurrentTimeSec] = React.useState(0);
     const [subtitleLayoutBounds, setSubtitleLayoutBounds] = React.useState({ width: 0, height: 0 });
-    const [subtitleMeasuredHeight, setSubtitleMeasuredHeight] = React.useState(0);
     const subtitleAlwaysEnabled = useSubtitlePreferencesStore((state) => state.alwaysEnabled);
     const subtitleVideoEnabledById = useSubtitlePreferencesStore((state) => state.videoEnabledById);
 
@@ -179,11 +178,15 @@ export const PoolFeedActiveVideoOverlay = memo(function PoolFeedActiveVideoOverl
             subtitleLayoutBounds.width,
             subtitleLayoutBounds.height,
             {
-                measuredSubtitleHeight: subtitleMeasuredHeight,
                 bottomPadding: SUBTITLE_BOTTOM_SAFE_PADDING,
+                verticalAnchor: 'bottom',
             }
         );
-    }, [subtitles?.presentation, subtitleLayoutBounds.width, subtitleLayoutBounds.height, subtitleMeasuredHeight]);
+    }, [subtitles?.presentation, subtitleLayoutBounds.width, subtitleLayoutBounds.height]);
+    const subtitlePositionStyle = React.useMemo(
+        () => subtitlePresentationStyle ?? { bottom: subtitleBottomOffset },
+        [subtitleBottomOffset, subtitlePresentationStyle]
+    );
     const resolvedSubtitleStyle = React.useMemo(() => resolveSubtitleStyle(subtitles?.style), [subtitles?.style]);
     const formattedSubtitleText = React.useMemo(
         () => applySubtitleTextCase(activeSubtitleText || '', subtitles?.style?.textCase),
@@ -293,11 +296,6 @@ export const PoolFeedActiveVideoOverlay = memo(function PoolFeedActiveVideoOverl
             return { width, height };
         });
     }, []);
-    const handleSubtitleWrapperLayout = useCallback((event: LayoutChangeEvent) => {
-        const nextHeight = event.nativeEvent.layout.height;
-        setSubtitleMeasuredHeight((prev) => (Math.abs(prev - nextHeight) < 0.5 ? prev : nextHeight));
-    }, []);
-
     // ========================================================================
     // Render
     // ========================================================================
@@ -410,13 +408,10 @@ export const PoolFeedActiveVideoOverlay = memo(function PoolFeedActiveVideoOverl
                         />
                         {shouldShowSubtitlePreference && showUiOverlays && activeSubtitleText && (
                             <View
-                                style={[styles.subtitleContainer, { bottom: subtitleBottomOffset }, subtitlePresentationStyle]}
+                                style={[styles.subtitleContainer, subtitlePositionStyle]}
                                 pointerEvents="none"
                             >
-                                <View
-                                    style={[styles.subtitleWrapper, subtitleWrapperDynamicStyle]}
-                                    onLayout={handleSubtitleWrapperLayout}
-                                >
+                                <View style={[styles.subtitleWrapper, subtitleWrapperDynamicStyle]}>
                                     <Text style={[styles.subtitleText, subtitleTextDynamicStyle]}>{formattedSubtitleText}</Text>
                                 </View>
                             </View>
