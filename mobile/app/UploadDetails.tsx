@@ -1,21 +1,25 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     Alert,
+    Dimensions,
     Modal,
     Pressable,
     ScrollView,
     StyleSheet,
     Switch,
     Text,
-    TextInput,
     View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, ChevronRight, PlusCircle, Tag, Users, X } from 'lucide-react-native';
+import { ArrowLeft, ChevronRight, CircleUserRound, MapPinCheckInside, X } from 'lucide-react-native';
 import { router } from 'expo-router';
+import { Image } from 'expo-image';
 import { SystemBars } from 'react-native-edge-to-edge';
 import { RichEditor, actions } from 'react-native-pell-rich-editor';
+import { useVideoPlayer } from 'expo-video';
 import AiIcon from '../assets/icons/ai.svg';
+import CommunityIcon from '../assets/icons/community.svg';
+import PartnershipIcon from '../assets/icons/partnership.svg';
 import { useThemeStore } from '../src/presentation/store/useThemeStore';
 import { useSurfaceTheme } from '../src/presentation/hooks/useSurfaceTheme';
 import { useUploadComposerStore } from '../src/presentation/store/useUploadComposerStore';
@@ -40,10 +44,64 @@ const COMMERCIAL_TYPES = [
     'Ürün İncelemesi',
     'Kendi Markam',
 ];
+const TOPIC_SUGGESTIONS = [
+    'kesfet',
+    'trend',
+    'stil',
+    'moda',
+    'bakim',
+    'makyaj',
+    'ciltbakimi',
+    'sacbakimi',
+    'kombin',
+    'gunlukrutin',
+    'yemektarifi',
+    'seyahat',
+    'spor',
+    'fitness',
+    'wellness',
+    'saglikliyasam',
+    'kahveritueli',
+    'tatli',
+    'evdebakim',
+    'minimalyasam',
+    'dekorasyon',
+    'teknoloji',
+    'mobilfotografcilik',
+    'icerikuretim',
+    'vlog',
+    'kamp',
+    'haftasonu',
+    'sokakstili',
+    'dogalurunler',
+    'alisveris',
+    'yenisezon',
+    'ilham',
+];
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const DESCRIPTION_MAX_LENGTH = 2200;
+const DESCRIPTION_MIN_HEIGHT = 72;
 const EDITOR_FONT_SIZE = 15;
 const EDITOR_LINE_HEIGHT = 21;
+const TOPIC_SUGGESTION_HEADER_HEIGHT = 44;
+const TOPIC_SUGGESTION_ROW_HEIGHT = 38;
+const TOPIC_SUGGESTION_VISIBLE_ROWS = 10;
+const TOPIC_SUGGESTION_MODAL_HEIGHT = 350;
+const PREVIEW_ASPECT_RATIO = 16 / 9;
+const PREVIEW_WIDTH = SCREEN_WIDTH;
+const PREVIEW_HEIGHT = PREVIEW_WIDTH * PREVIEW_ASPECT_RATIO;
+const PREVIEW_SCALE_WHEN_DESCRIPTION_EDITOR_OPEN = 0.44;
+const PREVIEW_MENU_GAP_WHEN_DESCRIPTION_EDITOR_OPEN = 0;
+const PREVIEW_TOP_GAP_WHEN_DESCRIPTION_EDITOR_OPEN = 20;
+const PREVIEW_COLLAPSED_TRANSLATE_Y = (
+    PREVIEW_TOP_GAP_WHEN_DESCRIPTION_EDITOR_OPEN -
+    (PREVIEW_HEIGHT * (1 - PREVIEW_SCALE_WHEN_DESCRIPTION_EDITOR_OPEN)) / 2
+) / PREVIEW_SCALE_WHEN_DESCRIPTION_EDITOR_OPEN;
+const PREVIEW_COLLAPSED_MARGIN_BOTTOM =
+    PREVIEW_MENU_GAP_WHEN_DESCRIPTION_EDITOR_OPEN -
+    (PREVIEW_HEIGHT * (1 - PREVIEW_SCALE_WHEN_DESCRIPTION_EDITOR_OPEN)) / 2 +
+    (PREVIEW_SCALE_WHEN_DESCRIPTION_EDITOR_OPEN * PREVIEW_COLLAPSED_TRANSLATE_Y);
 const HTML_NAMED_ENTITIES: Record<string, string> = {
     '&nbsp;': ' ',
     '&amp;': '&',
@@ -57,6 +115,24 @@ const DESCRIPTION_TAG_ACTION = {
     i: actions.setItalic,
     u: actions.setUnderline,
 } as const;
+type PreviewImageSource = React.ComponentProps<typeof Image>['source'];
+
+const getUriCandidate = (value: unknown): string | null => {
+    if (typeof value === 'string' && value.trim().length > 0) return value;
+    if (value && typeof value === 'object' && 'uri' in value) {
+        const uri = (value as { uri?: unknown }).uri;
+        if (typeof uri === 'string' && uri.trim().length > 0) return uri;
+    }
+    return null;
+};
+
+const pickPreferredUri = (...values: unknown[]): string | null => {
+    for (const value of values) {
+        const uri = getUriCandidate(value);
+        if (uri) return uri;
+    }
+    return null;
+};
 
 const decodeHtmlEntities = (input: string): string =>
     input
@@ -93,6 +169,42 @@ const normalizeRichEditorHtml = (inputHtml: string): string => {
     return nextValue;
 };
 
+const extractTopicTags = (input: string): string[] => {
+    const plainText = stripRichTextTags(input);
+    const matches = plainText.match(/(^|\s)#([^\s#]+)/g) ?? [];
+    const nextTags: string[] = [];
+
+    matches.forEach((match) => {
+        if (nextTags.length >= 5) return;
+
+        const normalized = match.trim().replace(/^#/, '');
+        if (!normalized) return;
+
+        nextTags.push(normalized);
+    });
+
+    return nextTags;
+};
+
+const extractActiveTopicQuery = (input: string): string | null => {
+    const plainText = stripRichTextTags(input);
+    const match = plainText.match(/(?:^|\s)#([^\s#]*)$/);
+    if (!match) return null;
+
+    return match[1] ?? '';
+};
+
+const getActiveTopicLineIndex = (input: string): number | null => {
+    const plainText = stripRichTextTags(input);
+    const match = plainText.match(/(?:^|\s)#([^\s#]*)$/);
+    if (!match) return null;
+
+    const triggerIndex = plainText.lastIndexOf('#');
+    if (triggerIndex < 0) return null;
+
+    return (plainText.slice(0, triggerIndex).match(/\n/g) ?? []).length;
+};
+
 export default function UploadDetailsScreen() {
     const insets = useSafeAreaInsets();
     const isDark = useThemeStore((state) => state.isDark);
@@ -100,7 +212,16 @@ export default function UploadDetailsScreen() {
     const { user } = useAuthStore();
     const { createDraft } = useDraftStore();
     const triggerStoryRefresh = useStoryStore((state) => state.triggerRefresh);
-    const { startUpload, setProgress, setStatus, setSuccess, setError, setThumbnailUri, reset: resetUploadState } = useUploadStore();
+    const {
+        startUpload,
+        setProgress,
+        setStatus,
+        setSuccess,
+        setError,
+        setThumbnailUri,
+        setTaggedPeoplePreview,
+        reset: resetUploadState,
+    } = useUploadStore();
     const draft = useUploadComposerStore((state) => state.draft);
     const subtitleCache = useUploadComposerStore((state) => state.subtitleCache);
     const subtitlePresentationCache = useUploadComposerStore((state) => state.subtitlePresentationCache);
@@ -117,23 +238,61 @@ export default function UploadDetailsScreen() {
         italic: false,
         underline: false,
     });
-    const [tags, setTags] = useState<string[]>([]);
     const [commercialType, setCommercialType] = useState<string | null>(null);
     const [brandName, setBrandName] = useState('');
     const [brandUrl, setBrandUrl] = useState('');
     const [useAILabel, setUseAILabel] = useState(false);
     const [showCommercialMenu, setShowCommercialMenu] = useState(false);
-    const [showTagInputModal, setShowTagInputModal] = useState(false);
-    const [currentTagInput, setCurrentTagInput] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isDescriptionFocused, setIsDescriptionFocused] = useState(false);
+    const [descriptionEditorHeight, setDescriptionEditorHeight] = useState(DESCRIPTION_MIN_HEIGHT);
+    const [descriptionSectionY, setDescriptionSectionY] = useState(0);
+    const [dismissedTopicSuggestionSignature, setDismissedTopicSuggestionSignature] = useState<string | null>(null);
 
     const bgColor = modalTheme.fullScreenBackground;
     const textColor = modalTheme.textPrimary;
     const subtextColor = modalTheme.textSecondary;
     const borderColor = modalTheme.sheetBorder;
     const inputBg = modalTheme.inputBackground;
-    const selectedFormatButtonBg = isDark ? '#3A3A3A' : '#E6E6E6';
-    const selectedFormatButtonBorder = isDark ? '#5A5A5A' : '#C9C9C9';
+    const formatButtonBorderColor = '#FFFFFF';
+    const selectedFormatButtonBg = inputBg;
+    const selectedFormatButtonBorder = '#FFFFFF';
+    const topicTags = useMemo(() => extractTopicTags(description), [description]);
+    const taggedPeople = draft?.taggedPeople ?? [];
+    const visibleTaggedPeople = useMemo(
+        () => (taggedPeople.length > 5 ? taggedPeople.slice(0, 4) : taggedPeople.slice(0, 5)),
+        [taggedPeople]
+    );
+    const hasTaggedPeopleOverflow = taggedPeople.length > 5;
+    const activeTopicQuery = useMemo(() => extractActiveTopicQuery(description), [description]);
+    const activeTopicLineIndex = useMemo(() => getActiveTopicLineIndex(description), [description]);
+    const topicSuggestions = useMemo(() => {
+        if (activeTopicQuery === null) return [];
+
+        const normalizedQuery = activeTopicQuery.trim().toLocaleLowerCase('tr-TR');
+        const matches = TOPIC_SUGGESTIONS.filter((item) =>
+            normalizedQuery.length === 0
+                ? true
+                : item.toLocaleLowerCase('tr-TR').startsWith(normalizedQuery)
+        );
+
+        return matches;
+    }, [activeTopicQuery]);
+    const showTopicSuggestionModal =
+        isDescriptionFocused && activeTopicQuery !== null && dismissedTopicSuggestionSignature !== description;
+    const topicSuggestionModalTop = useMemo(() => {
+        if (activeTopicLineIndex === null) return 0;
+        return descriptionSectionY + (activeTopicLineIndex + 1) * EDITOR_LINE_HEIGHT + 10;
+    }, [activeTopicLineIndex, descriptionSectionY]);
+    const previewAsset = useMemo(() => {
+        if (!draft?.selectedAssets?.length) return null;
+
+        const rawIndex = typeof draft.coverAssetIndex === 'number' ? draft.coverAssetIndex : 0;
+        const safeIndex = Math.min(Math.max(rawIndex, 0), draft.selectedAssets.length - 1);
+
+        return draft.selectedAssets[safeIndex] ?? draft.selectedAssets[0] ?? null;
+    }, [draft]);
+    const [generatedPreviewImageSource, setGeneratedPreviewImageSource] = useState<PreviewImageSource>(null);
 
     const title = useMemo(() => {
         if (!draft) return 'Gönderi Oluştur';
@@ -141,15 +300,123 @@ export default function UploadDetailsScreen() {
         return 'Gönderi Oluştur';
     }, [draft]);
 
-    const handleAddTag = () => setShowTagInputModal(true);
-    const handleRemoveTag = (index: number) => setTags((prev) => prev.filter((_, i) => i !== index));
-    const handleSaveTag = () => {
-        const value = currentTagInput.trim();
-        if (!value || tags.length >= 5) return;
-        setTags((prev) => [...prev, value]);
-        setCurrentTagInput('');
-        setShowTagInputModal(false);
+    const explicitPreviewImageSource = useMemo<PreviewImageSource>(() => {
+        if (!previewAsset) return null;
+
+        const draftRecord = draft as Record<string, unknown> | null;
+        const previewAssetRecord = previewAsset as Record<string, unknown>;
+        const preferredUri = pickPreferredUri(
+            draftRecord?.manualThumbnailUri,
+            draftRecord?.selectedThumbnailUri,
+            draftRecord?.thumbnailUri,
+            draftRecord?.selectedThumbnail,
+            previewAssetRecord.manualThumbnailUri,
+            previewAssetRecord.selectedThumbnailUri,
+            previewAssetRecord.thumbnailUri,
+            previewAssetRecord.selectedThumbnail,
+            previewAssetRecord.thumbnail,
+            previewAssetRecord.previewUri,
+            previewAssetRecord.posterUri,
+        );
+
+        if (preferredUri) return { uri: preferredUri };
+        if (previewAsset.type !== 'video') return { uri: previewAsset.uri };
+        return null;
+    }, [draft, previewAsset]);
+    const previewThumbnailTimeSec = useMemo(() => {
+        if (typeof draft?.coverTimeSec !== 'number' || !Number.isFinite(draft.coverTimeSec)) return 0;
+        return Math.max(0, draft.coverTimeSec);
+    }, [draft?.coverTimeSec]);
+    const shouldGeneratePreviewThumbnail = previewAsset?.type === 'video' && !explicitPreviewImageSource;
+    const previewVideoUriForThumbnail = shouldGeneratePreviewThumbnail && previewAsset ? previewAsset.uri : null;
+    const previewThumbnailPlayer = useVideoPlayer(previewVideoUriForThumbnail);
+    const previewImageSource = explicitPreviewImageSource ?? generatedPreviewImageSource;
+
+    useEffect(() => {
+        let isCancelled = false;
+
+        if (!shouldGeneratePreviewThumbnail) {
+            setGeneratedPreviewImageSource(null);
+            return () => {
+                isCancelled = true;
+            };
+        }
+
+        setGeneratedPreviewImageSource(null);
+
+        const requestedTimes = previewThumbnailTimeSec > 0 ? [previewThumbnailTimeSec, 0] : [0];
+
+        void previewThumbnailPlayer
+            .generateThumbnailsAsync(requestedTimes, {
+                maxWidth: Math.round(PREVIEW_WIDTH),
+                maxHeight: Math.round(PREVIEW_HEIGHT),
+            })
+            .then((thumbnails) => {
+                if (isCancelled) return;
+
+                const preferredThumbnail = thumbnails.find(
+                    (thumbnail) => Math.abs(thumbnail.requestedTime - previewThumbnailTimeSec) < 0.01
+                ) ?? thumbnails[0] ?? null;
+
+                setGeneratedPreviewImageSource((preferredThumbnail ?? null) as PreviewImageSource);
+            })
+            .catch((error) => {
+                if (isCancelled) return;
+                logError(LogCode.MEDIA_PICKER_ERROR, 'Failed to generate upload preview thumbnail', error);
+                setGeneratedPreviewImageSource(null);
+            });
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [previewThumbnailPlayer, previewThumbnailTimeSec, shouldGeneratePreviewThumbnail]);
+
+    useEffect(() => {
+        if (activeTopicQuery === null && dismissedTopicSuggestionSignature !== null) {
+            setDismissedTopicSuggestionSignature(null);
+        }
+    }, [activeTopicQuery, dismissedTopicSuggestionSignature]);
+
+    const handleAddTag = useCallback(() => {
+        setDismissedTopicSuggestionSignature(null);
+        const editor = descriptionEditorRef.current;
+        if (!editor) return;
+
+        (editor as any)?.showAndroidKeyboard?.();
+        editor.focusContentEditor();
+
+        requestAnimationFrame(() => {
+            editor.insertText('#');
+        });
+    }, []);
+    const handleAddPerson = () => {
+        router.push('/tag-people' as any);
     };
+    const handleAddLocation = () => {
+        Alert.alert('Bilgi', 'Konum ekleme seçimi sonraki adımda bağlanacak.');
+    };
+    const handleSelectTopicSuggestion = useCallback((suggestion: string) => {
+        if (activeTopicQuery === null) return;
+
+        const editor = descriptionEditorRef.current;
+        if (!editor) return;
+
+        const normalizedSuggestion = suggestion.toLocaleLowerCase('tr-TR');
+        const normalizedQuery = activeTopicQuery.toLocaleLowerCase('tr-TR');
+        const suffix = normalizedSuggestion.startsWith(normalizedQuery)
+            ? suggestion.slice(activeTopicQuery.length)
+            : suggestion;
+
+        (editor as any)?.showAndroidKeyboard?.();
+        editor.focusContentEditor();
+
+        requestAnimationFrame(() => {
+            editor.insertText(`${suffix} `);
+        });
+    }, [activeTopicQuery]);
+    const handleCloseTopicSuggestionModal = useCallback(() => {
+        setDismissedTopicSuggestionSignature(description);
+    }, [description]);
 
     const handleClubsSelect = () => {
         Alert.alert('Bilgi', 'CLUB seçimi sonraki adımda bağlanacak.');
@@ -212,10 +479,16 @@ export default function UploadDetailsScreen() {
 
     const handleDescriptionEditorFocus = useCallback(() => {
         descriptionFocusedRef.current = true;
+        setIsDescriptionFocused(true);
     }, []);
 
     const handleDescriptionEditorBlur = useCallback(() => {
         descriptionFocusedRef.current = false;
+        setIsDescriptionFocused(false);
+    }, []);
+    const handleDescriptionHeightChange = useCallback((height: number) => {
+        const nextHeight = Math.max(DESCRIPTION_MIN_HEIGHT, Math.ceil(height));
+        setDescriptionEditorHeight((current) => current === nextHeight ? current : nextHeight);
     }, []);
 
     const handleSaveDraft = async () => {
@@ -238,7 +511,7 @@ export default function UploadDetailsScreen() {
                 commercialType: commercialType || undefined,
                 brandName,
                 brandUrl,
-                tags,
+                tags: topicTags,
                 useAILabel,
                 uploadMode: draft.uploadMode,
             });
@@ -269,6 +542,7 @@ export default function UploadDetailsScreen() {
         setIsSubmitting(true);
         startUpload();
         if (draft.selectedAssets[0]?.uri) setThumbnailUri(draft.selectedAssets[0].uri);
+        setTaggedPeoplePreview(draft.taggedPeople ?? []);
 
         router.replace('/(tabs)' as any);
 
@@ -276,6 +550,7 @@ export default function UploadDetailsScreen() {
         formData.append('userId', user.id);
         formData.append('description', description);
         formData.append('commercialType', commercialType);
+        formData.append('tags', JSON.stringify(topicTags));
         formData.append('coverIndex', String(draft.coverAssetIndex));
         if (typeof draft.coverTimeSec === 'number' && draft.coverTimeSec >= 0) {
             formData.append('coverTimeSec', String(draft.coverTimeSec));
@@ -423,15 +698,56 @@ export default function UploadDetailsScreen() {
                 style={styles.scrollView}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
+                scrollEnabled={!showTopicSuggestionModal}
             >
-                <View style={[styles.descriptionSection, { backgroundColor: inputBg }]}>
+                {previewAsset ? (
+                    <View style={styles.previewSection}>
+                        <View style={styles.previewPage}>
+                            <View
+                                style={[
+                                    styles.previewContainer,
+                                    {
+                                        width: PREVIEW_WIDTH,
+                                        height: PREVIEW_HEIGHT,
+                                        transform: [
+                                            { scale: PREVIEW_SCALE_WHEN_DESCRIPTION_EDITOR_OPEN },
+                                            { translateY: PREVIEW_COLLAPSED_TRANSLATE_Y },
+                                        ],
+                                        marginBottom: PREVIEW_COLLAPSED_MARGIN_BOTTOM,
+                                    },
+                                ]}
+                            >
+                                {previewImageSource ? (
+                                    <Image
+                                        source={previewImageSource}
+                                        style={styles.previewMedia}
+                                        contentFit="cover"
+                                    />
+                                ) : (
+                                    <View style={[styles.previewFallback, { backgroundColor: inputBg }]}>
+                                        <Text style={[styles.previewFallbackText, { color: subtextColor }]}>
+                                            Önizleme hazırlanıyor...
+                                        </Text>
+                                    </View>
+                                )}
+                            </View>
+                        </View>
+                    </View>
+                ) : null}
+                <View
+                    style={styles.descriptionSection}
+                    onLayout={(event) => {
+                        setDescriptionSectionY(event.nativeEvent.layout.y);
+                    }}
+                >
                     <RichEditor
                         ref={descriptionEditorRef}
-                        style={styles.descriptionEditor}
-                        initialHeight={120}
+                        style={[styles.descriptionEditor, { minHeight: descriptionEditorHeight }]}
+                        initialHeight={DESCRIPTION_MIN_HEIGHT}
                         placeholder="Bir açıklama yaz ve konu etiketleri ekle..."
                         editorInitializedCallback={handleDescriptionEditorInitialized}
                         onChange={handleDescriptionChange}
+                        onHeightChange={handleDescriptionHeightChange}
                         onFocus={handleDescriptionEditorFocus}
                         onBlur={handleDescriptionEditorBlur}
                         styleWithCSS={false}
@@ -450,77 +766,191 @@ export default function UploadDetailsScreen() {
                                 margin: 0;
                                 padding: 0;
                             `,
+                            cssText: `
+                                [placeholder]:empty:before,
+                                [placeholder]:empty:focus:before {
+                                    font-size: 14px;
+                                    line-height: 20px;
+                                }
+                            `,
                         }}
                     />
                 </View>
                 <View style={styles.formatToolbarContainer}>
                     <View style={styles.formatToolbar}>
-                        <Pressable
-                            style={[
-                                styles.formatButton,
-                                { borderColor },
-                                formatButtonState.bold && {
-                                    backgroundColor: selectedFormatButtonBg,
-                                    borderColor: selectedFormatButtonBorder,
-                                },
-                            ]}
-                            onPress={() => handleApplyDescriptionStyle('b')}
-                        >
-                            <Text style={[styles.formatButtonText, { color: textColor, fontWeight: '700' }]}>B</Text>
-                        </Pressable>
-                        <Pressable
-                            style={[
-                                styles.formatButton,
-                                { borderColor },
-                                formatButtonState.italic && {
-                                    backgroundColor: selectedFormatButtonBg,
-                                    borderColor: selectedFormatButtonBorder,
-                                },
-                            ]}
-                            onPress={() => handleApplyDescriptionStyle('i')}
-                        >
-                            <Text style={[styles.formatButtonText, { color: textColor, fontStyle: 'italic' }]}>I</Text>
-                        </Pressable>
-                        <Pressable
-                            style={[
-                                styles.formatButton,
-                                { borderColor },
-                                formatButtonState.underline && {
-                                    backgroundColor: selectedFormatButtonBg,
-                                    borderColor: selectedFormatButtonBorder,
-                                },
-                            ]}
-                            onPress={() => handleApplyDescriptionStyle('u')}
-                        >
-                            <Text style={[styles.formatButtonText, { color: textColor, textDecorationLine: 'underline' }]}>U</Text>
-                        </Pressable>
+                        <View style={styles.formatToolbarButtons}>
+                            <Pressable
+                                style={[
+                                    styles.formatButton,
+                                    { borderColor: formatButtonBorderColor },
+                                    formatButtonState.bold && {
+                                        backgroundColor: selectedFormatButtonBg,
+                                        borderColor: selectedFormatButtonBorder,
+                                    },
+                                ]}
+                                onPress={() => handleApplyDescriptionStyle('b')}
+                            >
+                                <Text style={[styles.formatButtonText, { color: textColor, fontWeight: '700' }]}>B</Text>
+                            </Pressable>
+                            <Pressable
+                                style={[
+                                    styles.formatButton,
+                                    { borderColor: formatButtonBorderColor },
+                                    formatButtonState.italic && {
+                                        backgroundColor: selectedFormatButtonBg,
+                                        borderColor: selectedFormatButtonBorder,
+                                    },
+                                ]}
+                                onPress={() => handleApplyDescriptionStyle('i')}
+                            >
+                                <Text style={[styles.formatButtonText, { color: textColor, fontStyle: 'italic' }]}>I</Text>
+                            </Pressable>
+                            <Pressable
+                                style={[
+                                    styles.formatButton,
+                                    { borderColor: formatButtonBorderColor },
+                                    formatButtonState.underline && {
+                                        backgroundColor: selectedFormatButtonBg,
+                                        borderColor: selectedFormatButtonBorder,
+                                    },
+                                ]}
+                                onPress={() => handleApplyDescriptionStyle('u')}
+                            >
+                                <Text style={[styles.formatButtonText, { color: textColor, textDecorationLine: 'underline' }]}>U</Text>
+                            </Pressable>
+                        </View>
+                        {topicTags.length < 5 ? (
+                            <Pressable
+                                onPress={handleAddTag}
+                                style={[styles.addTagButton, styles.formatToolbarAddTagButton, { backgroundColor: inputBg }]}
+                            >
+                                <Text style={[styles.addTagButtonText, { color: textColor }]}># Konular ekle</Text>
+                            </Pressable>
+                        ) : null}
                     </View>
                 </View>
+                {showTopicSuggestionModal ? (
+                    <View
+                        style={[
+                            styles.topicSuggestionModal,
+                            {
+                                backgroundColor: inputBg,
+                                top: topicSuggestionModalTop,
+                            },
+                        ]}
+                    >
+                        <View style={styles.topicSuggestionHeader}>
+                            <Text style={[styles.topicSuggestionHeaderText, { color: textColor }]}>Önerilen Konular</Text>
+                            <Pressable
+                                style={styles.topicSuggestionCloseButton}
+                                onPress={handleCloseTopicSuggestionModal}
+                                hitSlop={8}
+                            >
+                                <X color={subtextColor} size={18} />
+                            </Pressable>
+                        </View>
+                        <View style={styles.topicSuggestionContent}>
+                            {topicSuggestions.length > 0 ? (
+                                <ScrollView
+                                    style={styles.topicSuggestionScroll}
+                                    showsVerticalScrollIndicator={false}
+                                    keyboardShouldPersistTaps="handled"
+                                    nestedScrollEnabled
+                                >
+                                    {topicSuggestions.map((item) => (
+                                        <Pressable
+                                            key={item}
+                                            style={styles.topicSuggestionItem}
+                                            onPress={() => handleSelectTopicSuggestion(item)}
+                                        >
+                                            <Text style={styles.topicSuggestionText}>{`#${item}`}</Text>
+                                        </Pressable>
+                                    ))}
+                                </ScrollView>
+                            ) : (
+                                <View style={styles.topicSuggestionEmpty}>
+                                    <Text style={[styles.topicSuggestionEmptyText, { color: subtextColor }]}>
+                                        Uygun konu bulunamadı.
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+                    </View>
+                ) : null}
 
                 <View style={styles.section}>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tagsScroll}>
-                        {tags.map((tag, index) => (
-                            <View key={index} style={[styles.tagChip, { backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)', borderColor: isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.1)' }]}>
+                        {topicTags.map((tag, index) => (
+                            <View key={`${tag}-${index}`} style={[styles.tagChip, { backgroundColor: inputBg }]}>
                                 <Text style={[styles.tagHashIcon, { color: textColor }]}>#</Text>
                                 <Text style={[styles.tagText, { color: textColor }]}>{tag}</Text>
-                                <Pressable onPress={() => handleRemoveTag(index)} hitSlop={8}>
-                                    <X size={14} color={subtextColor} />
-                                </Pressable>
                             </View>
                         ))}
-                        {tags.length < 5 ? (
-                            <Pressable onPress={handleAddTag} style={[styles.addTagButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)', borderColor: isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.1)' }]}>
-                                <Text style={[styles.tagHashIcon, { color: textColor }]}>#</Text>
-                                <PlusCircle size={16} color="#007AFF" />
-                            </Pressable>
-                        ) : null}
                     </ScrollView>
                 </View>
 
                 <View style={styles.menuSection}>
+                    <Pressable style={[styles.menuItem, { borderBottomColor: borderColor }]} onPress={handleAddPerson}>
+                        <View style={styles.menuItemLeft}>
+                            <CircleUserRound color={textColor} size={24} />
+                            <Text style={[styles.menuItemText, { color: textColor }]}>Kişileri etiketle</Text>
+                        </View>
+                        <View style={styles.menuItemRight}>
+                            {taggedPeople.length > 0 ? (
+                                <View style={styles.taggedPeoplePreview}>
+                                    {visibleTaggedPeople.map((person, index) => (
+                                        person.avatarUrl ? (
+                                            <Image
+                                                key={person.id}
+                                                source={{ uri: person.avatarUrl }}
+                                                style={[
+                                                    styles.taggedPersonAvatar,
+                                                    { borderColor: bgColor },
+                                                    index > 0 && styles.taggedPersonAvatarOverlap,
+                                                ]}
+                                                contentFit="cover"
+                                            />
+                                        ) : (
+                                            <View
+                                                key={person.id}
+                                                style={[
+                                                    styles.taggedPersonAvatar,
+                                                    styles.taggedPersonAvatarFallback,
+                                                    { borderColor: bgColor },
+                                                    index > 0 && styles.taggedPersonAvatarOverlap,
+                                                ]}
+                                            />
+                                        )
+                                    ))}
+                                    {hasTaggedPeopleOverflow ? (
+                                        <View
+                                            style={[
+                                                styles.taggedPersonAvatar,
+                                                styles.taggedPersonPlusBadge,
+                                                { borderColor: bgColor },
+                                                visibleTaggedPeople.length > 0 && styles.taggedPersonAvatarOverlap,
+                                            ]}
+                                        >
+                                            <Text style={styles.taggedPersonPlusText}>+</Text>
+                                        </View>
+                                    ) : null}
+                                </View>
+                            ) : null}
+                            <ChevronRight color={subtextColor} size={20} />
+                        </View>
+                    </Pressable>
+
+                    <Pressable style={[styles.menuItem, { borderBottomColor: borderColor }]} onPress={handleAddLocation}>
+                        <View style={styles.menuItemLeft}>
+                            <MapPinCheckInside color={textColor} size={24} />
+                            <Text style={[styles.menuItemText, { color: textColor }]}>Konum ekle</Text>
+                        </View>
+                        <ChevronRight color={subtextColor} size={20} />
+                    </Pressable>
+
                     <Pressable style={[styles.menuItem, { borderBottomColor: borderColor }]} onPress={handleClubsSelect}>
                         <View style={styles.menuItemLeft}>
-                            <Users color={textColor} size={24} />
+                            <CommunityIcon width={24} height={24} color={textColor} />
                             <Text style={[styles.menuItemText, { color: textColor }]}>CLUB&apos;s ekle</Text>
                         </View>
                         <ChevronRight color={subtextColor} size={20} />
@@ -528,9 +958,9 @@ export default function UploadDetailsScreen() {
 
                     <Pressable style={[styles.menuItem, { borderBottomColor: borderColor }]} onPress={() => setShowCommercialMenu(true)}>
                         <View style={styles.menuItemLeft}>
-                            <Tag color={textColor} size={24} />
+                            <PartnershipIcon width={24} height={24} color={textColor} />
                             <Text style={[styles.menuItemText, { color: textColor }]}>
-                                Ticari İlişki Ekle
+                                İş birliği ekle
                                 <Text style={styles.requiredStar}> *</Text>
                             </Text>
                         </View>
@@ -548,7 +978,7 @@ export default function UploadDetailsScreen() {
                             <View style={{ flex: 1 }}>
                                 <Text style={[styles.menuItemText, { color: textColor }]}>Yapay zeka etiketi ekle</Text>
                                 <Text style={[styles.aiDescription, { color: subtextColor }]}>
-                                    Yapay zekayla oluşturulan belirli gerçekçi içerikleri etiketlemeni zorunlu tutuyoruz.
+                                    Yapay zeka ile oluşturulan içerikleri destekliyoruz. Kullanıcı deneyimi ve yasal uyumluluk için yapay zeka ile oluşturulan içerikleri etiketlemeni istiyoruz.
                                 </Text>
                             </View>
                         </View>
@@ -603,38 +1033,6 @@ export default function UploadDetailsScreen() {
                     </View>
                 </Pressable>
             </Modal>
-
-            <Modal visible={showTagInputModal} transparent animationType="fade" onRequestClose={() => setShowTagInputModal(false)}>
-                <Pressable style={styles.modalOverlay} onPress={() => setShowTagInputModal(false)}>
-                    <View style={[styles.menuModal, { backgroundColor: modalTheme.sheetCard, borderColor }]}>
-                        <View style={[styles.menuHeader, { borderBottomColor: borderColor }]}>
-                            <Text style={[styles.menuTitle, { color: textColor }]}>Konu Etiketi Ekle</Text>
-                        </View>
-                        <View style={styles.brandFormSection}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                <Text style={[styles.brandFormLabel, { color: textColor, fontSize: 18 }]}>#</Text>
-                                <TextInput
-                                    style={[styles.brandFormInput, { flex: 1, backgroundColor: inputBg, color: textColor, borderColor }]}
-                                    placeholder="etiket giriniz"
-                                    placeholderTextColor={subtextColor}
-                                    value={currentTagInput}
-                                    onChangeText={setCurrentTagInput}
-                                    maxLength={30}
-                                    autoCapitalize="none"
-                                />
-                            </View>
-                            <View style={styles.tagInputActions}>
-                                <Pressable style={[styles.cancelTagButton, { borderColor }]} onPress={() => setShowTagInputModal(false)}>
-                                    <Text style={[styles.cancelTagButtonText, { color: textColor }]}>Vazgeç</Text>
-                                </Pressable>
-                                <Pressable style={[styles.saveTagButton, { backgroundColor: modalTheme.accent }]} onPress={handleSaveTag}>
-                                    <Text style={styles.saveTagButtonText}>Ekle</Text>
-                                </Pressable>
-                            </View>
-                        </View>
-                    </View>
-                </Pressable>
-            </Modal>
         </View>
     );
 }
@@ -654,27 +1052,138 @@ const styles = StyleSheet.create({
     backButton: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
     headerTitle: { fontSize: 24, fontWeight: '600', letterSpacing: 0.3, textAlign: 'center' },
     scrollView: { flex: 1 },
-    descriptionSection: { marginHorizontal: 20, marginTop: 12, borderRadius: 12, padding: 12 },
+    previewSection: {
+        width: PREVIEW_WIDTH,
+    },
+    previewPage: {
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+    },
+    previewContainer: {
+        borderRadius: 20,
+        overflow: 'hidden',
+        backgroundColor: '#1a1a1a',
+        alignSelf: 'center',
+    },
+    previewMedia: {
+        flex: 1,
+    },
+    previewFallback: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 24,
+    },
+    previewFallbackText: {
+        fontSize: 14,
+        fontWeight: '500',
+        textAlign: 'center',
+    },
+    descriptionSection: { marginHorizontal: 20, marginTop: 14, position: 'relative' },
     descriptionEditor: {
-        minHeight: 120,
-        fontSize: EDITOR_FONT_SIZE,
-        lineHeight: EDITOR_LINE_HEIGHT,
+        width: '100%',
+    },
+    topicSuggestionModal: {
+        position: 'absolute',
+        left: 10,
+        right: 10,
+        height: TOPIC_SUGGESTION_MODAL_HEIGHT,
+        borderRadius: 8,
+        borderWidth: 0,
+        overflow: 'hidden',
+        zIndex: 20,
+        elevation: 6,
+    },
+    topicSuggestionHeader: {
+        height: TOPIC_SUGGESTION_HEADER_HEIGHT,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 14,
+    },
+    topicSuggestionHeaderText: {
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    topicSuggestionCloseButton: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    topicSuggestionContent: {
+        flex: 1,
+    },
+    topicSuggestionScroll: {
+        flex: 1,
+    },
+    topicSuggestionItem: {
+        minHeight: TOPIC_SUGGESTION_ROW_HEIGHT,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+    },
+    topicSuggestionText: {
+        fontSize: 15,
+        fontWeight: '400',
+        color: '#FFFFFF',
+    },
+    topicSuggestionEmpty: {
+        flex: 1,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        justifyContent: 'center',
+    },
+    topicSuggestionEmptyText: {
+        fontSize: 14,
     },
     formatToolbarContainer: { marginHorizontal: 20, marginTop: 8 },
-    formatToolbar: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    formatToolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+    formatToolbarButtons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     formatButton: { minWidth: 34, height: 32, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
     formatButtonText: { fontSize: 16 },
     section: { marginTop: 14 },
     tagsScroll: { paddingHorizontal: 20 },
-    tagChip: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, paddingHorizontal: 10, height: 34, borderRadius: 17, marginRight: 8, gap: 6 },
-    tagHashIcon: { fontSize: 14, fontWeight: '700' },
-    tagText: { fontSize: 14, fontWeight: '500' },
-    addTagButton: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, paddingHorizontal: 10, height: 34, borderRadius: 17, gap: 6 },
-    menuSection: { marginTop: 18, marginHorizontal: 20 },
-    menuItem: { minHeight: 62, borderBottomWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 },
+    tagChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, height: 34, borderRadius: 8, marginRight: 8, gap: 6 },
+    tagHashIcon: { fontSize: 14, fontWeight: '600' },
+    tagText: { fontSize: 14, fontWeight: '600' },
+    addTagButton: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14, height: 34, borderRadius: 17, marginRight: 8 },
+    formatToolbarAddTagButton: { marginRight: 0, flexShrink: 0, borderRadius: 8 },
+    addTagButtonText: { fontSize: 14, fontWeight: '600' },
+    menuSection: { marginTop: 2, marginHorizontal: 20 },
+    menuItem: { minHeight: 52, borderBottomWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 },
     menuItemLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
     menuItemText: { fontSize: 16, fontWeight: '500' },
     menuItemRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    taggedPeoplePreview: { flexDirection: 'row', alignItems: 'center', marginRight: 2 },
+    taggedPersonAvatar: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        backgroundColor: '#D9D9D9',
+        borderWidth: 2,
+        overflow: 'hidden',
+    },
+    taggedPersonAvatarOverlap: {
+        marginLeft: -6,
+    },
+    taggedPersonAvatarFallback: {
+        opacity: 0.9,
+    },
+    taggedPersonPlusBadge: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(255,255,255,0.14)',
+    },
+    taggedPersonPlusText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '700',
+        lineHeight: 18,
+    },
     selectedValueText: { fontSize: 13, maxWidth: 160 },
     requiredStar: { color: '#FF3B30', fontWeight: '700' },
     aiDescription: { marginTop: 2, fontSize: 12, lineHeight: 16 },
@@ -692,12 +1201,4 @@ const styles = StyleSheet.create({
     menuOptionItem: { minHeight: 48, borderBottomWidth: 1, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     menuOptionText: { fontSize: 15 },
     checkmark: { fontSize: 16, fontWeight: '700' },
-    brandFormSection: { padding: 16 },
-    brandFormLabel: { fontSize: 14, fontWeight: '600', marginBottom: 8 },
-    brandFormInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, height: 44, fontSize: 15 },
-    tagInputActions: { marginTop: 16, flexDirection: 'row', gap: 10 },
-    cancelTagButton: { flex: 1, height: 42, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-    cancelTagButtonText: { fontSize: 14, fontWeight: '600' },
-    saveTagButton: { flex: 1, height: 42, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-    saveTagButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
 });

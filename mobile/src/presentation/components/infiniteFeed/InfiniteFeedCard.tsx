@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, Dimensions, type GestureResponderEve
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { Volume2, VolumeX, MoreVertical } from 'lucide-react-native';
-import VideoPlayer, { type OnLoadData, type OnLoadStartData, type OnProgressData, type OnVideoErrorData } from 'react-native-video';
+import VideoPlayer, { ViewType, type OnLoadData, type OnLoadStartData, type OnProgressData, type OnVideoErrorData } from 'react-native-video';
 import type { NetInfoStateType } from '@react-native-community/netinfo';
 import { getVideoUrl } from '../../../core/utils/videoUrl';
 import { Video as VideoEntity } from '../../../domain/entities/Video';
@@ -47,13 +47,14 @@ const END_GUARD_TOLERANCE_SEC = 1;
 const END_GUARD_MIN_DURATION_SEC = 3;
 const END_GUARD_MIN_PROGRESS_SEC = 1;
 const INACTIVE_RESUME_WINDOW_MS = 3000;
-const ACTIVE_WAKEUP_SEEK_DELAY_MS = 180;
+const ACTIVE_WAKEUP_SEEK_DELAY_MS = 400;
 const ACTIVE_WAKEUP_MIN_PROGRESS_SEC = 0.2;
 const DEFAULT_VIDEO_ASPECT_RATIO = 9 / 16;
 const MIN_VALID_ASPECT_RATIO = 0.2;
 const MAX_VALID_ASPECT_RATIO = 5;
 const SUBTITLE_MAX_WIDTH = Dimensions.get('window').width - (SUBTITLE_SIDE_MARGIN * 2);
 const SUBTITLE_BOTTOM_SAFE_PADDING = 60;
+const TAGGED_PEOPLE_PREVIEW_LIMIT = 3;
 
 const isNonEmptyString = (value: unknown): value is string =>
     typeof value === 'string' && value.trim().length > 0;
@@ -180,10 +181,20 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     const [playbackSource, setPlaybackSource] = useState<string | null>(null);
     const [isVideoVisible, setIsVideoVisible] = useState(false);
     const [isDecodePrewarmDone, setIsDecodePrewarmDone] = useState(false);
-    const [isInactivePauseWindow, setIsInactivePauseWindow] = useState(false);
+
     const [hasReachedLoopLimit, setHasReachedLoopLimit] = useState(false);
     const [videoProgressSec, setVideoProgressSec] = useState(0);
     const [videoDurationDisplaySec, setVideoDurationDisplaySec] = useState<number | null>(null);
+
+    // ✅ [PERF] Detect FlashList recycling during render (before effects).
+    // When item.id changes, state is stale for one render frame because
+    // the reset effect hasn't fired yet. We must ignore stale state to
+    // avoid flashing the previous video's content.
+    const mountedItemIdRef = useRef(item.id);
+    const isRecycledRender = mountedItemIdRef.current !== item.id;
+    if (isRecycledRender) {
+        mountedItemIdRef.current = item.id;
+    }
     const [thumbnailAspectRatio, setThumbnailAspectRatio] = useState<number | null>(null);
     const [loadedVideoAspectRatio, setLoadedVideoAspectRatio] = useState<number | null>(null);
     const videoRef = useRef<any>(null);
@@ -197,9 +208,11 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     const inactivePauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const activeWakeupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const hasAppliedActiveWakeupRef = useRef(false);
+    const hasActiveProgressRef = useRef(false);
     const lastSubtitleTimeMsRef = useRef(0);
 
     const [activeSubtitleText, setActiveSubtitleText] = useState<string | null>(null);
+    const activeSubtitleTextRef = useRef<string | null>(null);
     const [subtitleLayoutBounds, setSubtitleLayoutBounds] = useState({ width: 0, height: 0 });
     const { subtitles, getActiveSubtitle } = useSubtitles(isActive ? item.id : undefined);
     const subtitlePresentationStyle = useMemo(() => {
@@ -295,12 +308,68 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         () => (isNonEmptyString(item.user?.avatarUrl) ? item.user.avatarUrl : ''),
         [item.user?.avatarUrl]
     );
+    const hasTaggedPeopleOverflow = (item.taggedPeople?.length ?? 0) > TAGGED_PEOPLE_PREVIEW_LIMIT;
+    const visibleTaggedPeople = useMemo(
+        () => (item.taggedPeople ?? []).slice(0, hasTaggedPeopleOverflow ? TAGGED_PEOPLE_PREVIEW_LIMIT - 1 : TAGGED_PEOPLE_PREVIEW_LIMIT),
+        [hasTaggedPeopleOverflow, item.taggedPeople]
+    );
+    const taggedPeopleMeta = useMemo(() => {
+        if (visibleTaggedPeople.length === 0) return null;
+
+        return (
+            <View style={styles.taggedPeopleMetaRow}>
+                <Text style={styles.taggedPeopleMetaLabel}>ile</Text>
+                <View style={styles.taggedPeopleMetaAvatars}>
+                    {visibleTaggedPeople.map((person, personIndex) => {
+                        const fallbackCharacter = (person.fullName || person.username || '?').trim().charAt(0).toUpperCase() || '?';
+                        const hasAvatar = isNonEmptyString(person.avatarUrl);
+
+                        return (
+                            <View
+                                key={person.id || `${person.username}-${personIndex}`}
+                                style={[
+                                    styles.taggedPeopleMetaAvatarFrame,
+                                    personIndex > 0 && styles.taggedPeopleMetaAvatarOverlap,
+                                ]}
+                            >
+                                {hasAvatar ? (
+                                    <Image
+                                        source={{ uri: person.avatarUrl }}
+                                        style={styles.taggedPeopleMetaAvatarImage}
+                                        contentFit="cover"
+                                        cachePolicy="disk"
+                                    />
+                                ) : (
+                                    <View style={styles.taggedPeopleMetaAvatarFallback}>
+                                        <Text style={styles.taggedPeopleMetaAvatarFallbackText}>{fallbackCharacter}</Text>
+                                    </View>
+                                )}
+                            </View>
+                        );
+                    })}
+                    {hasTaggedPeopleOverflow ? (
+                        <View
+                            style={[
+                                styles.taggedPeopleMetaAvatarFrame,
+                                visibleTaggedPeople.length > 0 && styles.taggedPeopleMetaAvatarOverlap,
+                                styles.taggedPeopleMetaPlusFrame,
+                            ]}
+                        >
+                            <Text style={styles.taggedPeopleMetaPlusText}>+</Text>
+                        </View>
+                    ) : null}
+                </View>
+            </View>
+        );
+    }, [hasTaggedPeopleOverflow, visibleTaggedPeople]);
 
     const sourceVideoUrl = getVideoUrl(item);
     const videoUrl = isNonEmptyString(resolvedVideoSource) ? resolvedVideoSource : sourceVideoUrl;
     const isCarousel = item.postType === 'carousel' && (item.mediaUrls?.length ?? 0) > 0;
     const isVideo = !isCarousel && !!sourceVideoUrl;
-    const effectiveVideoSourceUrl = playbackSource ?? videoUrl;
+    // On recycled renders playbackSource still holds the PREVIOUS item's URL.
+    // Ignore it so we never flash the wrong video.
+    const effectiveVideoSourceUrl = isRecycledRender ? videoUrl : (playbackSource ?? videoUrl);
     const isLocalVideoSource = Boolean(effectiveVideoSourceUrl && isLocalFilePath(effectiveVideoSourceUrl));
     const bufferConfig = useMemo(
         () => getBufferConfig(networkType, isLocalVideoSource),
@@ -516,6 +585,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         }
 
         if (!isActive) return;
+        hasActiveProgressRef.current = true;
         const durationSec = videoDurationSecRef.current;
         const nextProgressSec = Math.max(
             0,
@@ -530,31 +600,35 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
 
         // Sync subtitles
         if (!shouldShowSubtitle) {
-            if (activeSubtitleText !== null) {
+            if (activeSubtitleTextRef.current !== null) {
+                activeSubtitleTextRef.current = null;
                 setActiveSubtitleText(null);
             }
             return;
         }
 
         const subtitle = getActiveSubtitle(lastSubtitleTimeMsRef.current);
-        if (subtitle !== activeSubtitleText) {
+        if (subtitle !== activeSubtitleTextRef.current) {
+            activeSubtitleTextRef.current = subtitle;
             setActiveSubtitleText(subtitle);
         }
-    }, [activeSubtitleText, getActiveSubtitle, isActive, revealVideoLayer, shouldShowSubtitle]);
+    }, [getActiveSubtitle, isActive, revealVideoLayer, shouldShowSubtitle]);
 
     useEffect(() => {
         if (!shouldShowSubtitle) {
-            if (activeSubtitleText !== null) {
+            if (activeSubtitleTextRef.current !== null) {
+                activeSubtitleTextRef.current = null;
                 setActiveSubtitleText(null);
             }
             return;
         }
 
         const subtitleNow = getActiveSubtitle(lastSubtitleTimeMsRef.current);
-        if (subtitleNow !== activeSubtitleText) {
+        if (subtitleNow !== activeSubtitleTextRef.current) {
+            activeSubtitleTextRef.current = subtitleNow;
             setActiveSubtitleText(subtitleNow);
         }
-    }, [activeSubtitleText, getActiveSubtitle, shouldShowSubtitle]);
+    }, [getActiveSubtitle, shouldShowSubtitle]);
 
     const handleVideoEnd = useCallback(() => {
         if (!isVideo) return;
@@ -610,6 +684,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         setHasReachedLoopLimit(false);
         lastReportedProgressSecRef.current = 0;
         setVideoProgressSec(0);
+
         videoRef.current?.seek?.(0);
     }, []);
 
@@ -647,11 +722,11 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         setVideoProgressSec(0);
         setVideoDurationDisplaySec(null);
         setHasReachedLoopLimit(false);
-        setIsInactivePauseWindow(false);
-        wasActiveRef.current = isActive;
+                wasActiveRef.current = isActive;
         setIsVideoVisible(!initialShouldGate);
         setIsDecodePrewarmDone(false);
         setPlaybackSource(null);
+        activeSubtitleTextRef.current = null;
         setActiveSubtitleText(null);
     }, [clearInactivePauseTimer, clearReadyFallbackTimer, disableThumbnail, hasThumbnail, item.id]);
 
@@ -754,7 +829,9 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
             activeWakeupTimerRef.current = null;
             if (!wasActiveRef.current) return;
             if (hasReachedLoopLimit) return;
-            if (lastReportedProgressSecRef.current > ACTIVE_WAKEUP_MIN_PROGRESS_SEC) return;
+            // If we already received a progress event while active, the decoder
+            // is running fine — no need to nudge it.
+            if (hasActiveProgressRef.current) return;
             try {
                 // Android can occasionally miss the first resume edge after feed insertions.
                 // A tiny seek nudges the decoder without visible jump.
@@ -783,8 +860,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
             clearActiveWakeupTimer();
             hasAppliedActiveWakeupRef.current = false;
             inactiveSinceRef.current = Date.now();
-            setIsInactivePauseWindow(true);
-            clearInactivePauseTimer();
+                        clearInactivePauseTimer();
             // âœ… 3-second threshold: mark for reset later (when video goes out of view)
             // Don't seek here - it causes visible jitter
             // The reset will happen in shouldMountVideo=false effect
@@ -793,12 +869,12 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
             inactivePauseTimerRef.current = setTimeout(() => {
                 inactivePauseTimerRef.current = null;
                 if (wasActiveRef.current) return;
-                setIsInactivePauseWindow(false);
-            }, INACTIVE_RESUME_WINDOW_MS);
+                            }, INACTIVE_RESUME_WINDOW_MS);
         }
 
         if (isActive && !wasActive) {
             hasAppliedActiveWakeupRef.current = false;
+            hasActiveProgressRef.current = false;
             // âœ… Immediately mark video as seen when it becomes active
             // This prevents thumbnail from showing on first scroll
             firstFrameSeenRef.current = true;
@@ -816,8 +892,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                 // or start fresh on next remount
             }
             inactiveSinceRef.current = null;
-            setIsInactivePauseWindow(false);
-        }
+                    }
 
         wasActiveRef.current = isActive;
     }, [clearActiveWakeupTimer, clearInactivePauseTimer, isActive, isVideo]);
@@ -942,6 +1017,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                                     <VerifiedBadge size={16} />
                                                 </View>
                                             )}
+                                            {taggedPeopleMeta}
                                         </View>
                                         <Pressable onPress={handleProfilePress} hitSlop={8}>
                                             <Text style={themedStyles.handle} numberOfLines={1}>
@@ -972,7 +1048,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                         </View>
                     </View>
                 ) : (
-                    <Pressable
+                    <View
                         style={mediaWrapperStyle}
                         onLayout={handleSubtitleContainerLayout}
                     >
@@ -991,7 +1067,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                             ) : (
                                 <View style={themedStyles.mediaPlaceholder} />
                             )}
-                            {shouldMountVideo && videoSource ? (
+                            {shouldMountVideo && videoSource && !isRecycledRender ? (
                                 <VideoPlayer
                                     ref={videoRef}
                                     source={videoSource as any}
@@ -1015,10 +1091,8 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                     onError={handleVideoError}
                                     hideShutterView={true}
                                     shutterColor="transparent"
-                                    poster={!disableThumbnail && hasThumbnail ? thumbnail : undefined}
-                                    posterResizeMode="cover"
-                                    // @ts-ignore - deprecated prop but required for stable Android overlay rendering
-                                    useTextureView={true}
+                                    poster={!disableThumbnail && hasThumbnail ? { source: { uri: thumbnail }, resizeMode: 'cover' } : undefined}
+                                    viewType={ViewType.TEXTURE}
                                     automaticallyWaitsToMinimizeStalling={false}
                                     preferredForwardBufferDuration={4}
                                     preventsDisplaySleepDuringVideoPlayback={false}
@@ -1089,6 +1163,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                                     <VerifiedBadge size={16} />
                                                 </View>
                                             )}
+                                            {taggedPeopleMeta}
                                         </View>
                                         <Pressable onPress={handleProfilePress} hitSlop={8}>
                                             <Text style={themedStyles.handle} numberOfLines={1}>
@@ -1117,7 +1192,6 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                 <MoreVertical size={22} color="#FFFFFF" strokeWidth={2.4} />
                             </Pressable>
                         </View>
-
                         {isVideo && !isCleanScreen && (
                             <View style={styles.mediaRightBottomActions} pointerEvents="box-none">
                                 <Pressable
@@ -1148,7 +1222,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                 </View>
                             </View>
                         )}
-                    </Pressable>
+                    </View>
                 )
             ) : null}
 
@@ -1263,6 +1337,59 @@ const styles = StyleSheet.create({
     verifiedBadge: {
         marginLeft: 2,
         alignSelf: 'center',
+    },
+    taggedPeopleMetaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        flexShrink: 0,
+    },
+    taggedPeopleMetaLabel: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    taggedPeopleMetaAvatars: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    taggedPeopleMetaAvatarFrame: {
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        overflow: 'hidden',
+        backgroundColor: 'rgba(255, 255, 255, 0.18)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.9)',
+    },
+    taggedPeopleMetaAvatarOverlap: {
+        marginLeft: -6,
+    },
+    taggedPeopleMetaAvatarImage: {
+        width: '100%',
+        height: '100%',
+    },
+    taggedPeopleMetaAvatarFallback: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    },
+    taggedPeopleMetaAvatarFallbackText: {
+        color: '#FFFFFF',
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    taggedPeopleMetaPlusFrame: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    },
+    taggedPeopleMetaPlusText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '700',
+        lineHeight: 18,
     },
     fullName: {
         fontSize: 15,

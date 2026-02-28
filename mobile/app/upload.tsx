@@ -29,7 +29,7 @@ export default function CameraScreen() {
     const { storyOnly } = useLocalSearchParams<{ storyOnly?: string | string[] }>();
     const isStoryOnlyEntry = Array.isArray(storyOnly) ? storyOnly[0] === '1' : storyOnly === '1';
 
-    const [facing, setFacing] = useState<CameraType>('back');
+    const [facing, setFacing] = useState<CameraType>('front');
     const [flash, setFlash] = useState<FlashMode>('off');
     const [permission, requestPermission] = useCameraPermissions();
     const [selectedMode, setSelectedMode] = useState(MODES[0]);
@@ -42,6 +42,7 @@ export default function CameraScreen() {
 
     // Recording state
     const [isRecording, setIsRecording] = useState(false);
+    const activeFlash: FlashMode = facing === 'front' ? 'off' : flash;
 
     // Get last photo from gallery for preview — deferred until transition completes
     useEffect(() => {
@@ -72,11 +73,18 @@ export default function CameraScreen() {
     }, [isStoryOnlyEntry, selectedMode]);
 
     const toggleFlash = () => {
+        if (facing === 'front') return;
         setFlash(current => current === 'off' ? 'on' : 'off');
     };
 
     const toggleCameraFacing = () => {
-        setFacing(current => current === 'back' ? 'front' : 'back');
+        setFacing(current => {
+            const nextFacing = current === 'back' ? 'front' : 'back';
+            if (nextFacing === 'front') {
+                setFlash('off');
+            }
+            return nextFacing;
+        });
     };
 
     if (!permission) {
@@ -213,7 +221,7 @@ export default function CameraScreen() {
                         ref={cameraRef}
                         style={styles.camera}
                         facing={facing}
-                        flash={flash}
+                        flash={activeFlash}
                     />
 
                 </View>

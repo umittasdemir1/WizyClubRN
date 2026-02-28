@@ -1,5 +1,7 @@
 import { User } from './User';
 
+export type VideoTaggedPerson = Pick<User, 'id' | 'username' | 'fullName' | 'avatarUrl' | 'isVerified'>;
+
 export interface Video {
     id: string;
     videoUrl: string;
@@ -26,6 +28,7 @@ export interface Video {
     width?: number;
     height?: number;
     createdAt?: string;
+    taggedPeople?: VideoTaggedPerson[];
     mediaUrls?: {
         url: string;
         type: 'video' | 'image';

@@ -71,9 +71,10 @@ const ESTIMATED_CARD_HEIGHT = Math.round(SCREEN_HEIGHT * 0.82);
 const THUMBNAIL_PREFETCH_OFFSETS = [-2, -1, 1, 2, 3];
 const FlashListAny = FlashList as any;
 const INFINITE_WINDOW_SIZE = 5;
-const INFINITE_MAX_RENDER_BATCH = 2;
+const INFINITE_MAX_RENDER_BATCH = 4;
 const INFINITE_DRAW_DISTANCE = ESTIMATED_CARD_HEIGHT * 2;
 const INFINITE_MINIMUM_VIEW_TIME_MS = 0;
+const FLASH_LIST_CONTENT_CONTAINER_STYLE = { paddingBottom: 0 } as const;
 const SUBTITLE_AVAILABILITY_CACHE_TTL_MS = 5 * 60 * 1000;
 const SUBTITLE_AVAILABILITY_PENDING_RETRY_MS = 3000;
 
@@ -132,6 +133,7 @@ export function InfiniteFeedManager({
     const setSubtitleSelectionForVideo = useSubtitlePreferencesStore((state) => state.setSelectionForVideo);
     const uploadStatus = useUploadStore((state) => state.status);
     const uploadedVideoId = useUploadStore((state) => state.uploadedVideoId);
+    const taggedPeoplePreview = useUploadStore((state) => state.taggedPeoplePreview);
     const resetUpload = useUploadStore((state) => state.reset);
     const globalIsPaused = useInfiniteFeedActiveVideoStore((state) => state.isPaused);
     const isScreenFocused = useInfiniteFeedActiveVideoStore((state) => state.isScreenFocused);
@@ -206,6 +208,11 @@ export function InfiniteFeedManager({
     const currentUserIdRef = useRef(currentUserId);
     const isMutedRef = useRef(isMuted);
     const netInfoTypeRef = useRef(netInfo.type);
+    const subtitleAlwaysEnabledRef = useRef(subtitleAlwaysEnabled);
+    const subtitleVideoEnabledByIdRef = useRef(subtitleVideoEnabledById);
+    const activeStoryUserIdsRef = useRef<Set<string>>(new Set());
+    const effectivePendingInlineIdRef = useRef<string | null>(null);
+    const effectivePendingInlineIndexRef = useRef<number>(0);
 
     const setActiveVideo = useInfiniteFeedActiveVideoStore((state) => state.setActiveVideo);
     const setPendingOpenVideo = useInfiniteFeedActiveVideoStore((state) => state.setPendingOpenVideo);
@@ -627,6 +634,7 @@ export function InfiniteFeedManager({
                 brandName: videoData.brand_name,
                 brandUrl: videoData.brand_url,
                 commercialType: videoData.commercial_type,
+                taggedPeople: taggedPeoplePreview.length > 0 ? taggedPeoplePreview : undefined,
                 mediaUrls: videoData.media_urls,
                 postType: videoData.post_type,
                 createdAt: videoData.created_at,
@@ -649,6 +657,7 @@ export function InfiniteFeedManager({
         prependVideo,
         refreshFeed,
         resetUpload,
+        taggedPeoplePreview,
         uploadedVideoId,
         uploadStatus,
     ]);
@@ -989,12 +998,17 @@ export function InfiniteFeedManager({
         currentUserIdRef.current = currentUserId;
         isMutedRef.current = isMuted;
         netInfoTypeRef.current = netInfo.type;
+        subtitleAlwaysEnabledRef.current = subtitleAlwaysEnabled;
+        subtitleVideoEnabledByIdRef.current = subtitleVideoEnabledById;
+        activeStoryUserIdsRef.current = activeStoryUserIds;
     });
 
     const effectivePendingInlineId = immediateActiveCommit ? activeInlineId : pendingInlineId;
     const effectivePendingInlineIndex = immediateActiveCommit ? activeInlineIndex : pendingInlineIndex;
+    effectivePendingInlineIdRef.current = effectivePendingInlineId;
+    effectivePendingInlineIndexRef.current = effectivePendingInlineIndex;
 
-    // ✅ [PERF] Optimized renderItem - uses refs for volatile values (8 deps → 3 deps)
+    // ✅ [PERF] Optimized renderItem - uses refs for volatile values (10 deps → 5 deps)
     const renderItem = useCallback(({ item, index, target }: { item: InfiniteFeedVideo; index: number; target?: string }) => {
         const handlers = cardActionHandlersRef.current;
         const colors = themeColorsRef.current;
@@ -1004,19 +1018,21 @@ export function InfiniteFeedManager({
         const pausedByLifecycle = globalIsPaused || !isScreenFocused || !isRouteFocused;
         const networkType = (netInfoTypeRef.current ?? null) as NetInfoStateType | null;
         const shouldShowSubtitle =
-            subtitleAlwaysEnabled ||
-            Boolean(subtitleVideoEnabledById[item.id]);
+            subtitleAlwaysEnabledRef.current ||
+            Boolean(subtitleVideoEnabledByIdRef.current[item.id]);
 
+        const pendingIdx = effectivePendingInlineIndexRef.current;
+        const pendingId = effectivePendingInlineIdRef.current;
         const prewarmRange = FEED_CONFIG.DECODE_PREWARM_AHEAD_COUNT;
         const prewarmPlayRange = FEED_CONFIG.DECODE_PREWARM_PLAY_COUNT;
         const prewarmDistance = scrollDirectionRef.current === 'up'
-            ? effectivePendingInlineIndex - index
-            : index - effectivePendingInlineIndex;
+            ? pendingIdx - index
+            : index - pendingIdx;
         const isPendingWindow = scrollDirectionRef.current === 'up'
-            ? (index <= effectivePendingInlineIndex && index >= effectivePendingInlineIndex - prewarmRange)
-            : (index >= effectivePendingInlineIndex && index <= effectivePendingInlineIndex + prewarmRange);
+            ? (index <= pendingIdx && index >= pendingIdx - prewarmRange)
+            : (index >= pendingIdx && index <= pendingIdx + prewarmRange);
         const allowDecodePrewarm = prewarmDistance >= 1 && prewarmDistance <= prewarmPlayRange;
-        const hasActiveStory = Boolean(item.user?.id && activeStoryUserIds.has(item.user.id));
+        const hasActiveStory = Boolean(item.user?.id && activeStoryUserIdsRef.current.has(item.user.id));
 
         return (
             <InfiniteFeedCard
@@ -1025,7 +1041,7 @@ export function InfiniteFeedManager({
                 activeIndex={activeInlineIndexRef.current}
                 colors={colors}
                 isActive={item.id === activeInlineId}
-                isPendingActive={item.id === effectivePendingInlineId || isPendingWindow}
+                isPendingActive={item.id === pendingId || isPendingWindow}
                 allowDecodePrewarm={allowDecodePrewarm}
                 isMuted={muted}
                 isPaused={browserVisible || pausedByLifecycle}
@@ -1051,15 +1067,10 @@ export function InfiniteFeedManager({
         );
     }, [
         activeInlineId,
-        activeStoryUserIds,
-        effectivePendingInlineId,
-        effectivePendingInlineIndex,
         globalIsPaused,
         isInAppBrowserVisible,
         isRouteFocused,
         isScreenFocused,
-        subtitleAlwaysEnabled,
-        subtitleVideoEnabledById,
     ]);
 
     // Active item changes when card visibility crosses threshold
@@ -1184,21 +1195,14 @@ export function InfiniteFeedManager({
         }, 32);
     }, [clearSettleTimer, commitPendingActive]);
 
-    // Only track the active video's resolved source so cache-resolve for
-    // non-visible videos doesn't trigger a full list re-render.
-    const activeResolvedSource = activeInlineId ? resolvedVideoSources[activeInlineId] : null;
     const playbackPauseGate = isInAppBrowserVisible || globalIsPaused || !isScreenFocused || !isRouteFocused;
 
     const flashListExtraData = useMemo(() => ({
         activeInlineId,
-        pendingInlineId: effectivePendingInlineId,
-        pendingInlineIndex: effectivePendingInlineIndex,
         isMuted,
-        immediateActiveCommit,
-        activeResolvedSource,
         playbackPauseGate,
         subtitlePreferencesRevision,
-    }), [activeInlineId, activeResolvedSource, effectivePendingInlineId, effectivePendingInlineIndex, immediateActiveCommit, isMuted, playbackPauseGate, subtitlePreferencesRevision]);
+    }), [activeInlineId, isMuted, playbackPauseGate, subtitlePreferencesRevision]);
 
     const listEmpty = (
         <View style={styles.emptyState}>
@@ -1284,9 +1288,7 @@ export function InfiniteFeedManager({
                     ) : null
                 }
                 ListEmptyComponent={listEmpty}
-                contentContainerStyle={{
-                    paddingBottom: 0,
-                }}
+                contentContainerStyle={FLASH_LIST_CONTENT_CONTAINER_STYLE}
             />
             <View
                 pointerEvents="none"

@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type * as ImagePicker from 'expo-image-picker';
 import { SubtitlePresentation, SubtitleSegment, SubtitleStyle } from '../../domain/entities/Subtitle';
+import type { User } from '../../domain/entities/User';
 
 export type UploadComposerQuality = 'low' | 'medium' | 'high';
 export type UploadComposerSubtitleLanguage = 'auto' | 'tr-TR' | 'en-US' | 'none';
@@ -13,6 +14,11 @@ export interface SubtitleCacheEntry {
     segments: SubtitleSegment[];
     timestamp: number;
 }
+
+export type UploadComposerTaggedUser = Pick<
+    User,
+    'id' | 'username' | 'fullName' | 'avatarUrl' | 'isVerified' | 'followersCount'
+>;
 
 export interface UploadComposerDraft {
     selectedAssets: ImagePicker.ImagePickerAsset[];
@@ -27,6 +33,7 @@ export interface UploadComposerDraft {
     subtitleLanguage: UploadComposerSubtitleLanguage;
     trimStartSec: number;
     trimEndSec: number;
+    taggedPeople?: UploadComposerTaggedUser[];
 }
 
 export type SubtitleSttState = 'loading' | 'ready' | 'no_audio' | 'error';

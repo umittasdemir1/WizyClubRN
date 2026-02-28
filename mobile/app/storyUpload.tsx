@@ -5,20 +5,18 @@ import {
     StyleSheet,
     Pressable,
     Image,
-    Dimensions,
 } from 'react-native';
 import { CameraView, CameraType, FlashMode, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
-import { X, Zap, ZapOff, Cog, RefreshCcw } from 'lucide-react-native';
+import { X, Zap, ZapOff, Cog } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LogCode, logError, logUI } from '@/core/services/Logger';
 import { textShadowStyle } from '@/core/utils/shadow';
 import { useGalleryPickerStore } from '../src/presentation/store/useGalleryPickerStore';
 import { useUploadComposerStore } from '../src/presentation/store/useUploadComposerStore';
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+import { CameraFlipButton } from '../src/presentation/components/upload/camera/CameraFlipButton';
 
 /**
  * Story Upload Screen - Dedicated story upload page
@@ -29,13 +27,13 @@ export default function StoryUploadScreen() {
     const insets = useSafeAreaInsets();
     const cameraRef = useRef<any>(null);
 
-    const [facing, setFacing] = useState<CameraType>('back');
+    const [facing, setFacing] = useState<CameraType>('front');
     const [flash, setFlash] = useState<FlashMode>('off');
     const [permission, requestPermission] = useCameraPermissions();
     const [lastPhoto, setLastPhoto] = useState<string | null>(null);
+    const activeFlash: FlashMode = facing === 'front' ? 'off' : flash;
 
     // Upload Flow
-    const pickedAssets = useGalleryPickerStore((state) => state.pickedAssets);
     const clearPickedAssets = useGalleryPickerStore((state) => state.clearPickedAssets);
     const setDraft = useUploadComposerStore((state) => state.setDraft);
 
@@ -63,11 +61,18 @@ export default function StoryUploadScreen() {
     // to ensure correct navigation stack (Composer -> Back -> Gallery).
 
     const toggleFlash = () => {
+        if (facing === 'front') return;
         setFlash(current => current === 'off' ? 'on' : 'off');
     };
 
     const toggleCameraFacing = () => {
-        setFacing(current => current === 'back' ? 'front' : 'back');
+        setFacing(current => {
+            const nextFacing = current === 'back' ? 'front' : 'back';
+            if (nextFacing === 'front') {
+                setFlash('off');
+            }
+            return nextFacing;
+        });
     };
 
     if (!permission) {
@@ -142,7 +147,7 @@ export default function StoryUploadScreen() {
                         ref={cameraRef}
                         style={styles.camera}
                         facing={facing}
-                        flash={flash}
+                        flash={activeFlash}
                     />
 
                     {/* Top Header */}
@@ -152,13 +157,17 @@ export default function StoryUploadScreen() {
                         </Pressable>
 
                         <View style={styles.topBarCenter}>
-                            <Pressable onPress={toggleFlash} style={[styles.iconButton, styles.topIconShift]}>
-                                {flash === 'off' ? (
-                                    <ZapOff color="#FFFFFF" size={30} strokeWidth={2} fill="#FFFFFF" />
-                                ) : (
-                                    <Zap color="#FFD60A" size={30} strokeWidth={2} fill="#FFD60A" />
-                                )}
-                            </Pressable>
+                            {facing === 'back' ? (
+                                <Pressable onPress={toggleFlash} style={[styles.iconButton, styles.topIconShift]}>
+                                    {flash === 'off' ? (
+                                        <ZapOff color="#FFFFFF" size={30} strokeWidth={2} fill="#FFFFFF" />
+                                    ) : (
+                                        <Zap color="#FFD60A" size={30} strokeWidth={2} fill="#FFD60A" />
+                                    )}
+                                </Pressable>
+                            ) : (
+                                <View style={[styles.iconButton, styles.topIconShift]} />
+                            )}
                         </View>
 
                         <Pressable onPress={() => logUI(LogCode.UI_INTERACTION, 'Camera settings button pressed')} style={[styles.iconButton, styles.topIconShiftRight, styles.topBarRight]}>
@@ -190,9 +199,11 @@ export default function StoryUploadScreen() {
 
                     {/* Flip Camera */}
                     <View style={styles.sideSlot}>
-                        <Pressable onPress={toggleCameraFacing} style={styles.flipButton}>
-                            <RefreshCcw color="#FFFFFF" size={32} strokeWidth={1.8} />
-                        </Pressable>
+                        <CameraFlipButton
+                            facing={facing}
+                            onPress={toggleCameraFacing}
+                            style={styles.flipButton}
+                        />
                     </View>
                 </View>
 
@@ -348,8 +359,6 @@ const styles = StyleSheet.create({
     flipButton: {
         width: 44,
         height: 44,
-        justifyContent: 'center',
-        alignItems: 'center',
         transform: [{ translateX: 20 }, { translateY: -15 }],
     },
     modeLabelContainer: {

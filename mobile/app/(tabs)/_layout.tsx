@@ -87,18 +87,28 @@ export default function TabLayout() {
                     backgroundColor: tabBarBackground,
                     borderTopWidth: 0,
                     borderTopColor: tabBarBackground,
-                    paddingTop: 8,
-                    paddingBottom: insets.bottom + 2,
-                    height: 50 + insets.bottom,
+                    paddingTop: 4,
+                    paddingBottom: insets.bottom + 4,
+                    height: 60 + insets.bottom,
+                },
+                tabBarItemStyle: {
+                    paddingTop: 2,
+                },
+                tabBarLabelStyle: {
+                    fontSize: 10,
+                    lineHeight: 12,
+                    fontWeight: '600',
+                    marginTop: 3,
                 },
                 tabBarActiveTintColor: tabIconColor,
                 tabBarInactiveTintColor: tabIconColor,
-                tabBarShowLabel: false,
+                tabBarShowLabel: true,
             }}
         >
             <Tabs.Screen
                 name="index"
                 options={{
+                    tabBarLabel: 'Ana Sayfa',
                     tabBarIcon: ({ color, focused }) => (
                         <View style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}>
                             <HomeIcon
@@ -113,6 +123,7 @@ export default function TabLayout() {
             <Tabs.Screen
                 name="explore"
                 options={{
+                    tabBarLabel: 'Keşfet',
                     tabBarIcon: ({ color, focused }) => (
                         <View style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}>
                             <Search
@@ -127,6 +138,7 @@ export default function TabLayout() {
             <Tabs.Screen
                 name="deals"
                 options={{
+                    tabBarLabel: 'Fırsatlar',
                     tabBarIcon: ({ color, focused }) => (
                         <View style={{ width: 52, height: 52, justifyContent: 'center', alignItems: 'center', marginTop: -4 }}>
                             <DealIcon
@@ -141,6 +153,7 @@ export default function TabLayout() {
             <Tabs.Screen
                 name="videos"
                 options={{
+                    tabBarLabel: 'Clips',
                     tabBarIcon: ({ color, focused }) => (
                         <View
                             style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}
@@ -157,6 +170,7 @@ export default function TabLayout() {
             <Tabs.Screen
                 name="profile"
                 options={{
+                    tabBarLabel: 'Profil',
                     tabBarIcon: ({ color, focused }) => (
                         <ProfileAvatarTabIcon color={color} focused={focused} />
                     ),

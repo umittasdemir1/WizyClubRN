@@ -1,9 +1,10 @@
 import React, { useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, Image } from 'react-native';
-import { X, Zap, ZapOff, Cog, RotateCcw } from 'lucide-react-native';
+import { X, Zap, ZapOff, Cog } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { FlashMode, CameraType } from 'expo-camera';
 import { LogCode, logUI } from '@/core/services/Logger';
+import { CameraFlipButton } from './CameraFlipButton';
 
 interface CameraBottomControlsProps {
     isRecording: boolean;
@@ -34,6 +35,7 @@ export const CameraControls = ({
 }: CameraBottomControlsProps) => {
     const isLongPressCapture = useRef(false);
     const suppressNextTap = useRef(false);
+    const showFlashControl = facing === 'back';
 
     return (
         <>
@@ -50,13 +52,17 @@ export const CameraControls = ({
                             <Text style={styles.recordingText}>Kaydediliyor</Text>
                         </View>
                     )}
-                    <Pressable onPress={toggleFlash} style={[styles.iconButton, styles.topIconShift]}>
-                        {flash === 'off' ? (
-                            <ZapOff color="#FFFFFF" size={30} strokeWidth={2} fill="#FFFFFF" />
-                        ) : (
-                            <Zap color="#FFD60A" size={30} strokeWidth={2} fill="#FFD60A" />
-                        )}
-                    </Pressable>
+                    {showFlashControl ? (
+                        <Pressable onPress={toggleFlash} style={[styles.iconButton, styles.topIconShift]}>
+                            {flash === 'off' ? (
+                                <ZapOff color="#FFFFFF" size={30} strokeWidth={2} fill="#FFFFFF" />
+                            ) : (
+                                <Zap color="#FFD60A" size={30} strokeWidth={2} fill="#FFD60A" />
+                            )}
+                        </Pressable>
+                    ) : (
+                        <View style={[styles.iconButton, styles.topIconShift]} />
+                    )}
                 </View>
 
                 <Pressable onPress={() => logUI(LogCode.UI_INTERACTION, 'Camera settings button pressed')} style={[styles.iconButton, styles.topIconShiftRight, styles.topBarRight]}>
@@ -109,9 +115,11 @@ export const CameraControls = ({
 
                 {/* Flip Camera */}
                 <View style={styles.sideSlot}>
-                    <Pressable onPress={toggleCameraFacing} style={[styles.flipButton, styles.flipButtonShift]}>
-                        <RotateCcw color="#FFFFFF" size={32} strokeWidth={1.8} />
-                    </Pressable>
+                    <CameraFlipButton
+                        facing={facing}
+                        onPress={toggleCameraFacing}
+                        style={[styles.flipButton, styles.flipButtonShift]}
+                    />
                 </View>
             </View>
         </>
@@ -243,8 +251,6 @@ const styles = StyleSheet.create({
     flipButton: {
         width: 44,
         height: 44,
-        justifyContent: 'center',
-        alignItems: 'center',
     },
     flipButtonShift: {
         transform: [{ translateX: 20 }],
