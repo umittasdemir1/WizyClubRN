@@ -559,7 +559,18 @@ app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
         coverIndex,
         subtitleLanguage,
         manualSubtitles,
+        taggedPeople,
     } = req.body;
+
+    let parsedTaggedPeople = [];
+    if (typeof taggedPeople === 'string' && taggedPeople.trim()) {
+        try {
+            const parsed = JSON.parse(taggedPeople);
+            parsedTaggedPeople = Array.isArray(parsed) ? parsed : [];
+        } catch (error) {
+            logLine('WARN', 'TAGS', 'Failed to parse taggedPeople payload', { error: error?.message || error });
+        }
+    }
 
     const parsedCoverIndex = Number.parseInt(String(coverIndex ?? '0'), 10);
     const safeCoverIndex = Number.isFinite(parsedCoverIndex) && parsedCoverIndex >= 0 ? parsedCoverIndex : 0;
@@ -908,6 +919,15 @@ app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
             }
         }
 
+        if (parsedTaggedPeople.length > 0) {
+            const tagInserts = parsedTaggedPeople.map(userId => ({
+                video_id: uploadedVideo.id,
+                tagged_user_id: userId
+            }));
+            const { error: tagError } = await supabase.from('post_tags').insert(tagInserts);
+            if (tagError) logLine('WARN', 'TAGS', 'Failed to insert video tags', { error: tagError.message, videoId: uploadedVideo.id });
+        }
+
         phase = 'response_success';
         setUploadProgress(uniqueId, 'done', 100);
         res.json({ success: true, data: uploadedVideo });
@@ -935,8 +955,18 @@ app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
 // Endpoint: STORY Upload (Supports Carousels)
 app.post('/upload-story', upload.array('video', 10), async (req, res) => {
     const files = req.files;
-    const { userId, description, brandName, brandUrl, commercialType } = req.body;
+    const { userId, description, brandName, brandUrl, commercialType, taggedPeople } = req.body;
     const authHeader = req.headers.authorization;
+
+    let parsedTaggedPeople = [];
+    if (typeof taggedPeople === 'string' && taggedPeople.trim()) {
+        try {
+            const parsed = JSON.parse(taggedPeople);
+            parsedTaggedPeople = Array.isArray(parsed) ? parsed : [];
+        } catch (error) {
+            logLine('WARN', 'TAGS', 'Failed to parse taggedPeople payload', { error: error?.message || error });
+        }
+    }
     let dbClient = supabase;
     let authenticatedUserId = null;
 
@@ -1081,7 +1111,18 @@ app.post('/upload-story', upload.array('video', 10), async (req, res) => {
 
         if (error) throw error;
 
-        res.json({ success: true, data: data[0] });
+        const uploadedStory = data[0];
+
+        if (parsedTaggedPeople.length > 0) {
+            const tagInserts = parsedTaggedPeople.map(userId => ({
+                story_id: uploadedStory.id,
+                tagged_user_id: userId
+            }));
+            const { error: tagError } = await dbClient.from('post_tags').insert(tagInserts);
+            if (tagError) logLine('WARN', 'TAGS', 'Failed to insert story tags', { error: tagError.message, storyId: uploadedStory.id });
+        }
+
+        res.json({ success: true, data: uploadedStory });
 
     } catch (error) {
         logLine('ERR', 'STORY', 'Story upload failed', { error: error?.message || error, uploadId: uniqueId });

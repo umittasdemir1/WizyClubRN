@@ -32,6 +32,7 @@ import { InfiniteFeedHeader, FeedTab } from './InfiniteFeedHeader';
 import { InfiniteFeedCard } from './InfiniteFeedCard';
 import { InfiniteFeedMoreOptionsSheet } from './InfiniteFeedMoreOptionsSheet';
 import { InfiniteFeedDeleteConfirmationModal } from './InfiniteFeedDeleteConfirmationModal';
+import { TaggedPeopleSheet } from './TaggedPeopleSheet';
 import { styles } from './InfiniteFeedManager.styles';
 import { FEED_FLAGS, FEED_CONFIG } from './hooks/useInfiniteFeedConfig';
 import { useStories } from '../../hooks/useStories';
@@ -142,6 +143,7 @@ export function InfiniteFeedManager({
     const [selectedMoreVideoId, setSelectedMoreVideoId] = useState<string | null>(null);
     const [isMoreDeleteConfirmationVisible, setMoreDeleteConfirmationVisible] = useState(false);
     const [isMoreSheetOpen, setIsMoreSheetOpen] = useState(false);
+    const [selectedTaggedVideoId, setSelectedTaggedVideoId] = useState<string | null>(null);
     const [subtitleAvailabilityByVideoId, setSubtitleAvailabilityByVideoId] = useState<
         Record<string, { hasSubtitles: boolean; fetchedAt: number; isProcessing?: boolean }>
     >({});
@@ -201,6 +203,7 @@ export function InfiniteFeedManager({
     const lastScrollOffsetYRef = useRef(0);
     const listRef = useRef<any>(null);
     const moreOptionsSheetRef = useRef<BottomSheetModal>(null);
+    const taggedPeopleSheetRef = useRef<BottomSheetModal>(null);
     const lastHandledReselectRef = useRef(0);
 
     // ✅ [PERF] Refs for renderItem volatile values - prevents renderItem recreation
@@ -298,6 +301,11 @@ export function InfiniteFeedManager({
         toggleShop(videoId);
         openInAppBrowser(normalizedUrl);
     }, [openInAppBrowser, toggleShop, videos]);
+
+    const handleOpenTaggedPeople = useCallback((videoId: string) => {
+        setSelectedTaggedVideoId(videoId);
+        taggedPeopleSheetRef.current?.present();
+    }, []);
 
     const handleOpenMoreOptions = useCallback((videoId: string) => {
         setSelectedMoreVideoId(videoId);
@@ -960,6 +968,7 @@ export function InfiniteFeedManager({
         onWatchMoreClips: handleOpenVideosTab,
         onCarouselTouchStart: handleCarouselTouchStart,
         onCarouselTouchEnd: handleCarouselTouchEnd,
+        onTagPress: handleOpenTaggedPeople,
     });
 
     useEffect(() => {
@@ -976,6 +985,7 @@ export function InfiniteFeedManager({
             onWatchMoreClips: handleOpenVideosTab,
             onCarouselTouchStart: handleCarouselTouchStart,
             onCarouselTouchEnd: handleCarouselTouchEnd,
+            onTagPress: handleOpenTaggedPeople,
         };
     }, [
         toggleMute,
@@ -990,6 +1000,7 @@ export function InfiniteFeedManager({
         handleOpenVideosTab,
         handleCarouselTouchStart,
         handleCarouselTouchEnd,
+        handleOpenTaggedPeople,
     ]);
 
     // ✅ [PERF] Sync volatile refs for renderItem (no re-render trigger)
@@ -1057,6 +1068,7 @@ export function InfiniteFeedManager({
                 onShare={handlers.onShare}
                 onShop={handlers.onShop}
                 onWatchMoreClips={handlers.onWatchMoreClips}
+                onTagPress={() => handlers.onTagPress?.(item.id)}
                 onCarouselTouchStart={handlers.onCarouselTouchStart}
                 onCarouselTouchEnd={handlers.onCarouselTouchEnd}
                 isMeasurement={target === 'Measurement'}
@@ -1232,107 +1244,117 @@ export function InfiniteFeedManager({
             onSwipeRight={() => router.push('/upload')}
             onSwipeLeft={() => router.navigate('/explore')}
             edgeOnly={true}
+            edgeTopInset={96}
         >
-        <View style={[styles.container, { backgroundColor: themeColors.background }]}>
-            <FlashListAny
-                ref={listRef}
-                data={videos}
-                renderItem={renderItem}
-                keyExtractor={(item: InfiniteFeedVideo) => item.id}
-                extraData={flashListExtraData}
-                viewabilityConfig={viewabilityConfig}
-                onViewableItemsChanged={onViewableItemsChanged}
-                onScrollBeginDrag={handleScrollBeginDrag}
-                onScrollEndDrag={handleScrollEndDrag}
-                onMomentumScrollBegin={handleMomentumScrollBegin}
-                onMomentumScrollEnd={handleMomentumScrollEnd}
-                onScroll={handleScroll}
-                scrollEventThrottle={32}
-                estimatedItemSize={ESTIMATED_CARD_HEIGHT}
-                removeClippedSubviews={true}
-                maxToRenderPerBatch={INFINITE_MAX_RENDER_BATCH}
-                windowSize={INFINITE_WINDOW_SIZE}
-                drawDistance={INFINITE_DRAW_DISTANCE}
-                showsVerticalScrollIndicator={false}
-                scrollEnabled={!isCarouselInteracting}
-                ListHeaderComponent={!FEED_FLAGS.INF_DISABLE_HEADER_TABS ? (
-                    <InfiniteFeedHeader
-                        activeTab={activeTab}
-                        onTabChange={setActiveTab}
-                        colors={themeColors}
-                        insetTop={insets.top}
-                        onUploadPress={() => router.push('/upload')}
-                        onCreateStoryPress={() => router.push({
-                            pathname: '/upload',
-                            params: { storyOnly: '1' },
-                        })}
-                        onNotificationPress={() => router.push('/notifications')}
-                        storyUsers={storyUsers}
-                        onStoryAvatarPress={handleStoryAvatarPress}
+            <View style={[styles.container, { backgroundColor: themeColors.background }]}>
+                <FlashListAny
+                    ref={listRef}
+                    data={videos}
+                    renderItem={renderItem}
+                    keyExtractor={(item: InfiniteFeedVideo) => item.id}
+                    extraData={flashListExtraData}
+                    viewabilityConfig={viewabilityConfig}
+                    onViewableItemsChanged={onViewableItemsChanged}
+                    onScrollBeginDrag={handleScrollBeginDrag}
+                    onScrollEndDrag={handleScrollEndDrag}
+                    onMomentumScrollBegin={handleMomentumScrollBegin}
+                    onMomentumScrollEnd={handleMomentumScrollEnd}
+                    onScroll={handleScroll}
+                    scrollEventThrottle={32}
+                    estimatedItemSize={ESTIMATED_CARD_HEIGHT}
+                    removeClippedSubviews={true}
+                    maxToRenderPerBatch={INFINITE_MAX_RENDER_BATCH}
+                    windowSize={INFINITE_WINDOW_SIZE}
+                    drawDistance={INFINITE_DRAW_DISTANCE}
+                    showsVerticalScrollIndicator={false}
+                    scrollEnabled={!isCarouselInteracting}
+                    ListHeaderComponent={!FEED_FLAGS.INF_DISABLE_HEADER_TABS ? (
+                        <InfiniteFeedHeader
+                            activeTab={activeTab}
+                            onTabChange={setActiveTab}
+                            colors={themeColors}
+                            insetTop={insets.top}
+                            onUploadPress={() => router.push('/upload')}
+                            onCreateStoryPress={() => router.push({
+                                pathname: '/upload',
+                                params: { storyOnly: '1' },
+                            })}
+                            onNotificationPress={() => router.push('/notifications')}
+                            storyUsers={storyUsers}
+                            onStoryAvatarPress={handleStoryAvatarPress}
+                        />
+                    ) : (
+                        <View style={{ height: insets.top }} />
+                    )}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={isRefreshing}
+                            onRefresh={refreshFeed}
+                            tintColor={themeColors.textPrimary}
+                        />
+                    }
+                    onEndReached={hasMore ? loadMore : undefined}
+                    onEndReachedThreshold={0.6}
+                    ListFooterComponent={
+                        isLoadingMore ? (
+                            <ThinSpinner size={32} color={themeColors.textPrimary} style={styles.footerLoader} />
+                        ) : null
+                    }
+                    ListEmptyComponent={listEmpty}
+                    contentContainerStyle={FLASH_LIST_CONTENT_CONTAINER_STYLE}
+                />
+                <View
+                    pointerEvents="none"
+                    style={[
+                        styles.statusBarOverlay,
+                        { height: insets.top, backgroundColor: themeColors.background },
+                    ]}
+                />
+                <View
+                    style={styles.sheetsContainer}
+                    pointerEvents={isMoreSheetOpen || isMoreDeleteConfirmationVisible ? 'box-none' : 'none'}
+                >
+                    {isMoreSheetOpen && !isMoreDeleteConfirmationVisible ? (
+                        <Pressable
+                            style={styles.sheetDismissOverlay}
+                            onPress={() => {
+                                setIsMoreSheetOpen(false);
+                                moreOptionsSheetRef.current?.dismiss();
+                            }}
+                        />
+                    ) : null}
+                    <InfiniteFeedMoreOptionsSheet
+                        ref={moreOptionsSheetRef}
+                        onSavePress={handleMoreSheetSave}
+                        onQrCodePress={handleMoreSheetQrCode}
+                        onEditPress={isOwnMoreOptionsVideo ? handleMoreSheetEdit : undefined}
+                        onDeletePress={isOwnMoreOptionsVideo ? handleMoreSheetDelete : undefined}
+                        onUnfollowPress={isFollowingMoreOptionsVideo ? handleMoreSheetUnfollow : undefined}
+                        onWhyThisPostPress={handleMoreSheetWhyThisPost}
+                        onShowMorePress={handleMoreSheetShowMore}
+                        onAboutAccountPress={handleMoreSheetAboutAccount}
+                        showSubtitleOption={shouldShowSubtitleOptionInMoreSheet}
+                        subtitleMode={subtitleModeForMoreOptions}
+                        onSubtitleModeChange={handleMoreSheetSubtitleModeChange}
+                        isFollowingCreator={isFollowingMoreOptionsVideo}
+                        onSheetStateChange={setIsMoreSheetOpen}
                     />
-                ) : (
-                    <View style={{ height: insets.top }} />
-                )}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={isRefreshing}
-                        onRefresh={refreshFeed}
-                        tintColor={themeColors.textPrimary}
+                    <InfiniteFeedDeleteConfirmationModal
+                        visible={isMoreDeleteConfirmationVisible}
+                        onCancel={handleCancelMoreDelete}
+                        onConfirm={handleConfirmMoreDelete}
                     />
-                }
-                onEndReached={hasMore ? loadMore : undefined}
-                onEndReachedThreshold={0.6}
-                ListFooterComponent={
-                    isLoadingMore ? (
-                        <ThinSpinner size={32} color={themeColors.textPrimary} style={styles.footerLoader} />
-                    ) : null
-                }
-                ListEmptyComponent={listEmpty}
-                contentContainerStyle={FLASH_LIST_CONTENT_CONTAINER_STYLE}
-            />
-            <View
-                pointerEvents="none"
-                style={[
-                    styles.statusBarOverlay,
-                    { height: insets.top, backgroundColor: themeColors.background },
-                ]}
-            />
-            <View
-                style={styles.sheetsContainer}
-                pointerEvents={isMoreSheetOpen || isMoreDeleteConfirmationVisible ? 'box-none' : 'none'}
-            >
-                {isMoreSheetOpen && !isMoreDeleteConfirmationVisible ? (
-                    <Pressable
-                        style={styles.sheetDismissOverlay}
-                        onPress={() => {
-                            setIsMoreSheetOpen(false);
-                            moreOptionsSheetRef.current?.dismiss();
+                    <TaggedPeopleSheet
+                        sheetRef={taggedPeopleSheetRef}
+                        taggedPeople={videos.find(v => v.id === selectedTaggedVideoId)?.taggedPeople || []}
+                        onClose={() => taggedPeopleSheetRef.current?.dismiss()}
+                        onUserPress={(userId) => {
+                            taggedPeopleSheetRef.current?.dismiss();
+                            handleOpenProfile(userId);
                         }}
                     />
-                ) : null}
-                <InfiniteFeedMoreOptionsSheet
-                    ref={moreOptionsSheetRef}
-                    onSavePress={handleMoreSheetSave}
-                    onQrCodePress={handleMoreSheetQrCode}
-                    onEditPress={isOwnMoreOptionsVideo ? handleMoreSheetEdit : undefined}
-                    onDeletePress={isOwnMoreOptionsVideo ? handleMoreSheetDelete : undefined}
-                    onUnfollowPress={isFollowingMoreOptionsVideo ? handleMoreSheetUnfollow : undefined}
-                    onWhyThisPostPress={handleMoreSheetWhyThisPost}
-                    onShowMorePress={handleMoreSheetShowMore}
-                    onAboutAccountPress={handleMoreSheetAboutAccount}
-                    showSubtitleOption={shouldShowSubtitleOptionInMoreSheet}
-                    subtitleMode={subtitleModeForMoreOptions}
-                    onSubtitleModeChange={handleMoreSheetSubtitleModeChange}
-                    isFollowingCreator={isFollowingMoreOptionsVideo}
-                    onSheetStateChange={setIsMoreSheetOpen}
-                />
-                <InfiniteFeedDeleteConfirmationModal
-                    visible={isMoreDeleteConfirmationVisible}
-                    onCancel={handleCancelMoreDelete}
-                    onConfirm={handleConfirmMoreDelete}
-                />
+                </View>
             </View>
-        </View>
         </SwipeWrapper>
     );
 }

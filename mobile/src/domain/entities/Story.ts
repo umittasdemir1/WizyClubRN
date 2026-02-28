@@ -22,5 +22,6 @@ export interface Story {
         type: 'video' | 'image';
         thumbnail?: string;
     }[];
+    taggedPeople?: Pick<User, 'id' | 'username' | 'fullName' | 'avatarUrl' | 'isVerified'>[];
     postType?: 'video' | 'carousel';
 }

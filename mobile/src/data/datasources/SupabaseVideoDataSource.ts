@@ -110,6 +110,7 @@ interface SupabaseVideo {
         x_url?: string;
         website?: string;
     };
+    post_tags?: any[];
 }
 
 export class SupabaseVideoDataSource {
@@ -125,7 +126,7 @@ export class SupabaseVideoDataSource {
 
         let query = supabase
             .from('videos')
-            .select('*, profiles(*)')
+            .select('*, profiles(*), post_tags(*, profiles(*))')
             .is('deleted_at', null)
             .order('created_at', { ascending: false })
             .order('id', { ascending: false })
@@ -148,7 +149,7 @@ export class SupabaseVideoDataSource {
 
             let fallbackQuery = supabase
                 .from('videos')
-                .select('*, profiles(*)')
+                .select('*, profiles(*), post_tags(*, profiles(*))')
                 .is('deleted_at', null)
                 .lt('created_at', cursor.createdAt)
                 .order('created_at', { ascending: false })
@@ -254,7 +255,7 @@ export class SupabaseVideoDataSource {
         const [storiesResult, viewsResult] = await Promise.all([
             supabase
                 .from('stories')
-                .select('*, profiles(*)')
+                .select('*, profiles(*), post_tags(*, profiles(*))')
                 .is('deleted_at', null)
                 .gt('expires_at', now)
                 .order('created_at', { ascending: false })
@@ -327,7 +328,7 @@ export class SupabaseVideoDataSource {
     async getVideoById(videoId: string): Promise<Video | null> {
         const { data, error } = await supabase
             .from('videos')
-            .select('*, profiles(*)')
+            .select('*, profiles(*), post_tags(*, profiles(*))')
             .eq('id', videoId)
             .single();
 
@@ -343,7 +344,7 @@ export class SupabaseVideoDataSource {
 
         const { data, error } = await supabase
             .from('videos')
-            .select('*, profiles(*)')
+            .select('*, profiles(*), post_tags(*, profiles(*))')
             .in('id', videoIds)
             .is('deleted_at', null);
 
@@ -431,6 +432,13 @@ export class SupabaseVideoDataSource {
             commercialType: dto.commercial_type,
             mediaUrls: normalizeMediaUrls(dto.media_urls),
             postType: dto.post_type,
+            taggedPeople: dto.post_tags?.map((pt: any) => ({
+                id: pt.tagged_user_id,
+                username: pt.profiles?.username || '',
+                fullName: pt.profiles?.full_name || '',
+                avatarUrl: pt.profiles?.avatar_url || '',
+                isVerified: pt.profiles?.is_verified || false,
+            })) || [],
         };
     }
 
@@ -466,6 +474,13 @@ export class SupabaseVideoDataSource {
             likesCount: dto.likes_count || 0,
             mediaUrls: normalizeMediaUrls(dto.media_urls),
             postType: dto.post_type,
+            taggedPeople: dto.post_tags?.map((pt: any) => ({
+                id: pt.tagged_user_id,
+                username: pt.profiles?.username || '',
+                fullName: pt.profiles?.full_name || '',
+                avatarUrl: pt.profiles?.avatar_url || '',
+                isVerified: pt.profiles?.is_verified || false,
+            })) || [],
         };
     }
 }

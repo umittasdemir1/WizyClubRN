@@ -1,7 +1,6 @@
 import React from 'react';
 import { StyleSheet, Dimensions } from 'react-native';
 import { GestureDetector, Gesture, GestureHandlerRootView } from 'react-native-gesture-handler';
-import { useRouter } from 'expo-router';
 import { runOnJS } from 'react-native-reanimated';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -15,6 +14,7 @@ interface SwipeWrapperProps {
     enableLeft?: boolean;
     enableRight?: boolean;
     edgeOnly?: boolean;
+    edgeTopInset?: number;
     disabled?: boolean;
 }
 
@@ -25,10 +25,9 @@ export const SwipeWrapper: React.FC<SwipeWrapperProps> = ({
     enableLeft = true,
     enableRight = true,
     edgeOnly = false,
+    edgeTopInset = 0,
     disabled = false,
 }) => {
-    const router = useRouter();
-
     const panGesture = Gesture.Pan()
         .enabled(!disabled)
         .activeOffsetX([-15, 15])
@@ -37,11 +36,14 @@ export const SwipeWrapper: React.FC<SwipeWrapperProps> = ({
         .onTouchesDown((e, state) => {
             if (!edgeOnly) return;
 
-            const touchX = e.changedTouches[0].x;
+            const touch = e.changedTouches[0];
+            const touchX = touch.x;
+            const touchY = touch.y;
             const isLeftEdge = touchX < 30;
             const isRightEdge = touchX > SCREEN_WIDTH - 30;
+            const isWithinTopInset = touchY <= edgeTopInset;
 
-            if (isLeftEdge || isRightEdge) {
+            if ((isLeftEdge || isRightEdge) && !isWithinTopInset) {
                 state.activate();
             } else {
                 state.fail();

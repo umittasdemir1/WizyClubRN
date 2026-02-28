@@ -134,10 +134,11 @@ interface InfiniteFeedCardProps {
     onLike: (id: string) => void;
     onSave: (id: string) => void;
     onFollow: (id: string) => void;
-    onShare: (id: string) => void;
-    onShop: (id: string) => void;
+    onShare: (videoId: string) => void;
+    onShop: (videoId: string) => void;
     onWatchMoreClips?: () => void;
-    onMore?: (id: string) => void;
+    onMore?: (videoId: string) => void;
+    onTagPress?: (videoId: string) => void;
     onCarouselTouchStart?: () => void;
     onCarouselTouchEnd?: () => void;
     isMeasurement?: boolean;
@@ -169,6 +170,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     onShop,
     onWatchMoreClips,
     onMore,
+    onTagPress,
     onCarouselTouchStart,
     onCarouselTouchEnd,
     isMeasurement = false,
@@ -310,14 +312,22 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     );
     const hasTaggedPeopleOverflow = (item.taggedPeople?.length ?? 0) > TAGGED_PEOPLE_PREVIEW_LIMIT;
     const visibleTaggedPeople = useMemo(
-        () => (item.taggedPeople ?? []).slice(0, hasTaggedPeopleOverflow ? TAGGED_PEOPLE_PREVIEW_LIMIT - 1 : TAGGED_PEOPLE_PREVIEW_LIMIT),
-        [hasTaggedPeopleOverflow, item.taggedPeople]
+        () => (item.taggedPeople ?? []).slice(0, TAGGED_PEOPLE_PREVIEW_LIMIT),
+        [item.taggedPeople]
     );
     const taggedPeopleMeta = useMemo(() => {
         if (visibleTaggedPeople.length === 0) return null;
 
         return (
-            <View style={styles.taggedPeopleMetaRow}>
+            <Pressable
+                style={styles.taggedPeopleMetaRow}
+                hitSlop={12}
+                pressRetentionOffset={12}
+                onPress={(event) => {
+                    event.stopPropagation?.();
+                    onTagPress?.(item.id);
+                }}
+            >
                 <Text style={styles.taggedPeopleMetaLabel}>ile</Text>
                 <View style={styles.taggedPeopleMetaAvatars}>
                     {visibleTaggedPeople.map((person, personIndex) => {
@@ -359,9 +369,9 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                         </View>
                     ) : null}
                 </View>
-            </View>
+            </Pressable>
         );
-    }, [hasTaggedPeopleOverflow, visibleTaggedPeople]);
+    }, [hasTaggedPeopleOverflow, visibleTaggedPeople, onTagPress, item.id]);
 
     const sourceVideoUrl = getVideoUrl(item);
     const videoUrl = isNonEmptyString(resolvedVideoSource) ? resolvedVideoSource : sourceVideoUrl;
@@ -722,7 +732,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         setVideoProgressSec(0);
         setVideoDurationDisplaySec(null);
         setHasReachedLoopLimit(false);
-                wasActiveRef.current = isActive;
+        wasActiveRef.current = isActive;
         setIsVideoVisible(!initialShouldGate);
         setIsDecodePrewarmDone(false);
         setPlaybackSource(null);
@@ -860,7 +870,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
             clearActiveWakeupTimer();
             hasAppliedActiveWakeupRef.current = false;
             inactiveSinceRef.current = Date.now();
-                        clearInactivePauseTimer();
+            clearInactivePauseTimer();
             // âœ… 3-second threshold: mark for reset later (when video goes out of view)
             // Don't seek here - it causes visible jitter
             // The reset will happen in shouldMountVideo=false effect
@@ -869,7 +879,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
             inactivePauseTimerRef.current = setTimeout(() => {
                 inactivePauseTimerRef.current = null;
                 if (wasActiveRef.current) return;
-                            }, INACTIVE_RESUME_WINDOW_MS);
+            }, INACTIVE_RESUME_WINDOW_MS);
         }
 
         if (isActive && !wasActive) {
@@ -892,7 +902,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                 // or start fresh on next remount
             }
             inactiveSinceRef.current = null;
-                    }
+        }
 
         wasActiveRef.current = isActive;
     }, [clearActiveWakeupTimer, clearInactivePauseTimer, isActive, isVideo]);
@@ -1041,9 +1051,10 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                     event.stopPropagation?.();
                                     handleMore();
                                 }}
-                                hitSlop={14}
+                                hitSlop={{ top: 16, bottom: 16, left: 16, right: 24 }}
+                                pressRetentionOffset={{ top: 16, bottom: 16, left: 16, right: 24 }}
                             >
-                                <MoreVertical size={22} color="#FFFFFF" strokeWidth={2.4} />
+                                <MoreVertical pointerEvents="none" size={22} color="#FFFFFF" strokeWidth={2.4} />
                             </Pressable>
                         </View>
                     </View>
@@ -1187,9 +1198,10 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                     event.stopPropagation?.();
                                     handleMore();
                                 }}
-                                hitSlop={14}
+                                hitSlop={{ top: 16, bottom: 16, left: 16, right: 24 }}
+                                pressRetentionOffset={{ top: 16, bottom: 16, left: 16, right: 24 }}
                             >
-                                <MoreVertical size={22} color="#FFFFFF" strokeWidth={2.4} />
+                                <MoreVertical pointerEvents="none" size={22} color="#FFFFFF" strokeWidth={2.4} />
                             </Pressable>
                         </View>
                         {isVideo && !isCleanScreen && (
@@ -1343,6 +1355,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: 6,
         flexShrink: 0,
+        minHeight: 32,
+        paddingVertical: 6,
+        paddingRight: 6,
+        marginVertical: -6,
+        marginRight: -6,
     },
     taggedPeopleMetaLabel: {
         color: '#FFFFFF',
@@ -1354,16 +1371,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     taggedPeopleMetaAvatarFrame: {
-        width: 18,
-        height: 18,
-        borderRadius: 9,
+        width: 24,
+        height: 24,
+        borderRadius: 12,
         overflow: 'hidden',
         backgroundColor: 'rgba(255, 255, 255, 0.18)',
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.9)',
     },
     taggedPeopleMetaAvatarOverlap: {
-        marginLeft: -6,
+        marginLeft: -8,
     },
     taggedPeopleMetaAvatarImage: {
         width: '100%',
@@ -1383,10 +1400,10 @@ const styles = StyleSheet.create({
     taggedPeopleMetaPlusFrame: {
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        backgroundColor: '#FFFFFF',
     },
     taggedPeopleMetaPlusText: {
-        color: '#FFFFFF',
+        color: 'rgba(0, 0, 0, 0.72)',
         fontSize: 16,
         fontWeight: '700',
         lineHeight: 18,
@@ -1435,6 +1452,7 @@ const styles = StyleSheet.create({
     },
     mediaTapLayer: {
         ...StyleSheet.absoluteFillObject,
+        top: 56,
         zIndex: 1,
     },
     videoContainer: {

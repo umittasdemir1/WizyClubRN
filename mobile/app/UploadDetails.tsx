@@ -562,6 +562,10 @@ export default function UploadDetailsScreen() {
             formData.append('trimEndSec', String(draft.trimEndSec));
         }
 
+        if (draft.taggedPeople && draft.taggedPeople.length > 0) {
+            formData.append('taggedPeople', JSON.stringify(draft.taggedPeople.map(p => p.id)));
+        }
+
         if (commercialType !== 'İş Birliği İçermiyor' && commercialType !== 'Kendi Markam') {
             if (brandName) formData.append('brandName', brandName);
             if (brandUrl) formData.append('brandUrl', brandUrl);
