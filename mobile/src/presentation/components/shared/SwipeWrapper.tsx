@@ -1,11 +1,13 @@
 import React from 'react';
 import { StyleSheet, Dimensions } from 'react-native';
 import { GestureDetector, Gesture, GestureHandlerRootView } from 'react-native-gesture-handler';
-import { runOnJS } from 'react-native-reanimated';
+import { runOnJS, useSharedValue } from 'react-native-reanimated';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25; // 25% of screen
 const SWIPE_VELOCITY_THRESHOLD = 800; // Faster threshold
+const EDGE_WIDTH = 30;
+const EDGE_SWIPE_ACTIVATION_PX = 10; // horizontal movement needed to confirm swipe intent
 
 interface SwipeWrapperProps {
     children: React.ReactNode;
@@ -28,6 +30,9 @@ export const SwipeWrapper: React.FC<SwipeWrapperProps> = ({
     edgeTopInset = 0,
     disabled = false,
 }) => {
+    const edgeTouchStartX = useSharedValue(0);
+    const isEdgeTouch = useSharedValue(false);
+
     const panGesture = Gesture.Pan()
         .enabled(!disabled)
         .activeOffsetX([-15, 15])
@@ -39,24 +44,43 @@ export const SwipeWrapper: React.FC<SwipeWrapperProps> = ({
             const touch = e.changedTouches[0];
             const touchX = touch.x;
             const touchY = touch.y;
-            const isLeftEdge = touchX < 30;
-            const isRightEdge = touchX > SCREEN_WIDTH - 30;
+            const isLeftEdge = touchX < EDGE_WIDTH;
+            const isRightEdge = touchX > SCREEN_WIDTH - EDGE_WIDTH;
             const isWithinTopInset = touchY <= edgeTopInset;
 
             if ((isLeftEdge || isRightEdge) && !isWithinTopInset) {
-                state.activate();
+                // Edge touch detected – don't activate yet.
+                // Wait for horizontal movement to distinguish taps from swipes.
+                // This allows tap gestures on UI elements near the edge
+                // (e.g. the more-options button) to work properly.
+                isEdgeTouch.value = true;
+                edgeTouchStartX.value = touch.absoluteX;
             } else {
+                isEdgeTouch.value = false;
                 state.fail();
             }
         })
         .onTouchesMove((e, state) => {
-            // If movement is mostly vertical, let the parent ScrollView handle it
+            if (!isEdgeTouch.value) return;
+
             const touch = e.allTouches[0];
+
+            // If movement is mostly vertical, let the parent ScrollView handle it
             if (Math.abs(touch.absoluteY - touch.y) > 10) {
+                isEdgeTouch.value = false;
                 state.fail();
+                return;
+            }
+
+            // Activate once horizontal movement confirms swipe intent
+            const dx = Math.abs(touch.absoluteX - edgeTouchStartX.value);
+            if (dx > EDGE_SWIPE_ACTIVATION_PX) {
+                state.activate();
             }
         })
         .onEnd((e) => {
+            isEdgeTouch.value = false;
+
             const shouldSwipeLeft =
                 e.translationX < -SWIPE_THRESHOLD ||
                 (e.translationX < -50 && e.velocityX < -SWIPE_VELOCITY_THRESHOLD);

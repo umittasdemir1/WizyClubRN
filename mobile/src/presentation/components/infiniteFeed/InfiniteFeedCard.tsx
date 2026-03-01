@@ -1,8 +1,9 @@
 ﻿import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, Dimensions, type GestureResponderEvent, type LayoutChangeEvent } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { Volume2, VolumeX, MoreVertical } from 'lucide-react-native';
+import { Volume2, VolumeX, MoreVertical, Plus } from 'lucide-react-native';
 import VideoPlayer, { ViewType, type OnLoadData, type OnLoadStartData, type OnProgressData, type OnVideoErrorData } from 'react-native-video';
 import type { NetInfoStateType } from '@react-native-community/netinfo';
 import { getVideoUrl } from '../../../core/utils/videoUrl';
@@ -139,6 +140,7 @@ interface InfiniteFeedCardProps {
     onWatchMoreClips?: () => void;
     onMore?: (videoId: string) => void;
     onTagPress?: (videoId: string) => void;
+    onHashtagPress?: (hashtag: string) => void;
     onCarouselTouchStart?: () => void;
     onCarouselTouchEnd?: () => void;
     isMeasurement?: boolean;
@@ -171,6 +173,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     onWatchMoreClips,
     onMore,
     onTagPress,
+    onHashtagPress,
     onCarouselTouchStart,
     onCarouselTouchEnd,
     isMeasurement = false,
@@ -365,7 +368,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                 styles.taggedPeopleMetaPlusFrame,
                             ]}
                         >
-                            <Text style={styles.taggedPeopleMetaPlusText}>+</Text>
+                            <Plus size={14} color="#080A0F" strokeWidth={2.8} />
                         </View>
                     ) : null}
                 </View>
@@ -481,13 +484,21 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         onShop(item.id);
     }, [item.id, onShop]);
 
-    const handleCommercialInfoPress = useCallback(() => {
-        // Placeholder callback for future commercial info flow.
-    }, []);
 
     const handleMore = useCallback(() => {
         onMore?.(item.id);
     }, [item.id, onMore]);
+
+    // Native tap gesture for more button - works reliably even when
+    // the card is partially visible in the FlashList scroll view.
+    const moreTapGesture = useMemo(() =>
+        Gesture.Tap()
+            .runOnJS(true)
+            .onEnd(() => {
+                handleMore();
+            }),
+        [handleMore]
+    );
 
     const revealVideoLayer = useCallback(() => {
         if (!shouldGateVideoVisibility) {
@@ -1017,7 +1028,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                     </Pressable>
                                     <View style={styles.headerText}>
                                         <View style={styles.nameRow}>
-                                            <Pressable onPress={handleProfilePress} hitSlop={8}>
+                                            <Pressable onPress={handleProfilePress}>
                                                 <Text style={themedStyles.fullName} numberOfLines={1}>
                                                     {item.user?.fullName || 'WizyClub User'}
                                                 </Text>
@@ -1029,7 +1040,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                             )}
                                             {taggedPeopleMeta}
                                         </View>
-                                        <Pressable onPress={handleProfilePress} hitSlop={8}>
+                                        <Pressable onPress={handleProfilePress} hitSlop={{ top: 0, bottom: 8, left: 8, right: 8 }}>
                                             <Text style={themedStyles.handle} numberOfLines={1}>
                                                 @{item.user?.username || 'wizyclub'}
                                             </Text>
@@ -1045,17 +1056,11 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                     <Text style={styles.followText}>Takip Et</Text>
                                 </Pressable>
                             )}
-                            <Pressable
-                                style={styles.moreButton}
-                                onPress={(event) => {
-                                    event.stopPropagation?.();
-                                    handleMore();
-                                }}
-                                hitSlop={{ top: 16, bottom: 16, left: 16, right: 24 }}
-                                pressRetentionOffset={{ top: 16, bottom: 16, left: 16, right: 24 }}
-                            >
-                                <MoreVertical pointerEvents="none" size={22} color="#FFFFFF" strokeWidth={2.4} />
-                            </Pressable>
+                            <GestureDetector gesture={moreTapGesture}>
+                                <View style={styles.moreButton} hitSlop={{ top: 16, bottom: 16, left: 16, right: 24 }}>
+                                    <MoreVertical pointerEvents="none" size={22} color="#FFFFFF" strokeWidth={2.4} />
+                                </View>
+                            </GestureDetector>
                         </View>
                     </View>
                 ) : (
@@ -1164,7 +1169,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                     </Pressable>
                                     <View style={styles.headerText}>
                                         <View style={styles.nameRow}>
-                                            <Pressable onPress={handleProfilePress} hitSlop={8}>
+                                            <Pressable onPress={handleProfilePress}>
                                                 <Text style={themedStyles.fullName} numberOfLines={1}>
                                                     {item.user?.fullName || 'WizyClub User'}
                                                 </Text>
@@ -1176,7 +1181,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                             )}
                                             {taggedPeopleMeta}
                                         </View>
-                                        <Pressable onPress={handleProfilePress} hitSlop={8}>
+                                        <Pressable onPress={handleProfilePress} hitSlop={{ top: 0, bottom: 8, left: 8, right: 8 }}>
                                             <Text style={themedStyles.handle} numberOfLines={1}>
                                                 @{item.user?.username || 'wizyclub'}
                                             </Text>
@@ -1192,17 +1197,11 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                     <Text style={styles.followText}>Takip Et</Text>
                                 </Pressable>
                             )}
-                            <Pressable
-                                style={styles.moreButton}
-                                onPress={(event) => {
-                                    event.stopPropagation?.();
-                                    handleMore();
-                                }}
-                                hitSlop={{ top: 16, bottom: 16, left: 16, right: 24 }}
-                                pressRetentionOffset={{ top: 16, bottom: 16, left: 16, right: 24 }}
-                            >
-                                <MoreVertical pointerEvents="none" size={22} color="#FFFFFF" strokeWidth={2.4} />
-                            </Pressable>
+                            <GestureDetector gesture={moreTapGesture}>
+                                <View style={styles.moreButton} hitSlop={{ top: 16, bottom: 16, left: 16, right: 24 }}>
+                                    <MoreVertical pointerEvents="none" size={22} color="#FFFFFF" strokeWidth={2.4} />
+                                </View>
+                            </GestureDetector>
                         </View>
                         {isVideo && !isCleanScreen && (
                             <View style={styles.mediaRightBottomActions} pointerEvents="box-none">
@@ -1255,7 +1254,6 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                         onSave={handleSave}
                         onShare={handleShare}
                         onShop={handleShop}
-                        onCommercialInfoPress={handleCommercialInfoPress}
                     />
                     {!showDescriptionBlock && showTimeHint && (
                         <Text style={themedStyles.timeHint}>{relativeTime}</Text>
@@ -1274,7 +1272,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                     <Text style={themedStyles.description} onPress={handleToggleDescription}>
                         <Text style={themedStyles.displayName} onPress={handleProfilePress}>{displayName}</Text>
                         {hasDescription ? ' ' : null}
-                        {hasDescription ? <RichTextLabel text={displayDescription} /> : null}
+                        {hasDescription ? <RichTextLabel text={displayDescription} onHashtagPress={onHashtagPress} /> : null}
                         {!isDescriptionExpanded && canToggleDescription && (
                             <Text style={themedStyles.readMore}>{'...daha fazla'}</Text>
                         )}
@@ -1357,9 +1355,12 @@ const styles = StyleSheet.create({
         flexShrink: 0,
         minHeight: 32,
         paddingVertical: 6,
+        paddingLeft: 6,
         paddingRight: 6,
         marginVertical: -6,
+        marginLeft: -6,
         marginRight: -6,
+        zIndex: 1,
     },
     taggedPeopleMetaLabel: {
         color: '#FFFFFF',
@@ -1401,12 +1402,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: '#FFFFFF',
-    },
-    taggedPeopleMetaPlusText: {
-        color: 'rgba(0, 0, 0, 0.72)',
-        fontSize: 16,
-        fontWeight: '700',
-        lineHeight: 18,
+        borderWidth: 1,
+        borderColor: '#080A0F',
     },
     fullName: {
         fontSize: 15,

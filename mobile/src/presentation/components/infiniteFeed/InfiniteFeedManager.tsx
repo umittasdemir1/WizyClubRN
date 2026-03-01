@@ -43,8 +43,10 @@ import { VideoCacheService } from '../../../data/services/VideoCacheService';
 import { useInAppBrowserStore } from '../../store/useInAppBrowserStore';
 import { PerformanceLogger } from '../../../core/services/PerformanceLogger';
 import { useUploadStore } from '../../store/useUploadStore';
+import { useUploadComposerStore } from '../../store/useUploadComposerStore';
 import { useSubtitlePreferencesStore, type SubtitlePreferenceMode } from '../../store/useSubtitlePreferencesStore';
 import { supabase } from '../../../core/supabase';
+import { SupabaseVideoDataSource } from '../../../data/datasources/SupabaseVideoDataSource';
 import { CONFIG } from '../../../core/config';
 import { ThinSpinner } from '../shared/ThinSpinner';
 
@@ -307,6 +309,12 @@ export function InfiniteFeedManager({
         taggedPeopleSheetRef.current?.present();
     }, []);
 
+    const hashtagDataSourceRef = useRef(new SupabaseVideoDataSource());
+    const handleHashtagPress = useCallback((hashtag: string) => {
+        hashtagDataSourceRef.current.incrementHashtagClick(hashtag);
+        router.push(`/search?q=${encodeURIComponent('#' + hashtag)}` as any);
+    }, [router]);
+
     const handleOpenMoreOptions = useCallback((videoId: string) => {
         setSelectedMoreVideoId(videoId);
         moreOptionsSheetRef.current?.present();
@@ -387,16 +395,105 @@ export function InfiniteFeedManager({
         setMoreDeleteConfirmationVisible(true);
     }, [currentUserId, selectedMoreVideoId, videos]);
 
-    const handleMoreSheetEdit = useCallback(() => {
+    const handleMoreSheetEdit = useCallback(async () => {
         const targetId = selectedMoreVideoId;
         if (!targetId) return;
 
         const selectedVideo = videos.find((video) => video.id === targetId);
         const isOwnVideo = !!currentUserId && selectedVideo?.user?.id === currentUserId;
-        if (!isOwnVideo) return;
+        if (!isOwnVideo || !selectedVideo) return;
 
         moreOptionsSheetRef.current?.dismiss();
-        router.push(`/edit?videoId=${encodeURIComponent(targetId)}` as any);
+
+        // Fetch hashtags for this video
+        let editTags: string[] = [];
+        try {
+            const { data: hashtagRows } = await supabase
+                .from('video_hashtags')
+                .select('hashtag_id, hashtags(name)')
+                .eq('video_id', targetId);
+            if (hashtagRows && Array.isArray(hashtagRows)) {
+                editTags = hashtagRows
+                    .map((row: any) => row.hashtags?.name)
+                    .filter((name: any): name is string => typeof name === 'string' && name.trim().length > 0);
+            }
+        } catch {}
+
+        // Map tagged people to UploadComposerTaggedUser format
+        const editTaggedPeople = (selectedVideo.taggedPeople ?? []).map((p) => ({
+            id: p.id,
+            username: p.username,
+            fullName: p.fullName,
+            avatarUrl: p.avatarUrl,
+            isVerified: p.isVerified,
+            followersCount: 0,
+        }));
+
+        // Fotoğraf/carousel için thumbnail veya mediaUrls'den al
+        const firstMedia = selectedVideo.mediaUrls?.[0];
+        const editVideoUrl = selectedVideo.videoUrl || firstMedia?.url || '';
+        const editThumbnailUrl = selectedVideo.thumbnailUrl || firstMedia?.thumbnail || firstMedia?.url || '';
+        const isPhotoPost = selectedVideo.postType === 'carousel' || (!selectedVideo.videoUrl && firstMedia?.type === 'image');
+
+        // Mevcut altyazıları çek ve cache'e yükle (yeniden STT maliyeti olmasın)
+        if (!isPhotoPost && editVideoUrl) {
+            try {
+                const subtitleRes = await fetch(`${CONFIG.API_URL}/videos/${targetId}/subtitles`);
+                if (subtitleRes.ok) {
+                    const subtitleResult = await subtitleRes.json();
+                    const rows = Array.isArray(subtitleResult?.data) ? subtitleResult.data : [];
+                    const completedSubs = rows.filter((s: any) => s?.status === 'completed');
+                    const sub = completedSubs.find((s: any) => s.language === 'auto') || completedSubs[0];
+
+                    if (sub?.segments) {
+                        let parsed = sub.segments;
+                        if (typeof parsed === 'string') {
+                            try { parsed = JSON.parse(parsed); } catch {}
+                        }
+                        const segments = Array.isArray(parsed?.segments) ? parsed.segments : (Array.isArray(parsed) ? parsed : []);
+                        const presentation = parsed?.presentation || null;
+                        const style = parsed?.style || null;
+
+                        if (segments.length > 0) {
+                            const store = useUploadComposerStore.getState();
+                            store.updateSubtitleCache(editVideoUrl, segments);
+                            if (presentation) store.updateSubtitlePresentation(editVideoUrl, presentation);
+                            if (style) store.updateSubtitleStyle(editVideoUrl, style);
+                        }
+                    }
+                }
+            } catch {}
+        }
+
+        useUploadComposerStore.getState().setDraft({
+            selectedAssets: [],
+            uploadMode: 'video',
+            coverAssetIndex: 0,
+            playbackRate: 1,
+            videoVolume: 1,
+            cropRatio: '9:16',
+            filterPreset: 'none',
+            qualityPreset: 'medium',
+            subtitleLanguage: 'auto',
+            trimStartSec: 0,
+            trimEndSec: 0,
+            editVideoId: targetId,
+            editVideoUrl,
+            editThumbnailUrl,
+            editDescription: selectedVideo.description ?? '',
+            editCommercialType: selectedVideo.commercialType ?? undefined,
+            editBrandName: selectedVideo.brandName ?? undefined,
+            editBrandUrl: selectedVideo.brandUrl ?? undefined,
+            editTags,
+            editTaggedPeople,
+        });
+
+        // Fotoğraf postları için doğrudan UploadDetails'a git (subtitle düzenleme yok)
+        if (isPhotoPost) {
+            router.push('/UploadDetails' as any);
+        } else {
+            router.push('/upload-composer' as any);
+        }
     }, [currentUserId, router, selectedMoreVideoId, videos]);
 
     const handleCancelMoreDelete = useCallback(() => {
@@ -969,6 +1066,7 @@ export function InfiniteFeedManager({
         onCarouselTouchStart: handleCarouselTouchStart,
         onCarouselTouchEnd: handleCarouselTouchEnd,
         onTagPress: handleOpenTaggedPeople,
+        onHashtagPress: handleHashtagPress,
     });
 
     useEffect(() => {
@@ -986,6 +1084,7 @@ export function InfiniteFeedManager({
             onCarouselTouchStart: handleCarouselTouchStart,
             onCarouselTouchEnd: handleCarouselTouchEnd,
             onTagPress: handleOpenTaggedPeople,
+            onHashtagPress: handleHashtagPress,
         };
     }, [
         toggleMute,
@@ -1001,6 +1100,7 @@ export function InfiniteFeedManager({
         handleCarouselTouchStart,
         handleCarouselTouchEnd,
         handleOpenTaggedPeople,
+        handleHashtagPress,
     ]);
 
     // ✅ [PERF] Sync volatile refs for renderItem (no re-render trigger)
@@ -1069,6 +1169,7 @@ export function InfiniteFeedManager({
                 onShop={handlers.onShop}
                 onWatchMoreClips={handlers.onWatchMoreClips}
                 onTagPress={() => handlers.onTagPress?.(item.id)}
+                onHashtagPress={handlers.onHashtagPress}
                 onCarouselTouchStart={handlers.onCarouselTouchStart}
                 onCarouselTouchEnd={handlers.onCarouselTouchEnd}
                 isMeasurement={target === 'Measurement'}
@@ -1262,7 +1363,7 @@ export function InfiniteFeedManager({
                     onScroll={handleScroll}
                     scrollEventThrottle={32}
                     estimatedItemSize={ESTIMATED_CARD_HEIGHT}
-                    removeClippedSubviews={true}
+                    removeClippedSubviews={false}
                     maxToRenderPerBatch={INFINITE_MAX_RENDER_BATCH}
                     windowSize={INFINITE_WINDOW_SIZE}
                     drawDistance={INFINITE_DRAW_DISTANCE}

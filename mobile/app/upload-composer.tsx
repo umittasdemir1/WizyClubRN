@@ -190,8 +190,21 @@ export default function UploadComposerScreen() {
     } = useUploadComposerStore();
     const initialAssets = draft?.selectedAssets ?? [];
     const uploadMode = draft?.uploadMode ?? 'video';
+    const isEditMode = !!draft?.editVideoId;
 
-    const [selectedAssets, setSelectedAssets] = useState(initialAssets);
+    const editModeAssets = useMemo(() => {
+        if (!draft?.editVideoId || !draft?.editVideoUrl) return [];
+        return [{
+            uri: draft.editVideoUrl,
+            type: 'video' as const,
+            width: 1080,
+            height: 1920,
+            duration: 0,
+            assetId: draft.editVideoId,
+            fileName: 'edit_video.mp4',
+        }] as ImagePicker.ImagePickerAsset[];
+    }, [draft?.editVideoId, draft?.editVideoUrl]);
+    const [selectedAssets, setSelectedAssets] = useState(isEditMode ? editModeAssets : initialAssets);
     const [activePreviewIndex, setActivePreviewIndex] = useState(0);
     const [isMuted, setIsMuted] = useState(false);
     const [isQualityMenuOpen, setIsQualityMenuOpen] = useState(false);
@@ -222,7 +235,19 @@ export default function UploadComposerScreen() {
 
     useEffect(() => {
         if (!draft) return;
-        setSelectedAssets(draft.selectedAssets || []);
+        if (draft.editVideoId && draft.editVideoUrl) {
+            setSelectedAssets([{
+                uri: draft.editVideoUrl,
+                type: 'video' as const,
+                width: 1080,
+                height: 1920,
+                duration: 0,
+                assetId: draft.editVideoId,
+                fileName: 'edit_video.mp4',
+            }] as ImagePicker.ImagePickerAsset[]);
+        } else {
+            setSelectedAssets(draft.selectedAssets || []);
+        }
         setQualityPreset(draft.qualityPreset || 'medium');
         setSubtitleLanguage(draft.subtitleLanguage || 'auto');
     }, [draft]);
@@ -533,6 +558,11 @@ export default function UploadComposerScreen() {
     }, [activeAssetUri, captionRequestedByUri, subtitleSttState]);
 
     const handleClose = () => {
+        if (isEditMode) {
+            useUploadComposerStore.getState().clearDraft();
+            router.back();
+            return;
+        }
         if (hasChanges) {
             setExitConfirmationVisible(true);
         } else {
@@ -762,8 +792,24 @@ export default function UploadComposerScreen() {
             previousDraft?.coverAssetIndex ?? 0,
             Math.max(0, selectedAssets.length - 1)
         );
+
+        // Edit mode alanlarını koru
+        const editFields: Partial<UploadComposerDraft> = {};
+        if (previousDraft?.editVideoId) {
+            editFields.editVideoId = previousDraft.editVideoId;
+            editFields.editVideoUrl = previousDraft.editVideoUrl;
+            editFields.editThumbnailUrl = previousDraft.editThumbnailUrl;
+            editFields.editDescription = previousDraft.editDescription;
+            editFields.editCommercialType = previousDraft.editCommercialType;
+            editFields.editBrandName = previousDraft.editBrandName;
+            editFields.editBrandUrl = previousDraft.editBrandUrl;
+            editFields.editTags = previousDraft.editTags;
+            editFields.editTaggedPeople = previousDraft.editTaggedPeople;
+            editFields.taggedPeople = previousDraft.taggedPeople ?? previousDraft.editTaggedPeople;
+        }
+
         useUploadComposerStore.getState().setDraft({
-            selectedAssets,
+            selectedAssets: isEditMode ? [] : selectedAssets,
             uploadMode,
             coverAssetIndex: safeCoverIndex,
             coverTimeSec: previousDraft?.coverTimeSec ?? 0,
@@ -775,6 +821,7 @@ export default function UploadComposerScreen() {
             subtitleLanguage,
             trimStartSec: previousDraft?.trimStartSec ?? 0,
             trimEndSec: previousDraft?.trimEndSec ?? 0,
+            ...editFields,
             ...overrides,
         });
     };
@@ -972,10 +1019,11 @@ export default function UploadComposerScreen() {
                                                         }
                                                         setIsQualityMenuOpen(false);
                                                     }}
+                                                    hideQuality={isEditMode}
                                                 />
                                             )}
 
-                                            {selectedAssets.length > 1 && (
+                                            {selectedAssets.length > 1 && !isEditMode && (
                                                 <Pressable
                                                     style={styles.removeAssetBtn}
                                                     onPress={() => removeAsset(index)}
@@ -1005,7 +1053,7 @@ export default function UploadComposerScreen() {
 
                         {!shouldHideBottomActions && (
                             <View style={styles.nextButtonContainer}>
-                                {selectedAssets[activePreviewIndex]?.type === 'video' && (
+                                {selectedAssets[activePreviewIndex]?.type === 'video' && !isEditMode && (
                                     <Pressable
                                         onPress={handleOpenVideoEditor}
                                         style={styles.nextButton}

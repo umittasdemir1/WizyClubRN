@@ -10,7 +10,7 @@ import Animated, {
     Extrapolation,
     SharedValue,
 } from 'react-native-reanimated';
-import { Heart, Send, Bookmark, PictureInPicture, ShieldQuestion } from 'lucide-react-native';
+import { Heart, Send, Bookmark, PictureInPicture } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { formatCount } from '../../../core/utils';
 import { ThemeColors } from './InfiniteFeedTypes';
@@ -58,7 +58,6 @@ interface InfiniteFeedActionsProps {
     onSave: () => void;
     onShare: () => void;
     onShop: () => void;
-    onCommercialInfoPress: () => void;
 }
 
 // ✅ [PERF] Memoized BurstParticle
@@ -222,7 +221,6 @@ export const InfiniteFeedActions = React.memo(function InfiniteFeedActions({
     onSave,
     onShare,
     onShop,
-    onCommercialInfoPress,
 }: InfiniteFeedActionsProps) {
     const shake = useSharedValue(0);
     const isDarkTheme = colors.textPrimary.toLowerCase() === '#ffffff';
@@ -298,16 +296,6 @@ export const InfiniteFeedActions = React.memo(function InfiniteFeedActions({
                             {shopTagText || 'İş Birliği'}
                         </Text>
                     </Pressable>
-                    <Pressable
-                        style={styles.commercialInfoButton}
-                        onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                            onCommercialInfoPress();
-                        }}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                        <ShieldQuestion size={14} color={commercialTagForegroundColor} strokeWidth={1.9} />
-                    </Pressable>
                 </View>
             ) : null}
         </Animated.View>
@@ -378,9 +366,9 @@ const styles = StyleSheet.create({
     commercialShopTag: {
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
         backgroundColor: 'rgba(255, 255, 255, 0.9)',
-        paddingLeft: 10,
-        paddingRight: 6,
+        paddingHorizontal: 10,
         minHeight: 30,
         borderRadius: 16,
         maxWidth: '66%',
@@ -388,6 +376,7 @@ const styles = StyleSheet.create({
     commercialMainAction: {
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
         gap: 6,
         flexShrink: 1,
     },

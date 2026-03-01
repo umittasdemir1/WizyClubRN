@@ -13,12 +13,13 @@ interface DescriptionSheetProps {
   video: Video | null;
   onFollowPress?: () => void;
   onChange?: (index: number) => void;
+  onHashtagPress?: (hashtag: string) => void;
 }
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export const DescriptionSheet = forwardRef<BottomSheet, DescriptionSheetProps>(
-  ({ video, onFollowPress, onChange }, ref) => {
+  ({ video, onFollowPress, onChange, onHashtagPress }, ref) => {
     const modalTheme = useSurfaceTheme();
     const { isDark } = modalTheme;
     const insets = useSafeAreaInsets();
@@ -112,7 +113,7 @@ export const DescriptionSheet = forwardRef<BottomSheet, DescriptionSheetProps>(
         <BottomSheetScrollView
           contentContainerStyle={{ paddingBottom: insets.bottom + 40, paddingHorizontal: 20 }}
         >
-          <RichTextLabel text={video?.description} style={[styles.description, { color: textPrimary }]} />
+          <RichTextLabel text={video?.description} style={[styles.description, { color: textPrimary }]} onHashtagPress={onHashtagPress} />
         </BottomSheetScrollView>
       </BottomSheet>
     );

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, FlatList, Keyboard, BackHandler, useWindowDimensions, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SystemBars } from 'react-native-edge-to-edge';
 import { ArrowLeft, Search, X, Clock } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -10,6 +10,9 @@ import VideoPlayer from 'react-native-video';
 import CarouselMediaIcon from '../assets/icons/carousel.svg';
 import VideoMediaIcon from '../assets/icons/videos.svg';
 import { VideoCacheService } from '../src/data/services/VideoCacheService';
+import { SupabaseVideoDataSource } from '../src/data/datasources/SupabaseVideoDataSource';
+import { supabase } from '../src/core/supabase';
+import { Hash } from 'lucide-react-native';
 import { useThemeStore } from '../src/presentation/store/useThemeStore';
 import { useAuthStore } from '../src/presentation/store/useAuthStore';
 import { useProfileSearch } from '../src/presentation/hooks/useProfileSearch';
@@ -35,6 +38,7 @@ const DISCOVERY_ICON_BG_SIZE = 28;
 type RecentUser = Pick<User, 'id' | 'username' | 'fullName' | 'avatarUrl' | 'isVerified' | 'followersCount'>;
 type RecentItem = { type: 'query'; value: string } | { type: 'user'; user: RecentUser };
 type SuggestionItem = { type: 'query'; value: string } | { type: 'user'; user: User };
+type HashtagResult = { id: string; name: string; post_count: number; click_count: number; search_count: number; score: number };
 const TABS = ['Senin İçin', 'Hesaplar', 'Kişiselleştirilmemiş', 'Etiketler', 'Yerder'] as const;
 type SearchTab = typeof TABS[number];
 
@@ -69,9 +73,10 @@ const resolvePostMediaType = (post: VideoEntity): 'carousel' | 'video' | 'photo'
 export default function SearchScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
+    const params = useLocalSearchParams<{ q?: string }>();
     const isDark = useThemeStore((state) => state.isDark);
     const theme = isDark ? DARK_COLORS : LIGHT_COLORS;
-    const [query, setQuery] = useState('');
+    const [query, setQuery] = useState(params.q ?? '');
     const [committedQuery, setCommittedQuery] = useState('');
     const [recentItems, setRecentItems] = useState<RecentItem[]>([]);
     const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -92,6 +97,9 @@ export default function SearchScreen() {
 
     const { results, isLoading, error, search, clear } = useProfileSearch(RESULT_LIMIT);
     const { results: postResults, isLoading: isPostsLoading, error: postsError, search: searchPosts, clear: clearPosts } = useVideoSearch(POST_LIMIT);
+    const [hashtagResults, setHashtagResults] = useState<HashtagResult[]>([]);
+    const [isHashtagsLoading, setIsHashtagsLoading] = useState(false);
+    const [isHashtagDiscovery, setIsHashtagDiscovery] = useState(false);
     const currentUserId = useAuthStore((state) => state.user?.id);
     const videoIndices = useMemo(
         () =>
@@ -147,6 +155,58 @@ export default function SearchScreen() {
         },
         [clearPosts, searchPosts]
     );
+
+    const searchHashtags = useCallback(async (value: string) => {
+        const trimmed = value.trim().replace(/^#/, '');
+        if (!trimmed) {
+            setHashtagResults([]);
+            return;
+        }
+        setIsHashtagsLoading(true);
+        try {
+            const { data, error: hashErr } = await supabase
+                .from('hashtags')
+                .select('id, name, click_count, search_count')
+                .ilike('name', `%${trimmed}%`)
+                .order('click_count', { ascending: false })
+                .limit(30);
+
+            if (hashErr || !data) {
+                setHashtagResults([]);
+                return;
+            }
+
+            // Count posts per hashtag
+            const hashtagIds = data.map((h: any) => h.id);
+            const { data: countData } = await supabase
+                .from('video_hashtags')
+                .select('hashtag_id')
+                .in('hashtag_id', hashtagIds);
+
+            const postCounts: Record<string, number> = {};
+            (countData ?? []).forEach((row: any) => {
+                postCounts[row.hashtag_id] = (postCounts[row.hashtag_id] || 0) + 1;
+            });
+
+            const mapped: HashtagResult[] = data.map((h: any) => {
+                const postCount = postCounts[h.id] || 0;
+                return {
+                    id: h.id,
+                    name: h.name,
+                    post_count: postCount,
+                    click_count: h.click_count || 0,
+                    search_count: h.search_count || 0,
+                    score: postCount * 1.0 + (h.click_count || 0) * 0.5 + (h.search_count || 0) * 0.3,
+                };
+            });
+            mapped.sort((a, b) => b.score - a.score);
+            setHashtagResults(mapped);
+        } catch {
+            setHashtagResults([]);
+        } finally {
+            setIsHashtagsLoading(false);
+        }
+    }, []);
 
     useFocusEffect(
         useCallback(() => {
@@ -366,8 +426,12 @@ export default function SearchScreen() {
         lastPostQueryRef.current = '';
         clear();
         clearPosts();
+        setHashtagResults([]);
+        setIsHashtagDiscovery(false);
         setIsCommittedSearch(false);
     };
+
+    const hashtagTrackingRef = useRef<SupabaseVideoDataSource | null>(null);
 
     const commitSearch = useCallback(
         (value: string, options?: { force?: boolean }) => {
@@ -377,17 +441,71 @@ export default function SearchScreen() {
                 clearTimeout(searchTimeoutRef.current);
             }
             setIsCommittedSearch(true);
-            setSelectedTab('Senin İçin');
             setCommittedQuery(trimmed);
-            const forceProfile = options?.force || Boolean(error);
-            const forcePosts = options?.force || Boolean(postsError);
-            runProfileSearch(trimmed, forceProfile ? { force: true } : undefined);
-            runPostSearch(trimmed, forcePosts ? { force: true } : undefined);
             addRecentQuery(trimmed);
             Keyboard.dismiss();
+
+            const isHashtagQuery = trimmed.startsWith('#');
+
+            if (isHashtagQuery) {
+                // Phase 1: Only search hashtags, no tabs
+                setIsHashtagDiscovery(true);
+                searchHashtags(trimmed);
+                // Don't run profile/post search yet
+            } else {
+                // Normal search: run all searches
+                setIsHashtagDiscovery(false);
+                setSelectedTab('Senin İçin');
+                const forceProfile = options?.force || Boolean(error);
+                const forcePosts = options?.force || Boolean(postsError);
+                runProfileSearch(trimmed, forceProfile ? { force: true } : undefined);
+                runPostSearch(trimmed, forcePosts ? { force: true } : undefined);
+                searchHashtags(trimmed);
+            }
+
+            // Track hashtag searches
+            const hashtagMatches = trimmed.match(/#([^\s#]+)/g);
+            if (hashtagMatches) {
+                if (!hashtagTrackingRef.current) hashtagTrackingRef.current = new SupabaseVideoDataSource();
+                hashtagMatches.forEach((tag) => {
+                    hashtagTrackingRef.current!.incrementHashtagSearch(tag.replace(/^#/, ''));
+                });
+            }
         },
-        [addRecentQuery, error, postsError, runPostSearch, runProfileSearch]
+        [addRecentQuery, error, postsError, runPostSearch, runProfileSearch, searchHashtags]
     );
+
+    // Phase 2: User picks a hashtag from discovery → full tabbed search
+    const commitHashtagFullSearch = useCallback(
+        (hashtagName: string) => {
+            const tagQuery = `#${hashtagName}`;
+            setQuery(tagQuery);
+            setCommittedQuery(tagQuery);
+            setIsHashtagDiscovery(false);
+            setIsCommittedSearch(true);
+            setSelectedTab('Senin İçin');
+
+            // Search posts containing this hashtag
+            runPostSearch(tagQuery, { force: true });
+            // Search users by the keyword (without #)
+            runProfileSearch(hashtagName, { force: true });
+            // Search related hashtags
+            searchHashtags(tagQuery);
+
+            // Track click
+            if (!hashtagTrackingRef.current) hashtagTrackingRef.current = new SupabaseVideoDataSource();
+            hashtagTrackingRef.current.incrementHashtagClick(hashtagName);
+        },
+        [runPostSearch, runProfileSearch, searchHashtags]
+    );
+
+    const initialQueryHandled = useRef(false);
+    useEffect(() => {
+        if (!initialQueryHandled.current && params.q) {
+            initialQueryHandled.current = true;
+            commitSearch(params.q);
+        }
+    }, [params.q, commitSearch]);
 
     const handleSubmit = () => {
         commitSearch(query);
@@ -742,7 +860,48 @@ export default function SearchScreen() {
                 />
             )}
 
-            {shouldSearch && isCommittedSearch && (
+            {/* Phase 1: Hashtag discovery — no tabs, just hashtag list */}
+            {shouldSearch && isCommittedSearch && isHashtagDiscovery && (
+                <FlatList
+                    data={hashtagResults}
+                    keyExtractor={(item) => item.id}
+                    renderItem={({ item: hashtag }) => (
+                        <Pressable
+                            style={styles.resultRow}
+                            onPress={() => commitHashtagFullSearch(hashtag.name)}
+                        >
+                            <View style={[styles.searchBubble, { backgroundColor: inputColors.backgroundColor }]}>
+                                <Hash size={20} color={inputColors.iconColor} />
+                            </View>
+                            <View style={styles.resultInfo}>
+                                <Text style={[styles.resultTitle, { color: theme.textPrimary }]} numberOfLines={1}>
+                                    #{hashtag.name}
+                                </Text>
+                                <Text style={[styles.resultMeta, { color: theme.textSecondary }]}>
+                                    {formatCount(hashtag.post_count)} gönderi
+                                </Text>
+                            </View>
+                        </Pressable>
+                    )}
+                    contentContainerStyle={[styles.resultsContent, { paddingBottom: insets.bottom + 24 }]}
+                    ListEmptyComponent={
+                        isHashtagsLoading ? (
+                            <View style={styles.emptyState}>
+                                <ActivityIndicator size="small" color={theme.textSecondary} />
+                            </View>
+                        ) : (
+                            <View style={styles.emptyState}>
+                                <Text style={[styles.emptyText, { color: theme.textSecondary }]}>Etiket bulunamadı</Text>
+                            </View>
+                        )
+                    }
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                />
+            )}
+
+            {/* Phase 2: Full tabbed search (normal or after picking a hashtag) */}
+            {shouldSearch && isCommittedSearch && !isHashtagDiscovery && (
                 <>
                     <View style={[styles.tabBarWrapper, { borderBottomColor: inputColors.borderColor }]}>
                         <ScrollView
@@ -819,7 +978,45 @@ export default function SearchScreen() {
                             showsVerticalScrollIndicator={false}
                         />
                     )}
-                    {selectedTab !== 'Senin İçin' && selectedTab !== 'Hesaplar' && (
+                    {selectedTab === 'Etiketler' && (
+                        <FlatList
+                            data={hashtagResults}
+                            keyExtractor={(item) => item.id}
+                            renderItem={({ item: hashtag }) => (
+                                <Pressable
+                                    style={styles.resultRow}
+                                    onPress={() => commitHashtagFullSearch(hashtag.name)}
+                                >
+                                    <View style={[styles.searchBubble, { backgroundColor: inputColors.backgroundColor }]}>
+                                        <Hash size={20} color={inputColors.iconColor} />
+                                    </View>
+                                    <View style={styles.resultInfo}>
+                                        <Text style={[styles.resultTitle, { color: theme.textPrimary }]} numberOfLines={1}>
+                                            #{hashtag.name}
+                                        </Text>
+                                        <Text style={[styles.resultMeta, { color: theme.textSecondary }]}>
+                                            {formatCount(hashtag.post_count)} gönderi
+                                        </Text>
+                                    </View>
+                                </Pressable>
+                            )}
+                            contentContainerStyle={[styles.resultsContent, { paddingBottom: insets.bottom + 24 }]}
+                            ListEmptyComponent={
+                                isHashtagsLoading ? (
+                                    <View style={styles.emptyState}>
+                                        <ActivityIndicator size="small" color={theme.textSecondary} />
+                                    </View>
+                                ) : (
+                                    <View style={styles.emptyState}>
+                                        <Text style={[styles.emptyText, { color: theme.textSecondary }]}>Etiket bulunamadı</Text>
+                                    </View>
+                                )
+                            }
+                            keyboardShouldPersistTaps="handled"
+                            showsVerticalScrollIndicator={false}
+                        />
+                    )}
+                    {selectedTab !== 'Senin İçin' && selectedTab !== 'Hesaplar' && selectedTab !== 'Etiketler' && (
                         <View style={[styles.resultsContent, { paddingBottom: insets.bottom + 24 }]} />
                     )}
                 </>

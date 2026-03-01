@@ -483,4 +483,16 @@ export class SupabaseVideoDataSource {
             })) || [],
         };
     }
+
+    async incrementHashtagClick(hashtagName: string): Promise<void> {
+        const normalized = hashtagName.trim().toLowerCase();
+        if (!normalized) return;
+        await supabase.rpc('increment_hashtag_click', { p_hashtag_name: normalized });
+    }
+
+    async incrementHashtagSearch(hashtagName: string): Promise<void> {
+        const normalized = hashtagName.trim().toLowerCase();
+        if (!normalized) return;
+        await supabase.rpc('increment_hashtag_search', { p_hashtag_name: normalized });
+    }
 }

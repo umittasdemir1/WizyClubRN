@@ -34,6 +34,15 @@ export interface UploadComposerDraft {
     trimStartSec: number;
     trimEndSec: number;
     taggedPeople?: UploadComposerTaggedUser[];
+    editVideoId?: string;
+    editVideoUrl?: string;
+    editThumbnailUrl?: string;
+    editDescription?: string;
+    editCommercialType?: string;
+    editBrandName?: string;
+    editBrandUrl?: string;
+    editTags?: string[];
+    editTaggedPeople?: UploadComposerTaggedUser[];
 }
 
 export type SubtitleSttState = 'loading' | 'ready' | 'no_audio' | 'error';

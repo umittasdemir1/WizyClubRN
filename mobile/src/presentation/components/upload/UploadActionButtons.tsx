@@ -22,6 +22,7 @@ interface UploadActionButtonsProps {
     hasSubtitles: boolean;
     isSttLoading: boolean;
     onToggleCaptionsTap: () => void;
+    hideQuality?: boolean;
 }
 
 export const UploadActionButtons = ({
@@ -38,50 +39,53 @@ export const UploadActionButtons = ({
     hasSubtitles,
     isSttLoading,
     onToggleCaptionsTap,
+    hideQuality,
 }: UploadActionButtonsProps) => {
     const CaptionsIcon = isDark ? CaptionsDarkIcon : CaptionsLightIcon;
 
     return (
         <View style={[styles.mediaSideActions, { top: insets.top + 70, left: 16 }]}>
-            <View>
-                <Pressable
-                    style={styles.sideActionItem}
-                    onPress={() => {
-                        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setIsQualityMenuOpen(!isQualityMenuOpen);
-                    }}
-                >
-                    <View style={styles.hdBadge}>
-                        <Text style={styles.hdText}>HD</Text>
-                    </View>
-                </Pressable>
+            {!hideQuality && (
+                <View>
+                    <Pressable
+                        style={styles.sideActionItem}
+                        onPress={() => {
+                            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            setIsQualityMenuOpen(!isQualityMenuOpen);
+                        }}
+                    >
+                        <View style={styles.hdBadge}>
+                            <Text style={styles.hdText}>HD</Text>
+                        </View>
+                    </Pressable>
 
-                {isQualityMenuOpen && (
-                    <BlurView intensity={60} tint="dark" style={styles.qualityDropdown}>
-                        {(['low', 'medium', 'high'] as UploadComposerQuality[]).map((q) => (
-                            <Pressable
-                                key={q}
-                                onPress={() => {
-                                    void Haptics.selectionAsync();
-                                    setQualityPreset(q);
-                                    setIsQualityMenuOpen(false);
-                                }}
-                                style={[
-                                    styles.qualityOption,
-                                    qualityPreset === q && styles.qualityOptionActive
-                                ]}
-                            >
-                                <Text style={[
-                                    styles.qualityOptionText,
-                                    qualityPreset === q && styles.qualityOptionTextActive
-                                ]}>
-                                    {q === 'low' ? 'Düşük' : q === 'medium' ? 'Orta' : 'Yüksek'}
-                                </Text>
-                            </Pressable>
-                        ))}
-                    </BlurView>
-                )}
-            </View>
+                    {isQualityMenuOpen && (
+                        <BlurView intensity={60} tint="dark" style={styles.qualityDropdown}>
+                            {(['low', 'medium', 'high'] as UploadComposerQuality[]).map((q) => (
+                                <Pressable
+                                    key={q}
+                                    onPress={() => {
+                                        void Haptics.selectionAsync();
+                                        setQualityPreset(q);
+                                        setIsQualityMenuOpen(false);
+                                    }}
+                                    style={[
+                                        styles.qualityOption,
+                                        qualityPreset === q && styles.qualityOptionActive
+                                    ]}
+                                >
+                                    <Text style={[
+                                        styles.qualityOptionText,
+                                        qualityPreset === q && styles.qualityOptionTextActive
+                                    ]}>
+                                        {q === 'low' ? 'Düşük' : q === 'medium' ? 'Orta' : 'Yüksek'}
+                                    </Text>
+                                </Pressable>
+                            ))}
+                        </BlurView>
+                    )}
+                </View>
+            )}
 
             <View>
                 <Pressable

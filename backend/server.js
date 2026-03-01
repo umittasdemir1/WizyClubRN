@@ -560,7 +560,16 @@ app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
         subtitleLanguage,
         manualSubtitles,
         taggedPeople,
+        tags,
     } = req.body;
+
+    let parsedTags = [];
+    if (typeof tags === 'string' && tags.trim()) {
+        try {
+            const parsed = JSON.parse(tags);
+            parsedTags = Array.isArray(parsed) ? parsed.filter(t => typeof t === 'string' && t.trim()).map(t => t.trim().toLowerCase()) : [];
+        } catch { parsedTags = []; }
+    }
 
     let parsedTaggedPeople = [];
     if (typeof taggedPeople === 'string' && taggedPeople.trim()) {
@@ -916,6 +925,43 @@ app.post('/upload-hls', upload.array('video', 10), async (req, res) => {
                     language: subtitleLang,
                     segments: normalizedSegments.length,
                 });
+            }
+        }
+
+        if (parsedTags.length > 0) {
+            try {
+                // Upsert hashtags (create if not exists)
+                const { data: hashtagRows, error: hashtagUpsertError } = await supabase
+                    .from('hashtags')
+                    .upsert(
+                        parsedTags.map(name => ({ name })),
+                        { onConflict: 'name', ignoreDuplicates: true }
+                    )
+                    .select('id, name');
+
+                if (hashtagUpsertError) {
+                    logLine('WARN', 'HASHTAGS', 'Failed to upsert hashtags', { error: hashtagUpsertError.message, videoId: uploadedVideo.id });
+                } else {
+                    // Fetch all hashtag IDs (upsert may not return existing rows with ignoreDuplicates)
+                    const { data: allHashtags } = await supabase
+                        .from('hashtags')
+                        .select('id, name')
+                        .in('name', parsedTags);
+
+                    if (allHashtags && allHashtags.length > 0) {
+                        const videoHashtagInserts = allHashtags.map(h => ({
+                            video_id: uploadedVideo.id,
+                            hashtag_id: h.id,
+                        }));
+                        const { error: vhError } = await supabase
+                            .from('video_hashtags')
+                            .upsert(videoHashtagInserts, { onConflict: 'video_id,hashtag_id', ignoreDuplicates: true });
+                        if (vhError) logLine('WARN', 'HASHTAGS', 'Failed to insert video_hashtags', { error: vhError.message, videoId: uploadedVideo.id });
+                        else logLine('OK', 'HASHTAGS', 'Hashtags saved', { videoId: uploadedVideo.id, tags: parsedTags });
+                    }
+                }
+            } catch (hashErr) {
+                logLine('WARN', 'HASHTAGS', 'Hashtag processing failed', { error: hashErr?.message || hashErr, videoId: uploadedVideo.id });
             }
         }
 
@@ -1599,6 +1645,143 @@ async function runStoryCleanup() {
 setInterval(runStoryCleanup, 60 * 60 * 1000);
 // Run once on startup (after 30 seconds to let server fully start)
 setTimeout(runStoryCleanup, 30 * 1000);
+
+// Endpoint: PATCH Video (Edit metadata)
+app.patch('/videos/:id', async (req, res) => {
+    const videoId = req.params.id;
+
+    logBanner('PATCH VIDEO REQUEST', [
+        `Video ID: ${videoId}`,
+    ]);
+
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Authorization header required' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+        return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
+    try {
+        // Fetch video and verify ownership
+        const { data: video, error: fetchError } = await supabase
+            .from('videos')
+            .select('id, user_id')
+            .eq('id', videoId)
+            .single();
+
+        if (fetchError || !video) {
+            return res.status(404).json({ error: 'Video not found' });
+        }
+
+        if (video.user_id !== user.id) {
+            return res.status(403).json({ error: 'You can only edit your own videos' });
+        }
+
+        const { description, commercialType, brandName, brandUrl, isCommercial, tags, taggedPeople } = req.body;
+
+        // Update video metadata
+        const updatePayload = {};
+        if (description !== undefined) updatePayload.description = description;
+        if (commercialType !== undefined) updatePayload.commercial_type = commercialType;
+        if (brandName !== undefined) updatePayload.brand_name = brandName;
+        if (brandUrl !== undefined) updatePayload.brand_url = brandUrl;
+        if (isCommercial !== undefined) updatePayload.is_commercial = isCommercial;
+
+        if (Object.keys(updatePayload).length > 0) {
+            const { error: updateError } = await supabase
+                .from('videos')
+                .update(updatePayload)
+                .eq('id', videoId);
+
+            if (updateError) {
+                logLine('ERR', 'PATCH', 'Failed to update video', { videoId, error: updateError.message });
+                throw updateError;
+            }
+            logLine('OK', 'PATCH', 'Video metadata updated', { videoId, fields: Object.keys(updatePayload) });
+        }
+
+        // Update hashtags: delete existing, then re-insert
+        if (Array.isArray(tags)) {
+            // Delete existing video_hashtags
+            const { error: deleteHashtagError } = await supabase
+                .from('video_hashtags')
+                .delete()
+                .eq('video_id', videoId);
+
+            if (deleteHashtagError) {
+                logLine('WARN', 'PATCH', 'Failed to delete existing hashtags', { videoId, error: deleteHashtagError.message });
+            }
+
+            const parsedTags = tags.filter(t => typeof t === 'string' && t.trim()).map(t => t.trim().toLowerCase());
+
+            if (parsedTags.length > 0) {
+                // Upsert hashtags
+                await supabase
+                    .from('hashtags')
+                    .upsert(
+                        parsedTags.map(name => ({ name })),
+                        { onConflict: 'name', ignoreDuplicates: true }
+                    );
+
+                // Fetch all hashtag IDs
+                const { data: allHashtags } = await supabase
+                    .from('hashtags')
+                    .select('id, name')
+                    .in('name', parsedTags);
+
+                if (allHashtags && allHashtags.length > 0) {
+                    const videoHashtagInserts = allHashtags.map(h => ({
+                        video_id: videoId,
+                        hashtag_id: h.id,
+                    }));
+                    const { error: vhError } = await supabase
+                        .from('video_hashtags')
+                        .upsert(videoHashtagInserts, { onConflict: 'video_id,hashtag_id', ignoreDuplicates: true });
+
+                    if (vhError) logLine('WARN', 'PATCH', 'Failed to insert video_hashtags', { error: vhError.message, videoId });
+                    else logLine('OK', 'PATCH', 'Hashtags updated', { videoId, tags: parsedTags });
+                }
+            } else {
+                logLine('OK', 'PATCH', 'All hashtags removed', { videoId });
+            }
+        }
+
+        // Update tagged people: delete existing, then re-insert
+        if (Array.isArray(taggedPeople)) {
+            const { error: deleteTagError } = await supabase
+                .from('post_tags')
+                .delete()
+                .eq('video_id', videoId);
+
+            if (deleteTagError) {
+                logLine('WARN', 'PATCH', 'Failed to delete existing tagged people', { videoId, error: deleteTagError.message });
+            }
+
+            if (taggedPeople.length > 0) {
+                const tagInserts = taggedPeople.map(userId => ({
+                    video_id: videoId,
+                    tagged_user_id: userId,
+                }));
+                const { error: tagError } = await supabase.from('post_tags').insert(tagInserts);
+                if (tagError) logLine('WARN', 'PATCH', 'Failed to insert tagged people', { error: tagError.message, videoId });
+                else logLine('OK', 'PATCH', 'Tagged people updated', { videoId, count: taggedPeople.length });
+            } else {
+                logLine('OK', 'PATCH', 'All tagged people removed', { videoId });
+            }
+        }
+
+        res.json({ success: true, videoId });
+
+    } catch (error) {
+        logLine('ERR', 'PATCH', 'Video edit failed', { videoId, error: error?.message || error });
+        res.status(500).json({ error: error?.message || 'Video edit failed' });
+    }
+});
 
 // Endpoint: DELETE Video (Soft Delete by default)
 app.delete('/videos/:id', async (req, res) => {

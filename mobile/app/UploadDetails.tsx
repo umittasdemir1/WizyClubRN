@@ -227,20 +227,30 @@ export default function UploadDetailsScreen() {
     const subtitlePresentationCache = useUploadComposerStore((state) => state.subtitlePresentationCache);
     const subtitleStyleCache = useUploadComposerStore((state) => state.subtitleStyleCache);
     const clearDraft = useUploadComposerStore((state) => state.clearDraft);
+    const isEditMode = !!draft?.editVideoId;
     const descriptionEditorRef = useRef<RichEditor | null>(null);
     const descriptionHtmlRef = useRef('');
     const descriptionToolbarRegisteredRef = useRef(false);
     const descriptionFocusedRef = useRef(false);
 
-    const [description, setDescription] = useState('');
+    const [description, setDescription] = useState(() => {
+        if (!draft?.editDescription && !draft?.editTags?.length) return '';
+        const base = draft?.editDescription ?? '';
+        if (!draft?.editTags?.length) return base;
+        const existingTags = new Set(extractTopicTags(base).map(t => t.toLocaleLowerCase('tr-TR')));
+        const missingTags = draft.editTags.filter(t => !existingTags.has(t.toLocaleLowerCase('tr-TR')));
+        if (missingTags.length === 0) return base;
+        const tagSuffix = missingTags.map(t => `#${t}`).join(' ');
+        return base ? `${base}\n${tagSuffix}` : tagSuffix;
+    });
     const [formatButtonState, setFormatButtonState] = useState({
         bold: false,
         italic: false,
         underline: false,
     });
-    const [commercialType, setCommercialType] = useState<string | null>(null);
-    const [brandName, setBrandName] = useState('');
-    const [brandUrl, setBrandUrl] = useState('');
+    const [commercialType, setCommercialType] = useState<string | null>(draft?.editCommercialType ?? null);
+    const [brandName, setBrandName] = useState(draft?.editBrandName ?? '');
+    const [brandUrl, setBrandUrl] = useState(draft?.editBrandUrl ?? '');
     const [useAILabel, setUseAILabel] = useState(false);
     const [showCommercialMenu, setShowCommercialMenu] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -258,7 +268,7 @@ export default function UploadDetailsScreen() {
     const selectedFormatButtonBg = inputBg;
     const selectedFormatButtonBorder = '#FFFFFF';
     const topicTags = useMemo(() => extractTopicTags(description), [description]);
-    const taggedPeople = draft?.taggedPeople ?? [];
+    const taggedPeople = draft?.taggedPeople ?? draft?.editTaggedPeople ?? [];
     const visibleTaggedPeople = useMemo(
         () => (taggedPeople.length > 5 ? taggedPeople.slice(0, 4) : taggedPeople.slice(0, 5)),
         [taggedPeople]
@@ -285,20 +295,22 @@ export default function UploadDetailsScreen() {
         return descriptionSectionY + (activeTopicLineIndex + 1) * EDITOR_LINE_HEIGHT + 10;
     }, [activeTopicLineIndex, descriptionSectionY]);
     const previewAsset = useMemo(() => {
+        if (isEditMode) return null;
         if (!draft?.selectedAssets?.length) return null;
 
         const rawIndex = typeof draft.coverAssetIndex === 'number' ? draft.coverAssetIndex : 0;
         const safeIndex = Math.min(Math.max(rawIndex, 0), draft.selectedAssets.length - 1);
 
         return draft.selectedAssets[safeIndex] ?? draft.selectedAssets[0] ?? null;
-    }, [draft]);
+    }, [draft, isEditMode]);
     const [generatedPreviewImageSource, setGeneratedPreviewImageSource] = useState<PreviewImageSource>(null);
 
     const title = useMemo(() => {
         if (!draft) return 'Gönderi Oluştur';
+        if (isEditMode) return 'Gönderiyi Düzenle';
         if (draft.uploadMode === 'story') return 'Hikaye Oluştur';
         return 'Gönderi Oluştur';
-    }, [draft]);
+    }, [draft, isEditMode]);
 
     const explicitPreviewImageSource = useMemo<PreviewImageSource>(() => {
         if (!previewAsset) return null;
@@ -678,6 +690,72 @@ export default function UploadDetailsScreen() {
         }
     };
 
+    const handleEditSave = async () => {
+        if (isSubmitting || !draft?.editVideoId) return;
+        if (!user?.id) {
+            Alert.alert('Giriş Gerekli', 'Düzenleme yapmak için lütfen giriş yapın.');
+            return;
+        }
+
+        setIsSubmitting(true);
+
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const accessToken = session?.access_token;
+            if (!accessToken) {
+                Alert.alert('Oturum Hatası', 'Lütfen tekrar giriş yapın.');
+                setIsSubmitting(false);
+                return;
+            }
+
+            const isCommercial = commercialType ? commercialType !== 'İş Birliği İçermiyor' : false;
+
+            const body: Record<string, any> = {
+                description,
+                commercialType: commercialType || null,
+                isCommercial,
+                tags: topicTags,
+            };
+
+            if (commercialType && commercialType !== 'İş Birliği İçermiyor' && commercialType !== 'Kendi Markam') {
+                body.brandName = brandName || null;
+                body.brandUrl = brandUrl || null;
+            } else {
+                body.brandName = null;
+                body.brandUrl = null;
+            }
+
+            if (taggedPeople.length > 0) {
+                body.taggedPeople = taggedPeople.map(p => p.id);
+            } else {
+                body.taggedPeople = [];
+            }
+
+            const response = await fetch(`${CONFIG.API_URL}/videos/${draft.editVideoId}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${accessToken}`,
+                },
+                body: JSON.stringify(body),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Güncelleme başarısız oldu.');
+            }
+
+            clearDraft();
+            Alert.alert('Başarılı', 'Gönderi başarıyla güncellendi.');
+            router.replace('/(tabs)' as any);
+        } catch (error: any) {
+            logError(LogCode.EXCEPTION_UNCAUGHT, 'Edit save exception', error);
+            Alert.alert('Hata', error?.message || 'Güncelleme sırasında bir hata oluştu.');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     return (
         <View style={[styles.container, { backgroundColor: bgColor }]}>
             <SystemBars
@@ -704,7 +782,7 @@ export default function UploadDetailsScreen() {
                 keyboardShouldPersistTaps="handled"
                 scrollEnabled={!showTopicSuggestionModal}
             >
-                {previewAsset ? (
+                {(previewAsset || (isEditMode && draft?.editThumbnailUrl)) ? (
                     <View style={styles.previewSection}>
                         <View style={styles.previewPage}>
                             <View
@@ -721,7 +799,13 @@ export default function UploadDetailsScreen() {
                                     },
                                 ]}
                             >
-                                {previewImageSource ? (
+                                {isEditMode && draft?.editThumbnailUrl ? (
+                                    <Image
+                                        source={{ uri: draft.editThumbnailUrl }}
+                                        style={styles.previewMedia}
+                                        contentFit="cover"
+                                    />
+                                ) : previewImageSource ? (
                                     <Image
                                         source={previewImageSource}
                                         style={styles.previewMedia}
@@ -748,6 +832,7 @@ export default function UploadDetailsScreen() {
                         ref={descriptionEditorRef}
                         style={[styles.descriptionEditor, { minHeight: descriptionEditorHeight }]}
                         initialHeight={DESCRIPTION_MIN_HEIGHT}
+                        initialContentHTML={isEditMode ? description || undefined : undefined}
                         placeholder="Bir açıklama yaz ve konu etiketleri ekle..."
                         editorInitializedCallback={handleDescriptionEditorInitialized}
                         onChange={handleDescriptionChange}
@@ -997,20 +1082,44 @@ export default function UploadDetailsScreen() {
             </ScrollView>
 
             <View style={[styles.bottomButtons, { backgroundColor: bgColor, borderTopColor: borderColor, paddingBottom: insets.bottom + 12 }]}>
-                <Pressable
-                    style={[styles.draftButton, { backgroundColor: modalTheme.sheetCard }]}
-                    onPress={handleSaveDraft}
-                    disabled={isSubmitting}
-                >
-                    <Text style={[styles.draftButtonText, { color: textColor }]}>Taslağı Kaydet</Text>
-                </Pressable>
-                <Pressable
-                    style={[styles.shareButton, (!commercialType || isSubmitting) && styles.shareButtonDisabled]}
-                    onPress={handleShare}
-                    disabled={!commercialType || isSubmitting}
-                >
-                    <Text style={styles.shareButtonText}>Paylaş</Text>
-                </Pressable>
+                {isEditMode ? (
+                    <>
+                        <Pressable
+                            style={[styles.draftButton, { backgroundColor: modalTheme.sheetCard }]}
+                            onPress={() => {
+                                clearDraft();
+                                router.back();
+                            }}
+                            disabled={isSubmitting}
+                        >
+                            <Text style={[styles.draftButtonText, { color: textColor }]}>Vazgeç</Text>
+                        </Pressable>
+                        <Pressable
+                            style={[styles.shareButton, isSubmitting && styles.shareButtonDisabled]}
+                            onPress={handleEditSave}
+                            disabled={isSubmitting}
+                        >
+                            <Text style={styles.shareButtonText}>Kaydet</Text>
+                        </Pressable>
+                    </>
+                ) : (
+                    <>
+                        <Pressable
+                            style={[styles.draftButton, { backgroundColor: modalTheme.sheetCard }]}
+                            onPress={handleSaveDraft}
+                            disabled={isSubmitting}
+                        >
+                            <Text style={[styles.draftButtonText, { color: textColor }]}>Taslağı Kaydet</Text>
+                        </Pressable>
+                        <Pressable
+                            style={[styles.shareButton, (!commercialType || isSubmitting) && styles.shareButtonDisabled]}
+                            onPress={handleShare}
+                            disabled={!commercialType || isSubmitting}
+                        >
+                            <Text style={styles.shareButtonText}>Paylaş</Text>
+                        </Pressable>
+                    </>
+                )}
             </View>
 
             <Modal visible={showCommercialMenu} transparent animationType="fade" onRequestClose={() => setShowCommercialMenu(false)}>
