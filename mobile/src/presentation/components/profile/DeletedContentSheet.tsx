@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import { RotateCcw, Trash2 } from 'lucide-react-native';
-import { supabase } from '../../../core/supabase';
+import { FeedQueryService, type DeletedVideoRecord } from '../../../data/services/FeedQueryService';
 import { CONFIG } from '../../../core/config';
 import { logVideo, logError, LogCode } from '@/core/services/Logger';
 import { useSurfaceTheme } from '../../hooks/useSurfaceTheme';
+import { getAccessToken } from '../../store/getAccessToken';
+import { useAuthStore } from '../../store/useAuthStore';
 
 interface DeletedContentMenuProps {
     isDark: boolean;
@@ -16,10 +18,12 @@ type ContentTab = 'videos' | 'stories';
 
 export const DeletedContentMenu = ({ isDark, isActive }: DeletedContentMenuProps) => {
     const [activeTab, setActiveTab] = useState<ContentTab>('videos');
-    const [deletedVideos, setDeletedVideos] = useState<any[]>([]);
+    const [deletedVideos, setDeletedVideos] = useState<DeletedVideoRecord[]>([]);
     const [deletedStories, setDeletedStories] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const modalTheme = useSurfaceTheme(isDark);
+    const [feedQueryService] = useState(() => new FeedQueryService());
+    const currentUserId = useAuthStore((state) => state.user?.id);
 
     const metaColor = isDark ? '#9a9aa0' : '#6b6b72';
     const textColor = isDark ? '#f2f2f4' : '#121214';
@@ -32,21 +36,18 @@ export const DeletedContentMenu = ({ isDark, isActive }: DeletedContentMenuProps
     const tabInactiveBg = isDark ? '#1c1c1e' : '#f2f2f5';
 
     const fetchDeletedVideos = async () => {
-        const { data } = await supabase
-            .from('videos')
-            .select('*')
-            .not('deleted_at', 'is', null)
-            .order('deleted_at', { ascending: false });
-
-        if (data) {
-            setDeletedVideos(data);
+        if (!currentUserId) {
+            setDeletedVideos([]);
+            return;
         }
+
+        const data = await feedQueryService.getDeletedVideos(currentUserId, 50);
+        setDeletedVideos(data);
     };
 
     const fetchDeletedStories = async () => {
         try {
-            const { useAuthStore } = require('../../store/useAuthStore');
-            const token = useAuthStore.getState().session?.access_token;
+            const token = await getAccessToken();
             if (!token) return;
 
             const response = await fetch(`${CONFIG.API_URL}/stories/recently-deleted`, {
@@ -75,13 +76,23 @@ export const DeletedContentMenu = ({ isDark, isActive }: DeletedContentMenuProps
         if (isActive) {
             fetchAll();
         }
-    }, [isActive]);
+    }, [currentUserId, feedQueryService, isActive]);
 
     // ---- Video Actions ----
     const handleRestoreVideo = async (id: string) => {
         try {
+            const token = await getAccessToken();
+            if (!token) {
+                Alert.alert("Hata", "Oturum bulunamadı.");
+                return;
+            }
+
             const response = await fetch(`${CONFIG.API_URL}/videos/${id}/restore`, {
                 method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
             });
             const result = await response.json();
             if (result.success) {
@@ -106,8 +117,7 @@ export const DeletedContentMenu = ({ isDark, isActive }: DeletedContentMenuProps
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            const { useAuthStore } = require('../../store/useAuthStore');
-                            const token = useAuthStore.getState().session?.access_token;
+                            const token = await getAccessToken();
                             logVideo(LogCode.VIDEO_DELETE_PERMANENT, 'Permanent delete initiated', {
                                 videoId: id,
                                 hasToken: !!token
@@ -136,8 +146,7 @@ export const DeletedContentMenu = ({ isDark, isActive }: DeletedContentMenuProps
     // ---- Story Actions ----
     const handleRestoreStory = async (id: string) => {
         try {
-            const { useAuthStore } = require('../../store/useAuthStore');
-            const token = useAuthStore.getState().session?.access_token;
+            const token = await getAccessToken();
             if (!token) {
                 Alert.alert("Hata", "Oturum bulunamadı.");
                 return;
@@ -173,8 +182,7 @@ export const DeletedContentMenu = ({ isDark, isActive }: DeletedContentMenuProps
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            const { useAuthStore } = require('../../store/useAuthStore');
-                            const token = useAuthStore.getState().session?.access_token;
+                            const token = await getAccessToken();
                             if (!token) return;
 
                             const response = await fetch(`${CONFIG.API_URL}/stories/${id}?force=true`, {
@@ -198,7 +206,8 @@ export const DeletedContentMenu = ({ isDark, isActive }: DeletedContentMenuProps
     };
 
     // ---- Time helpers ----
-    const getVideoDaysLeft = (deletedAt: string) => {
+    const getVideoDaysLeft = (deletedAt: string | null) => {
+        if (!deletedAt) return 0;
         const deletedAtMs = new Date(deletedAt).getTime();
         const diffDays = Math.floor((Date.now() - deletedAtMs) / (1000 * 60 * 60 * 24));
         return Math.max(0, 15 - diffDays);
@@ -213,19 +222,19 @@ export const DeletedContentMenu = ({ isDark, isActive }: DeletedContentMenuProps
     // ---- Render items ----
     const renderVideoItem = (item: any) => (
         <View key={item.id} style={[styles.itemContainer, { borderBottomColor: separatorColor, borderBottomWidth: modalTheme.separatorWidth }]}>
-            <Image
-                source={{ uri: item.thumbnail_url }}
-                style={[styles.thumbnail, { borderColor: thumbnailBorder, borderWidth: modalTheme.separatorWidth }]}
-                contentFit="cover"
-            />
+                <Image
+                    source={{ uri: item.thumbnailUrl }}
+                    style={[styles.thumbnail, { borderColor: thumbnailBorder, borderWidth: modalTheme.separatorWidth }]}
+                    contentFit="cover"
+                />
             <View style={styles.infoContainer}>
                 <View style={styles.metaRow}>
                     <Text style={[styles.dateText, { color: '#FFFFFF' }]}>
-                        Silinme: {new Date(item.deleted_at).toLocaleDateString()}
+                        Silinme: {new Date(item.deletedAt).toLocaleDateString()}
                     </Text>
                     <View style={[styles.daysLeftPill, { backgroundColor: actionBg }]}>
                         <Text style={[styles.daysLeftText, { color: '#FFFFFF' }]}>
-                            {getVideoDaysLeft(item.deleted_at) === 0 ? 'Süre doldu' : `${getVideoDaysLeft(item.deleted_at)} gün kaldı`}
+                            {getVideoDaysLeft(item.deletedAt) === 0 ? 'Süre doldu' : `${getVideoDaysLeft(item.deletedAt)} gün kaldı`}
                         </Text>
                     </View>
                 </View>

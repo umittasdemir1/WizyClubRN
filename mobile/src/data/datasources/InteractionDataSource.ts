@@ -3,6 +3,11 @@ import { LogCode, logData, logError } from '@/core/services/Logger';
 
 export class InteractionDataSource {
     async toggleLike(userId: string, targetId: string, targetType: 'video' | 'story'): Promise<boolean> {
+        const rpcResult = await this.toggleLikeViaRpc(userId, targetId, targetType);
+        if (rpcResult !== null) {
+            return rpcResult;
+        }
+
         const column = targetType === 'video' ? 'video_id' : 'story_id';
 
         // Önce beğeni var mı kontrol et
@@ -44,6 +49,11 @@ export class InteractionDataSource {
     }
 
     async toggleSave(userId: string, videoId: string): Promise<boolean> {
+        const rpcResult = await this.toggleSaveViaRpc(userId, videoId);
+        if (rpcResult !== null) {
+            return rpcResult;
+        }
+
         // Kontrol et
         const { data: existing, error } = await supabase
             .from('saves')
@@ -110,5 +120,47 @@ export class InteractionDataSource {
 
         // 2. & 3. Manual count updates REMOVED to prevent double counting.
         // DB triggers should handle 'following_count' and 'followers_count' updates.
+    }
+
+    private async toggleLikeViaRpc(userId: string, targetId: string, targetType: 'video' | 'story'): Promise<boolean | null> {
+        const { data, error } = await supabase.rpc('toggle_like_v1', {
+            p_user_id: userId,
+            p_video_id: targetType === 'video' ? targetId : null,
+            p_story_id: targetType === 'story' ? targetId : null,
+        });
+
+        if (error) {
+            if (error.code !== '42883') {
+                logError(LogCode.DB_QUERY_ERROR, 'toggleLike RPC unavailable, falling back to legacy flow', {
+                    userId,
+                    targetId,
+                    targetType,
+                    error,
+                });
+            }
+            return null;
+        }
+
+        return !!data;
+    }
+
+    private async toggleSaveViaRpc(userId: string, videoId: string): Promise<boolean | null> {
+        const { data, error } = await supabase.rpc('toggle_save_v1', {
+            p_user_id: userId,
+            p_video_id: videoId,
+        });
+
+        if (error) {
+            if (error.code !== '42883') {
+                logError(LogCode.DB_QUERY_ERROR, 'toggleSave RPC unavailable, falling back to legacy flow', {
+                    userId,
+                    videoId,
+                    error,
+                });
+            }
+            return null;
+        }
+
+        return !!data;
     }
 }

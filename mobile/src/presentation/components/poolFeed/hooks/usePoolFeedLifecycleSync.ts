@@ -3,6 +3,7 @@ import { useFocusEffect } from 'expo-router';
 import { SystemBars } from 'react-native-edge-to-edge';
 import { useActiveVideoStore } from '../../../store/useActiveVideoStore';
 import { FeedPrefetchService } from '../../../../data/services/FeedPrefetchService';
+import { FeedQueryService } from '../../../../data/services/FeedQueryService';
 import { logUI, LogCode } from '@/core/services/Logger';
 import { Video } from '../../../../domain/entities/Video';
 
@@ -60,6 +61,7 @@ export function usePoolFeedLifecycleSync(options: LifecycleSyncOptions) {
     const wasPlayingBeforeWebViewRef = useRef(false);
     const wasPlayingBeforeBackgroundRef = useRef(false);
     const wasPlayingBeforeBlurRef = useRef(false);
+    const feedQueryServiceRef = useRef(new FeedQueryService());
 
     // 1. Keep videosRef in sync
     useEffect(() => {
@@ -173,41 +175,12 @@ export function usePoolFeedLifecycleSync(options: LifecycleSyncOptions) {
     useEffect(() => {
         if (uploadedVideoId && uploadStatus === 'success' && prependVideo) {
             const handleUploadSuccess = async () => {
-                const { supabase } = require('../../../../core/supabase');
-                const { data: videoData } = await supabase
-                    .from('videos')
-                    .select('*, profiles:user_id(*)')
-                    .eq('id', uploadedVideoId)
-                    .single();
+                const newVideo = await feedQueryServiceRef.current.waitForVideoForFeed(uploadedVideoId, {
+                    attempts: 5,
+                    delayMs: 120,
+                });
 
-                if (videoData) {
-                    const newVideo: Video = {
-                        id: videoData.id,
-                        videoUrl: videoData.video_url,
-                        thumbnailUrl: videoData.thumbnail_url,
-                        description: videoData.description || '',
-                        user: {
-                            id: videoData.profiles?.id || videoData.user_id,
-                            username: videoData.profiles?.username || 'unknown',
-                            fullName: videoData.profiles?.full_name || '',
-                            avatarUrl: videoData.profiles?.avatar_url || '',
-                            isFollowing: false,
-                        },
-                        likesCount: 0,
-                        savesCount: 0,
-                        sharesCount: 0,
-                        shopsCount: 0,
-                        commentsCount: 0,
-                        isLiked: false,
-                        isSaved: false,
-                        isCommercial: videoData.is_commercial || false,
-                        commercialType: videoData.commercial_type || null,
-                        brandName: videoData.brand_name || null,
-                        brandUrl: videoData.brand_url || null,
-                        createdAt: videoData.created_at,
-                        mediaUrls: videoData.media_urls,
-                        postType: videoData.post_type,
-                    };
+                if (newVideo) {
                     prependVideo(newVideo);
                     setTimeout(() => {
                         listRef.current?.scrollToIndex({ index: 0, animated: false });

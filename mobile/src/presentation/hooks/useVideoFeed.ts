@@ -3,6 +3,7 @@ import { Alert, Share, unstable_batchedUpdates } from 'react-native';
 import { Video } from '../../domain/entities/Video';
 import { VideoFeedCursor } from '../../domain/entities/VideoFeed';
 import { GetVideoFeedUseCase } from '../../domain/usecases/GetVideoFeedUseCase';
+import { IncrementShareCountUseCase } from '../../domain/usecases/IncrementShareCountUseCase';
 import { ToggleLikeUseCase } from '../../domain/usecases/ToggleLikeUseCase';
 import { ToggleSaveUseCase } from '../../domain/usecases/ToggleSaveUseCase';
 import { ToggleFollowUseCase } from '../../domain/usecases/ToggleFollowUseCase';
@@ -71,6 +72,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
     const interactionRepository = useRef(new InteractionRepositoryImpl()).current;
 
     const getVideoFeedUseCase = useRef(new GetVideoFeedUseCase(videoRepository)).current;
+    const incrementShareCountUseCase = useRef(new IncrementShareCountUseCase(videoRepository)).current;
     const toggleLikeUseCase = useRef(new ToggleLikeUseCase(interactionRepository)).current;
     const toggleSaveUseCase = useRef(new ToggleSaveUseCase(interactionRepository)).current;
     const toggleFollowUseCase = useRef(new ToggleFollowUseCase(interactionRepository)).current;
@@ -562,18 +564,11 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
         );
 
         try {
-            const { supabase } = require('../../core/supabase');
-            const { error } = await supabase.rpc('increment_video_counter', {
-                video_id: videoId,
-                counter_column: 'shares_count'
-            });
-
-            if (error) throw error;
-            logData(LogCode.DB_UPDATE, 'Share count synced to DB via RPC', { videoId });
+            await incrementShareCountUseCase.execute(videoId);
         } catch (error) {
-            logError(LogCode.DB_UPDATE, 'Failed to sync share count', error);
+            logError(LogCode.DB_UPDATE, 'Failed to sync share count', { videoId, error });
         }
-    }, [applyVideoCounterDelta, setVideosWithDescriptionOverrides]);
+    }, [applyVideoCounterDelta, incrementShareCountUseCase, setVideosWithDescriptionOverrides]);
 
     const toggleShare = useCallback(async (videoId: string) => {
         const video = videos.find(v => v.id === videoId);

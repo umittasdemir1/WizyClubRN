@@ -27,8 +27,8 @@ import { useAuthStore } from '../src/presentation/store/useAuthStore';
 import { useDraftStore } from '../src/presentation/store/useDraftStore';
 import { useUploadStore } from '../src/presentation/store/useUploadStore';
 import { useStoryStore } from '../src/presentation/store/useStoryStore';
+import { getAccessToken } from '../src/presentation/store/getAccessToken';
 import { CONFIG } from '../src/core/config';
-import { supabase } from '../src/core/supabase';
 import { LogCode, logData, logError } from '@/core/services/Logger';
 import { stripRichTextTags } from '../src/core/utils/richText';
 
@@ -629,8 +629,7 @@ export default function UploadDetailsScreen() {
             xhr.open('POST', uploadUrl);
 
             try {
-                const { data: { session } } = await supabase.auth.getSession();
-                const accessToken = session?.access_token;
+                const accessToken = await getAccessToken();
                 if (accessToken) xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
             } catch {
                 // ignore token fetch failure
@@ -700,8 +699,7 @@ export default function UploadDetailsScreen() {
         setIsSubmitting(true);
 
         try {
-            const { data: { session } } = await supabase.auth.getSession();
-            const accessToken = session?.access_token;
+            const accessToken = await getAccessToken();
             if (!accessToken) {
                 Alert.alert('Oturum Hatası', 'Lütfen tekrar giriş yapın.');
                 setIsSubmitting(false);

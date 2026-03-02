@@ -15,6 +15,7 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { ImagePickerAsset } from 'expo-image-picker';
 import {
     X,
     Trash2,
@@ -202,7 +203,7 @@ export default function UploadComposerScreen() {
             duration: 0,
             assetId: draft.editVideoId,
             fileName: 'edit_video.mp4',
-        }] as ImagePicker.ImagePickerAsset[];
+        }] as ImagePickerAsset[];
     }, [draft?.editVideoId, draft?.editVideoUrl]);
     const [selectedAssets, setSelectedAssets] = useState(isEditMode ? editModeAssets : initialAssets);
     const [activePreviewIndex, setActivePreviewIndex] = useState(0);
@@ -244,7 +245,7 @@ export default function UploadComposerScreen() {
                 duration: 0,
                 assetId: draft.editVideoId,
                 fileName: 'edit_video.mp4',
-            }] as ImagePicker.ImagePickerAsset[]);
+            }] as ImagePickerAsset[]);
         } else {
             setSelectedAssets(draft.selectedAssets || []);
         }

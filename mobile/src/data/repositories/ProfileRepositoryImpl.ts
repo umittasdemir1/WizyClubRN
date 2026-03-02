@@ -75,6 +75,10 @@ export class ProfileRepositoryImpl implements IProfileRepository {
         return await this.dataSource.checkUsernameAvailability(username, currentUserId);
     }
 
+    async bootstrapProfileForSignUp(userId: string, email: string, fullName: string): Promise<string | null> {
+        return this.dataSource.bootstrapProfileForSignUp(userId, email, fullName);
+    }
+
     private mapDtoToUser(dto: any): User {
         return {
             id: dto.id,

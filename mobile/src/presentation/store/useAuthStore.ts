@@ -1,7 +1,11 @@
 import { create } from 'zustand';
-import { supabase } from '../../core/supabase';
 import type { User as SupabaseUser, Session } from '@supabase/supabase-js';
+import { AuthRepositoryImpl } from '../../data/repositories/AuthRepositoryImpl';
+import { ProfileRepositoryImpl } from '../../data/repositories/ProfileRepositoryImpl';
 import { LogCode, logAuth, logError } from '@/core/services/Logger';
+
+const authRepository = new AuthRepositoryImpl();
+const profileRepository = new ProfileRepositoryImpl();
 
 interface AuthState {
   user: SupabaseUser | null;
@@ -28,7 +32,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ isLoading: true });
 
       // Get current session
-      const { data: { session }, error } = await supabase.auth.getSession();
+      const { session, error } = await authRepository.getSession();
 
       if (error) {
         logError(LogCode.AUTH_SESSION_CHECK, 'Session check failed', error);
@@ -45,7 +49,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       });
 
       // Listen for auth changes
-      supabase.auth.onAuthStateChange((_event, session) => {
+      authRepository.onAuthStateChange((_event, session) => {
         logAuth(LogCode.AUTH_TOKEN_REFRESH, `Auth state changed: ${_event}`, { userId: session?.user?.id });
         set({ user: session?.user ?? null, session: session ?? null });
       });
@@ -59,10 +63,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       set({ isLoading: true, error: null });
 
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { user, session, error } = await authRepository.signIn(email, password);
 
       if (error) {
         logError(LogCode.AUTH_LOGIN_FAILED, 'Sign in failed', { email, error: error.message });
@@ -78,8 +79,8 @@ export const useAuthStore = create<AuthState>((set) => ({
         return { success: false, error: errorMessage };
       }
 
-      logAuth(LogCode.AUTH_LOGIN_SUCCESS, 'User signed in', { userId: data.user?.id, email });
-      set({ user: data.user, session: data.session, isLoading: false, error: null });
+      logAuth(LogCode.AUTH_LOGIN_SUCCESS, 'User signed in', { userId: user?.id, email });
+      set({ user, session, isLoading: false, error: null });
       return { success: true };
     } catch (error: unknown) {
       const err = error as Error;
@@ -95,15 +96,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ isLoading: true, error: null });
 
       // Create auth user
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-          },
-        },
-      });
+      const { user, error } = await authRepository.signUp(email, password, fullName);
 
       if (error) {
         logError(LogCode.AUTH_LOGIN_FAILED, 'Sign up failed', { email, error: error.message });
@@ -121,24 +114,12 @@ export const useAuthStore = create<AuthState>((set) => ({
         return { success: false, error: errorMessage };
       }
 
-      // Create profile in profiles table
-      if (data.user) {
-        const username = email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+      // Bootstrap the profile record via the data layer so store code stays auth-focused.
+      if (user) {
+        const username = await profileRepository.bootstrapProfileForSignUp(user.id, email, fullName);
 
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .upsert({
-            id: data.user.id,
-            username: username,
-            full_name: fullName,
-            avatar_url: `https://api.dicebear.com/7.x/avataaars/png?seed=${username}`,
-            shop_enabled: false,
-          });
-
-        if (profileError) {
-          logError(LogCode.DB_INSERT, 'Profile creation failed', profileError);
-        } else {
-          logAuth(LogCode.AUTH_LOGIN_SUCCESS, 'User profile created', { userId: data.user.id, username });
+        if (username) {
+          logAuth(LogCode.AUTH_LOGIN_SUCCESS, 'User profile created', { userId: user.id, username });
         }
       }
 
@@ -155,7 +136,10 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   signOut: async () => {
     try {
-      await supabase.auth.signOut();
+      const error = await authRepository.signOut();
+      if (error) {
+        throw error;
+      }
       logAuth(LogCode.AUTH_LOGOUT, 'User signed out');
       set({ user: null, error: null });
     } catch (err) {

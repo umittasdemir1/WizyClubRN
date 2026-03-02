@@ -40,13 +40,12 @@ import { useVideoViewTracking } from '../../hooks/useVideoViewTracking';
 import type { ViewToken } from 'react-native';
 import { FeedPrefetchService } from '../../../data/services/FeedPrefetchService';
 import { VideoCacheService } from '../../../data/services/VideoCacheService';
+import { FeedQueryService } from '../../../data/services/FeedQueryService';
 import { useInAppBrowserStore } from '../../store/useInAppBrowserStore';
 import { PerformanceLogger } from '../../../core/services/PerformanceLogger';
 import { useUploadStore } from '../../store/useUploadStore';
 import { useUploadComposerStore } from '../../store/useUploadComposerStore';
 import { useSubtitlePreferencesStore, type SubtitlePreferenceMode } from '../../store/useSubtitlePreferencesStore';
-import { supabase } from '../../../core/supabase';
-import { SupabaseVideoDataSource } from '../../../data/datasources/SupabaseVideoDataSource';
 import { CONFIG } from '../../../core/config';
 import { ThinSpinner } from '../shared/ThinSpinner';
 
@@ -306,9 +305,9 @@ export function InfiniteFeedManager({
         taggedPeopleSheetRef.current?.present();
     }, []);
 
-    const hashtagDataSourceRef = useRef(new SupabaseVideoDataSource());
+    const feedQueryServiceRef = useRef(new FeedQueryService());
     const handleHashtagPress = useCallback((hashtag: string) => {
-        hashtagDataSourceRef.current.incrementHashtagClick(hashtag);
+        feedQueryServiceRef.current.recordHashtagClick(hashtag);
         router.push(`/search?q=${encodeURIComponent('#' + hashtag)}` as any);
     }, [router]);
 
@@ -405,15 +404,7 @@ export function InfiniteFeedManager({
         // Fetch hashtags for this video
         let editTags: string[] = [];
         try {
-            const { data: hashtagRows } = await supabase
-                .from('video_hashtags')
-                .select('hashtag_id, hashtags(name)')
-                .eq('video_id', targetId);
-            if (hashtagRows && Array.isArray(hashtagRows)) {
-                editTags = hashtagRows
-                    .map((row: any) => row.hashtags?.name)
-                    .filter((name: any): name is string => typeof name === 'string' && name.trim().length > 0);
-            }
+            editTags = await feedQueryServiceRef.current.getVideoHashtags(targetId);
         } catch {}
 
         // Map tagged people to UploadComposerTaggedUser format
@@ -646,32 +637,15 @@ export function InfiniteFeedManager({
             requestAnimationFrame(tick);
         });
 
-        const fetchUploadedVideo = async () => {
-            for (let attempt = 0; attempt < 5; attempt += 1) {
-                const { data, error } = await supabase
-                    .from('videos')
-                    .select('*, profiles:user_id(*)')
-                    .eq('id', uploadedVideoId)
-                    .single();
-
-                if (data && !error) {
-                    return data as any;
-                }
-
-                if (attempt < 4) {
-                    await wait(120);
-                }
-            }
-
-            return null;
-        };
-
         const handleUploadSuccess = async () => {
             // Keep success preview visible briefly before injecting the new post.
             await wait(2000);
             if (cancelled) return;
 
-            const videoData = await fetchUploadedVideo();
+            const videoData = await feedQueryServiceRef.current.waitForVideoForFeed(uploadedVideoId, {
+                attempts: 5,
+                delayMs: 120,
+            });
             if (cancelled) return;
 
             if (!videoData) {
@@ -685,55 +659,12 @@ export function InfiniteFeedManager({
                 return;
             }
 
-            const profileData = Array.isArray(videoData.profiles) ? videoData.profiles[0] : videoData.profiles;
-
-            const uploadedVideo: InfiniteFeedVideo = {
-                id: videoData.id,
-                videoUrl: videoData.video_url,
-                thumbnailUrl: videoData.thumbnail_url,
-                description: videoData.description || '',
-                likesCount: videoData.likes_count || 0,
-                viewsCount: videoData.views_count || 0,
-                commentsCount: 0,
-                sharesCount: videoData.shares_count || 0,
-                shopsCount: videoData.shops_count || 0,
-                spriteUrl: videoData.sprite_url,
-                isLiked: false,
-                isSaved: false,
-                savesCount: videoData.saves_count || 0,
-                user: {
-                    id: profileData?.id || videoData.user_id,
-                    username: profileData?.username || 'unknown',
-                    fullName: profileData?.full_name || '',
-                    avatarUrl: profileData?.avatar_url || '',
-                    country: profileData?.country,
-                    age: profileData?.age,
-                    bio: profileData?.bio,
-                    website: profileData?.website,
-                    isVerified: profileData?.is_verified,
-                    shopEnabled: profileData?.shop_enabled,
-                    followersCount: profileData?.followers_count,
-                    followingCount: profileData?.following_count,
-                    postsCount: profileData?.posts_count,
-                    isFollowing: false,
-                    instagramUrl: profileData?.instagram_url,
-                    tiktokUrl: profileData?.tiktok_url,
-                    youtubeUrl: profileData?.youtube_url,
-                    xUrl: profileData?.x_url,
-                },
-                musicName: videoData.music_name || 'Original Audio',
-                musicAuthor: videoData.music_author || 'WizyClub',
-                width: videoData.width,
-                height: videoData.height,
-                isCommercial: videoData.is_commercial,
-                brandName: videoData.brand_name,
-                brandUrl: videoData.brand_url,
-                commercialType: videoData.commercial_type,
-                taggedPeople: taggedPeoplePreview.length > 0 ? taggedPeoplePreview : undefined,
-                mediaUrls: videoData.media_urls,
-                postType: videoData.post_type,
-                createdAt: videoData.created_at,
-            };
+            const uploadedVideo: InfiniteFeedVideo = taggedPeoplePreview.length > 0
+                ? {
+                    ...videoData,
+                    taggedPeople: taggedPeoplePreview,
+                }
+                : videoData;
 
             prependVideo(uploadedVideo);
             await waitFrames(2);

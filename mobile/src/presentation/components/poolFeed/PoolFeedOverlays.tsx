@@ -33,6 +33,7 @@ import { PoolFeedDeleteConfirmationModal } from './PoolFeedDeleteConfirmationMod
 import { PoolFeedActiveVideoOverlay } from './PoolFeedActiveVideoOverlay';
 
 import { Video } from '../../../domain/entities/Video';
+import { SubtitlePreferenceMode } from '../../store/useSubtitlePreferencesStore';
 import { FEED_COLORS, SCREEN_WIDTH, isDisabled } from './hooks/usePoolFeedConfig';
 
 // ============================================================================
@@ -54,9 +55,9 @@ export interface PoolFeedOverlaysProps {
     /** Show subtitle option in more sheet */
     showSubtitleOption: boolean;
     /** Subtitle mode for active video */
-    subtitleMode: 'off' | 'video' | 'always';
+    subtitleMode: SubtitlePreferenceMode;
     /** Subtitle mode change handler */
-    onSubtitleModeChange: (mode: 'off' | 'video' | 'always') => void;
+    onSubtitleModeChange: (mode: SubtitlePreferenceMode) => void;
     /** Is clean screen mode */
     isCleanScreen: boolean;
     /** Is seeking */

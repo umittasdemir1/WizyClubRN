@@ -26,6 +26,35 @@ Ana sonuc:
 2. `Edge Functions`, DB + dis servis + auth orkestrasyonu gereken islerde faydali olur; saf veri okuma kompozisyonu icin ilk tercih olmamali.
 3. `Realtime`, hikaye halkasi ve upload tamamlama gibi dar kapsamli event akislarda faydali; ama "sicak" tablolari dogrudan genis capta `postgres_changes` ile dinlemek dikkatli yapilmali.
 
+## Uygulama Durumu (2026-03-02 guncel)
+
+Bu rapordaki ana maddeler artik kod ve canli SQL tarafinda uygulanmis durumda:
+
+- `get_feed_page_v1` canliya alinmis durumda ve mobile feed fallback'li sekilde bunu kullaniyor
+- `get_user_interaction_v1` canliya alinmis durumda; liked ve saved activity ekranlari bunu kullaniyor
+- `toggle_like_v1` ve `toggle_save_v1` canliya alinmis durumda; mobile tarafi fallback'li sekilde bunlari deniyor
+- UI katmanindaki dogrudan Supabase query'ler data layer / repository / service katmanina tasindi
+- daginik `auth.getSession()` kullanimlari ortak auth store + helper/repository hattina toplandi
+- `DeletedContentSheet` sorgusu data layer'a tasindi, kullanici kapsaminda ve limitli hale getirildi
+- `useStories` artik shared channel kullaniyor; her eventte full invalidation yerine cache patch modeli uyguluyor
+- `getStories()` kullanicinin tum `story_views` gecmisini cekmek yerine sadece aktif story ID'leri icin gorulme kayitlarini okuyor
+- hashtag aramasi icin `search_hashtags_v1` RPC canliya alinmis durumda ve mobile fallback'li sekilde bunu destekliyor
+- watch history icin `get_user_interaction_v1` history destegi canliya alinmis durumda
+- canli ortamda toggle/read-model hotfix'leri uygulanmis ve dogrulanmis durumda
+- yeni RPC'ler `verify:mobile-rpcs` ile canlida dogrulandi
+- repo tarafinda eksik `video_views` migration'i eklendi ve toggle SQL dosyalari tarihsel `text` / guncel `uuid` schema varyantlarina uyumlu hale getirildi
+
+Zorunlu bir uygulama adimi kalmadi.
+
+Bu raporda kalan Faz 3 basliklari:
+
+- `EXPLAIN`
+- `pg_stat_statements`
+- `index_advisor`
+- index tuning / read replica degerlendirmesi
+
+bir eksik tamamlama degil; sonraki performans olcekleme ve kapasite optimizasyon fazidir.
+
 ## Inceleme Kapsami
 
 Kod taranan ana alanlar:

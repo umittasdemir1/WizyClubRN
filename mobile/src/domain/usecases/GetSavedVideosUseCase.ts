@@ -9,6 +9,11 @@ export class GetSavedVideosUseCase {
     ) { }
 
     async execute(userId: string): Promise<Video[]> {
+        const rpcVideos = await this.videoRepository.getUserInteractionVideos('saved', userId);
+        if (rpcVideos) {
+            return rpcVideos;
+        }
+
         const savedVideoIds = await this.saveRepository.getSavedVideos(userId);
         if (!savedVideoIds.length) return [];
 

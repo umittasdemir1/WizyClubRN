@@ -15,6 +15,10 @@ export class StoryRepositoryImpl implements IStoryRepository {
         return this.dataSource.getStories(userId);
     }
 
+    async getStoryById(storyId: string, userId?: string): Promise<Story | null> {
+        return this.dataSource.getStoryById(storyId, userId);
+    }
+
     async markAsViewed(storyId: string): Promise<void> {
         const { data: { user } } = await import('../../core/supabase').then(m => m.supabase.auth.getUser());
         if (user) {

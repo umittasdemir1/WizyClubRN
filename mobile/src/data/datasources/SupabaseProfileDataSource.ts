@@ -171,6 +171,27 @@ export class SupabaseProfileDataSource {
         return result.avatarUrl;
     }
 
+    async bootstrapProfileForSignUp(userId: string, email: string, fullName: string): Promise<string | null> {
+        const username = email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+
+        const { error } = await supabase
+            .from('profiles')
+            .upsert({
+                id: userId,
+                username,
+                full_name: fullName,
+                avatar_url: `https://api.dicebear.com/7.x/avataaars/png?seed=${username}`,
+                shop_enabled: false,
+            });
+
+        if (error) {
+            logError(LogCode.DB_INSERT, 'Profile bootstrap failed', { userId, email, error });
+            return null;
+        }
+
+        return username;
+    }
+
     private mapUserToDto(user: Partial<User>) {
         const dto: any = {};
         if ('username' in user) dto.username = user.username;

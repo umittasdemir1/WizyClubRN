@@ -11,6 +11,11 @@ export class UserActivityRepositoryImpl implements IUserActivityRepository {
     }
 
     async getLikedVideos(userId: string): Promise<Video[]> {
+        const rpcVideos = await this.videoDataSource.getUserInteractionVideos('likes', userId);
+        if (rpcVideos) {
+            return rpcVideos;
+        }
+
         const { data, error } = await supabase
             .from('likes')
             .select('video_id')
@@ -24,6 +29,11 @@ export class UserActivityRepositoryImpl implements IUserActivityRepository {
     }
 
     async getSavedVideos(userId: string): Promise<Video[]> {
+        const rpcVideos = await this.videoDataSource.getUserInteractionVideos('saved', userId);
+        if (rpcVideos) {
+            return rpcVideos;
+        }
+
         const { data, error } = await supabase
             .from('saves')
             .select('video_id')
@@ -36,6 +46,11 @@ export class UserActivityRepositoryImpl implements IUserActivityRepository {
     }
 
     async getWatchHistory(userId: string): Promise<Video[]> {
+        const rpcVideos = await this.videoDataSource.getUserInteractionVideos('history', userId);
+        if (rpcVideos) {
+            return rpcVideos;
+        }
+
         const { data, error } = await supabase
             .from('video_views')
             .select('video_id')

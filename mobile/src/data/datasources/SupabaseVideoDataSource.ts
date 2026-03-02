@@ -113,8 +113,36 @@ interface SupabaseVideo {
     post_tags?: any[];
 }
 
+interface SupabaseEditableVideo {
+    id: string;
+    user_id: string;
+    thumbnail_url: string | null;
+    description: string | null;
+}
+
+interface SupabaseFeedRpcRow extends SupabaseVideo {
+    is_liked: boolean;
+    is_saved: boolean;
+    is_following: boolean;
+}
+
+interface SupabaseUserInteractionRpcRow extends SupabaseFeedRpcRow {
+    activity_at: string;
+}
+
+interface SupabaseHashtagSearchRpcRow {
+    id: string;
+    name: string;
+    post_count: number | string;
+    click_count: number;
+    search_count: number;
+    score: number | string;
+}
+
 export class SupabaseVideoDataSource {
     private static readonly DEFAULT_VIEW_COOLDOWN_MS = 30 * 60 * 1000;
+    private static readonly UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
     async getVideos(limit: number, userId?: string, authorId?: string, cursor?: VideoFeedCursor | null): Promise<VideoFeedResult> {
         const normalizedLimit = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 10;
         logData(LogCode.DB_QUERY_START, 'Fetching videos with cursor pagination', {
@@ -123,6 +151,11 @@ export class SupabaseVideoDataSource {
             authorId,
             cursor,
         });
+
+        const rpcResult = await this.getVideosViaReadModel(normalizedLimit, userId, authorId, cursor);
+        if (rpcResult) {
+            return rpcResult;
+        }
 
         let query = supabase
             .from('videos')
@@ -222,6 +255,96 @@ export class SupabaseVideoDataSource {
         };
     }
 
+    private async getVideosViaReadModel(
+        limit: number,
+        userId?: string,
+        authorId?: string,
+        cursor?: VideoFeedCursor | null
+    ): Promise<VideoFeedResult | null> {
+        if (!this.canUseFeedReadModel(userId, authorId, cursor)) {
+            return null;
+        }
+
+        const { data, error } = await supabase.rpc('get_feed_page_v1', {
+            p_limit: limit,
+            p_user_id: userId ?? null,
+            p_author_id: authorId ?? null,
+            p_cursor_created_at: cursor?.createdAt ?? null,
+            p_cursor_id: cursor?.id ?? null,
+        });
+
+        if (error) {
+            if (error.code !== '42883') {
+                logError(LogCode.DB_QUERY_ERROR, 'Feed read model RPC unavailable, falling back to legacy queries', {
+                    error,
+                    userId,
+                    authorId,
+                    cursor,
+                });
+            }
+            return null;
+        }
+
+        const rows = (data as SupabaseFeedRpcRow[] | null) || [];
+        if (!rows.length) {
+            return {
+                videos: [],
+                nextCursor: null,
+            };
+        }
+
+        const videos = rows.map((row) => this.mapToVideo(row, {
+            isLiked: row.is_liked,
+            isSaved: row.is_saved,
+            isFollowing: row.is_following,
+        }));
+
+        const lastItem = rows[rows.length - 1];
+        const nextCursor = rows.length >= limit
+            ? {
+                createdAt: lastItem.created_at,
+                id: lastItem.id,
+            }
+            : null;
+
+        return {
+            videos,
+            nextCursor,
+        };
+    }
+
+    private canUseFeedReadModel(userId?: string, authorId?: string, cursor?: VideoFeedCursor | null): boolean {
+        if (cursor?.id && !SupabaseVideoDataSource.UUID_PATTERN.test(cursor.id)) return false;
+        return true;
+    }
+
+    async getUserInteractionVideos(activityType: 'likes' | 'saved' | 'history', userId: string): Promise<Video[] | null> {
+        if (!userId) return [];
+
+        const { data, error } = await supabase.rpc('get_user_interaction_v1', {
+            p_user_id: userId,
+            p_activity_type: activityType,
+        });
+
+        if (error) {
+            if (error.code !== '42883') {
+                logError(LogCode.DB_QUERY_ERROR, 'User interaction RPC unavailable, falling back to legacy queries', {
+                    activityType,
+                    userId,
+                    error,
+                });
+            }
+            return null;
+        }
+
+        const rows = (data as SupabaseUserInteractionRpcRow[] | null) || [];
+        return rows.map((row) => this.mapToVideo(row, {
+            isLiked: row.is_liked,
+            isSaved: row.is_saved,
+            isFollowing: row.is_following,
+        }));
+    }
+
     async searchVideos(query: string, limit: number = 20, userId?: string): Promise<Video[]> {
         const trimmed = query.trim();
         if (!trimmed) return [];
@@ -251,32 +374,75 @@ export class SupabaseVideoDataSource {
     async getStories(userId?: string): Promise<Story[]> {
         const now = new Date().toISOString();
 
-        // Parallel fetch: stories + story_views (removed auth.getUser() call - userId passed as param)
-        const [storiesResult, viewsResult] = await Promise.all([
-            supabase
-                .from('stories')
-                .select('*, profiles(*), post_tags(*, profiles(*))')
-                .is('deleted_at', null)
-                .gt('expires_at', now)
-                .order('created_at', { ascending: false })
-                .limit(50),
-            userId
-                ? supabase.from('story_views').select('story_id').eq('user_id', userId)
-                : Promise.resolve({ data: null }),
-        ]);
+        const storiesResult = await supabase
+            .from('stories')
+            .select('*, profiles(*), post_tags(*, profiles(*))')
+            .is('deleted_at', null)
+            .gt('expires_at', now)
+            .order('created_at', { ascending: false })
+            .limit(50);
 
         if (storiesResult.error) {
             logError(LogCode.DB_QUERY_ERROR, 'Supabase stories fetch error', storiesResult.error);
             return [];
         }
 
-        const viewedStoryIds = new Set<string>();
-        if (viewsResult.data) {
-            (viewsResult.data as Array<{ story_id: string }>).forEach(v => viewedStoryIds.add(v.story_id));
+        const stories = (storiesResult.data as any[] | null) || [];
+        if (!stories.length) {
+            return [];
         }
 
-        logData(LogCode.DB_QUERY_SUCCESS, 'Stories fetched successfully', { count: storiesResult.data?.length || 0 });
-        return (storiesResult.data as any[]).map(dto => this.mapToStory(dto, viewedStoryIds.has(dto.id)));
+        let viewRows: Array<{ story_id: string }> = [];
+        if (userId) {
+            const storyIds = stories.map((story) => story.id).filter(Boolean);
+            if (storyIds.length > 0) {
+                const { data: storyViews } = await supabase
+                    .from('story_views')
+                    .select('story_id')
+                    .eq('user_id', userId)
+                    .in('story_id', storyIds);
+
+                viewRows = (storyViews as Array<{ story_id: string }> | null) || [];
+            }
+        }
+
+        const viewedStoryIds = new Set<string>();
+        viewRows.forEach(v => viewedStoryIds.add(v.story_id));
+
+        logData(LogCode.DB_QUERY_SUCCESS, 'Stories fetched successfully', { count: stories.length });
+        return stories.map(dto => this.mapToStory(dto, viewedStoryIds.has(dto.id)));
+    }
+
+    async getStoryById(storyId: string, userId?: string): Promise<Story | null> {
+        const now = new Date().toISOString();
+        const { data, error } = await supabase
+            .from('stories')
+            .select('*, profiles(*), post_tags(*, profiles(*))')
+            .eq('id', storyId)
+            .is('deleted_at', null)
+            .gt('expires_at', now)
+            .maybeSingle<any>();
+
+        if (error || !data) {
+            if (error) {
+                logError(LogCode.DB_QUERY_ERROR, 'Single story fetch failed', { storyId, error });
+            }
+            return null;
+        }
+
+        let isViewed = false;
+        if (userId) {
+            const { data: storyView } = await supabase
+                .from('story_views')
+                .select('story_id')
+                .eq('user_id', userId)
+                .eq('story_id', storyId)
+                .maybeSingle<{ story_id: string }>();
+
+            isViewed = !!storyView;
+        }
+
+        return this.mapToStory(data, isViewed);
     }
 
     async markStoryAsViewed(storyId: string, userId: string): Promise<void> {
@@ -325,6 +491,20 @@ export class SupabaseVideoDataSource {
         return (data as 'inserted' | 'cooldown' | 'error') || 'error';
     }
 
+    async incrementShareCount(videoId: string): Promise<void> {
+        const { error } = await supabase.rpc('increment_video_counter', {
+            video_id: videoId,
+            counter_column: 'shares_count',
+        });
+
+        if (error) {
+            logError(LogCode.DB_UPDATE, 'Failed to sync share count', { videoId, error });
+            throw error;
+        }
+
+        logData(LogCode.DB_UPDATE, 'Share count synced to DB via RPC', { videoId });
+    }
+
     async getVideoById(videoId: string): Promise<Video | null> {
         const { data, error } = await supabase
             .from('videos')
@@ -337,6 +517,44 @@ export class SupabaseVideoDataSource {
         }
 
         return this.mapToVideo(data as SupabaseVideo);
+    }
+
+    async getEditableVideo(videoId: string): Promise<SupabaseEditableVideo | null> {
+        const { data, error } = await supabase
+            .from('videos')
+            .select('id,user_id,thumbnail_url,description')
+            .eq('id', videoId)
+            .is('deleted_at', null)
+            .maybeSingle<SupabaseEditableVideo>();
+
+        if (error || !data) {
+            logError(LogCode.DB_QUERY_ERROR, 'Edit video fetch failed', { videoId, error });
+            return null;
+        }
+
+        return data;
+    }
+
+    async updateVideoDescription(videoId: string, userId: string, description: string): Promise<boolean> {
+        const { data, error } = await supabase
+            .from('videos')
+            .update({ description })
+            .eq('id', videoId)
+            .eq('user_id', userId)
+            .is('deleted_at', null)
+            .select('id')
+            .maybeSingle<{ id: string }>();
+
+        if (error || !data) {
+            logError(LogCode.DB_UPDATE, 'Edit video update failed', {
+                videoId,
+                userId,
+                error,
+            });
+            return false;
+        }
+
+        return true;
     }
 
     async getVideosByIds(videoIds: string[], userId?: string): Promise<Video[]> {
@@ -384,6 +602,37 @@ export class SupabaseVideoDataSource {
             isSaved: savedVideoIds.has(v.id),
             isFollowing: followedUserIds.has(v.user_id)
         }));
+    }
+
+    async getDeletedVideos(
+        userId?: string,
+        limit: number = 50
+    ): Promise<Array<{ id: string; thumbnail_url: string | null; deleted_at: string | null }>> {
+        const normalizedLimit = Number.isFinite(limit) ? Math.max(1, Math.floor(limit)) : 50;
+
+        let query = supabase
+            .from('videos')
+            .select('id,thumbnail_url,deleted_at')
+            .not('deleted_at', 'is', null)
+            .order('deleted_at', { ascending: false })
+            .limit(normalizedLimit);
+
+        if (userId) {
+            query = query.eq('user_id', userId);
+        }
+
+        const { data, error } = await query;
+
+        if (error || !data) {
+            logError(LogCode.DB_QUERY_ERROR, 'Deleted videos fetch failed', {
+                userId,
+                limit: normalizedLimit,
+                error,
+            });
+            return [];
+        }
+
+        return data as Array<{ id: string; thumbnail_url: string | null; deleted_at: string | null }>;
     }
 
     private mapToVideo(dto: SupabaseVideo, interactions?: { isLiked: boolean; isSaved: boolean; isFollowing: boolean }): Video {
@@ -488,6 +737,115 @@ export class SupabaseVideoDataSource {
         const normalized = hashtagName.trim().toLowerCase();
         if (!normalized) return;
         await supabase.rpc('increment_hashtag_click', { p_hashtag_name: normalized });
+    }
+
+    async getHashtagsByVideoId(videoId: string): Promise<string[]> {
+        const { data, error } = await supabase
+            .from('video_hashtags')
+            .select('hashtags(name)')
+            .eq('video_id', videoId);
+
+        if (error || !data) {
+            logError(LogCode.DB_QUERY_ERROR, 'Video hashtags fetch error', { videoId, error });
+            return [];
+        }
+
+        return (data as Array<{ hashtags?: { name?: string } | null }>)
+            .map((row) => row.hashtags?.name)
+            .filter((name): name is string => typeof name === 'string' && name.trim().length > 0);
+    }
+
+    async searchHashtags(query: string, limit: number = 30): Promise<Array<{
+        id: string;
+        name: string;
+        postCount: number;
+        clickCount: number;
+        searchCount: number;
+        score: number;
+    }>> {
+        const trimmed = query.trim().replace(/^#/, '');
+        if (!trimmed) return [];
+
+        const { data: rpcData, error: rpcError } = await supabase.rpc('search_hashtags_v1', {
+            p_query: trimmed,
+            p_limit: limit,
+        });
+
+        if (!rpcError) {
+            const rows = (rpcData as SupabaseHashtagSearchRpcRow[] | null) || [];
+            return rows.map((row) => ({
+                id: row.id,
+                name: row.name,
+                postCount: Number(row.post_count || 0),
+                clickCount: row.click_count || 0,
+                searchCount: row.search_count || 0,
+                score: Number(row.score || 0),
+            }));
+        }
+
+        if (rpcError.code !== '42883') {
+            logError(LogCode.DB_QUERY_ERROR, 'Hashtag RPC search failed, falling back to legacy search', {
+                query: trimmed,
+                error: rpcError,
+            });
+        }
+
+        return this.searchHashtagsLegacy(trimmed, limit);
+    }
+
+    private async searchHashtagsLegacy(query: string, limit: number): Promise<Array<{
+        id: string;
+        name: string;
+        postCount: number;
+        clickCount: number;
+        searchCount: number;
+        score: number;
+    }>> {
+        const { data, error: hashtagError } = await supabase
+            .from('hashtags')
+            .select('id, name, click_count, search_count')
+            .ilike('name', `%${query}%`)
+            .order('click_count', { ascending: false })
+            .limit(limit);
+
+        if (hashtagError || !data) {
+            logError(LogCode.DB_QUERY_ERROR, 'Hashtag search failed', { query, error: hashtagError });
+            return [];
+        }
+
+        const hashtagIds = data.map((item: any) => item.id).filter(Boolean);
+        if (!hashtagIds.length) {
+            return [];
+        }
+
+        const { data: countData, error: countError } = await supabase
+            .from('video_hashtags')
+            .select('hashtag_id')
+            .in('hashtag_id', hashtagIds);
+
+        if (countError) {
+            logError(LogCode.DB_QUERY_ERROR, 'Hashtag post count fetch failed', { query, error: countError });
+            return [];
+        }
+
+        const postCounts: Record<string, number> = {};
+        (countData ?? []).forEach((row: any) => {
+            postCounts[row.hashtag_id] = (postCounts[row.hashtag_id] || 0) + 1;
+        });
+
+        return data
+            .map((item: any) => {
+                const postCount = postCounts[item.id] || 0;
+                return {
+                    id: item.id,
+                    name: item.name,
+                    postCount,
+                    clickCount: item.click_count || 0,
+                    searchCount: item.search_count || 0,
+                    score: postCount * 1.0 + (item.click_count || 0) * 0.5 + (item.search_count || 0) * 0.3,
+                };
+            })
+            .sort((a, b) => b.score - a.score);
     }
 
     async incrementHashtagSearch(hashtagName: string): Promise<void> {

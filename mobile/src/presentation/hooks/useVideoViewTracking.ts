@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { SupabaseVideoDataSource } from '../../data/datasources/SupabaseVideoDataSource';
+import { VideoRepositoryImpl } from '../../data/repositories/VideoRepositoryImpl';
+import { RecordVideoViewUseCase } from '../../domain/usecases';
 import { useVideoCounterStore } from '../store/useVideoCounterStore';
 
 type UseVideoViewTrackingOptions = {
@@ -14,7 +15,7 @@ const DEFAULT_MIN_VIEW_MS = 2000;
 const DEFAULT_VIEW_COOLDOWN_MS = 30 * 60 * 1000;
 const MAX_RECENT_ENTRIES = 5000;
 
-const videoDataSource = new SupabaseVideoDataSource();
+const recordVideoViewUseCase = new RecordVideoViewUseCase(new VideoRepositoryImpl());
 const recentViewsByUserVideo = new Map<string, number>();
 
 const maybePruneRecentViews = (now: number, cooldownMs: number) => {
@@ -59,7 +60,7 @@ export function useVideoViewTracking({
             // Reserve cooldown slot immediately to prevent concurrent duplicate writes.
             recentViewsByUserVideo.set(cacheKey, now);
             void (async () => {
-                const status = await videoDataSource.recordVideoView(videoId, userId, { cooldownMs: safeCooldownMs });
+                const status = await recordVideoViewUseCase.execute(videoId, userId, { cooldownMs: safeCooldownMs });
                 if (isCancelled) return;
 
                 if (status === 'error') {

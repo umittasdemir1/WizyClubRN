@@ -3,14 +3,27 @@ import { useQuery } from '@tanstack/react-query';
 import { Story } from '../../domain/entities/Story';
 import { GetStoriesUseCase } from '../../domain/usecases/GetStoriesUseCase';
 import { StoryRepositoryImpl } from '../../data/repositories/StoryRepositoryImpl';
+import { StoryRealtimeEvent, StoryRealtimeService } from '../../data/services/StoryRealtimeService';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useStoryStore } from '../store/useStoryStore';
 import { useAuthStore } from '../store/useAuthStore';
-import { supabase } from '../../core/supabase';
 import { queryClient, QUERY_KEYS } from '../../core/query/queryClient';
 
 const storyRepository = new StoryRepositoryImpl();
 const getStoriesUseCase = new GetStoriesUseCase(storyRepository);
+const storyRealtimeService = new StoryRealtimeService();
+
+const sortStories = (stories: Story[]) =>
+    [...stories].sort((a, b) => {
+        const createdAtDiff = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        if (createdAtDiff !== 0) return createdAtDiff;
+        return b.id.localeCompare(a.id);
+    });
+
+const upsertStory = (stories: Story[], nextStory: Story): Story[] => {
+    const filtered = stories.filter((story) => story.id !== nextStory.id);
+    return sortStories([...filtered, nextStory]);
+};
 
 /**
  * Unified Story Hook
@@ -19,7 +32,7 @@ const getStoriesUseCase = new GetStoriesUseCase(storyRepository);
  * @param userId Optional user ID to focus on specific stories.
  * @param mode Optional mode for specific behavior tuning (if needed in future).
  */
-export function useStories(userId?: string, mode?: 'default' | 'infinite' | 'pool') {
+export function useStories(userId?: string, _mode?: 'default' | 'infinite' | 'pool') {
     const [currentIndex, setCurrentIndex] = useState(0);
     const router = useRouter();
     const { initial } = useLocalSearchParams<{ initial?: string }>();
@@ -48,23 +61,43 @@ export function useStories(userId?: string, mode?: 'default' | 'infinite' | 'poo
         void queryClient.invalidateQueries({ queryKey: storiesQueryKey });
     }, [refreshTrigger, storiesQueryKey]);
 
-    // Realtime updates so story ring reacts instantly to insert/delete/update.
-    useEffect(() => {
-        const channel = supabase
-            .channel(`stories-realtime-${mode || 'default'}-${currentUser?.id || 'anon'}`)
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'stories' },
-                () => {
-                    void queryClient.invalidateQueries({ queryKey: storiesQueryKey });
-                }
-            )
-            .subscribe();
+    const applyStoryRealtimeEvent = useCallback((event: StoryRealtimeEvent) => {
+        const eventStory = (event.new || event.old || {}) as { id?: unknown; deleted_at?: unknown; expires_at?: unknown };
+        const storyId = typeof eventStory.id === 'string' ? eventStory.id : null;
 
-        return () => {
-            void supabase.removeChannel(channel);
-        };
-    }, [currentUser?.id, mode, storiesQueryKey]);
+        if (!storyId) {
+            void queryClient.invalidateQueries({ queryKey: storiesQueryKey });
+            return;
+        }
+
+        const isRemovalEvent = event.eventType === 'DELETE'
+            || eventStory.deleted_at != null
+            || (typeof eventStory.expires_at === 'string' && new Date(eventStory.expires_at).getTime() <= Date.now());
+
+        if (isRemovalEvent) {
+            queryClient.setQueryData(storiesQueryKey, (existing: Story[] = []) =>
+                existing.filter((story) => story.id !== storyId)
+            );
+            return;
+        }
+
+        void (async () => {
+            const nextStory = await storyRepository.getStoryById(storyId, currentUser?.id);
+
+            queryClient.setQueryData(storiesQueryKey, (existing: Story[] = []) => {
+                const currentStories = Array.isArray(existing) ? existing : [];
+                if (!nextStory) {
+                    return currentStories.filter((story) => story.id !== storyId);
+                }
+                return upsertStory(currentStories, nextStory);
+            });
+        })();
+    }, [currentUser?.id, storiesQueryKey]);
+
+    // Realtime updates now use a shared channel and patch the cache instead of full-list invalidation on every event.
+    useEffect(() => {
+        return storyRealtimeService.subscribe(applyStoryRealtimeEvent);
+    }, [applyStoryRealtimeEvent]);
 
     // Derived Data: Sorted and Grouped Users
     const { sortedUsers, usersMap } = useMemo(() => {
@@ -125,7 +158,7 @@ export function useStories(userId?: string, mode?: 'default' | 'infinite' | 'poo
     }, [userId, allStories, sortedUsers, usersMap]);
 
     // Update currentIndex on initial move
-    useMemo(() => {
+    useEffect(() => {
         if (userId && initial === 'last' && stories.length > 0) {
             setCurrentIndex(stories.length - 1);
         } else if (userId) {

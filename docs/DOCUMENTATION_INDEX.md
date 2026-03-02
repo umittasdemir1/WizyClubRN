@@ -113,6 +113,7 @@ Bu dosya, projede yer alan tum dokumanlari listeler.
 
 ## research
 - [2026-03-02 Mobile Supabase Query Optimization Report.md](research/2026-03-02 Mobile Supabase Query Optimization Report.md)
+- [2026-03-02 Mobile Supabase Final Performance Review.md](research/2026-03-02 Mobile Supabase Final Performance Review.md)
 - [deep-research-report.md](research/deep-research-report.md)
 - [infinite-feed-performance-report-2026-02-08.md](research/infinite-feed-performance-report-2026-02-08.md)
 - [POOL_COMPATIBILITY_INVESTIGATION.md](research/POOL_COMPATIBILITY_INVESTIGATION.md)

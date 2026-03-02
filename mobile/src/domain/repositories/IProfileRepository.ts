@@ -7,4 +7,5 @@ export interface IProfileRepository {
     updateProfile(userId: string, profile: Partial<User>): Promise<User>;
     uploadAvatar(userId: string, fileUri: string): Promise<string>;
     checkUsernameAvailability(username: string, currentUserId: string): Promise<boolean>;
+    bootstrapProfileForSignUp(userId: string, email: string, fullName: string): Promise<string | null>;
 }

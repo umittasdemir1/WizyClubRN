@@ -151,9 +151,8 @@ export const PoolFeedManager = ({
         Record<string, { hasSubtitles: boolean; fetchedAt: number; isProcessing?: boolean }>
     >({});
     const subtitleAvailabilityRef = useRef(subtitleAvailabilityByVideoId);
-    const subtitleAlwaysEnabled = useSubtitlePreferencesStore((state) => state.alwaysEnabled);
-    const subtitleVideoEnabledById = useSubtitlePreferencesStore((state) => state.videoEnabledById);
-    const setSubtitleSelectionForVideo = useSubtitlePreferencesStore((state) => state.setSelectionForVideo);
+    const subtitlePreferenceMode = useSubtitlePreferencesStore((state) => state.mode);
+    const setSubtitlePreferenceMode = useSubtitlePreferencesStore((state) => state.setMode);
 
     const activeVideo = useMemo(() => videos.find((v) => v.id === activeVideoId) || null, [videos, activeVideoId]);
     const isOwnActiveVideo = !!activeVideo && activeVideo.user?.id === user?.id;
@@ -259,15 +258,14 @@ export const PoolFeedManager = ({
     }, [activeVideo?.id, subtitleAvailabilityByVideoId]);
 
     const subtitleMode = useMemo<SubtitlePreferenceMode>(() => {
-        if (!activeVideo?.id) return subtitleAlwaysEnabled ? 'always' : 'off';
-        if (subtitleAlwaysEnabled) return 'always';
-        return subtitleVideoEnabledById[activeVideo.id] ? 'video' : 'off';
-    }, [activeVideo?.id, subtitleAlwaysEnabled, subtitleVideoEnabledById]);
+        if (subtitlePreferenceMode === 'always') return 'always';
+        if (subtitlePreferenceMode === 'on' && showSubtitleOption) return 'on';
+        return 'off';
+    }, [showSubtitleOption, subtitlePreferenceMode]);
 
     const handleSubtitleModeChange = useCallback((mode: SubtitlePreferenceMode) => {
-        if (!activeVideo?.id) return;
-        setSubtitleSelectionForVideo(activeVideo.id, mode);
-    }, [activeVideo?.id, setSubtitleSelectionForVideo]);
+        setSubtitlePreferenceMode(mode);
+    }, [setSubtitlePreferenceMode]);
 
     const isViewTrackingEnabled = Boolean(
         activeVideo?.id &&

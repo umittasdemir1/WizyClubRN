@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, RefreshCw, Save } from 'lucide-react-native';
 import { CONFIG } from '../src/core/config';
-import { supabase } from '../src/core/supabase';
+import { getAccessToken } from '../src/presentation/store/getAccessToken';
 import { useThemeStore } from '../src/presentation/store/useThemeStore';
 
 type SubtitleRow = {
@@ -99,8 +99,7 @@ export default function SubtitleEditScreen() {
         if (!resolvedVideoId) return;
         setIsGenerating(true);
         try {
-            const { data: { session } } = await supabase.auth.getSession();
-            const accessToken = session?.access_token;
+            const accessToken = await getAccessToken();
             if (!accessToken) {
                 throw new Error('Lütfen tekrar giriş yapın.');
             }
@@ -130,8 +129,7 @@ export default function SubtitleEditScreen() {
         if (!resolvedVideoId || segments.length === 0) return;
         setIsSaving(true);
         try {
-            const { data: { session } } = await supabase.auth.getSession();
-            const accessToken = session?.access_token;
+            const accessToken = await getAccessToken();
             if (!accessToken) {
                 throw new Error('Lütfen tekrar giriş yapın.');
             }

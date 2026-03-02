@@ -10,8 +10,7 @@ import VideoPlayer from 'react-native-video';
 import CarouselMediaIcon from '../assets/icons/carousel.svg';
 import VideoMediaIcon from '../assets/icons/videos.svg';
 import { VideoCacheService } from '../src/data/services/VideoCacheService';
-import { SupabaseVideoDataSource } from '../src/data/datasources/SupabaseVideoDataSource';
-import { supabase } from '../src/core/supabase';
+import { FeedQueryService, type HashtagSearchResult } from '../src/data/services/FeedQueryService';
 import { Hash } from 'lucide-react-native';
 import { useThemeStore } from '../src/presentation/store/useThemeStore';
 import { useAuthStore } from '../src/presentation/store/useAuthStore';
@@ -38,7 +37,7 @@ const DISCOVERY_ICON_BG_SIZE = 28;
 type RecentUser = Pick<User, 'id' | 'username' | 'fullName' | 'avatarUrl' | 'isVerified' | 'followersCount'>;
 type RecentItem = { type: 'query'; value: string } | { type: 'user'; user: RecentUser };
 type SuggestionItem = { type: 'query'; value: string } | { type: 'user'; user: User };
-type HashtagResult = { id: string; name: string; post_count: number; click_count: number; search_count: number; score: number };
+type HashtagResult = HashtagSearchResult;
 const TABS = ['Senin İçin', 'Hesaplar', 'Kişiselleştirilmemiş', 'Etiketler', 'Yerder'] as const;
 type SearchTab = typeof TABS[number];
 
@@ -100,6 +99,7 @@ export default function SearchScreen() {
     const [hashtagResults, setHashtagResults] = useState<HashtagResult[]>([]);
     const [isHashtagsLoading, setIsHashtagsLoading] = useState(false);
     const [isHashtagDiscovery, setIsHashtagDiscovery] = useState(false);
+    const feedQueryServiceRef = useRef(new FeedQueryService());
     const currentUserId = useAuthStore((state) => state.user?.id);
     const videoIndices = useMemo(
         () =>
@@ -157,50 +157,14 @@ export default function SearchScreen() {
     );
 
     const searchHashtags = useCallback(async (value: string) => {
-        const trimmed = value.trim().replace(/^#/, '');
-        if (!trimmed) {
+        if (!value.trim()) {
             setHashtagResults([]);
             return;
         }
         setIsHashtagsLoading(true);
         try {
-            const { data, error: hashErr } = await supabase
-                .from('hashtags')
-                .select('id, name, click_count, search_count')
-                .ilike('name', `%${trimmed}%`)
-                .order('click_count', { ascending: false })
-                .limit(30);
-
-            if (hashErr || !data) {
-                setHashtagResults([]);
-                return;
-            }
-
-            // Count posts per hashtag
-            const hashtagIds = data.map((h: any) => h.id);
-            const { data: countData } = await supabase
-                .from('video_hashtags')
-                .select('hashtag_id')
-                .in('hashtag_id', hashtagIds);
-
-            const postCounts: Record<string, number> = {};
-            (countData ?? []).forEach((row: any) => {
-                postCounts[row.hashtag_id] = (postCounts[row.hashtag_id] || 0) + 1;
-            });
-
-            const mapped: HashtagResult[] = data.map((h: any) => {
-                const postCount = postCounts[h.id] || 0;
-                return {
-                    id: h.id,
-                    name: h.name,
-                    post_count: postCount,
-                    click_count: h.click_count || 0,
-                    search_count: h.search_count || 0,
-                    score: postCount * 1.0 + (h.click_count || 0) * 0.5 + (h.search_count || 0) * 0.3,
-                };
-            });
-            mapped.sort((a, b) => b.score - a.score);
-            setHashtagResults(mapped);
+            const results = await feedQueryServiceRef.current.searchHashtags(value, 30);
+            setHashtagResults(results);
         } catch {
             setHashtagResults([]);
         } finally {
@@ -431,8 +395,6 @@ export default function SearchScreen() {
         setIsCommittedSearch(false);
     };
 
-    const hashtagTrackingRef = useRef<SupabaseVideoDataSource | null>(null);
-
     const commitSearch = useCallback(
         (value: string, options?: { force?: boolean }) => {
             const trimmed = value.trim();
@@ -466,9 +428,8 @@ export default function SearchScreen() {
             // Track hashtag searches
             const hashtagMatches = trimmed.match(/#([^\s#]+)/g);
             if (hashtagMatches) {
-                if (!hashtagTrackingRef.current) hashtagTrackingRef.current = new SupabaseVideoDataSource();
                 hashtagMatches.forEach((tag) => {
-                    hashtagTrackingRef.current!.incrementHashtagSearch(tag.replace(/^#/, ''));
+                    feedQueryServiceRef.current.recordHashtagSearch(tag.replace(/^#/, ''));
                 });
             }
         },
@@ -493,8 +454,7 @@ export default function SearchScreen() {
             searchHashtags(tagQuery);
 
             // Track click
-            if (!hashtagTrackingRef.current) hashtagTrackingRef.current = new SupabaseVideoDataSource();
-            hashtagTrackingRef.current.incrementHashtagClick(hashtagName);
+            feedQueryServiceRef.current.recordHashtagClick(hashtagName);
         },
         [runPostSearch, runProfileSearch, searchHashtags]
     );

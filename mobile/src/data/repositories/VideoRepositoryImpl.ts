@@ -32,4 +32,20 @@ export class VideoRepositoryImpl implements IVideoRepository {
     async getVideosByIds(videoIds: string[], userId?: string): Promise<Video[]> {
         return this.dataSource.getVideosByIds(videoIds, userId);
     }
+
+    async getUserInteractionVideos(activityType: 'likes' | 'saved' | 'history', userId: string): Promise<Video[] | null> {
+        return this.dataSource.getUserInteractionVideos(activityType, userId);
+    }
+
+    async recordVideoView(
+        videoId: string,
+        userId: string,
+        options?: { cooldownMs?: number }
+    ): Promise<'inserted' | 'cooldown' | 'error'> {
+        return this.dataSource.recordVideoView(videoId, userId, options);
+    }
+
+    async incrementShareCount(videoId: string): Promise<void> {
+        await this.dataSource.incrementShareCount(videoId);
+    }
 }

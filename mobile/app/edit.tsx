@@ -18,21 +18,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X, Check } from 'lucide-react-native';
 import { useThemeStore } from '../src/presentation/store/useThemeStore';
 import { useAuthStore } from '../src/presentation/store/useAuthStore';
+import { getAccessToken } from '../src/presentation/store/getAccessToken';
 import { useVideoEditStore } from '../src/presentation/store/useVideoEditStore';
+import { FeedQueryService } from '../src/data/services/FeedQueryService';
 import { LIGHT_COLORS, DARK_COLORS } from '../src/core/constants';
-import { supabase } from '../src/core/supabase';
-import { logError, LogCode } from '../src/core/services/Logger';
 import { CONFIG } from '../src/core/config';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PREVIEW_WIDTH = SCREEN_WIDTH * 0.40;
-
-type EditVideoPayload = {
-    id: string;
-    user_id: string;
-    thumbnail_url: string | null;
-    description: string | null;
-};
 
 const normalizeParam = (value: string | string[] | undefined) => (
     Array.isArray(value) ? value[0] : value
@@ -47,6 +40,7 @@ export default function EditPostScreen() {
     const { isDark } = useThemeStore();
     const { user } = useAuthStore();
     const upsertDescription = useVideoEditStore((state) => state.upsertDescription);
+    const feedQueryServiceRef = useMemo(() => new FeedQueryService(), []);
     const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
 
     const [isLoading, setIsLoading] = useState(true);
@@ -74,35 +68,26 @@ export default function EditPostScreen() {
         setIsLoading(true);
         setError(null);
 
-        const { data, error: fetchError } = await supabase
-            .from('videos')
-            .select('id,user_id,thumbnail_url,description')
-            .eq('id', resolvedVideoId)
-            .is('deleted_at', null)
-            .single<EditVideoPayload>();
+        const data = await feedQueryServiceRef.getEditableVideo(resolvedVideoId);
 
-        if (fetchError || !data) {
-            logError(LogCode.DB_QUERY_ERROR, 'Edit video fetch failed', {
-                videoId: resolvedVideoId,
-                error: fetchError,
-            });
+        if (!data) {
             setError('Gönderi yüklenemedi.');
             setIsLoading(false);
             return;
         }
 
-        if (user?.id && data.user_id !== user.id) {
+        if (user?.id && data.userId !== user.id) {
             setError('Bu gönderiyi düzenleme yetkin bulunmuyor.');
             setIsLoading(false);
             return;
         }
 
-        const fetchedDescription = data.description || '';
-        setThumbnailUrl(data.thumbnail_url || null);
+        const fetchedDescription = data.description;
+        setThumbnailUrl(data.thumbnailUrl);
         setDescription(fetchedDescription);
         setInitialDescription(fetchedDescription);
         setIsLoading(false);
-    }, [resolvedVideoId, user?.id]);
+    }, [feedQueryServiceRef, resolvedVideoId, user?.id]);
 
     useEffect(() => {
         void fetchEditableVideo();
@@ -117,23 +102,9 @@ export default function EditPostScreen() {
 
         setIsSaving(true);
 
-        const { data: updatedVideo, error: updateError } = await supabase
-            .from('videos')
-            .update({
-                description,
-            })
-            .eq('id', resolvedVideoId)
-            .eq('user_id', user.id)
-            .is('deleted_at', null)
-            .select('id')
-            .single();
+        const updated = await feedQueryServiceRef.updateVideoDescription(resolvedVideoId, user.id, description);
 
-        if (updateError || !updatedVideo) {
-            logError(LogCode.DB_UPDATE, 'Edit video update failed', {
-                videoId: resolvedVideoId,
-                userId: user.id,
-                error: updateError,
-            });
+        if (!updated) {
             Alert.alert('Hata', 'Gönderi güncellenirken bir hata oluştu.');
             setIsSaving(false);
             return;
@@ -143,7 +114,7 @@ export default function EditPostScreen() {
         upsertDescription(resolvedVideoId, description);
         setIsSaving(false);
         router.back();
-    }, [description, hasUnsavedChanges, isSaving, resolvedVideoId, router, upsertDescription, user?.id]);
+    }, [description, feedQueryServiceRef, hasUnsavedChanges, isSaving, resolvedVideoId, router, upsertDescription, user?.id]);
 
     const handleOpenSubtitleEditor = useCallback(() => {
         if (!resolvedVideoId) return;
@@ -153,8 +124,7 @@ export default function EditPostScreen() {
     const handleGenerateSubtitles = useCallback(async () => {
         if (!resolvedVideoId) return;
         try {
-            const { data: { session } } = await supabase.auth.getSession();
-            const accessToken = session?.access_token;
+            const accessToken = await getAccessToken();
             if (!accessToken) {
                 throw new Error('Lütfen tekrar giriş yapın.');
             }
