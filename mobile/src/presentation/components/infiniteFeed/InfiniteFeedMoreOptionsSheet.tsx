@@ -1,4 +1,4 @@
-﻿import React, { forwardRef, useMemo } from 'react';
+import React, { forwardRef, useMemo } from 'react';
 import { BottomSheetModal } from '@gorhom/bottom-sheet';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import {
@@ -115,7 +115,7 @@ export const InfiniteFeedMoreOptionsSheet = forwardRef<BottomSheetModal, Infinit
                         activeLabel={
                             subtitleMode === 'always'
                                 ? 'Her Zaman'
-                                : subtitleMode === 'video'
+                                : subtitleMode === 'on'
                                     ? 'Açık'
                                     : 'Kapalı'
                         }
@@ -123,13 +123,11 @@ export const InfiniteFeedMoreOptionsSheet = forwardRef<BottomSheetModal, Infinit
                             if (!onSubtitleModeChange) return;
                             if (label === 'Her Zaman') {
                                 onSubtitleModeChange('always');
-                                return;
+                            } else if (label === 'Açık') {
+                                onSubtitleModeChange('on');
+                            } else {
+                                onSubtitleModeChange('off');
                             }
-                            if (label === 'Açık') {
-                                onSubtitleModeChange('video');
-                                return;
-                            }
-                            onSubtitleModeChange('off');
                         }}
                         options={['Kapalı', 'Açık', 'Her Zaman']}
                         isDark={modalTheme.isDark}

@@ -153,9 +153,18 @@ export default function EditPostScreen() {
     const handleGenerateSubtitles = useCallback(async () => {
         if (!resolvedVideoId) return;
         try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const accessToken = session?.access_token;
+            if (!accessToken) {
+                throw new Error('Lütfen tekrar giriş yapın.');
+            }
+
             const response = await fetch(`${CONFIG.API_URL}/videos/${resolvedVideoId}/subtitles/generate`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${accessToken}`,
+                },
                 body: JSON.stringify({ language: 'auto' }),
             });
             if (!response.ok) {

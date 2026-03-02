@@ -689,6 +689,7 @@ export default function UploadComposerScreen() {
 
     const handleRemoveSubtitlesForUri = useCallback((uri: string) => {
         removeSubtitleData(uri);
+        setSubtitleLanguage('none');
         setCaptionRequestedByUri((prev) => ({ ...prev, [uri]: false }));
         setIsDraggingSubtitle(false);
         setIsEditingSubtitle(false);

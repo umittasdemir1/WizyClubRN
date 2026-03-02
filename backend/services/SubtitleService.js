@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { SpeechClient } = require('@google-cloud/speech').v2;
+const { SUBTITLE_SEGMENT_DURATION_MS } = require('../config/constants');
 
 // ──────────────────────────────────────────────
 // Fallback logger (same pattern as HlsService)
@@ -158,7 +159,13 @@ class SubtitleService {
                             const segmentDuration = currentSegment.endMs - currentSegment.startMs;
                             const endsWithPunctuation = /[.!?]$/.test(word.word);
 
-                            if (segmentDuration >= 3000 || (segmentDuration >= 1500 && endsWithPunctuation)) {
+                            if (
+                                segmentDuration >= SUBTITLE_SEGMENT_DURATION_MS
+                                || (
+                                    segmentDuration >= (SUBTITLE_SEGMENT_DURATION_MS / 2)
+                                    && endsWithPunctuation
+                                )
+                            ) {
                                 segments.push({
                                     startMs: currentSegment.startMs,
                                     endMs: currentSegment.endMs,
@@ -261,7 +268,7 @@ class SubtitleService {
                     video_id: videoId,
                     language: languageCode,
                     status: 'completed',
-                    segments: JSON.stringify(segments),
+                    segments,
                     error_message: null,
                     updated_at: new Date().toISOString(),
                 }, { onConflict: 'video_id,language' });

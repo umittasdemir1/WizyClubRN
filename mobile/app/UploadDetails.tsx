@@ -265,7 +265,7 @@ export default function UploadDetailsScreen() {
     const borderColor = modalTheme.sheetBorder;
     const inputBg = modalTheme.inputBackground;
     const formatButtonBorderColor = '#FFFFFF';
-    const selectedFormatButtonBg = inputBg;
+    const selectedFormatButtonBg = '#FFFFFF';
     const selectedFormatButtonBorder = '#FFFFFF';
     const topicTags = useMemo(() => extractTopicTags(description), [description]);
     const taggedPeople = draft?.taggedPeople ?? draft?.editTaggedPeople ?? [];
@@ -709,12 +709,40 @@ export default function UploadDetailsScreen() {
             }
 
             const isCommercial = commercialType ? commercialType !== 'İş Birliği İçermiyor' : false;
+            const editVideoUri = draft.editVideoUrl;
+            const editedSubtitleEntry = editVideoUri ? subtitleCache[editVideoUri] : null;
+            const editedSubtitlePresentation = editVideoUri
+                ? (subtitlePresentationCache[editVideoUri] || null)
+                : null;
+            const editedSubtitleStyle = editVideoUri
+                ? (subtitleStyleCache[editVideoUri] || null)
+                : null;
+            const shouldDeleteSubtitles = isEditMode && draft.subtitleLanguage === 'none';
+            const shouldUpdateSubtitles = Boolean(
+                !shouldDeleteSubtitles &&
+                editVideoUri &&
+                editedSubtitleEntry?.segments?.length
+            );
+            const subtitlePatchPayload = shouldDeleteSubtitles
+                ? {
+                    subtitleOperation: 'delete',
+                }
+                : (shouldUpdateSubtitles && editedSubtitleEntry)
+                    ? {
+                        subtitleOperation: 'update',
+                        subtitleLanguage: draft.subtitleLanguage || 'auto',
+                        subtitleSegments: editedSubtitleEntry.segments,
+                        subtitlePresentation: editedSubtitlePresentation,
+                        subtitleStyle: editedSubtitleStyle,
+                    }
+                    : {};
 
             const body: Record<string, any> = {
                 description,
                 commercialType: commercialType || null,
                 isCommercial,
                 tags: topicTags,
+                ...subtitlePatchPayload,
             };
 
             if (commercialType && commercialType !== 'İş Birliği İçermiyor' && commercialType !== 'Kendi Markam') {
@@ -879,7 +907,7 @@ export default function UploadDetailsScreen() {
                                 ]}
                                 onPress={() => handleApplyDescriptionStyle('b')}
                             >
-                                <Text style={[styles.formatButtonText, { color: textColor, fontWeight: '700' }]}>B</Text>
+                                <Text style={[styles.formatButtonText, { color: formatButtonState.bold ? bgColor : textColor, fontWeight: '700' }]}>B</Text>
                             </Pressable>
                             <Pressable
                                 style={[
@@ -892,7 +920,7 @@ export default function UploadDetailsScreen() {
                                 ]}
                                 onPress={() => handleApplyDescriptionStyle('i')}
                             >
-                                <Text style={[styles.formatButtonText, { color: textColor, fontStyle: 'italic' }]}>I</Text>
+                                <Text style={[styles.formatButtonText, { color: formatButtonState.italic ? bgColor : textColor, fontStyle: 'italic' }]}>I</Text>
                             </Pressable>
                             <Pressable
                                 style={[
@@ -905,7 +933,7 @@ export default function UploadDetailsScreen() {
                                 ]}
                                 onPress={() => handleApplyDescriptionStyle('u')}
                             >
-                                <Text style={[styles.formatButtonText, { color: textColor, textDecorationLine: 'underline' }]}>U</Text>
+                                <Text style={[styles.formatButtonText, { color: formatButtonState.underline ? bgColor : textColor, textDecorationLine: 'underline' }]}>U</Text>
                             </Pressable>
                         </View>
                         {topicTags.length < 5 ? (

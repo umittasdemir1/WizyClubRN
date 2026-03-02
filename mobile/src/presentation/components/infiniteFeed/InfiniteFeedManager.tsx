@@ -130,10 +130,8 @@ export function InfiniteFeedManager({
     const { stories: storyListData } = useStories(undefined, 'infinite');
     const isInAppBrowserVisible = useInAppBrowserStore((state) => state.isVisible);
     const openInAppBrowser = useInAppBrowserStore((state) => state.openUrl);
-    const subtitleAlwaysEnabled = useSubtitlePreferencesStore((state) => state.alwaysEnabled);
-    const subtitleVideoEnabledById = useSubtitlePreferencesStore((state) => state.videoEnabledById);
-    const subtitlePreferencesRevision = useSubtitlePreferencesStore((state) => state.revision);
-    const setSubtitleSelectionForVideo = useSubtitlePreferencesStore((state) => state.setSelectionForVideo);
+    const subtitleMode = useSubtitlePreferencesStore((state) => state.mode);
+    const setSubtitleMode = useSubtitlePreferencesStore((state) => state.setMode);
     const uploadStatus = useUploadStore((state) => state.status);
     const uploadedVideoId = useUploadStore((state) => state.uploadedVideoId);
     const taggedPeoplePreview = useUploadStore((state) => state.taggedPeoplePreview);
@@ -213,8 +211,7 @@ export function InfiniteFeedManager({
     const currentUserIdRef = useRef(currentUserId);
     const isMutedRef = useRef(isMuted);
     const netInfoTypeRef = useRef(netInfo.type);
-    const subtitleAlwaysEnabledRef = useRef(subtitleAlwaysEnabled);
-    const subtitleVideoEnabledByIdRef = useRef(subtitleVideoEnabledById);
+    const subtitleModeRef = useRef(subtitleMode);
     const activeStoryUserIdsRef = useRef<Set<string>>(new Set());
     const effectivePendingInlineIdRef = useRef<string | null>(null);
     const effectivePendingInlineIndexRef = useRef<number>(0);
@@ -555,21 +552,14 @@ export function InfiniteFeedManager({
         handleOpenProfile(targetUserId);
     }, [handleOpenProfile, selectedMoreVideoId, videos]);
 
-    const subtitleModeForMoreOptions = useMemo<SubtitlePreferenceMode>(() => {
-        if (!selectedMoreVideoId) return subtitleAlwaysEnabled ? 'always' : 'off';
-        if (subtitleAlwaysEnabled) return 'always';
-        return subtitleVideoEnabledById[selectedMoreVideoId] ? 'video' : 'off';
-    }, [selectedMoreVideoId, subtitleAlwaysEnabled, subtitleVideoEnabledById]);
-
     const shouldShowSubtitleOptionInMoreSheet = useMemo(() => {
         if (!selectedMoreVideoId) return false;
         return Boolean(subtitleAvailabilityByVideoId[selectedMoreVideoId]?.hasSubtitles);
     }, [selectedMoreVideoId, subtitleAvailabilityByVideoId]);
 
     const handleMoreSheetSubtitleModeChange = useCallback((mode: SubtitlePreferenceMode) => {
-        if (!selectedMoreVideoId) return;
-        setSubtitleSelectionForVideo(selectedMoreVideoId, mode);
-    }, [selectedMoreVideoId, setSubtitleSelectionForVideo]);
+        setSubtitleMode(mode);
+    }, [setSubtitleMode]);
 
     const storyUsers = useMemo(() => {
         return storyListData.reduce((acc: any[], story) => {
@@ -1109,8 +1099,7 @@ export function InfiniteFeedManager({
         currentUserIdRef.current = currentUserId;
         isMutedRef.current = isMuted;
         netInfoTypeRef.current = netInfo.type;
-        subtitleAlwaysEnabledRef.current = subtitleAlwaysEnabled;
-        subtitleVideoEnabledByIdRef.current = subtitleVideoEnabledById;
+        subtitleModeRef.current = subtitleMode;
         activeStoryUserIdsRef.current = activeStoryUserIds;
     });
 
@@ -1128,9 +1117,7 @@ export function InfiniteFeedManager({
         const browserVisible = isInAppBrowserVisible;
         const pausedByLifecycle = globalIsPaused || !isScreenFocused || !isRouteFocused;
         const networkType = (netInfoTypeRef.current ?? null) as NetInfoStateType | null;
-        const shouldShowSubtitle =
-            subtitleAlwaysEnabledRef.current ||
-            Boolean(subtitleVideoEnabledByIdRef.current[item.id]);
+        const shouldShowSubtitle = subtitleMode !== 'off';
 
         const pendingIdx = effectivePendingInlineIndexRef.current;
         const pendingId = effectivePendingInlineIdRef.current;
@@ -1184,6 +1171,7 @@ export function InfiniteFeedManager({
         isInAppBrowserVisible,
         isRouteFocused,
         isScreenFocused,
+        subtitleMode, // Dependency eklendi
     ]);
 
     // Active item changes when card visibility crosses threshold
@@ -1314,8 +1302,8 @@ export function InfiniteFeedManager({
         activeInlineId,
         isMuted,
         playbackPauseGate,
-        subtitlePreferencesRevision,
-    }), [activeInlineId, isMuted, playbackPauseGate, subtitlePreferencesRevision]);
+        subtitleMode,
+    }), [activeInlineId, isMuted, playbackPauseGate, subtitleMode]);
 
     const listEmpty = (
         <View style={styles.emptyState}>
@@ -1398,7 +1386,7 @@ export function InfiniteFeedManager({
                     onEndReachedThreshold={0.6}
                     ListFooterComponent={
                         isLoadingMore ? (
-                            <ThinSpinner size={32} color={themeColors.textPrimary} style={styles.footerLoader} />
+                            <ThinSpinner size={48} color={themeColors.textPrimary} style={styles.footerLoader} />
                         ) : null
                     }
                     ListEmptyComponent={listEmpty}
@@ -1435,7 +1423,7 @@ export function InfiniteFeedManager({
                         onShowMorePress={handleMoreSheetShowMore}
                         onAboutAccountPress={handleMoreSheetAboutAccount}
                         showSubtitleOption={shouldShowSubtitleOptionInMoreSheet}
-                        subtitleMode={subtitleModeForMoreOptions}
+                        subtitleMode={subtitleMode}
                         onSubtitleModeChange={handleMoreSheetSubtitleModeChange}
                         isFollowingCreator={isFollowingMoreOptionsVideo}
                         onSheetStateChange={setIsMoreSheetOpen}

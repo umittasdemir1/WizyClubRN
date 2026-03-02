@@ -33,6 +33,7 @@ export const styles = StyleSheet.create({
     },
     footerLoader: {
         paddingVertical: 20,
+        alignSelf: 'center',
     },
     statusBarOverlay: {
         position: 'absolute',

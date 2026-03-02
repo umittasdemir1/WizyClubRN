@@ -148,8 +148,7 @@ export const PoolFeedActiveVideoOverlay = memo(function PoolFeedActiveVideoOverl
     const [activeSubtitleText, setActiveSubtitleText] = React.useState<string | null>(null);
     const [currentTimeSec, setCurrentTimeSec] = React.useState(0);
     const [subtitleLayoutBounds, setSubtitleLayoutBounds] = React.useState({ width: 0, height: 0 });
-    const subtitleAlwaysEnabled = useSubtitlePreferencesStore((state) => state.alwaysEnabled);
-    const subtitleVideoEnabledById = useSubtitlePreferencesStore((state) => state.videoEnabledById);
+    const subtitleMode = useSubtitlePreferencesStore((state) => state.mode);
 
     // Native Thread Delay Logic
     // 0 = Hidden, 1 = Visible
@@ -169,7 +168,7 @@ export const PoolFeedActiveVideoOverlay = memo(function PoolFeedActiveVideoOverl
     const showUiOverlays = !isCleanScreen;
     const showTapIndicator = !!tapIndicator && !hasError;
     const showSeekBar = isPlayable;
-    const shouldShowSubtitlePreference = subtitleAlwaysEnabled || Boolean(subtitleVideoEnabledById[video.id]);
+    const shouldShowSubtitlePreference = subtitleMode !== 'off';
     const subtitleBottomOffset = Math.max(170, insets.bottom + 150);
     const { subtitles, getActiveSubtitle } = useSubtitles(shouldShowSubtitlePreference ? video.id : undefined);
     const subtitlePresentationStyle = React.useMemo(() => {

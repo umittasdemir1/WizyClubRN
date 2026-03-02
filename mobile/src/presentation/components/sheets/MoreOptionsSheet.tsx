@@ -1,4 +1,4 @@
-﻿import React, { forwardRef, useMemo } from 'react';
+import React, { forwardRef, useMemo } from 'react';
 import { BottomSheetModal } from '@gorhom/bottom-sheet';
 import {
     MessageSquareWarning,
@@ -16,6 +16,7 @@ import { useActiveVideoStore } from '../../store/useActiveVideoStore';
 import { useSurfaceTheme } from '../../hooks/useSurfaceTheme';
 import { FeedMoreOptionsSheetBase } from './FeedMoreOptionsSheetBase';
 import { FeedMoreOptionItem, FeedMoreSegmentedItem } from './FeedMoreOptionsSheetItems';
+import { SubtitlePreferenceMode } from '../../store/useSubtitlePreferencesStore';
 import ClosedCaptionsDarkIcon from '../../../../assets/icons/closed-captions-dark.svg';
 import ClosedCaptionsLightIcon from '../../../../assets/icons/closed-captions-light.svg';
 
@@ -24,8 +25,8 @@ interface MoreOptionsSheetProps {
     onEditPress?: () => void;
     onDeletePress?: () => void;
     showSubtitleOption?: boolean;
-    subtitleMode?: 'off' | 'video' | 'always';
-    onSubtitleModeChange?: (mode: 'off' | 'video' | 'always') => void;
+    subtitleMode?: SubtitlePreferenceMode;
+    onSubtitleModeChange?: (mode: SubtitlePreferenceMode) => void;
     isCleanScreen?: boolean;
 }
 
@@ -119,7 +120,7 @@ export const MoreOptionsSheet = forwardRef<BottomSheetModal, MoreOptionsSheetPro
                         activeLabel={
                             subtitleMode === 'always'
                                 ? 'Her Zaman'
-                                : subtitleMode === 'video'
+                                : subtitleMode === 'on'
                                     ? 'Açık'
                                     : 'Kapalı'
                         }
@@ -127,13 +128,11 @@ export const MoreOptionsSheet = forwardRef<BottomSheetModal, MoreOptionsSheetPro
                             if (!onSubtitleModeChange) return;
                             if (label === 'Her Zaman') {
                                 onSubtitleModeChange('always');
-                                return;
+                            } else if (label === 'Açık') {
+                                onSubtitleModeChange('on');
+                            } else {
+                                onSubtitleModeChange('off');
                             }
-                            if (label === 'Açık') {
-                                onSubtitleModeChange('video');
-                                return;
-                            }
-                            onSubtitleModeChange('off');
                         }}
                         options={['Kapalı', 'Açık', 'Her Zaman']}
                         isDark={isDark}

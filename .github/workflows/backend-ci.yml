@@ -1,0 +1,116 @@
+name: Backend CI
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-ci.yml'
+  push:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend-tests:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm ci
+
+      - name: Run backend test suites
+        run: npm run test:all
+
+  backend-smoke:
+    name: Backend Smoke
+    runs-on: ubuntu-latest
+    needs: backend-tests
+    if: github.event_name != 'pull_request'
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+      R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+      GOOGLE_CLOUD_PROJECT_ID: ${{ secrets.GOOGLE_CLOUD_PROJECT_ID }}
+      GOOGLE_CLOUD_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CLOUD_CREDENTIALS_JSON }}
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check required smoke secrets
+        id: smoke_secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(SUPABASE_URL R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_BUCKET_NAME R2_PUBLIC_URL)
+          missing=()
+
+          if [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ] && [ -z "${SUPABASE_KEY:-}" ]; then
+            missing+=("SUPABASE_SERVICE_ROLE_KEY|SUPABASE_KEY")
+          fi
+
+          for name in "${required[@]}"; do
+            if [ -z "${!name:-}" ]; then
+              missing+=("$name")
+            fi
+          done
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "Missing smoke secrets: ${missing[*]}"
+            exit 0
+          fi
+
+          echo "available=true" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node.js
+        if: steps.smoke_secrets.outputs.available == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        if: steps.smoke_secrets.outputs.available == 'true'
+        run: npm ci
+
+      - name: Write Google credentials file
+        if: steps.smoke_secrets.outputs.available == 'true' && env.GOOGLE_CLOUD_CREDENTIALS_JSON != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "$GOOGLE_CLOUD_CREDENTIALS_JSON" > google-credentials.json
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$PWD/google-credentials.json" >> "$GITHUB_ENV"
+
+      - name: Run backend smoke checks
+        if: steps.smoke_secrets.outputs.available == 'true'
+        run: npm run smoke
+
+      - name: Skip smoke checks when secrets are missing
+        if: steps.smoke_secrets.outputs.available != 'true'
+        run: echo "Skipping smoke checks because required backend secrets are not configured."
