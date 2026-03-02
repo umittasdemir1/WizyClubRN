@@ -69,6 +69,7 @@ Bu dosya, projede yer alan tum dokumanlari listeler.
 - [55 - Feed Video Hard Cleanup Refactor.md](dev-logs/55 - Feed Video Hard Cleanup Refactor.md)
 - [56 - Feed Video Hard Cleanup Refactor Tr.md](dev-logs/56 - Feed Video Hard Cleanup Refactor Tr.md)
 - [57 - Feed Video Hard Cleanup Refactor Todo.md](dev-logs/57 - Feed Video Hard Cleanup Refactor Todo.md)
+- [58 - 2026 03 02 Backend Refactor ve CI Tamamlama Raporu.md](dev-logs/58 - 2026 03 02 Backend Refactor ve CI Tamamlama Raporu.md)
 - [6 - Performance Analysis.md](dev-logs/6 - Performance Analysis.md)
 
 ## features
@@ -116,4 +117,3 @@ Bu dosya, projede yer alan tum dokumanlari listeler.
 - [POOL_COMPATIBILITY_INVESTIGATION.md](research/POOL_COMPATIBILITY_INVESTIGATION.md)
 - [POOL_COMPATIBILITY_INVESTIGATION_TODO.md](research/POOL_COMPATIBILITY_INVESTIGATION_TODO.md)
 - [POOL_COMPATIBILITY_INVESTIGATION_TR.md](research/POOL_COMPATIBILITY_INVESTIGATION_TR.md)
-
