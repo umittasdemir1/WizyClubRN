@@ -405,7 +405,7 @@ export function InfiniteFeedManager({
         let editTags: string[] = [];
         try {
             editTags = await feedQueryServiceRef.current.getVideoHashtags(targetId);
-        } catch {}
+        } catch { }
 
         // Map tagged people to UploadComposerTaggedUser format
         const editTaggedPeople = (selectedVideo.taggedPeople ?? []).map((p) => ({
@@ -436,7 +436,7 @@ export function InfiniteFeedManager({
                     if (sub?.segments) {
                         let parsed = sub.segments;
                         if (typeof parsed === 'string') {
-                            try { parsed = JSON.parse(parsed); } catch {}
+                            try { parsed = JSON.parse(parsed); } catch { }
                         }
                         const segments = Array.isArray(parsed?.segments) ? parsed.segments : (Array.isArray(parsed) ? parsed : []);
                         const presentation = parsed?.presentation || null;
@@ -450,7 +450,7 @@ export function InfiniteFeedManager({
                         }
                     }
                 }
-            } catch {}
+            } catch { }
         }
 
         useUploadComposerStore.getState().setDraft({
@@ -887,11 +887,17 @@ export function InfiniteFeedManager({
             const memoryCached = VideoCacheService.getMemoryCachedPath(activeVideoUrl);
             if (memoryCached) {
                 setResolvedSourceForId(activeVideo.id, memoryCached);
+                // Active video already cached — allow full prefetch for upcoming videos
+                prefetchService.resumeAfterActiveVideo();
             } else {
+                // Active video loading from network — throttle prefetch to prioritize playback
+                prefetchService.pauseForActiveVideo();
                 const previousResolved = resolvedVideoSourcesRef.current[activeVideo.id] ?? null;
                 const hasResolvedFallback = Boolean(previousResolved);
                 prefetchService.cacheVideoNow(activeVideoUrl)
                     .then((cachedPath) => {
+                        // Active video cached — restore full prefetch bandwidth
+                        prefetchService.resumeAfterActiveVideo();
                         if (cachedPath) {
                             resolveIfCurrent(cachedPath);
                             return;
@@ -907,6 +913,7 @@ export function InfiniteFeedManager({
                         });
                     })
                     .catch(() => {
+                        prefetchService.resumeAfterActiveVideo();
                         if (!hasResolvedFallback) {
                             setResolvedSourceForId(activeVideo.id, null);
                         }

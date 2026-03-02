@@ -1,11 +1,14 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import { SystemBars } from 'react-native-edge-to-edge';
 import { useActiveVideoStore } from '../../../store/useActiveVideoStore';
 import { FeedPrefetchService } from '../../../../data/services/FeedPrefetchService';
 import { FeedQueryService } from '../../../../data/services/FeedQueryService';
+import { UploadFlowTelemetryService } from '../../../../data/services/UploadFlowTelemetryService';
 import { logUI, LogCode } from '@/core/services/Logger';
 import { Video } from '../../../../domain/entities/Video';
+import type { UploadedVideoPayload } from '../../../store/useUploadStore';
 
 interface LifecycleSyncOptions {
     videos: Video[];
@@ -18,8 +21,10 @@ interface LifecycleSyncOptions {
     isInAppBrowserVisible: boolean;
     netInfo: any;
     uploadedVideoId: string | null;
+    uploadedVideoPayload: UploadedVideoPayload | null;
     uploadStatus: string;
     resetUpload: () => void;
+    tryConsumeUploadSuccess: (videoId: string) => boolean;
     prependVideo?: (video: Video) => void;
     setActiveVideo: (id: string | null, index: number) => void;
     togglePause: () => void;
@@ -44,8 +49,10 @@ export function usePoolFeedLifecycleSync(options: LifecycleSyncOptions) {
         isInAppBrowserVisible,
         netInfo,
         uploadedVideoId,
+        uploadedVideoPayload,
         uploadStatus,
         resetUpload,
+        tryConsumeUploadSuccess,
         prependVideo,
         setActiveVideo,
         togglePause,
@@ -62,6 +69,7 @@ export function usePoolFeedLifecycleSync(options: LifecycleSyncOptions) {
     const wasPlayingBeforeBackgroundRef = useRef(false);
     const wasPlayingBeforeBlurRef = useRef(false);
     const feedQueryServiceRef = useRef(new FeedQueryService());
+    const isRouteFocused = useIsFocused();
 
     // 1. Keep videosRef in sync
     useEffect(() => {
@@ -173,23 +181,53 @@ export function usePoolFeedLifecycleSync(options: LifecycleSyncOptions) {
 
     // 10. Handle upload success
     useEffect(() => {
-        if (uploadedVideoId && uploadStatus === 'success' && prependVideo) {
-            const handleUploadSuccess = async () => {
-                const newVideo = await feedQueryServiceRef.current.waitForVideoForFeed(uploadedVideoId, {
-                    attempts: 5,
-                    delayMs: 120,
-                });
-
-                if (newVideo) {
-                    prependVideo(newVideo);
-                    setTimeout(() => {
-                        listRef.current?.scrollToIndex({ index: 0, animated: false });
-                        setActiveVideo(uploadedVideoId, 0);
-                    }, 100);
-                    resetUpload();
-                }
-            };
-            handleUploadSuccess();
+        if (!isRouteFocused || !uploadedVideoId || uploadStatus !== 'success' || !prependVideo) return;
+        if (!tryConsumeUploadSuccess(uploadedVideoId)) {
+            return;
         }
-    }, [uploadedVideoId, uploadStatus, prependVideo, setActiveVideo, resetUpload]);
+
+        const handleUploadSuccess = async () => {
+            const immediateVideo = feedQueryServiceRef.current.mapUploadedVideoForFeed(uploadedVideoPayload);
+            const newVideo = immediateVideo || await feedQueryServiceRef.current.waitForUploadedVideo(uploadedVideoId);
+
+            if (newVideo) {
+                prependVideo(newVideo);
+                setTimeout(() => {
+                    listRef.current?.scrollToIndex({ index: 0, animated: false });
+                    setActiveVideo(uploadedVideoId, 0);
+                }, 100);
+                resetUpload();
+                return;
+            }
+
+            const existingIndex = videosRef.current.findIndex((video) => video.id === uploadedVideoId);
+            if (existingIndex >= 0) {
+                UploadFlowTelemetryService.record({
+                    name: 'refresh_skipped',
+                    code: LogCode.VIDEO_UPLOAD_REFRESH_SKIPPED,
+                    message: 'Pool feed refresh skipped because video already exists in feed',
+                    videoId: uploadedVideoId,
+                    details: {
+                        existingIndex,
+                    },
+                });
+                setTimeout(() => {
+                    listRef.current?.scrollToIndex({ index: existingIndex, animated: false });
+                    setActiveVideo(uploadedVideoId, existingIndex);
+                }, 100);
+            }
+
+            resetUpload();
+        };
+        void handleUploadSuccess();
+    }, [
+        isRouteFocused,
+        uploadedVideoId,
+        uploadedVideoPayload,
+        uploadStatus,
+        prependVideo,
+        resetUpload,
+        setActiveVideo,
+        tryConsumeUploadSuccess,
+    ]);
 }

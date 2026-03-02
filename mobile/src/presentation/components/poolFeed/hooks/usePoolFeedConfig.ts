@@ -12,6 +12,7 @@
  */
 
 import { Dimensions } from 'react-native';
+import { FEED_DATA_CONFIG } from '../../../config/feedDataConfig';
 
 // ============================================================================
 // FEED FLAGS - Normalized UI Control System
@@ -138,11 +139,11 @@ export const FEED_CONFIG = {
     /** Auto-advance threshold in "fast" viewing mode (seconds) */
     FAST_MODE_AUTO_ADVANCE_THRESHOLD: 10,
 
-    /** Number of videos to prefetch ahead of current position */
-    PREFETCH_AHEAD_COUNT: 3,
+    /** Number of videos to prefetch ahead of current position (from central config) */
+    PREFETCH_AHEAD_COUNT: FEED_DATA_CONFIG.PREFETCH_AHEAD_COUNT,
 
-    /** Number of videos to prefetch behind current position */
-    PREFETCH_BEHIND_COUNT: 1,
+    /** Number of videos to prefetch behind current position (from central config) */
+    PREFETCH_BEHIND_COUNT: FEED_DATA_CONFIG.PREFETCH_BEHIND_COUNT,
 
     /** Number of UI overlays to pre-mount ahead of current position */
     UI_PRELOAD_AHEAD_COUNT: 2,

@@ -4,6 +4,8 @@ import { Story } from '../../domain/entities/Story';
 import { User } from '../../domain/entities/User';
 import { supabase } from '../../core/supabase';
 import { LogCode, logData, logError } from '@/core/services/Logger';
+import { RpcFallbackTelemetryService } from '../services/RpcFallbackTelemetryService';
+import type { UploadedVideoPayload } from '../../presentation/store/useUploadStore';
 
 // User mapping - converts user_id to display info
 const USER_MAP: Record<string, { displayName: string; avatar: string }> = {
@@ -262,6 +264,16 @@ export class SupabaseVideoDataSource {
         cursor?: VideoFeedCursor | null
     ): Promise<VideoFeedResult | null> {
         if (!this.canUseFeedReadModel(userId, authorId, cursor)) {
+            RpcFallbackTelemetryService.record({
+                rpcName: 'get_feed_page_v1',
+                fallbackPath: 'videos_select_plus_hydration',
+                reason: 'unsupported_input',
+                userIdPresent: !!userId,
+                details: {
+                    hasAuthorId: !!authorId,
+                    hasCursor: !!cursor,
+                },
+            });
             return null;
         }
 
@@ -274,6 +286,19 @@ export class SupabaseVideoDataSource {
         });
 
         if (error) {
+            const reason = error.code === '42883' ? 'rpc_missing' : 'rpc_error';
+            RpcFallbackTelemetryService.record({
+                rpcName: 'get_feed_page_v1',
+                fallbackPath: 'videos_select_plus_hydration',
+                reason,
+                errorCode: error.code,
+                userIdPresent: !!userId,
+                details: {
+                    hasAuthorId: !!authorId,
+                    hasCursor: !!cursor,
+                },
+            });
+
             if (error.code !== '42883') {
                 logError(LogCode.DB_QUERY_ERROR, 'Feed read model RPC unavailable, falling back to legacy queries', {
                     error,
@@ -327,6 +352,18 @@ export class SupabaseVideoDataSource {
         });
 
         if (error) {
+            const reason = error.code === '42883' ? 'rpc_missing' : 'rpc_error';
+            RpcFallbackTelemetryService.record({
+                rpcName: 'get_user_interaction_v1',
+                fallbackPath: 'interaction_table_then_getVideosByIds',
+                reason,
+                errorCode: error.code,
+                userIdPresent: !!userId,
+                details: {
+                    activityType,
+                },
+            });
+
             if (error.code !== '42883') {
                 logError(LogCode.DB_QUERY_ERROR, 'User interaction RPC unavailable, falling back to legacy queries', {
                     activityType,
@@ -374,16 +411,26 @@ export class SupabaseVideoDataSource {
     async getStories(userId?: string): Promise<Story[]> {
         const now = new Date().toISOString();
 
-        const storiesResult = await supabase
-            .from('stories')
-            .select('*, profiles(*), post_tags(*, profiles(*))')
-            .is('deleted_at', null)
-            .gt('expires_at', now)
-            .order('created_at', { ascending: false })
-            .limit(50);
+        let storiesResult;
+        try {
+            storiesResult = await supabase
+                .from('stories')
+                .select('*, profiles(*), post_tags(*, profiles(*))')
+                .is('deleted_at', null)
+                .gt('expires_at', now)
+                .order('created_at', { ascending: false })
+                .limit(50);
+        } catch (e) {
+            logError(LogCode.DB_QUERY_ERROR, 'Stories fetch threw unexpectedly', { error: e });
+            return [];
+        }
 
         if (storiesResult.error) {
-            logError(LogCode.DB_QUERY_ERROR, 'Supabase stories fetch error', storiesResult.error);
+            logError(LogCode.DB_QUERY_ERROR, 'Supabase stories fetch error', {
+                code: storiesResult.error.code,
+                message: storiesResult.error.message,
+                hint: (storiesResult.error as any).hint,
+            });
             return [];
         }
 
@@ -635,6 +682,53 @@ export class SupabaseVideoDataSource {
         return data as Array<{ id: string; thumbnail_url: string | null; deleted_at: string | null }>;
     }
 
+    mapUploadPayloadToVideo(payload: UploadedVideoPayload): Video | null {
+        if (!payload?.id || !payload?.user_id || !payload?.video_url) {
+            return null;
+        }
+
+        return this.mapToVideo({
+            id: payload.id,
+            user_id: payload.user_id,
+            video_url: payload.video_url,
+            thumbnail_url: payload.thumbnail_url || '',
+            description: payload.description || '',
+            likes_count: payload.likes_count || 0,
+            views_count: payload.views_count || 0,
+            shares_count: payload.shares_count || 0,
+            saves_count: payload.saves_count || 0,
+            shops_count: payload.shops_count || 0,
+            created_at: payload.created_at || new Date().toISOString(),
+            sprite_url: payload.sprite_url || undefined,
+            width: payload.width || undefined,
+            height: payload.height || undefined,
+            is_commercial: payload.is_commercial || undefined,
+            brand_name: payload.brand_name || undefined,
+            brand_url: payload.brand_url || undefined,
+            commercial_type: payload.commercial_type || undefined,
+            media_urls: Array.isArray(payload.media_urls) ? payload.media_urls : undefined,
+            post_type: payload.post_type,
+            profiles: payload.profiles ? {
+                username: payload.profiles.username || '',
+                full_name: payload.profiles.full_name || '',
+                avatar_url: payload.profiles.avatar_url || '',
+                country: payload.profiles.country || '',
+                age: payload.profiles.age || 0,
+                bio: payload.profiles.bio || '',
+                is_verified: !!payload.profiles.is_verified,
+                shop_enabled: payload.profiles.shop_enabled,
+                followers_count: payload.profiles.followers_count || 0,
+                following_count: payload.profiles.following_count || 0,
+                posts_count: payload.profiles.posts_count || 0,
+                instagram_url: payload.profiles.instagram_url,
+                tiktok_url: payload.profiles.tiktok_url,
+                youtube_url: payload.profiles.youtube_url,
+                x_url: payload.profiles.x_url,
+                website: payload.profiles.website,
+            } : undefined,
+        });
+    }
+
     private mapToVideo(dto: SupabaseVideo, interactions?: { isLiked: boolean; isSaved: boolean; isFollowing: boolean }): Video {
         return {
             id: dto.id,
@@ -653,18 +747,18 @@ export class SupabaseVideoDataSource {
             savesCount: dto.saves_count || 0,
             user: dto.profiles ? {
                 id: dto.user_id,
-                username: dto.profiles.username,
-                fullName: dto.profiles.full_name,
-                avatarUrl: dto.profiles.avatar_url,
+                username: dto.profiles.username || '',
+                fullName: dto.profiles.full_name || '',
+                avatarUrl: dto.profiles.avatar_url || '',
                 country: dto.profiles.country,
                 age: dto.profiles.age,
                 bio: dto.profiles.bio,
                 website: dto.profiles.website,
-                isVerified: dto.profiles.is_verified,
-                shopEnabled: dto.profiles.shop_enabled,
-                followersCount: dto.profiles.followers_count,
-                followingCount: dto.profiles.following_count,
-                postsCount: dto.profiles.posts_count,
+                isVerified: dto.profiles.is_verified ?? false,
+                shopEnabled: dto.profiles.shop_enabled ?? false,
+                followersCount: dto.profiles.followers_count ?? 0,
+                followingCount: dto.profiles.following_count ?? 0,
+                postsCount: dto.profiles.posts_count ?? 0,
                 isFollowing: interactions?.isFollowing || false,
                 instagramUrl: dto.profiles.instagram_url,
                 tiktokUrl: dto.profiles.tiktok_url,
@@ -701,17 +795,17 @@ export class SupabaseVideoDataSource {
             isViewed: isViewed,
             user: dto.profiles ? {
                 id: dto.user_id,
-                username: dto.profiles.username,
-                fullName: dto.profiles.full_name,
-                avatarUrl: dto.profiles.avatar_url,
+                username: dto.profiles.username || '',
+                fullName: dto.profiles.full_name || '',
+                avatarUrl: dto.profiles.avatar_url || '',
                 country: dto.profiles.country,
                 age: dto.profiles.age,
                 bio: dto.profiles.bio,
-                isVerified: dto.profiles.is_verified,
-                shopEnabled: dto.profiles.shop_enabled,
-                followersCount: dto.profiles.followers_count,
-                followingCount: dto.profiles.following_count,
-                postsCount: dto.profiles.posts_count,
+                isVerified: dto.profiles.is_verified ?? false,
+                shopEnabled: dto.profiles.shop_enabled ?? false,
+                followersCount: dto.profiles.followers_count ?? 0,
+                followingCount: dto.profiles.following_count ?? 0,
+                postsCount: dto.profiles.posts_count ?? 0,
                 isFollowing: false,
             } : getUserFromId(dto.user_id),
             width: dto.width,
@@ -784,9 +878,28 @@ export class SupabaseVideoDataSource {
         }
 
         if (rpcError.code !== '42883') {
+            RpcFallbackTelemetryService.record({
+                rpcName: 'search_hashtags_v1',
+                fallbackPath: 'hashtags_then_video_hashtags_aggregate',
+                reason: 'rpc_error',
+                errorCode: rpcError.code,
+                details: {
+                    queryLength: trimmed.length,
+                },
+            });
             logError(LogCode.DB_QUERY_ERROR, 'Hashtag RPC search failed, falling back to legacy search', {
                 query: trimmed,
                 error: rpcError,
+            });
+        } else {
+            RpcFallbackTelemetryService.record({
+                rpcName: 'search_hashtags_v1',
+                fallbackPath: 'hashtags_then_video_hashtags_aggregate',
+                reason: 'rpc_missing',
+                errorCode: rpcError.code,
+                details: {
+                    queryLength: trimmed.length,
+                },
             });
         }
 

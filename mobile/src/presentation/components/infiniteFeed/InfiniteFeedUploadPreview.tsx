@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -26,10 +26,27 @@ export function InfiniteFeedUploadPreview({ borderColor }: { borderColor: string
     const progress = useUploadStore((state) => state.progress);
     const status = useUploadStore((state) => state.status);
     const uploadMode = useUploadComposerStore((state) => state.draft?.uploadMode);
+    const [hideSuccessPreview, setHideSuccessPreview] = useState(false);
 
     const isProcessing = status === 'compressing' || status === 'uploading' || status === 'processing';
     const isSuccess = status === 'success';
-    const shouldShow = (isProcessing || isSuccess) && !!thumbnailUri;
+
+    useEffect(() => {
+        if (!isSuccess) {
+            setHideSuccessPreview(false);
+            return;
+        }
+
+        const timeoutId = setTimeout(() => {
+            setHideSuccessPreview(true);
+        }, 2800);
+
+        return () => {
+            clearTimeout(timeoutId);
+        };
+    }, [isSuccess]);
+
+    const shouldShow = (isProcessing || (isSuccess && !hideSuccessPreview)) && !!thumbnailUri;
 
     if (!shouldShow) return null;
 

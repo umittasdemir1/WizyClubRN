@@ -59,8 +59,8 @@ export class SupabaseProfileDataSource {
         });
 
         if (error) {
-            logError(LogCode.DB_QUERY_ERROR, 'Profile fetch error (RPC)', { userId, error });
-            throw error;
+            logError(LogCode.DB_QUERY_ERROR, 'Profile RPC failed, falling back to legacy query', { userId, errorCode: error.code });
+            return this.getProfileLegacy(userId, viewerId);
         }
 
         if (!data) {
@@ -73,6 +73,39 @@ export class SupabaseProfileDataSource {
             hasUnseenStory: data?.has_unseen_story,
         });
         return data;
+    }
+
+    private async getProfileLegacy(userId: string, viewerId?: string): Promise<any> {
+        const { data: profile, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .maybeSingle();
+
+        if (error) {
+            logError(LogCode.DB_QUERY_ERROR, 'Profile legacy fetch also failed', { userId, error });
+            throw error;
+        }
+
+        if (!profile) return null;
+
+        let isFollowing = false;
+        if (viewerId && viewerId !== userId) {
+            const { data: followRow } = await supabase
+                .from('follows')
+                .select('id')
+                .eq('follower_id', viewerId)
+                .eq('following_id', userId)
+                .maybeSingle();
+            isFollowing = !!followRow;
+        }
+
+        return {
+            ...profile,
+            is_following: isFollowing,
+            has_stories: false,
+            has_unseen_story: false,
+        };
     }
 
     async getProfileLite(userId: string): Promise<any> {

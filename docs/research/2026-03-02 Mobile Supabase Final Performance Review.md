@@ -1,150 +1,92 @@
 # 2026-03-02 Mobile Supabase Final Performance Review
 
-Bu dokuman, `2026-03-02 Mobile Supabase Query Optimization Report.md` sonrasinda yapilan uygulamalarin ve son denetimin ozetidir.
+Bu dosya, `2026-03-02 Mobile Supabase Query Optimization Report.md` ve `2026-03-02 Mobile Supabase DB Measurement Plan.md` icindeki kararlarin birlestirilmis ve guncel tek kaynagidir.
 
-Amac:
+Bu tarih itibariyla bu konu icin canonical dokuman budur.
 
-- kritik query optimizasyonlarinin gercekten tamamlanip tamamlanmadigini netlestirmek
-- database tarafinin dogru yonetilip yonetilmedigini degerlendirmek
-- kalan isleri "hata" ve "gelecek optimizasyon" olarak ayirmak
+## Faz Sirasi
 
-## Sonuc
+1. Ilk analiz ve mimari yon: `Query Optimization Report`
+2. Ilk olcum ve DB tuning: `DB Measurement Plan`
+3. Birlesik son durum ve yurutme karari: bu dokuman
 
-Kritik seviyede acik bir hata, bloklayici eksik ya da "yanlis query modeli" kalmadi.
+## Net Durum
 
-Mobile ve Supabase tarafi su an:
+Kritik seviyede acik bir hata, bloklayici eksik ya da yanlis query modeli kalmadi.
 
-- dogru mimari yone alinmis durumda
-- canli RPC'ler ile destekleniyor
-- fallback mekanizmalari sayesinde guvenli calisiyor
-- presentation/app katmaninda daginik Supabase erisimi tasimiyor
+Mobile + Supabase hattinda su basliklar tamamlanmis durumda:
+
+- query consolidation yapildi
+- read-model RPC'ler canliya alindi
+- toggle RPC'ler canliya alindi
+- UI katmanindaki daginik Supabase erisimi buyuk oranda data layer'a toplandi
+- auth/session erisimi ortak hatta toplandi
+- `DeletedContentSheet` kullanici kapsamli ve limitli hale getirildi
+- `useStories` shared channel + cache patch modeline tasindi
+- story gorulme sorgusu sadece aktif story ID'leri ile sinirlandi
+- watch history fallback akisi sadeleştirildi
+- eksik `video_views` migration'i eklendi
+- canli toggle/read-model hotfix'leri dogrulandi
+
+Canliya alinmis ve dogrulanmis ana RPC'ler:
+
+- `get_feed_page_v1`
+- `get_user_interaction_v1`
+- `search_hashtags_v1`
+- `toggle_like_v1`
+- `toggle_save_v1`
+- mevcut diger destek RPC'leri (`search_content`, `record_video_view_v2`, `get_profile_full`)
 
 Kisa karar:
 
 - Bugun icin "database tarafini yanlis yonetiyoruz" denemez.
 - Bugun icin "olcek altinda daha da iyi hale getirebiliriz" denir.
 
-## Tamamlanan Ana Basliklar
+## Olcum ve DB Tuning Sonucu
 
-### 1. Query consolidation tamamlandi
-
-Canliya alinmis ve dogrulanmis RPC'ler:
-
-- `get_feed_page_v1`
-- `get_user_interaction_v1(saved)`
-- `get_user_interaction_v1(history)`
-- `search_hashtags_v1`
-- `toggle_like_v1`
-- `toggle_save_v1`
-
-Bu ne sagliyor:
-
-- feed read akisi tek round-trip yola gecebilir
-- liked/saved/history activity ekranlari tek read-model ile doner
-- hashtag aramasi server-side aggregate ile donebilir
-- like/save write akisi read-then-write yerine server-side toggle ile biter
-
-### 2. Clean architecture sinirlari duzeldi
-
-Mobile presentation/app katmaninda dogrudan:
-
-- `supabase.from(...)`
-- `supabase.rpc(...)`
-- `supabase.channel(...)`
-- daginik `supabase.auth.getSession()`
-
-deseni kalmadi.
-
-Bu, veri erisimini:
-
-- data source
-- repository
-- use case
-- service
-
-katmanlarinda topladi.
-
-### 3. Story Realtime modeli iyilesti
-
-`useStories` artik:
-
-- shared channel kullaniyor
-- her eventte tum listeyi tekrar cekmiyor
-- cache patch mantigi ile tekil story ekleme/guncelleme/silme yapiyor
-
-Ek olarak `getStories()` artik kullanicinin tum `story_views` gecmisini cekmek yerine yalnizca aktif story ID'leri icin gorulme durumu okuyor.
-
-### 4. Over-fetch riskleri daraltildi
-
-- `DeletedContentSheet` kullanici kapsamli ve limitli hale geldi
-- watch history fallback akisinda gereksiz ekstra query davranisi temizlendi
-- repo tarafinda eksik `video_views` migration'i eklendi
-
-## Database Tarafi Dogru Yonetiliyor mu?
-
-Kisa cevap: Evet, yon dogru. Ama performansin "iyi" olmasi ile "olceklenebilir sekilde iyi" olmasi farkli seylerdir.
-
-Bugun dogru olanlar:
-
-- agir mobile read akislari server-side read-model ile toplandi
-- write tarafinda atomik toggle fonksiyonlari var
-- canli SQL dogrulandi
-- mobile tarafinda fallback oldugu icin deploy riski dusuk
-- sorgu seklini azaltma konusunda dogru oncelik secildi
-
-Bugun olctugumuz ana noktalar:
+Ilk `EXPLAIN (ANALYZE, BUFFERS, VERBOSE, FORMAT JSON)` turunda:
 
 - `get_feed_page_v1`: yaklasik `4.87 ms`
 - `get_user_interaction_v1(saved)`: yaklasik `45.75 ms`
 - `get_user_interaction_v1(history)`: yaklasik `23.54 ms`
 - `search_hashtags_v1`: yaklasik `6.45 ms`
 
-Bu ilk olcumler su sonucu veriyor:
+Ilk sinyal:
 
-- feed ve hashtag aramasi bugun icin saglikli
-- asil tuning ihtiyaci `get_user_interaction_v1`, ozellikle `saved` modu
-- tum olcumler cache uzerinden calisti (`Shared Read Blocks = 0`)
+- feed ve hashtag aramasi saglikli
+- asil tuning ihtiyaci `get_user_interaction_v1`, ozellikle `saved`
+- olcumler sicak cache uzerinden calisti
 
-Ilk index tuning turu sonrasinda ikinci olcumde:
+Ilk index hotfix paketi uygulandi:
 
-- `get_user_interaction_v1(saved)`: `45.75 ms` -> `9.64 ms`
-- `get_user_interaction_v1(history)`: `23.54 ms` -> `7.73 ms`
-- `get_feed_page_v1`: `4.87 ms` -> `6.97 ms`
+- SQL: `backend/scripts/sql/mobile-query-index-hotfix.sql`
 
-Bu da sunu gosteriyor:
+Ikinci olcum turunda:
 
-- activity read-model tarafindaki asil darboqaz dogrudan dustu
-- feed tarafi yeni index ile calisiyor ve hala saglikli tek haneli ms bandinda
+- `get_user_interaction_v1(saved)`: `45.75 ms -> 9.64 ms`
+- `get_user_interaction_v1(history)`: `23.54 ms -> 7.73 ms`
+- `get_feed_page_v1`: `4.87 ms -> 6.97 ms`
+
+Bu ne demek:
+
+- activity read-model tarafindaki ana darboqaz hedefli sekilde dusuruldu
+- feed tarafinda regresyon yok; hala tek haneli ms bandinda
 - ilk index paketi beklenen hedefi tuttu
 
-Bugun henuz ayrica olculmemis olanlar:
+## pg_stat_statements Durumu
 
-- `pg_stat_statements` icin test ve DDL gurultusundan arinmis daha temiz bir pencere
-- hangi fallback yolunun ne kadar sik calistigi
+`pg_stat_statements` aktif ve ilk snapshot alindi.
 
-Yani:
+Ancak bu ilk pencere:
 
-- mimari dogru
-- ilk performans verisi alindi
-- ilk index tuning turu uygulandi ve dogrulandi
-- ilk `pg_stat_statements` snapshot'i da alindi
-- artik sira daha temiz canli yuk penceresinde tekrar okumakta
+- `EXPLAIN` sorgulari
+- `CREATE FUNCTION`
+- `CREATE INDEX`
+- rollout sirasindaki DDL
 
-## Kalan Riskler (Hata Degil)
+ile kirlenmis durumda.
 
-### 1. Activity read-model icin DB takibi gerekli
-
-Ilk index paketi uygulandi ve etkisi dogrulandi.
-
-Bu yuzden bir sonraki teknik ihtiyac yeni index degil, canli yuk takibidir.
-
-Ozellikle:
-
-- `pg_stat_statements` ile gercek cagri frekansi
-- toplam zaman / ortalama zaman dagilimi
-- activity yolunun buyuk veri altindaki davranisi
-
-Ilk `pg_stat_statements` snapshot'inda gercek uygulama RPC cagri ortalamalari saglikli gorunuyor:
+Ilk faydali sinyal olarak gorulen uygulama RPC ortalamalari saglikli:
 
 - `get_feed_page_v1`: yaklasik `0.80 - 2.29 ms`
 - `get_user_interaction_v1`: yaklasik `0.14 - 2.02 ms`
@@ -152,153 +94,55 @@ Ilk `pg_stat_statements` snapshot'inda gercek uygulama RPC cagri ortalamalari sa
 - `toggle_save_v1`: yaklasik `1.30 ms`
 - `search_hashtags_v1`: yaklasik `0.39 ms`
 
-Ancak ayni snapshot, bizim test/DDL sorgularimizi da iceriyor; bu yuzden bunu "ilk sinyal" olarak okuyup daha temiz bir pencerede tekrar bakmak gerekir.
+Ama karar vermek icin daha temiz pencere gereklidir.
 
-### 2. Feed icin yeni query sekline ozel index eksik
+## Kalanlar: Hata Mi, Sonraki Faz Mi?
 
-Temel index'ler vardi; ilk tuning turunda feed icin yeni read-model index'i de eklendi.
+Ana mimari ve ilk tuning fazi tamamlandi.
 
-Ozellikle:
+Ancak su an halen kapatilmasi gereken uygulama seviyesinde acik teknik konular var.
 
-- `videos (created_at desc, id desc) where deleted_at is null`
-- `videos (user_id, created_at desc, id desc) where deleted_at is null`
+Kalan basliklar sonraki performans ve olcekleme fazidir:
 
-benzeri partial/composite index'ler artik hazir.
+- temiz `pg_stat_statements` okumasi
+- buyuk veri altinda ikinci dogrulama
+- fallback kullanimini telemetry ile gorunur kilma
+- upload polling'i guvenli sekilde event/payload modeline tasima
+- gerekirse ikinci index paketi veya daha ileri DB olcekleme
 
-Bu alan artik "eksik" degil; ikinci buyuk veri turunda sadece tekrar dogrulanmali.
+Ek olarak loglardan gorulen acik operasyonel sorunlar:
 
-### 3. Story patch modeli hala event basina tekil fetch yapiyor
+- `get_feed_page_v1` su anda bazi ortamlarda fallback'e dusuyor; read-model RPC yolu stabil degil
+- `SessionLogService` `user_sessions` insert hattinda hata veriyor
+- `getStories()` fetch'inde hata goruluyor
+- `get_profile_full` RPC yolunda bazi fetch hatalari goruluyor
+- upload response payload'i ile dogrudan feed prepend denemesi gecici olarak rollback edildi; yeniden ancak dogru veri kontrati ve dogrulama ile acilacak
 
-Bugunku model, full refetch'ten daha iyi.
+## Guncel Oncelik Sirasi
 
-Ama her `INSERT/UPDATE` olayinda tek bir `getStoryById()` fetch'i yapiyor.
+1. `get_feed_page_v1` fallback nedenini izole et ve read-model RPC yolunu tekrar stabil hale getir.
+2. `SessionLogService`, `getStories()` ve `get_profile_full` tarafindaki canli hata kaynaklarini ayikla.
+3. Mobil fallback kullanimini telemetry ile gorunur tut ve acik kalan fallback oranlarini dogrula.
+4. Upload polling tarafini su an stabil polling-first modelde tut; payload-first akisi ancak dogru profile verisi ve tekrar dogrulama ile yeniden ac.
+5. Temiz bir zaman penceresinde `pg_stat_statements` tekrar oku.
+6. Veri buyudukce ayni `EXPLAIN` bloklarini periyodik tekrar dogrula.
+7. Ancak bu verilerden sonra ikinci index paketi, replica veya daha ileri DB olcekleme dusun.
 
-Story frekansi cok artarsa bir sonraki adim:
+## Uygulama Olarak Sonraki Teknik Is
 
-- server-side Broadcast payload
-- ya da daha ince domain event modeli
+Kod tarafinda en dogru ilk is:
 
-olmali.
+- fallback kullanimini sayilabilir hale getirmek
+- hangi RPC'lerin ne kadar sik legacy yola dustugunu loglamak
+- bir sonraki performans turu icin net sinyal toplamak
 
-### 4. Upload sonrasi polling tam bitmedi
+Bu, yeni index yazmaktan once daha dogru ve daha dusuk riskli adimdir.
 
-Upload sonrasi ortak servisle temizlendi, ama hala:
+## Superseded Dokumanlar
 
-- kisa sureli polling
-- gerekirse feed refresh
+Asagidaki dosyalar tarihsel baglam icin tutulur ama artik tek basina karar kaynagi degildir:
 
-deseni var.
+- `2026-03-02 Mobile Supabase Query Optimization Report.md`
+- `2026-03-02 Mobile Supabase DB Measurement Plan.md`
 
-En iyi sonraki adim:
-
-- upload response icine minimal video DTO koymak
-- ya da Realtime Broadcast ile ilgili oturuma "video hazir" eventi atmak
-
-### 5. Hashtag arama icin DB tuning sonrasi yapilmali
-
-`search_hashtags_v1` artik dogru yerde.
-
-Ama arama yukunde gercek fark icin:
-
-- `hashtags(name)` tarafinda trigram ya da uygun text index
-
-degerlendirilmeli.
-
-Bu, kod degil DB tuning fazidir.
-
-### 6. Canli schema farkliligi riski artik kontrol altinda ama not edilmeli
-
-Tarihsel migration dosyalarinda `user_id` tipleri yer yer `text`, canli ortamda bazi tablolarda `uuid`.
-
-Bu yuzden toggle SQL'leri portable hale getirildi:
-
-- alttaki kolon tipini runtime'da okuyup
-- `text` ya da `uuid` varyantina gore calisiyor
-
-Bu dogru cozum. Ama ileride schema standardizasyonu ayrica ele alinmali.
-
-## Performans Onerileri (En Dogru Sonraki Faz)
-
-### 1. pg_stat_statements'i temiz bir pencerede tekrar oku
-
-`EXPLAIN ANALYZE` ilk ve ikinci turu tamamlandi.
-
-Ilk index paketi uygulandi ve beklenen hiz kazanci alindi.
-
-Bu yuzden ilk yapilmasi gereken su:
-
-- gercekte en cok cagrilan sorgular
-- en yavas sorgular
-- toplam IO / total time agir sorgular
-
-resmini cikarmak.
-
-Not:
-
-- mevcut snapshot kullanisli ama test ve rollout sorgulari ile kirlenmis durumda
-- bir sonraki okumayi normal uygulama trafigi altinda yapmak daha dogru karar verir
-
-### 2. Ikinci turu buyuk veri altinda tekrar dogrula
-
-Index'lerden sonra ayni `EXPLAIN ANALYZE` bloklari tekrar calistirildi ve iyilesme dogrulandi.
-
-Sonraki hedef:
-
-- veri hacmi arttiginda bu metrikleri periyodik kontrol etmek
-- activity ve feed tarafinda yeni regressions var mi bakmak
-
-Basariyi su sekilde okuyacagiz:
-
-- `saved` ve `history` tek haneli ms bandini koruyor mu?
-- `Shared Read Blocks` veri buyudukce sicrama yapiyor mu?
-- feed planinda aktif index stabil kullaniliyor mu?
-
-### 3. Upload polling'i event modeline tas
-
-En net bir sonraki mobil performans kazanci burada:
-
-- backend response payload
-veya
-- Realtime Broadcast
-
-ile upload sonrasi ikinci/ucuncu fetch'leri azaltmak.
-
-### 4. Fallback kullanimini olc
-
-Kod fallback'li yazildi. Bu guvenli.
-
-Ama artik bilmek istedigimiz sey:
-
-- gercekte hangi akislarda hala fallback'e dusuluyor?
-- hangi ekranlar artik tam RPC yolunu kullaniyor?
-
-Bunun icin kisa telemetry/log eklemek cok degerli olur.
-
-## Net Durum
-
-Bugun kalanlar ikiye ayriliyor:
-
-### Hata / eksik tamamlama
-
-Zorunlu bir hata ya da eksik tamamlama kalmadi.
-
-### Sonraki optimizasyon fazi
-
-Kalanlar:
-
-- ikinci tur olcum
-- index tuning
-- upload eventlestirme
-- schema standardizasyonu
-
-basliklari.
-
-Bu nedenle bugunku durum "tamamlanmamis refactor" degil, "yeni performans fazina hazir saglam taban" durumudur.
-
-## Onerilen Sirali Sonraki Adimlar
-
-1. `likes`, `saves`, `post_tags` ve `videos` icin hedefli index SQL'lerini yaz.
-2. Fallback kullanimini kisa telemetry ile gorunur hale getir.
-3. Upload polling'i response payload veya Broadcast modeline tas.
-4. Daha temiz bir zaman penceresinde `pg_stat_statements` tekrar oku.
-5. Sonraki turda ancak gerekirse ikinci index paketi, replica veya ileri DB olcekleme dusun.
+Bu konu icin guncel kararlar yalnizca bu dosyadan okunmalidir.

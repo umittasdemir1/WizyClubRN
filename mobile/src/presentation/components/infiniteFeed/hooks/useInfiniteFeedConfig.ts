@@ -3,7 +3,10 @@
  *
  * This file intentionally duplicates Infinite-related feed configuration so
  * infinite components no longer depend on pool feed config files.
+ * Prefetch values are imported from the central feedDataConfig.
  */
+
+import { FEED_DATA_CONFIG } from '../../../config/feedDataConfig';
 
 export const INFINITE_FEED_FLAGS = {
     /** Master switch for all InfiniteFeed overlays */
@@ -31,10 +34,10 @@ export const INFINITE_FEED_FLAGS = {
 } as const;
 
 export const INFINITE_FEED_CONFIG = {
-    /** Number of videos to prefetch ahead of current position (network/disk warmup) */
-    PREFETCH_AHEAD_COUNT: 6,
-    /** Number of videos to prefetch behind current position */
-    PREFETCH_BEHIND_COUNT: 0,
+    /** Number of videos to prefetch ahead of current position (from central config) */
+    PREFETCH_AHEAD_COUNT: FEED_DATA_CONFIG.PREFETCH_AHEAD_COUNT,
+    /** Number of videos to prefetch behind current position (from central config) */
+    PREFETCH_BEHIND_COUNT: FEED_DATA_CONFIG.PREFETCH_BEHIND_COUNT,
     /** Number of next videos to mount for decode pre-warm (paused at first frame) */
     DECODE_PREWARM_AHEAD_COUNT: 2,
     /** Number of nearest candidates allowed to actively decode-prewarm at once */

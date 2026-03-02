@@ -130,6 +130,8 @@ export const PoolFeedManager = ({
     const openInAppBrowser = useInAppBrowserStore((state) => state.openUrl);
     const uploadStatus = useUploadStore((state) => state.status);
     const uploadedVideoId = useUploadStore((state) => state.uploadedVideoId);
+    const uploadedVideoPayload = useUploadStore((state) => state.uploadedVideoPayload);
+    const tryConsumeUploadSuccess = useUploadStore((state) => state.tryConsumeUploadSuccess);
     const { reset: resetUpload } = useUploadStore();
 
     // Refs
@@ -345,8 +347,9 @@ export const PoolFeedManager = ({
 
     usePoolFeedLifecycleSync({
         videos, videosRef, activeVideoId, activeIndex: resolvedActiveIndex, isPaused, isAppActive,
-        ignoreAppState, isInAppBrowserVisible, netInfo, uploadedVideoId,
+        ignoreAppState, isInAppBrowserVisible, netInfo, uploadedVideoId, uploadedVideoPayload,
         uploadStatus, resetUpload, prependVideo, setActiveVideo, togglePause,
+        tryConsumeUploadSuccess,
         setPaused, setScreenFocused, setActiveTab, listRef,
         lastActiveIdRef, lastInternalIndex,
         resetPlayback: videoCallbacks.resetPlayback,

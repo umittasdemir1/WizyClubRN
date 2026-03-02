@@ -49,6 +49,23 @@ class FeedPrefetchService {
   }
 
   /**
+   * Temporarily reduce prefetch concurrency while active video buffers.
+   * This gives more bandwidth to the currently playing video.
+   */
+  pauseForActiveVideo() {
+    this.maxParallelDownloads = 1;
+  }
+
+  /**
+   * Restore normal prefetch concurrency after active video has buffered.
+   */
+  resumeAfterActiveVideo() {
+    const isFast =
+      this.networkType === NetInfoStateType.wifi || this.networkType === NetInfoStateType.ethernet;
+    this.maxParallelDownloads = isFast ? 3 : 2;
+  }
+
+  /**
    * Queue videos for prefetching with priority support
    * @param videos - Full video list
    * @param indices - Indices to prefetch

@@ -1,11 +1,17 @@
 import { Video } from '../../domain/entities/Video';
 import { SupabaseVideoDataSource } from '../datasources/SupabaseVideoDataSource';
 import { VideoRepositoryImpl } from '../repositories/VideoRepositoryImpl';
+import type { UploadedVideoPayload } from '../../presentation/store/useUploadStore';
+import { LogCode } from '@/core/services/Logger';
+import { UploadFlowTelemetryService } from './UploadFlowTelemetryService';
 
 interface WaitForVideoOptions {
     attempts?: number;
     delayMs?: number;
 }
+
+const UPLOAD_VIDEO_WAIT_ATTEMPTS = 5;
+const UPLOAD_VIDEO_WAIT_DELAY_MS = 120;
 
 export interface EditableVideoRecord {
     id: string;
@@ -54,13 +60,51 @@ export class FeedQueryService {
 
         for (let attempt = 0; attempt < attempts; attempt += 1) {
             const video = await this.getVideoForFeed(videoId);
-            if (video) return video;
+            if (video) {
+                if (attempt > 0) {
+                    UploadFlowTelemetryService.record({
+                        name: 'poll_resolved',
+                        code: LogCode.VIDEO_UPLOAD_POLL_RESOLVED,
+                        message: 'Upload video resolved after polling',
+                        videoId,
+                        details: {
+                            attemptsUsed: attempt + 1,
+                            delayMs,
+                        },
+                    });
+                }
+                return video;
+            }
 
             if (attempt < attempts - 1 && delayMs > 0) {
                 await new Promise((resolve) => setTimeout(resolve, delayMs));
             }
         }
 
+        UploadFlowTelemetryService.record({
+            name: 'poll_missed',
+            code: LogCode.VIDEO_UPLOAD_POLL_MISSED,
+            message: 'Upload video polling exhausted without result',
+            level: 'warn',
+            videoId,
+            details: {
+                attempts,
+                delayMs,
+            },
+        });
+
+        return null;
+    }
+
+    async waitForUploadedVideo(videoId: string): Promise<Video | null> {
+        return this.waitForVideoForFeed(videoId, {
+            attempts: UPLOAD_VIDEO_WAIT_ATTEMPTS,
+            delayMs: UPLOAD_VIDEO_WAIT_DELAY_MS,
+        });
+    }
+
+    mapUploadedVideoForFeed(payload: UploadedVideoPayload | null | undefined): Video | null {
+        if (!payload) return null;
         return null;
     }
 

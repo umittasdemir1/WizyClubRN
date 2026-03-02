@@ -6,7 +6,7 @@ function createVideoRepository(dbClient) {
             const { data, error } = await dbClient
                 .from('videos')
                 .insert(payload)
-                .select();
+                .select('*, profiles(*)');
 
             if (error) throw error;
             return Array.isArray(data) ? toVideoRecord(data[0]) : null;

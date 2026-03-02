@@ -1,5 +1,6 @@
 import { supabase } from '../../core/supabase';
 import { LogCode, logData, logError } from '@/core/services/Logger';
+import { RpcFallbackTelemetryService } from '../services/RpcFallbackTelemetryService';
 
 export class InteractionDataSource {
     async toggleLike(userId: string, targetId: string, targetType: 'video' | 'story'): Promise<boolean> {
@@ -130,6 +131,18 @@ export class InteractionDataSource {
         });
 
         if (error) {
+            const reason = error.code === '42883' ? 'rpc_missing' : 'rpc_error';
+            RpcFallbackTelemetryService.record({
+                rpcName: 'toggle_like_v1',
+                fallbackPath: 'likes_legacy_toggle',
+                reason,
+                errorCode: error.code,
+                userIdPresent: !!userId,
+                details: {
+                    targetType,
+                },
+            });
+
             if (error.code !== '42883') {
                 logError(LogCode.DB_QUERY_ERROR, 'toggleLike RPC unavailable, falling back to legacy flow', {
                     userId,
@@ -151,6 +164,15 @@ export class InteractionDataSource {
         });
 
         if (error) {
+            const reason = error.code === '42883' ? 'rpc_missing' : 'rpc_error';
+            RpcFallbackTelemetryService.record({
+                rpcName: 'toggle_save_v1',
+                fallbackPath: 'saves_legacy_toggle',
+                reason,
+                errorCode: error.code,
+                userIdPresent: !!userId,
+            });
+
             if (error.code !== '42883') {
                 logError(LogCode.DB_QUERY_ERROR, 'toggleSave RPC unavailable, falling back to legacy flow', {
                     userId,

@@ -31,6 +31,7 @@ import { getAccessToken } from '../src/presentation/store/getAccessToken';
 import { CONFIG } from '../src/core/config';
 import { LogCode, logData, logError } from '@/core/services/Logger';
 import { stripRichTextTags } from '../src/core/utils/richText';
+import type { UploadedVideoPayload } from '../src/presentation/store/useUploadStore';
 
 const COMMERCIAL_TYPES = [
     'İş Birliği İçermiyor',
@@ -654,9 +655,16 @@ export default function UploadDetailsScreen() {
                 clearInterval(progressInterval);
                 if (xhr.status === 200) {
                     const response = JSON.parse(xhr.responseText);
+                    const uploadedVideoPayload =
+                        draft.uploadMode === 'story'
+                            ? null
+                            : ((response?.data && typeof response.data === 'object') ? response.data as UploadedVideoPayload : null);
                     setProgress(100);
                     setTimeout(() => {
-                        setSuccess(draft.uploadMode === 'story' ? '' : (response.data?.id || 'new-video'));
+                        setSuccess(
+                            draft.uploadMode === 'story' ? '' : (uploadedVideoPayload?.id || 'new-video'),
+                            uploadedVideoPayload
+                        );
                         setIsSubmitting(false);
                         if (draft.uploadMode === 'story') {
                             triggerStoryRefresh();
