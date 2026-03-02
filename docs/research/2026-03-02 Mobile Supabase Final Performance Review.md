@@ -92,21 +92,46 @@ Bugun dogru olanlar:
 - mobile tarafinda fallback oldugu icin deploy riski dusuk
 - sorgu seklini azaltma konusunda dogru oncelik secildi
 
-Bugun henuz olculmemis olanlar:
+Bugun olctugumuz ana noktalar:
 
-- yeni RPC'lerin gercek `EXPLAIN` planlari
-- buyuk veri hacminde indeks etkinligi
-- en pahali sorgularin gercek frekansi
+- `get_feed_page_v1`: yaklasik `4.87 ms`
+- `get_user_interaction_v1(saved)`: yaklasik `45.75 ms`
+- `get_user_interaction_v1(history)`: yaklasik `23.54 ms`
+- `search_hashtags_v1`: yaklasik `6.45 ms`
+
+Bu ilk olcumler su sonucu veriyor:
+
+- feed ve hashtag aramasi bugun icin saglikli
+- asil tuning ihtiyaci `get_user_interaction_v1`, ozellikle `saved` modu
+- tum olcumler cache uzerinden calisti (`Shared Read Blocks = 0`)
+
+Bugun henuz ayrica olculmemis olanlar:
+
+- `pg_stat_statements` ile gercek frekans / toplam maliyet dagilimi
+- buyuk veri hacminde indeks etkinliginin ikinci olcum turu
 - hangi fallback yolunun ne kadar sik calistigi
 
 Yani:
 
 - mimari dogru
-- operasyonel olcek verisi henuz ayrica olculmeli
+- ilk performans verisi alindi
+- artik sira hedefli index tuning'de
 
 ## Kalan Riskler (Hata Degil)
 
-### 1. Feed icin yeni query sekline ozel index eksik
+### 1. Activity read-model icin yeni query sekline ozel index eksik
+
+Olcumler sonrasi en net hedef artik `get_user_interaction_v1`.
+
+Ozellikle:
+
+- `likes (user_id, created_at desc, video_id) where video_id is not null`
+- `saves (user_id, created_at desc, video_id)`
+- `post_tags (video_id, created_at, id)`
+
+ilk yazilacak index adaylari.
+
+### 2. Feed icin yeni query sekline ozel index eksik
 
 Temel index'ler var, ama yeni read-model'e ozel en guclu kombinasyonlar henuz eklenmedi.
 
@@ -119,7 +144,7 @@ benzeri partial/composite index'ler feed buyudukce fark yaratacak.
 
 Bu yok diye sistem yanlis degil, ama bu olmadan bir sure sonra gereksiz scan maliyeti buyur.
 
-### 2. Story patch modeli hala event basina tekil fetch yapiyor
+### 3. Story patch modeli hala event basina tekil fetch yapiyor
 
 Bugunku model, full refetch'ten daha iyi.
 
@@ -132,7 +157,7 @@ Story frekansi cok artarsa bir sonraki adim:
 
 olmali.
 
-### 3. Upload sonrasi polling tam bitmedi
+### 4. Upload sonrasi polling tam bitmedi
 
 Upload sonrasi ortak servisle temizlendi, ama hala:
 
@@ -146,7 +171,7 @@ En iyi sonraki adim:
 - upload response icine minimal video DTO koymak
 - ya da Realtime Broadcast ile ilgili oturuma "video hazir" eventi atmak
 
-### 4. Hashtag arama icin DB tuning sonrasi yapilmali
+### 5. Hashtag arama icin DB tuning sonrasi yapilmali
 
 `search_hashtags_v1` artik dogru yerde.
 
@@ -158,7 +183,7 @@ degerlendirilmeli.
 
 Bu, kod degil DB tuning fazidir.
 
-### 5. Canli schema farkliligi riski artik kontrol altinda ama not edilmeli
+### 6. Canli schema farkliligi riski artik kontrol altinda ama not edilmeli
 
 Tarihsel migration dosyalarinda `user_id` tipleri yer yer `text`, canli ortamda bazi tablolarda `uuid`.
 
@@ -171,21 +196,23 @@ Bu dogru cozum. Ama ileride schema standardizasyonu ayrica ele alinmali.
 
 ## Performans Onerileri (En Dogru Sonraki Faz)
 
-### 1. EXPLAIN ANALYZE yap
+### 1. Index tuning fazina gec
 
-Ilk yapilmasi gereken su:
+`EXPLAIN ANALYZE` ilk turu tamamlandi.
 
-- `get_feed_page_v1`
-- `get_user_interaction_v1`
-- `search_hashtags_v1`
+Bu yuzden ilk yapilmasi gereken su:
 
-icin gercek query planini olcmek.
+- `likes`
+- `saves`
+- `post_tags`
+- ikinci sirada `videos`
 
-Hedef:
+icin hedefli index SQL yazmak ve uygulamak.
 
-- seq scan var mi
-- sort maliyeti buyuk mu
-- join'ler dogru index kullaniyor mu
+Ilk hedef:
+
+- `get_user_interaction_v1(saved)` yolunu dusurmek
+- sonra `history` ve feed'i ikinci turda tekrar olcmek
 
 ### 2. pg_stat_statements ile gercek agir query'leri olc
 
@@ -199,16 +226,15 @@ tespit edilmeli.
 
 Bu olmadan index kararlari kismen tahmin olur.
 
-### 3. Index tuning fazina gec
+### 3. Ikinci olcum turunu yap
 
-Olcumden sonra su alanlarda index eklemek mantikli:
+Index'lerden sonra ayni `EXPLAIN ANALYZE` bloklari tekrar calistirilmali.
 
-- feed read-model
-- stories active list
-- hashtag search
-- gerekirse author feed varyanti
+Basariyi su sekilde okuyacagiz:
 
-Bu asamada `index_advisor` da kullanilabilir.
+- `saved` ve `history` ms suresi duser mi?
+- `Shared Hit Blocks` anlamsiz yuksek kalir mi?
+- feed planinda ek buffer iyilesmesi olur mu?
 
 ### 4. Upload polling'i event modeline tas
 
@@ -243,7 +269,7 @@ Zorunlu bir hata ya da eksik tamamlama kalmadi.
 
 Kalanlar:
 
-- olcum
+- ikinci tur olcum
 - index tuning
 - upload eventlestirme
 - schema standardizasyonu
@@ -254,8 +280,8 @@ Bu nedenle bugunku durum "tamamlanmamis refactor" degil, "yeni performans fazina
 
 ## Onerilen Sirali Sonraki Adimlar
 
-1. `EXPLAIN ANALYZE` ile 3 ana RPC'yi olc.
-2. `pg_stat_statements` ile gercek yuku cikar.
-3. Feed ve hashtag icin hedefli index SQL'lerini yaz.
+1. `likes`, `saves`, `post_tags` ve `videos` icin hedefli index SQL'lerini yaz.
+2. Bu index'leri uygulayip ayni `EXPLAIN ANALYZE` bloklarini tekrar olc.
+3. `pg_stat_statements` ile gercek yuku cikar.
 4. Upload polling'i response payload veya Broadcast modeline tas.
 5. Sonraki turda ancak gerekirse replica / ileri DB olcekleme dusun.

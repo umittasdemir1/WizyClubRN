@@ -112,6 +112,7 @@ Bu dosya, projede yer alan tum dokumanlari listeler.
 - [TASKS_GUIDE.md](guides/TASKS_GUIDE.md)
 
 ## research
+- [2026-03-02 Mobile Supabase DB Measurement Plan.md](research/2026-03-02 Mobile Supabase DB Measurement Plan.md)
 - [2026-03-02 Mobile Supabase Query Optimization Report.md](research/2026-03-02 Mobile Supabase Query Optimization Report.md)
 - [2026-03-02 Mobile Supabase Final Performance Review.md](research/2026-03-02 Mobile Supabase Final Performance Review.md)
 - [deep-research-report.md](research/deep-research-report.md)
