@@ -89,6 +89,34 @@ Not:
 - `Shared Read Blocks`: `0`
 - sonuc: su an icin kabul edilebilir
 
+## Index Hotfix Sonrasi Ikinci Olcum Turu
+
+Ilk index paketi [mobile-query-index-hotfix.sql](/home/user/WizyClubRN/backend/scripts/sql/mobile-query-index-hotfix.sql) ile uygulandi ve ayni olcumler tekrarlandi.
+
+### 1. `get_user_interaction_v1(saved)`
+
+- once: `45.75 ms`
+- sonra: `9.64 ms`
+- iyilesme: yaklasik `%79`
+
+### 2. `get_user_interaction_v1(history)`
+
+- once: `23.54 ms`
+- sonra: `7.73 ms`
+- iyilesme: yaklasik `%67`
+
+### 3. `get_feed_page_v1`
+
+- once: `4.87 ms`
+- sonra: `6.97 ms`
+- yorum: feed hala tek haneli ms bandinda saglikli; yeni `idx_videos_active_created_id` kullaniliyor
+
+Not:
+
+- ikinci turda feed olcumunde `Shared Read Blocks = 2` goruldu
+- bu, yeni index sayfalarinin ilk okunmasi nedeniyle normaldir
+- feed tarafinda bir alarm ya da bozulma sinyali yok
+
 ## Bu Sonuclar Ne Soyluyor?
 
 - diskten okuma yok; tum olcumlerde `Shared Read Blocks = 0`
@@ -100,7 +128,34 @@ Not:
 Bu yuzden bugunku karar:
 
 - database tarafi yanlis yonetilmiyor
-- ama activity read-model yolu bir sonraki net DB optimizasyon hedefi
+- activity read-model sicak noktasi ilk index paketiyle ciddi sekilde dusuruldu
+- bir sonraki DB adimi artik ikinci tur dogrulama ve `pg_stat_statements` ile gercek yuk resmini cikarmak
+
+## pg_stat_statements Ilk Bakis
+
+`pg_stat_statements` aktif ve ilk JSON taramasi alindi.
+
+Buradaki onemli not:
+
+- ustte gorunen en yuksek `total_exec_time` kayitlarinin bir kismi gercek uygulama trafigi degil
+- bunlar bizim SQL Editor'da calistirdigimiz `EXPLAIN` sorgulari ve `CREATE FUNCTION / CREATE INDEX` DDL adimlari
+
+Yani ilk snapshot, test ve rollout sirasindaki teknik sorgularla kirlenmis durumda.
+
+Buna ragmen gercek uygulama RPC cagri ornekleri sunlari gosteriyor:
+
+- `get_feed_page_v1`: `17` cagrida ortalama yaklasik `2.29 ms`
+- `get_feed_page_v1` (ikinci varyant): `6` cagrida ortalama yaklasik `0.80 ms`
+- `get_user_interaction_v1`: `10` cagrida ortalama yaklasik `0.14 ms`
+- `toggle_like_v1`: `33` cagrida ortalama yaklasik `1.14 ms`
+- `toggle_save_v1`: `7` cagrida ortalama yaklasik `1.30 ms`
+- `search_hashtags_v1`: `4` cagrida ortalama yaklasik `0.39 ms`
+
+Bu da su an icin su karari destekliyor:
+
+- canli uygulama RPC yolu hizli
+- ilk index paketi sonrasi acil ikinci bir index paketi gerekmiyor
+- bir sonraki dogru adim, daha temiz bir zaman penceresinde tekrar `pg_stat_statements` okumak
 
 ## Neye Bakiyoruz?
 
@@ -177,6 +232,10 @@ Not:
 - `videos` index'leri feed'i daha da sertlestirmek icin ikinci sirada
 - `hashtags(name)` trigram index su an acil degil; `search_hashtags_v1` su an kotu sinyal vermiyor
 
+Bu ilk paket icin hazirlanan uygulanabilir SQL:
+
+- [mobile-query-index-hotfix.sql](/home/user/WizyClubRN/backend/scripts/sql/mobile-query-index-hotfix.sql)
+
 ## pg_stat_statements Neden Gerekli?
 
 `EXPLAIN ANALYZE` bize plan gosterir.
@@ -197,9 +256,9 @@ Ikisini birlikte gormek gerekir.
 ## Bu Fazdan Sonra Ne Yapacagiz?
 
 1. `likes`, `saves`, `post_tags` ve gerekirse `videos` icin hedefli index SQL'lerini yazacagiz.
-2. Bu index'leri uyguladiktan sonra ayni [mobile-query-explain-analyze.sql](/home/user/WizyClubRN/backend/scripts/sql/mobile-query-explain-analyze.sql) bloklarini tekrar calistiracagiz.
-3. `get_user_interaction_v1(saved)` ve `history` icin gercek iyilesmeyi ms ve buffer bazinda tekrar olcecegiz.
-4. Ardindan `pg_stat_statements` ile canlidaki toplam agirlik/frekans resmini cikaracagiz.
+2. Bu index'ler uygulandi ve ayni [mobile-query-explain-analyze.sql](/home/user/WizyClubRN/backend/scripts/sql/mobile-query-explain-analyze.sql) bloklariyla ikinci tur olcum alindi.
+3. `saved` ve `history` yolunda beklenen iyilesme dogrulandi.
+4. Siradaki adim, test/DDL gurultusu durulduktan sonra `pg_stat_statements` ile daha temiz bir zaman penceresinde canlidaki toplam agirlik/frekans resmini cikarmak.
 5. Sonraki fazda ancak gerekirse upload polling, broadcast ve ileri DB olcekleme kararlarina gececegiz.
 
 ## Kisa Karar

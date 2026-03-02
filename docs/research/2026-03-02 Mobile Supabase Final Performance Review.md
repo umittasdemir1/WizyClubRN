@@ -105,44 +105,67 @@ Bu ilk olcumler su sonucu veriyor:
 - asil tuning ihtiyaci `get_user_interaction_v1`, ozellikle `saved` modu
 - tum olcumler cache uzerinden calisti (`Shared Read Blocks = 0`)
 
+Ilk index tuning turu sonrasinda ikinci olcumde:
+
+- `get_user_interaction_v1(saved)`: `45.75 ms` -> `9.64 ms`
+- `get_user_interaction_v1(history)`: `23.54 ms` -> `7.73 ms`
+- `get_feed_page_v1`: `4.87 ms` -> `6.97 ms`
+
+Bu da sunu gosteriyor:
+
+- activity read-model tarafindaki asil darboqaz dogrudan dustu
+- feed tarafi yeni index ile calisiyor ve hala saglikli tek haneli ms bandinda
+- ilk index paketi beklenen hedefi tuttu
+
 Bugun henuz ayrica olculmemis olanlar:
 
-- `pg_stat_statements` ile gercek frekans / toplam maliyet dagilimi
-- buyuk veri hacminde indeks etkinliginin ikinci olcum turu
+- `pg_stat_statements` icin test ve DDL gurultusundan arinmis daha temiz bir pencere
 - hangi fallback yolunun ne kadar sik calistigi
 
 Yani:
 
 - mimari dogru
 - ilk performans verisi alindi
-- artik sira hedefli index tuning'de
+- ilk index tuning turu uygulandi ve dogrulandi
+- ilk `pg_stat_statements` snapshot'i da alindi
+- artik sira daha temiz canli yuk penceresinde tekrar okumakta
 
 ## Kalan Riskler (Hata Degil)
 
-### 1. Activity read-model icin yeni query sekline ozel index eksik
+### 1. Activity read-model icin DB takibi gerekli
 
-Olcumler sonrasi en net hedef artik `get_user_interaction_v1`.
+Ilk index paketi uygulandi ve etkisi dogrulandi.
+
+Bu yuzden bir sonraki teknik ihtiyac yeni index degil, canli yuk takibidir.
 
 Ozellikle:
 
-- `likes (user_id, created_at desc, video_id) where video_id is not null`
-- `saves (user_id, created_at desc, video_id)`
-- `post_tags (video_id, created_at, id)`
+- `pg_stat_statements` ile gercek cagri frekansi
+- toplam zaman / ortalama zaman dagilimi
+- activity yolunun buyuk veri altindaki davranisi
 
-ilk yazilacak index adaylari.
+Ilk `pg_stat_statements` snapshot'inda gercek uygulama RPC cagri ortalamalari saglikli gorunuyor:
+
+- `get_feed_page_v1`: yaklasik `0.80 - 2.29 ms`
+- `get_user_interaction_v1`: yaklasik `0.14 - 2.02 ms`
+- `toggle_like_v1`: yaklasik `1.14 ms`
+- `toggle_save_v1`: yaklasik `1.30 ms`
+- `search_hashtags_v1`: yaklasik `0.39 ms`
+
+Ancak ayni snapshot, bizim test/DDL sorgularimizi da iceriyor; bu yuzden bunu "ilk sinyal" olarak okuyup daha temiz bir pencerede tekrar bakmak gerekir.
 
 ### 2. Feed icin yeni query sekline ozel index eksik
 
-Temel index'ler var, ama yeni read-model'e ozel en guclu kombinasyonlar henuz eklenmedi.
+Temel index'ler vardi; ilk tuning turunda feed icin yeni read-model index'i de eklendi.
 
 Ozellikle:
 
 - `videos (created_at desc, id desc) where deleted_at is null`
 - `videos (user_id, created_at desc, id desc) where deleted_at is null`
 
-benzeri partial/composite index'ler feed buyudukce fark yaratacak.
+benzeri partial/composite index'ler artik hazir.
 
-Bu yok diye sistem yanlis degil, ama bu olmadan bir sure sonra gereksiz scan maliyeti buyur.
+Bu alan artik "eksik" degil; ikinci buyuk veri turunda sadece tekrar dogrulanmali.
 
 ### 3. Story patch modeli hala event basina tekil fetch yapiyor
 
@@ -196,47 +219,41 @@ Bu dogru cozum. Ama ileride schema standardizasyonu ayrica ele alinmali.
 
 ## Performans Onerileri (En Dogru Sonraki Faz)
 
-### 1. Index tuning fazina gec
+### 1. pg_stat_statements'i temiz bir pencerede tekrar oku
 
-`EXPLAIN ANALYZE` ilk turu tamamlandi.
+`EXPLAIN ANALYZE` ilk ve ikinci turu tamamlandi.
+
+Ilk index paketi uygulandi ve beklenen hiz kazanci alindi.
 
 Bu yuzden ilk yapilmasi gereken su:
 
-- `likes`
-- `saves`
-- `post_tags`
-- ikinci sirada `videos`
-
-icin hedefli index SQL yazmak ve uygulamak.
-
-Ilk hedef:
-
-- `get_user_interaction_v1(saved)` yolunu dusurmek
-- sonra `history` ve feed'i ikinci turda tekrar olcmek
-
-### 2. pg_stat_statements ile gercek agir query'leri olc
-
-Hissettiren yavaslik yerine gercek maliyeti gormek icin:
-
-- en cok cagrilan sorgular
+- gercekte en cok cagrilan sorgular
 - en yavas sorgular
 - toplam IO / total time agir sorgular
 
-tespit edilmeli.
+resmini cikarmak.
 
-Bu olmadan index kararlari kismen tahmin olur.
+Not:
 
-### 3. Ikinci olcum turunu yap
+- mevcut snapshot kullanisli ama test ve rollout sorgulari ile kirlenmis durumda
+- bir sonraki okumayi normal uygulama trafigi altinda yapmak daha dogru karar verir
 
-Index'lerden sonra ayni `EXPLAIN ANALYZE` bloklari tekrar calistirilmali.
+### 2. Ikinci turu buyuk veri altinda tekrar dogrula
+
+Index'lerden sonra ayni `EXPLAIN ANALYZE` bloklari tekrar calistirildi ve iyilesme dogrulandi.
+
+Sonraki hedef:
+
+- veri hacmi arttiginda bu metrikleri periyodik kontrol etmek
+- activity ve feed tarafinda yeni regressions var mi bakmak
 
 Basariyi su sekilde okuyacagiz:
 
-- `saved` ve `history` ms suresi duser mi?
-- `Shared Hit Blocks` anlamsiz yuksek kalir mi?
-- feed planinda ek buffer iyilesmesi olur mu?
+- `saved` ve `history` tek haneli ms bandini koruyor mu?
+- `Shared Read Blocks` veri buyudukce sicrama yapiyor mu?
+- feed planinda aktif index stabil kullaniliyor mu?
 
-### 4. Upload polling'i event modeline tas
+### 3. Upload polling'i event modeline tas
 
 En net bir sonraki mobil performans kazanci burada:
 
@@ -246,7 +263,7 @@ veya
 
 ile upload sonrasi ikinci/ucuncu fetch'leri azaltmak.
 
-### 5. Fallback kullanimini olc
+### 4. Fallback kullanimini olc
 
 Kod fallback'li yazildi. Bu guvenli.
 
@@ -281,7 +298,7 @@ Bu nedenle bugunku durum "tamamlanmamis refactor" degil, "yeni performans fazina
 ## Onerilen Sirali Sonraki Adimlar
 
 1. `likes`, `saves`, `post_tags` ve `videos` icin hedefli index SQL'lerini yaz.
-2. Bu index'leri uygulayip ayni `EXPLAIN ANALYZE` bloklarini tekrar olc.
-3. `pg_stat_statements` ile gercek yuku cikar.
-4. Upload polling'i response payload veya Broadcast modeline tas.
-5. Sonraki turda ancak gerekirse replica / ileri DB olcekleme dusun.
+2. Fallback kullanimini kisa telemetry ile gorunur hale getir.
+3. Upload polling'i response payload veya Broadcast modeline tas.
+4. Daha temiz bir zaman penceresinde `pg_stat_statements` tekrar oku.
+5. Sonraki turda ancak gerekirse ikinci index paketi, replica veya ileri DB olcekleme dusun.
