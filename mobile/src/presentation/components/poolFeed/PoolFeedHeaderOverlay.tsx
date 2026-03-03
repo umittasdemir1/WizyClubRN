@@ -7,8 +7,8 @@ import { useUploadStore } from '../../store/useUploadStore';
 import { textShadowStyle } from '@/core/utils/shadow';
 
 // Import SVGs
-import SunIcon from '../../../../assets/icons/sun.svg';
-import VideosUploadSvgIcon from '../../../../assets/icons/videosupload.svg';
+import SunIcon from '@assets/icons/ui/sun.svg';
+import VideosUploadSvgIcon from '@assets/icons/media/videosupload.svg';
 
 // Brightness Button sub-component
 function BrightnessButton() {

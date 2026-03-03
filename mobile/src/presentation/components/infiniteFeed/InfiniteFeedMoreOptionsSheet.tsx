@@ -17,8 +17,8 @@ import { useSurfaceTheme } from '../../hooks/useSurfaceTheme';
 import { FeedMoreOptionsSheetBase } from '../sheets/FeedMoreOptionsSheetBase';
 import { FeedMoreOptionItem, FeedMoreSegmentedItem } from '../sheets/FeedMoreOptionsSheetItems';
 import { SubtitlePreferenceMode } from '../../store/useSubtitlePreferencesStore';
-import ClosedCaptionsDarkIcon from '../../../../assets/icons/closed-captions-dark.svg';
-import ClosedCaptionsLightIcon from '../../../../assets/icons/closed-captions-light.svg';
+import ClosedCaptionsDarkIcon from '@assets/icons/editor/closed-captions-dark.svg';
+import ClosedCaptionsLightIcon from '@assets/icons/editor/closed-captions-light.svg';
 
 interface InfiniteFeedMoreOptionsSheetProps {
     onSavePress?: () => void;

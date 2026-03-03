@@ -26,6 +26,10 @@ export interface UploadComposerDraft {
     coverAssetIndex: number;
     coverTimeSec?: number;
     selectedThumbnailUri?: string;
+    locationName?: string;
+    locationAddress?: string;
+    locationLatitude?: number;
+    locationLongitude?: number;
     playbackRate: number;
     videoVolume: number;
     cropRatio: UploadComposerCropRatio;

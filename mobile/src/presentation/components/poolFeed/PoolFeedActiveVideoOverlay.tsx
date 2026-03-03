@@ -55,7 +55,7 @@ import { Video } from '../../../domain/entities/Video';
 import { PoolFeedActionButtons, PoolFeedActionButtonsRef } from './PoolFeedActionButtons';
 import { PoolFeedMetadataLayer } from './PoolFeedMetadataLayer';
 import { PoolFeedVideoSeekBar } from './PoolFeedVideoSeekBar';
-import PlayIcon from '../../../../assets/icons/play.svg';
+import PlayIcon from '@assets/icons/media/play.svg';
 import type { PoolFeedVideoPlayerPoolRef } from './PoolFeedVideoPlayerPool';
 
 const MAX_RETRIES = 3;

@@ -90,6 +90,10 @@ interface SupabaseVideo {
     brand_name?: string;
     brand_url?: string;
     commercial_type?: string;
+    location_name?: string;
+    location_address?: string;
+    location_latitude?: number;
+    location_longitude?: number;
     music_name?: string;
     music_author?: string;
     media_urls?: any[];
@@ -408,6 +412,53 @@ export class SupabaseVideoDataSource {
         return ids.map((id) => videoMap.get(id)).filter(Boolean) as Video[];
     }
 
+    async searchVideosByLocation(query: string, limit: number = 20, userId?: string): Promise<Video[]> {
+        const trimmed = query.trim();
+        if (!trimmed) return [];
+
+        const escaped = trimmed.replace(/[%_]/g, '\\$&');
+        const ilikeTerm = `%${escaped}%`;
+
+        const { data, error } = await supabase
+            .from('videos')
+            .select('*, profiles(*), post_tags(*, profiles(*))')
+            .is('deleted_at', null)
+            .or(`location_name.ilike.${ilikeTerm},location_address.ilike.${ilikeTerm}`)
+            .order('created_at', { ascending: false })
+            .limit(limit);
+
+        if (error) {
+            logError(LogCode.DB_QUERY_ERROR, 'Location video search error', { query: trimmed, error });
+            return [];
+        }
+
+        const videos = (data as SupabaseVideo[] | null) || [];
+        if (!videos.length) return [];
+
+        if (!userId) {
+            return videos.map((video) => this.mapToVideo(video));
+        }
+
+        const videoIds = videos.map((video) => video.id);
+        const authorIds = [...new Set(videos.map((video) => video.user_id))];
+
+        const [likes, saves, follows] = await Promise.all([
+            supabase.from('likes').select('video_id').eq('user_id', userId).in('video_id', videoIds),
+            supabase.from('saves').select('video_id').eq('user_id', userId).in('video_id', videoIds),
+            supabase.from('follows').select('following_id').eq('follower_id', userId).in('following_id', authorIds),
+        ]);
+
+        const likedVideoIds = new Set(likes.data?.map((row) => row.video_id) || []);
+        const savedVideoIds = new Set(saves.data?.map((row) => row.video_id) || []);
+        const followedUserIds = new Set(follows.data?.map((row) => row.following_id) || []);
+
+        return videos.map((video) => this.mapToVideo(video, {
+            isLiked: likedVideoIds.has(video.id),
+            isSaved: savedVideoIds.has(video.id),
+            isFollowing: followedUserIds.has(video.user_id),
+        }));
+    }
+
     async getStories(userId?: string): Promise<Story[]> {
         const now = new Date().toISOString();
 
@@ -706,6 +757,10 @@ export class SupabaseVideoDataSource {
             brand_name: payload.brand_name || undefined,
             brand_url: payload.brand_url || undefined,
             commercial_type: payload.commercial_type || undefined,
+            location_name: payload.location_name || undefined,
+            location_address: payload.location_address || undefined,
+            location_latitude: payload.location_latitude || undefined,
+            location_longitude: payload.location_longitude || undefined,
             media_urls: Array.isArray(payload.media_urls) ? payload.media_urls : undefined,
             post_type: payload.post_type,
             profiles: payload.profiles ? {
@@ -773,6 +828,10 @@ export class SupabaseVideoDataSource {
             brandName: dto.brand_name,
             brandUrl: dto.brand_url,
             commercialType: dto.commercial_type,
+            locationName: dto.location_name,
+            locationAddress: dto.location_address,
+            locationLatitude: dto.location_latitude,
+            locationLongitude: dto.location_longitude,
             mediaUrls: normalizeMediaUrls(dto.media_urls),
             postType: dto.post_type,
             taggedPeople: dto.post_tags?.map((pt: any) => ({

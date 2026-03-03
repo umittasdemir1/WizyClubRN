@@ -2,6 +2,7 @@ const { LEGACY_MIGRATION_MAIN_USER_ID } = require('../config/constants');
 const { createDraftRepository } = require('../repositories/DraftRepository');
 const { createDraftRoutes } = require('../routes/draftRoutes');
 const { createProfileRoutes } = require('../routes/profileRoutes');
+const { createPlacesRoutes } = require('../routes/placesRoutes');
 const { createStoryRoutes } = require('../routes/storyRoutes');
 const { createSubtitleRoutes } = require('../routes/subtitleRoutes');
 const { createSystemRoutes } = require('../routes/systemRoutes');
@@ -41,6 +42,7 @@ function createRoutes({ infrastructure, useCases, logLine }) {
         generateVideoSubtitlesUseCase,
         migrateAssetsUseCase,
         normalizeSubtitleMutationInput,
+        placesService,
     } = useCases;
 
     return {
@@ -73,6 +75,10 @@ function createRoutes({ infrastructure, useCases, logLine }) {
             upload,
             supabase,
             uploadAvatarUseCase,
+        }),
+        placesRoutes: createPlacesRoutes({
+            placesService,
+            logLine,
         }),
         draftRoutes: createDraftRoutes({
             supabase,

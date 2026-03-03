@@ -19,6 +19,7 @@ function validateEnv(env = process.env) {
         supabaseUrl: env.SUPABASE_URL,
         supabaseServiceKey: env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_KEY,
         supabaseAuthKey: env.SUPABASE_KEY || env.SUPABASE_SERVICE_ROLE_KEY,
+        googlePlacesApiKey: env.GOOGLE_PLACES_API_KEY || env.GOOGLE_MAPS_API_KEY || '',
         r2AccountId: env.R2_ACCOUNT_ID,
         r2AccessKeyId: env.R2_ACCESS_KEY_ID,
         r2SecretAccessKey: env.R2_SECRET_ACCESS_KEY,

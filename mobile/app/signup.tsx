@@ -88,7 +88,7 @@ export default function SignupScreen() {
     return (
         <View style={styles.container}>
             <ImageBackground
-                source={require('../assets/images/auth_background.png')}
+                source={require('../assets/images/auth/auth_background.png')}
                 style={styles.backgroundImage}
                 resizeMode="cover"
             >

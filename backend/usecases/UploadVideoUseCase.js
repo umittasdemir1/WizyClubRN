@@ -46,6 +46,10 @@ class UploadVideoUseCase {
             coverIndex,
             subtitleLanguage,
             manualSubtitles,
+            locationName,
+            locationAddress,
+            locationLatitude,
+            locationLongitude,
             taggedPeople,
             tags,
         } = body || {};
@@ -62,6 +66,18 @@ class UploadVideoUseCase {
         const safeCoverIndex = Number.isFinite(parsedCoverIndex) && parsedCoverIndex >= 0 ? parsedCoverIndex : 0;
         const parsedTrimStartSec = Number.parseFloat(String(trimStartSec ?? '0'));
         const parsedTrimEndSec = Number.parseFloat(String(trimEndSec ?? '0'));
+        const parsedLocationLatitude = Number.parseFloat(String(locationLatitude ?? ''));
+        const parsedLocationLongitude = Number.parseFloat(String(locationLongitude ?? ''));
+        const normalizedLocationName =
+            typeof locationName === 'string' && locationName.trim() ? locationName.trim() : null;
+        const normalizedLocationAddress =
+            typeof locationAddress === 'string' && locationAddress.trim() ? locationAddress.trim() : null;
+        const normalizedLocationLatitude = Number.isFinite(parsedLocationLatitude)
+            ? parsedLocationLatitude
+            : null;
+        const normalizedLocationLongitude = Number.isFinite(parsedLocationLongitude)
+            ? parsedLocationLongitude
+            : null;
         const hasTrimRange =
             Number.isFinite(parsedTrimStartSec)
             && Number.isFinite(parsedTrimEndSec)
@@ -278,6 +294,10 @@ class UploadVideoUseCase {
                 brandName,
                 brandUrl,
                 commercialType,
+                locationName: normalizedLocationName,
+                locationAddress: normalizedLocationAddress,
+                locationLatitude: normalizedLocationLatitude,
+                locationLongitude: normalizedLocationLongitude,
                 isCommercial,
                 width: finalWidth,
                 height: finalHeight,

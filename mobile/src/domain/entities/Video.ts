@@ -25,6 +25,10 @@ export interface Video {
     brandUrl?: string | null;
     isCommercial?: boolean;
     commercialType?: string | null;
+    locationName?: string | null;
+    locationAddress?: string | null;
+    locationLatitude?: number | null;
+    locationLongitude?: number | null;
     width?: number;
     height?: number;
     createdAt?: string;

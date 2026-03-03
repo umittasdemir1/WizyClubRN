@@ -10,6 +10,7 @@ export function useProfileSearch(limit: number = 20) {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const requestIdRef = useRef(0);
+    const profileRepository = useRef(new ProfileRepositoryImpl()).current;
     const searchUseCase = useRef(new SearchProfilesUseCase(new ProfileRepositoryImpl())).current;
 
     const search = useCallback(async (query: string) => {
@@ -41,6 +42,35 @@ export function useProfileSearch(limit: number = 20) {
         }
     }, [limit, searchUseCase]);
 
+    const searchByLocation = useCallback(async (query: string) => {
+        const trimmed = query.trim();
+        if (!trimmed) {
+            setResults([]);
+            setError(null);
+            setIsLoading(false);
+            return;
+        }
+
+        const requestId = ++requestIdRef.current;
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            const viewerId = useAuthStore.getState().user?.id;
+            const data = await profileRepository.searchProfilesByLocation(trimmed, limit, viewerId);
+            if (requestId !== requestIdRef.current) return;
+            setResults(data);
+        } catch (err) {
+            logError(LogCode.REPO_ERROR, 'Location profile search failed', { error: err, query: trimmed });
+            if (requestId !== requestIdRef.current) return;
+            setError('Arama sırasında bir hata oluştu.');
+        } finally {
+            if (requestId === requestIdRef.current) {
+                setIsLoading(false);
+            }
+        }
+    }, [limit, profileRepository]);
+
     const clear = useCallback(() => {
         requestIdRef.current += 1;
         setResults([]);
@@ -53,6 +83,7 @@ export function useProfileSearch(limit: number = 20) {
         isLoading,
         error,
         search,
+        searchByLocation,
         clear,
     };
 }

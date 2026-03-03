@@ -4,7 +4,8 @@ import { Image } from 'expo-image';
 
 interface CategoryCardProps {
     title: string;
-    icon?: string;
+    iconSource?: React.ComponentProps<typeof Image>['source'];
+    iconComponent?: React.ComponentType<any>;
     iconType?: 'image' | 'dots';
     backgroundColor: string;
     onPress?: () => void;
@@ -13,7 +14,8 @@ interface CategoryCardProps {
 
 export function CategoryCard({
     title,
-    icon,
+    iconSource,
+    iconComponent: IconComponent,
     iconType = 'image',
     backgroundColor,
     onPress,
@@ -33,9 +35,11 @@ export function CategoryCard({
                         <View style={[styles.dot, { backgroundColor: '#ec4899' }]} />
                         <View style={[styles.dot, { backgroundColor: '#ec4899' }]} />
                     </View>
-                ) : icon ? (
+                ) : IconComponent ? (
+                    <IconComponent width={48} height={48} />
+                ) : iconSource ? (
                     <Image
-                        source={{ uri: icon }}
+                        source={iconSource}
                         style={styles.icon}
                         contentFit="contain"
                     />

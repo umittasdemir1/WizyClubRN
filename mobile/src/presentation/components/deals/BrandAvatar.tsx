@@ -7,7 +7,8 @@ interface BrandAvatarProps {
     brandName: string;
     discount: string;
     backgroundColor: string;
-    iconUrl: string;
+    iconSource?: React.ComponentProps<typeof Image>['source'];
+    iconComponent?: React.ComponentType<any>;
     onPress?: () => void;
 }
 
@@ -15,18 +16,23 @@ export function BrandAvatar({
     brandName,
     discount,
     backgroundColor,
-    iconUrl,
+    iconSource,
+    iconComponent: IconComponent,
     onPress,
 }: BrandAvatarProps) {
     return (
         <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
             <View style={styles.avatarWrapper}>
                 <View style={[styles.avatar, { backgroundColor }]}>
-                    <Image
-                        source={{ uri: iconUrl }}
-                        style={styles.icon}
-                        contentFit="contain"
-                    />
+                    {IconComponent ? (
+                        <IconComponent width={48} height={48} />
+                    ) : iconSource ? (
+                        <Image
+                            source={iconSource}
+                            style={styles.icon}
+                            contentFit="contain"
+                        />
+                    ) : null}
                 </View>
                 <View style={styles.badge}>
                     <Text style={styles.badgeText}>{discount}</Text>

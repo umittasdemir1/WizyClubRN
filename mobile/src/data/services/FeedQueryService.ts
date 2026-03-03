@@ -105,7 +105,7 @@ export class FeedQueryService {
 
     mapUploadedVideoForFeed(payload: UploadedVideoPayload | null | undefined): Video | null {
         if (!payload) return null;
-        return null;
+        return this.videoDataSource.mapUploadPayloadToVideo(payload);
     }
 
     async getVideoHashtags(videoId: string): Promise<string[]> {

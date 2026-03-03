@@ -3,8 +3,8 @@ import { View, Text, StyleSheet, Pressable, Dimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { Eye, Play } from 'lucide-react-native';
 import { textShadowStyle } from '@/core/utils/shadow';
-import CarouselMediaIcon from '../../../../assets/icons/carousel.svg';
-import VideoMediaIcon from '../../../../assets/icons/videos.svg';
+import CarouselMediaIcon from '@assets/icons/media/carousel.svg';
+import VideoMediaIcon from '@assets/icons/navigation/videos.svg';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const COLUMN_COUNT = 3;

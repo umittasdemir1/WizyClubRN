@@ -133,6 +133,7 @@ export function InfiniteFeedManager({
     const setSubtitleMode = useSubtitlePreferencesStore((state) => state.setMode);
     const uploadStatus = useUploadStore((state) => state.status);
     const uploadedVideoId = useUploadStore((state) => state.uploadedVideoId);
+    const uploadedVideoPayload = useUploadStore((state) => state.uploadedVideoPayload);
     const taggedPeoplePreview = useUploadStore((state) => state.taggedPeoplePreview);
     const resetUpload = useUploadStore((state) => state.reset);
     const globalIsPaused = useInfiniteFeedActiveVideoStore((state) => state.isPaused);
@@ -309,6 +310,11 @@ export function InfiniteFeedManager({
     const handleHashtagPress = useCallback((hashtag: string) => {
         feedQueryServiceRef.current.recordHashtagClick(hashtag);
         router.push(`/search?q=${encodeURIComponent('#' + hashtag)}` as any);
+    }, [router]);
+    const handleLocationPress = useCallback((locationQuery: string) => {
+        const trimmed = locationQuery.trim();
+        if (!trimmed) return;
+        router.push(`/search?q=${encodeURIComponent(trimmed)}&tab=${encodeURIComponent('Yerler')}` as any);
     }, [router]);
 
     const handleOpenMoreOptions = useCallback((videoId: string) => {
@@ -642,7 +648,8 @@ export function InfiniteFeedManager({
             await wait(2000);
             if (cancelled) return;
 
-            const videoData = await feedQueryServiceRef.current.waitForVideoForFeed(uploadedVideoId, {
+            const immediateVideo = feedQueryServiceRef.current.mapUploadedVideoForFeed(uploadedVideoPayload);
+            const videoData = immediateVideo || await feedQueryServiceRef.current.waitForVideoForFeed(uploadedVideoId, {
                 attempts: 5,
                 delayMs: 120,
             });
@@ -685,6 +692,7 @@ export function InfiniteFeedManager({
         resetUpload,
         taggedPeoplePreview,
         uploadedVideoId,
+        uploadedVideoPayload,
         uploadStatus,
     ]);
 
@@ -995,6 +1003,7 @@ export function InfiniteFeedManager({
         onCarouselTouchEnd: handleCarouselTouchEnd,
         onTagPress: handleOpenTaggedPeople,
         onHashtagPress: handleHashtagPress,
+        onLocationPress: handleLocationPress,
     });
 
     useEffect(() => {
@@ -1013,6 +1022,7 @@ export function InfiniteFeedManager({
             onCarouselTouchEnd: handleCarouselTouchEnd,
             onTagPress: handleOpenTaggedPeople,
             onHashtagPress: handleHashtagPress,
+            onLocationPress: handleLocationPress,
         };
     }, [
         toggleMute,
@@ -1029,6 +1039,7 @@ export function InfiniteFeedManager({
         handleCarouselTouchEnd,
         handleOpenTaggedPeople,
         handleHashtagPress,
+        handleLocationPress,
     ]);
 
     // ✅ [PERF] Sync volatile refs for renderItem (no re-render trigger)
@@ -1095,6 +1106,7 @@ export function InfiniteFeedManager({
                 onWatchMoreClips={handlers.onWatchMoreClips}
                 onTagPress={() => handlers.onTagPress?.(item.id)}
                 onHashtagPress={handlers.onHashtagPress}
+                onLocationPress={handlers.onLocationPress}
                 onCarouselTouchStart={handlers.onCarouselTouchStart}
                 onCarouselTouchEnd={handlers.onCarouselTouchEnd}
                 isMeasurement={target === 'Measurement'}

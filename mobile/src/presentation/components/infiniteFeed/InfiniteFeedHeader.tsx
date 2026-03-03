@@ -6,7 +6,7 @@ import { useNotificationStore } from '../../store/useNotificationStore';
 import { ThemeColors } from './InfiniteFeedTypes';
 import { InfiniteStoryBar } from './InfiniteStoryBar';
 import { InfiniteFeedUploadPreview } from './InfiniteFeedUploadPreview';
-import NotificationIcon from '../../../../assets/icons/notification.svg';
+import NotificationIcon from '@assets/icons/ui/notification.svg';
 
 export const FEED_TABS = ['Takipte', 'Sana \u00d6zel'] as const;
 export type FeedTab = (typeof FEED_TABS)[number];
@@ -256,4 +256,3 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
 });
-

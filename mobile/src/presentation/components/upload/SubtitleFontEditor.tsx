@@ -15,11 +15,11 @@ import type {
     SubtitleTextCase,
 } from '../../../domain/entities/Subtitle';
 import { resolveSubtitleFontFamily } from '../../../core/utils/subtitleOverlay';
-import OverlayCloseIcon from '../../../../assets/icons/overlayclose.svg';
-import OverlayOpenIcon from '../../../../assets/icons/overlayopen.svg';
-import ADownIcon from '../../../../assets/icons/a_down.svg';
-import AUpIcon from '../../../../assets/icons/a_up.svg';
-import TypeIcon from '../../../../assets/icons/type.svg';
+import OverlayCloseIcon from '@assets/icons/editor/overlayclose.svg';
+import OverlayOpenIcon from '@assets/icons/editor/overlayopen.svg';
+import ADownIcon from '@assets/icons/editor/a_down.svg';
+import AUpIcon from '@assets/icons/editor/a_up.svg';
+import TypeIcon from '@assets/icons/editor/type.svg';
 
 interface SubtitleFontOption {
     value: SubtitleFontFamily;
@@ -57,7 +57,7 @@ const TEXT_COLOR_INITIAL_VISIBLE_WIDTH =
     (TEXT_COLOR_SWATCH_SIZE * TEXT_COLOR_INITIAL_VISIBLE_COUNT)
     + (TEXT_COLOR_SWATCH_GAP * (TEXT_COLOR_INITIAL_VISIBLE_COUNT - 1))
     + TEXT_COLOR_DIVIDER_WIDTH;
-const ColorWheelIconAsset = require('../../../../assets/icons/color-wheel');
+const ColorWheelIconAsset = require('../../../../assets/icons/editor/color-wheel.png');
 
 const FONT_OPTIONS: SubtitleFontOption[] = [
     { value: 'system', label: 'Classic' },

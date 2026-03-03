@@ -58,6 +58,17 @@ export class ProfileRepositoryImpl implements IProfileRepository {
         }
     }
 
+    async searchProfilesByLocation(query: string, limit: number = 20, viewerId?: string): Promise<User[]> {
+        try {
+            const data = await this.dataSource.searchProfilesByLocation(query, limit, viewerId);
+            return data.map((dto: any) => this.mapDtoToUser(dto));
+        } catch (error: unknown) {
+            const err = error as Error;
+            logError(LogCode.REPO_ERROR, 'Profile repository location search error', { error: err, query, viewerId });
+            return [];
+        }
+    }
+
     async updateProfile(userId: string, profile: Partial<User>): Promise<User> {
         // Convert camelCase to snake_case for DB is handled in DataSource usually 
         // or we need to map it here before sending if DataSource expects snake_case.

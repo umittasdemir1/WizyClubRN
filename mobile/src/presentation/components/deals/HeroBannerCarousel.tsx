@@ -23,10 +23,11 @@ const GAP = 10; // Kartlar arası boşluk (Azalttık ki kopuk durmasın)
 // Burası ilk kartın solundaki boşluktur.
 // Kart %92 olduğu için kalan boşluk %8'dir. Bunun yarısı %4 sağa, %4 sola düşer.
 const SIDE_OFFSET = (SCREEN_WIDTH - CARD_WIDTH) / 7.5;
+type BannerImageSource = React.ComponentProps<typeof Image>['source'];
 
 interface AdBanner {
   id: string;
-  imageUrl: string;
+  imageSource: BannerImageSource;
   onPress?: () => void;
 }
 
@@ -86,7 +87,7 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
           style={styles.cardInner}
         >
           <Image
-            source={{ uri: item.imageUrl }}
+            source={item.imageSource}
             style={styles.image}
             contentFit="cover"
             transition={200}

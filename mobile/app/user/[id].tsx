@@ -39,10 +39,10 @@ import Animated, {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
-import LikeIcon from '../../assets/icons/like.svg';
-import ShareIcon from '../../assets/icons/share.svg';
-import VideosTabSvgIcon from '../../assets/icons/videos.svg';
-import DarkVideosTabSvgIcon from '../../assets/icons/darkvideos.svg';
+import LikeIcon from '@assets/icons/ui/like.svg';
+import ShareIcon from '@assets/icons/ui/share.svg';
+import VideosTabSvgIcon from '@assets/icons/navigation/videos.svg';
+import DarkVideosTabSvgIcon from '@assets/icons/navigation/darkvideos.svg';
 import { useVideoFeed } from '../../src/presentation/hooks/useVideoFeed';
 import { useProfile } from '../../src/presentation/hooks/useProfile';
 import { LIGHT_COLORS, DARK_COLORS } from '../../src/core/constants';

@@ -1,8 +1,8 @@
 import React from 'react';
 import { View, StyleSheet, Dimensions, Pressable } from 'react-native';
 import { Image } from 'expo-image';
-import CarouselMediaIcon from '../../../../assets/icons/carousel.svg';
-import VideoMediaIcon from '../../../../assets/icons/videos.svg';
+import CarouselMediaIcon from '@assets/icons/media/carousel.svg';
+import VideoMediaIcon from '@assets/icons/navigation/videos.svg';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const GAP = 2;

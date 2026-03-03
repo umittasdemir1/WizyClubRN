@@ -32,6 +32,7 @@ const UploadAvatarUseCase = require('../usecases/UploadAvatarUseCase');
 const UploadStoryUseCase = require('../usecases/UploadStoryUseCase');
 const UploadVideoUseCase = require('../usecases/UploadVideoUseCase');
 const HlsService = require('../services/HlsService');
+const PlacesService = require('../services/PlacesService');
 const SubtitleService = require('../services/SubtitleService');
 const { createHttpError } = require('../utils/httpError');
 const { safeParseJsonArray } = require('../utils/safeParseJsonArray');
@@ -70,8 +71,13 @@ function createUseCases({
         logLine,
         cooldownMs: SUBTITLE_COOLDOWN_MS,
     });
+    const placesService = new PlacesService({
+        apiKey: envConfig.googlePlacesApiKey,
+        logLine,
+    });
 
     return {
+        placesService,
         uploadProgressService,
         generateVideoSubtitlesUseCase: new GenerateVideoSubtitlesUseCase({
             subtitleService,

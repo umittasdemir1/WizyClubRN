@@ -67,6 +67,10 @@ test('video and story mappers convert upload payloads into DB payloads', () => {
         brandName: 'Wizy',
         brandUrl: 'https://wizy.example',
         commercialType: 'brand',
+        locationName: 'Midtown AVM',
+        locationAddress: 'Atasehir, Istanbul',
+        locationLatitude: 40.987654,
+        locationLongitude: 29.123456,
         isCommercial: true,
         width: 1080,
         height: 1920,
@@ -76,6 +80,8 @@ test('video and story mappers convert upload payloads into DB payloads', () => {
     assert.equal(videoPayload.user_id, 'user-1');
     assert.equal(videoPayload.video_url, 'https://cdn.example/master.mp4');
     assert.equal(videoPayload.is_commercial, true);
+    assert.equal(videoPayload.location_name, 'Midtown AVM');
+    assert.equal(videoPayload.location_address, 'Atasehir, Istanbul');
 
     const storyPayload = toStoryInsertPayload({
         userId: 'user-2',

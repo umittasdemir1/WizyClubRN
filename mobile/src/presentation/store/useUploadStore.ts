@@ -20,6 +20,10 @@ export interface UploadedVideoPayload {
     brand_name?: string | null;
     brand_url?: string | null;
     commercial_type?: string | null;
+    location_name?: string | null;
+    location_address?: string | null;
+    location_latitude?: number | null;
+    location_longitude?: number | null;
     media_urls?: unknown[];
     post_type?: 'video' | 'carousel';
     profiles?: {

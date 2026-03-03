@@ -27,7 +27,7 @@ function toVideoRecord(row) {
 }
 
 function toVideoInsertPayload(input) {
-    return {
+    const payload = {
         user_id: input.userId,
         video_url: input.videoUrl,
         thumbnail_url: input.thumbnailUrl,
@@ -43,6 +43,21 @@ function toVideoInsertPayload(input) {
         height: input.height,
         processing_status: input.processingStatus || 'completed',
     };
+
+    if (input.locationName != null || input.locationAddress != null) {
+        payload.location_name = input.locationName || null;
+        payload.location_address = input.locationAddress || null;
+    }
+
+    if (typeof input.locationLatitude === 'number') {
+        payload.location_latitude = input.locationLatitude;
+    }
+
+    if (typeof input.locationLongitude === 'number') {
+        payload.location_longitude = input.locationLongitude;
+    }
+
+    return payload;
 }
 
 module.exports = {

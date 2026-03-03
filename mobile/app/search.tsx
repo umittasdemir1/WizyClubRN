@@ -3,12 +3,13 @@ import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, FlatList, Key
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SystemBars } from 'react-native-edge-to-edge';
-import { ArrowLeft, Search, X, Clock } from 'lucide-react-native';
+import * as Location from 'expo-location';
+import { ArrowLeft, Search, X, Clock, MapPinCheckInside } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import VideoPlayer from 'react-native-video';
-import CarouselMediaIcon from '../assets/icons/carousel.svg';
-import VideoMediaIcon from '../assets/icons/videos.svg';
+import CarouselMediaIcon from '@assets/icons/media/carousel.svg';
+import VideoMediaIcon from '@assets/icons/navigation/videos.svg';
 import { VideoCacheService } from '../src/data/services/VideoCacheService';
 import { FeedQueryService, type HashtagSearchResult } from '../src/data/services/FeedQueryService';
 import { Hash } from 'lucide-react-native';
@@ -23,6 +24,7 @@ import { formatCount } from '../src/core/utils';
 import { getVideoUrl } from '../src/core/utils/videoUrl';
 import { User } from '../src/domain/entities/User';
 import { Video as VideoEntity } from '../src/domain/entities/Video';
+import { CONFIG } from '../src/core/config';
 
 const RECENT_KEY = 'search.recent.users';
 const MAX_RECENT = 10;
@@ -31,15 +33,39 @@ const RESULT_LIMIT = 30;
 const POST_LIMIT = 30;
 const SEARCH_DEBOUNCE_MS = 350;
 const POST_GRID_GAP = 2;
+const SEARCH_BUBBLE_ICON_SIZE = 24;
 const DISCOVERY_ICON_SIZE = 22;
 const DISCOVERY_ICON_BG_SIZE = 28;
+const DEFAULT_ACCOUNTS_PREVIEW_LIMIT = 5;
+const LOCATION_ACCOUNTS_PREVIEW_LIMIT = 10;
 
 type RecentUser = Pick<User, 'id' | 'username' | 'fullName' | 'avatarUrl' | 'isVerified' | 'followersCount'>;
-type RecentItem = { type: 'query'; value: string } | { type: 'user'; user: RecentUser };
+type SearchQueryKind = 'search' | 'hashtag' | 'place';
+type RecentItem = { type: 'query'; value: string; queryKind: SearchQueryKind } | { type: 'user'; user: RecentUser };
 type SuggestionItem = { type: 'query'; value: string } | { type: 'user'; user: User };
 type HashtagResult = HashtagSearchResult;
-const TABS = ['Senin İçin', 'Hesaplar', 'Kişiselleştirilmemiş', 'Etiketler', 'Yerder'] as const;
+type PlaceResult = {
+    id: string;
+    placeId?: string;
+    name: string;
+    address: string;
+};
+const TABS = ['Senin İçin', 'Hesaplar', 'Kişiselleştirilmemiş', 'Etiketler', 'Yerler'] as const;
 type SearchTab = typeof TABS[number];
+const normalizeSearchTab = (value: unknown): SearchTab | null => {
+    if (typeof value !== 'string') return null;
+    return (TABS as readonly string[]).includes(value) ? value as SearchTab : null;
+};
+const resolveRecentQueryKind = (
+    value: string,
+    preferredTab?: SearchTab,
+    mode: 'default' | 'location' = 'default'
+): SearchQueryKind => {
+    const trimmed = value.trim();
+    if (trimmed.startsWith('#')) return 'hashtag';
+    if (mode === 'location' || preferredTab === 'Yerler') return 'place';
+    return 'search';
+};
 
 const resolvePostMedia = (post: VideoEntity) => {
     const media = post.mediaUrls ?? [];
@@ -72,7 +98,7 @@ const resolvePostMediaType = (post: VideoEntity): 'carousel' | 'video' | 'photo'
 export default function SearchScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
-    const params = useLocalSearchParams<{ q?: string }>();
+    const params = useLocalSearchParams<{ q?: string; tab?: string }>();
     const isDark = useThemeStore((state) => state.isDark);
     const theme = isDark ? DARK_COLORS : LIGHT_COLORS;
     const [query, setQuery] = useState(params.q ?? '');
@@ -81,8 +107,9 @@ export default function SearchScreen() {
     const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastProfileQueryRef = useRef<string>('');
     const lastPostQueryRef = useRef<string>('');
-    const [selectedTab, setSelectedTab] = useState<SearchTab>('Senin İçin');
+    const [selectedTab, setSelectedTab] = useState<SearchTab>(normalizeSearchTab(params.tab) ?? 'Senin İçin');
     const [isCommittedSearch, setIsCommittedSearch] = useState(false);
+    const [searchMode, setSearchMode] = useState<'default' | 'location'>('default');
     const [activePostIndex, setActivePostIndex] = useState<number | null>(null);
     const [videoSources, setVideoSources] = useState<Record<string, { uri: string }>>({});
     const [readyVideoIds, setReadyVideoIds] = useState<Record<string, boolean>>({});
@@ -91,16 +118,28 @@ export default function SearchScreen() {
     const [footerOffsetY, setFooterOffsetY] = useState(0);
     const [gridLocalY, setGridLocalY] = useState(0);
     const [tileLayouts, setTileLayouts] = useState<Record<string, { y: number; height: number }>>({});
+    const [tabLayouts, setTabLayouts] = useState<Partial<Record<SearchTab, { x: number; width: number }>>>({});
+    const tabScrollRef = useRef<ScrollView | null>(null);
     const { width: windowWidth } = useWindowDimensions();
     const postTileWidth = (windowWidth - POST_GRID_GAP) / 2;
 
-    const { results, isLoading, error, search, clear } = useProfileSearch(RESULT_LIMIT);
-    const { results: postResults, isLoading: isPostsLoading, error: postsError, search: searchPosts, clear: clearPosts } = useVideoSearch(POST_LIMIT);
+    const { results, isLoading, error, search, searchByLocation: searchProfilesByLocation, clear } = useProfileSearch(RESULT_LIMIT);
+    const {
+        results: postResults,
+        isLoading: isPostsLoading,
+        error: postsError,
+        search: searchPosts,
+        searchByLocation: searchVideosByLocation,
+        clear: clearPosts,
+    } = useVideoSearch(POST_LIMIT);
     const [hashtagResults, setHashtagResults] = useState<HashtagResult[]>([]);
     const [isHashtagsLoading, setIsHashtagsLoading] = useState(false);
     const [isHashtagDiscovery, setIsHashtagDiscovery] = useState(false);
+    const [placeResults, setPlaceResults] = useState<PlaceResult[]>([]);
+    const [isPlacesLoading, setIsPlacesLoading] = useState(false);
     const feedQueryServiceRef = useRef(new FeedQueryService());
     const currentUserId = useAuthStore((state) => state.user?.id);
+    const lastPlaceQueryRef = useRef<string>('');
     const videoIndices = useMemo(
         () =>
             postResults.reduce<number[]>((acc, post, index) => {
@@ -156,6 +195,29 @@ export default function SearchScreen() {
         [clearPosts, searchPosts]
     );
 
+    const runLocationProfileSearch = useCallback(
+        (value: string, options?: { force?: boolean }) => {
+            const trimmed = value.trim();
+            if (trimmed.length < MIN_QUERY_LENGTH) return;
+            if (!options?.force && trimmed === lastProfileQueryRef.current) return;
+            lastProfileQueryRef.current = trimmed;
+            searchProfilesByLocation(trimmed);
+        },
+        [searchProfilesByLocation]
+    );
+
+    const runLocationPostSearch = useCallback(
+        (value: string, options?: { force?: boolean }) => {
+            const trimmed = value.trim();
+            if (trimmed.length < MIN_QUERY_LENGTH) return;
+            if (!options?.force && trimmed === lastPostQueryRef.current) return;
+            lastPostQueryRef.current = trimmed;
+            clearPosts();
+            searchVideosByLocation(trimmed);
+        },
+        [clearPosts, searchVideosByLocation]
+    );
+
     const searchHashtags = useCallback(async (value: string) => {
         if (!value.trim()) {
             setHashtagResults([]);
@@ -169,6 +231,90 @@ export default function SearchScreen() {
             setHashtagResults([]);
         } finally {
             setIsHashtagsLoading(false);
+        }
+    }, []);
+
+    const searchPlaces = useCallback(async (value: string, options?: { force?: boolean }) => {
+        const trimmed = value.trim();
+        if (trimmed.length < MIN_QUERY_LENGTH) {
+            lastPlaceQueryRef.current = '';
+            setPlaceResults([]);
+            return;
+        }
+        if (!options?.force && trimmed === lastPlaceQueryRef.current) {
+            return;
+        }
+
+        lastPlaceQueryRef.current = trimmed;
+        setIsPlacesLoading(true);
+
+        try {
+            const response = await fetch(
+                `${CONFIG.API_URL}/places/autocomplete?q=${encodeURIComponent(trimmed)}&limit=10`
+            );
+            const payload = await response.json().catch(() => ({})) as {
+                success?: boolean;
+                error?: string;
+                data?: {
+                    predictions?: Array<{
+                        placeId?: string;
+                        name?: string;
+                        address?: string;
+                    }>;
+                };
+            };
+
+            if (!response.ok || payload.success === false) {
+                throw new Error(payload.error || 'Failed to search places');
+            }
+
+            const normalized = (payload.data?.predictions ?? [])
+                .map((item, index) => {
+                    const name = typeof item?.name === 'string' ? item.name.trim() : '';
+                    if (!name) return null;
+                    const placeId = typeof item?.placeId === 'string' ? item.placeId.trim() : '';
+                    const nextPlace: PlaceResult = {
+                        id: placeId || `place:${trimmed}:${index}`,
+                        name,
+                        address: (typeof item?.address === 'string' && item.address.trim()) || 'Adres bilgisi yok',
+                    };
+                    if (placeId) {
+                        nextPlace.placeId = placeId;
+                    }
+                    return nextPlace;
+                })
+                .filter((item): item is PlaceResult => item !== null);
+
+            setPlaceResults(normalized);
+        } catch {
+            try {
+                const geocoded = await Location.geocodeAsync(trimmed);
+                const fallback = await Promise.all(
+                    geocoded.slice(0, 8).map(async (item, index) => {
+                        const reverse = await Location.reverseGeocodeAsync({
+                            latitude: item.latitude,
+                            longitude: item.longitude,
+                        });
+                        const reverseRow = reverse[0];
+                        const address = [
+                            reverseRow?.district,
+                            reverseRow?.city,
+                            reverseRow?.region,
+                        ].filter(Boolean).join(', ') || 'Adres bilgisi yok';
+
+                        return {
+                            id: `fallback:${item.latitude.toFixed(5)}:${item.longitude.toFixed(5)}:${index}`,
+                            name: trimmed,
+                            address,
+                        } satisfies PlaceResult;
+                    })
+                );
+                setPlaceResults(fallback);
+            } catch {
+                setPlaceResults([]);
+            }
+        } finally {
+            setIsPlacesLoading(false);
         }
     }, []);
 
@@ -189,6 +335,7 @@ export default function SearchScreen() {
         const onBackPress = () => {
             if (isCommittedSearch) {
                 setIsCommittedSearch(false);
+                setSearchMode('default');
                 return true;
             }
             return false;
@@ -208,7 +355,12 @@ export default function SearchScreen() {
                     const cleaned: RecentItem[] = parsed
                         .map((item) => {
                             if (item && typeof item === 'object' && item.type === 'query' && typeof item.value === 'string') {
-                                return { type: 'query' as const, value: item.value };
+                                const parsedKind = item.queryKind;
+                                const queryKind: SearchQueryKind =
+                                    parsedKind === 'hashtag' || parsedKind === 'place' || parsedKind === 'search'
+                                        ? parsedKind
+                                        : resolveRecentQueryKind(item.value);
+                                return { type: 'query' as const, value: item.value, queryKind };
                             }
                             if (item && typeof item === 'object' && item.type === 'user' && item.user && typeof item.user.id === 'string') {
                                 const user = item.user;
@@ -241,6 +393,23 @@ export default function SearchScreen() {
     }, []);
 
     useEffect(() => {
+        const activeLayout = tabLayouts[selectedTab];
+        if (!activeLayout || !tabScrollRef.current) return;
+
+        const targetX = Math.max(0, activeLayout.x - ((windowWidth - activeLayout.width) / 2));
+        requestAnimationFrame(() => {
+            tabScrollRef.current?.scrollTo({ x: targetX, animated: true });
+        });
+    }, [selectedTab, tabLayouts, windowWidth]);
+
+    useEffect(() => {
+        if (isCommittedSearch) {
+            if (searchTimeoutRef.current) {
+                clearTimeout(searchTimeoutRef.current);
+            }
+            return;
+        }
+
         const trimmed = query.trim();
         if (searchTimeoutRef.current) {
             clearTimeout(searchTimeoutRef.current);
@@ -264,7 +433,7 @@ export default function SearchScreen() {
                 clearTimeout(searchTimeoutRef.current);
             }
         };
-    }, [query, clear, clearPosts, runProfileSearch]);
+    }, [query, clear, clearPosts, isCommittedSearch, runProfileSearch]);
 
     useEffect(() => {
         setVideoSources({});
@@ -344,6 +513,7 @@ export default function SearchScreen() {
     const handleBack = () => {
         if (isCommittedSearch) {
             setIsCommittedSearch(false);
+            setSearchMode('default');
             return;
         }
         router.back();
@@ -367,12 +537,13 @@ export default function SearchScreen() {
         });
     }, []);
 
-    const addRecentQuery = useCallback((value: string) => {
+    const addRecentQuery = useCallback((value: string, queryKind?: SearchQueryKind) => {
         const normalized = value.trim();
         if (!normalized) return;
+        const resolvedKind = queryKind ?? resolveRecentQueryKind(normalized);
         setRecentItems((prev) => {
             const filtered = prev.filter((item) => !(item.type === 'query' && item.value.toLowerCase() === normalized.toLowerCase()));
-            const next: RecentItem[] = [{ type: 'query' as const, value: normalized }, ...filtered].slice(0, MAX_RECENT);
+            const next: RecentItem[] = [{ type: 'query' as const, value: normalized, queryKind: resolvedKind }, ...filtered].slice(0, MAX_RECENT);
             AsyncStorage.setItem(RECENT_KEY, JSON.stringify(next)).catch(() => { });
             return next;
         });
@@ -388,41 +559,54 @@ export default function SearchScreen() {
         setCommittedQuery('');
         lastProfileQueryRef.current = '';
         lastPostQueryRef.current = '';
+        lastPlaceQueryRef.current = '';
         clear();
         clearPosts();
         setHashtagResults([]);
+        setPlaceResults([]);
         setIsHashtagDiscovery(false);
         setIsCommittedSearch(false);
+        setSearchMode('default');
     };
 
     const commitSearch = useCallback(
-        (value: string, options?: { force?: boolean }) => {
+        (value: string, options?: { force?: boolean; preferredTab?: SearchTab; mode?: 'default' | 'location' }) => {
             const trimmed = value.trim();
             if (trimmed.length < MIN_QUERY_LENGTH) return;
             if (searchTimeoutRef.current) {
                 clearTimeout(searchTimeoutRef.current);
             }
+            const nextMode = options?.mode === 'location' ? 'location' : 'default';
             setIsCommittedSearch(true);
             setCommittedQuery(trimmed);
-            addRecentQuery(trimmed);
+            setSearchMode(nextMode);
+            addRecentQuery(trimmed, resolveRecentQueryKind(trimmed, options?.preferredTab, nextMode));
             Keyboard.dismiss();
 
             const isHashtagQuery = trimmed.startsWith('#');
 
             if (isHashtagQuery) {
                 // Phase 1: Only search hashtags, no tabs
+                setSearchMode('default');
                 setIsHashtagDiscovery(true);
                 searchHashtags(trimmed);
+                setPlaceResults([]);
                 // Don't run profile/post search yet
             } else {
                 // Normal search: run all searches
                 setIsHashtagDiscovery(false);
-                setSelectedTab('Senin İçin');
+                setSelectedTab(options?.preferredTab ?? 'Senin İçin');
                 const forceProfile = options?.force || Boolean(error);
                 const forcePosts = options?.force || Boolean(postsError);
-                runProfileSearch(trimmed, forceProfile ? { force: true } : undefined);
-                runPostSearch(trimmed, forcePosts ? { force: true } : undefined);
+                if (nextMode === 'location') {
+                    runLocationProfileSearch(trimmed, forceProfile ? { force: true } : undefined);
+                    runLocationPostSearch(trimmed, forcePosts ? { force: true } : undefined);
+                } else {
+                    runProfileSearch(trimmed, forceProfile ? { force: true } : undefined);
+                    runPostSearch(trimmed, forcePosts ? { force: true } : undefined);
+                }
                 searchHashtags(trimmed);
+                searchPlaces(trimmed, options?.force ? { force: true } : undefined);
             }
 
             // Track hashtag searches
@@ -433,7 +617,17 @@ export default function SearchScreen() {
                 });
             }
         },
-        [addRecentQuery, error, postsError, runPostSearch, runProfileSearch, searchHashtags]
+        [
+            addRecentQuery,
+            error,
+            postsError,
+            runLocationPostSearch,
+            runLocationProfileSearch,
+            runPostSearch,
+            runProfileSearch,
+            searchHashtags,
+            searchPlaces,
+        ]
     );
 
     // Phase 2: User picks a hashtag from discovery → full tabbed search
@@ -444,7 +638,9 @@ export default function SearchScreen() {
             setCommittedQuery(tagQuery);
             setIsHashtagDiscovery(false);
             setIsCommittedSearch(true);
+            setSearchMode('default');
             setSelectedTab('Senin İçin');
+            addRecentQuery(tagQuery, 'hashtag');
 
             // Search posts containing this hashtag
             runPostSearch(tagQuery, { force: true });
@@ -456,23 +652,42 @@ export default function SearchScreen() {
             // Track click
             feedQueryServiceRef.current.recordHashtagClick(hashtagName);
         },
-        [runPostSearch, runProfileSearch, searchHashtags]
+        [addRecentQuery, runPostSearch, runProfileSearch, searchHashtags]
     );
 
-    const initialQueryHandled = useRef(false);
+    const lastRouteSyncKeyRef = useRef('');
     useEffect(() => {
-        if (!initialQueryHandled.current && params.q) {
-            initialQueryHandled.current = true;
-            commitSearch(params.q);
+        const nextQuery = typeof params.q === 'string' ? params.q : '';
+        const nextTab = normalizeSearchTab(params.tab) ?? undefined;
+        const syncKey = `${nextQuery}::${nextTab ?? ''}`;
+
+        if (syncKey === lastRouteSyncKeyRef.current) {
+            return;
         }
-    }, [params.q, commitSearch]);
+
+        lastRouteSyncKeyRef.current = syncKey;
+
+        if (nextQuery.trim().length >= MIN_QUERY_LENGTH) {
+            setQuery(nextQuery);
+            commitSearch(nextQuery, { preferredTab: nextTab });
+            return;
+        }
+
+        if (nextTab) {
+            setSelectedTab(nextTab);
+        }
+    }, [params.q, params.tab, commitSearch]);
 
     const handleSubmit = () => {
         commitSearch(query);
     };
 
     const handleRetry = () => {
-        commitSearch(query, { force: true });
+        commitSearch(query, {
+            force: true,
+            preferredTab: searchMode === 'location' ? 'Senin İçin' : selectedTab,
+            mode: searchMode,
+        });
     };
 
     const handleRemoveRecent = (item: RecentItem) => {
@@ -494,7 +709,12 @@ export default function SearchScreen() {
         return [...followed, ...others];
     }, [results]);
 
-    const forYouResults = useMemo(() => displayResults.slice(0, 5), [displayResults]);
+    const accountsPreviewLimit = searchMode === 'location' ? LOCATION_ACCOUNTS_PREVIEW_LIMIT : DEFAULT_ACCOUNTS_PREVIEW_LIMIT;
+    const forYouResults = useMemo(
+        () => displayResults.slice(0, accountsPreviewLimit),
+        [accountsPreviewLimit, displayResults]
+    );
+    const hasMorePreviewAccounts = searchMode === 'location' && displayResults.length > forYouResults.length;
 
     const suggestionResults = useMemo<SuggestionItem[]>(() => {
         const followed = results.filter((item) => item.isFollowing);
@@ -511,14 +731,14 @@ export default function SearchScreen() {
     const handleOpenProfile = useCallback((user: RecentUser | User) => {
         addRecentUser(user);
         if (query.trim().length > 0) {
-            addRecentQuery(query);
+            addRecentQuery(query, resolveRecentQueryKind(query, selectedTab, searchMode));
         }
         if (currentUserId && user.id === currentUserId) {
             router.push('/profile');
             return;
         }
         router.push(`/user/${user.id}` as any);
-    }, [addRecentQuery, addRecentUser, currentUserId, query, router]);
+    }, [addRecentQuery, addRecentUser, currentUserId, query, router, searchMode, selectedTab]);
 
     const renderUserRow = (user: RecentUser | User) => (
         <View style={styles.resultRow}>
@@ -563,7 +783,7 @@ export default function SearchScreen() {
                         }}
                     >
                         <View style={[styles.searchBubble, { backgroundColor: inputColors.backgroundColor }]}>
-                            <Search size={18} color={inputColors.iconColor} />
+                            <Search size={SEARCH_BUBBLE_ICON_SIZE} color={inputColors.iconColor} />
                         </View>
                         <View style={styles.resultInfo}>
                             <Text style={[styles.resultTitle, { color: theme.textPrimary }]} numberOfLines={1}>
@@ -579,14 +799,23 @@ export default function SearchScreen() {
 
     const renderRecentItem = ({ item }: { item: RecentItem }) => {
         if (item.type === 'query') {
+            const recentQueryIcon = item.queryKind === 'hashtag'
+                ? <Hash size={SEARCH_BUBBLE_ICON_SIZE} color={inputColors.iconColor} />
+                : item.queryKind === 'place'
+                    ? <MapPinCheckInside size={SEARCH_BUBBLE_ICON_SIZE} color={inputColors.iconColor} />
+                    : <Clock size={SEARCH_BUBBLE_ICON_SIZE} color={inputColors.iconColor} />;
             return (
                 <View style={styles.resultRow}>
                     <Pressable style={styles.resultContent} onPress={() => {
                         setQuery(item.value);
+                        if (item.queryKind === 'place') {
+                            commitSearch(item.value, { force: true, preferredTab: 'Senin İçin', mode: 'location' });
+                            return;
+                        }
                         commitSearch(item.value);
                     }}>
                         <View style={[styles.searchBubble, { backgroundColor: inputColors.backgroundColor }]}>
-                            <Clock size={18} color={inputColors.iconColor} />
+                            {recentQueryIcon}
                         </View>
                         <View style={styles.resultInfo}>
                             <Text style={[styles.resultTitle, { color: theme.textPrimary }]} numberOfLines={1}>
@@ -759,7 +988,7 @@ export default function SearchScreen() {
                     <ArrowLeft size={22} color={theme.textPrimary} />
                 </Pressable>
                 <View style={[styles.headerSearchWrap, { backgroundColor: inputColors.backgroundColor, borderColor: inputColors.borderColor }]}> 
-                    <Search size={18} color={inputColors.iconColor} />
+                    <Search size={SEARCH_BUBBLE_ICON_SIZE} color={inputColors.iconColor} />
                     <TextInput
                         style={[styles.searchInput, { color: theme.textPrimary }]}
                         placeholder="Ara"
@@ -767,6 +996,7 @@ export default function SearchScreen() {
                         value={query}
                         onChangeText={(text) => {
                             setIsCommittedSearch(false);
+                            setSearchMode('default');
                             setQuery(text);
                         }}
                         returnKeyType="search"
@@ -865,6 +1095,7 @@ export default function SearchScreen() {
                 <>
                     <View style={[styles.tabBarWrapper, { borderBottomColor: inputColors.borderColor }]}>
                         <ScrollView
+                            ref={tabScrollRef}
                             horizontal
                             showsHorizontalScrollIndicator={false}
                             contentContainerStyle={styles.tabBar}
@@ -883,6 +1114,16 @@ export default function SearchScreen() {
                                             styles.tabItem,
                                             isActive && [styles.activeTab, { borderBottomColor: theme.textPrimary }],
                                         ]}
+                                        onLayout={(event) => {
+                                            const { x, width } = event.nativeEvent.layout;
+                                            setTabLayouts((prev) => {
+                                                const current = prev[tab];
+                                                if (current && current.x === x && current.width === width) {
+                                                    return prev;
+                                                }
+                                                return { ...prev, [tab]: { x, width } };
+                                            });
+                                        }}
                                         onPress={() => setSelectedTab(tab)}
                                     >
                                         <Text style={[styles.tabText, { color: isActive ? theme.textPrimary : theme.textSecondary }]}>
@@ -905,7 +1146,21 @@ export default function SearchScreen() {
                             ListHeaderComponent={<AccountsHeader />}
                             ListFooterComponent={
                                 <View onLayout={(event) => setFooterOffsetY(event.nativeEvent.layout.y)}>
-                                    <View style={styles.sectionSpacer} />
+                                    {hasMorePreviewAccounts ? (
+                                        <>
+                                            <View style={styles.sectionSpacer} />
+                                            <Pressable
+                                                style={[styles.moreAccountsButton, { borderColor: inputColors.borderColor }]}
+                                                onPress={() => setSelectedTab('Hesaplar')}
+                                            >
+                                                <Text style={[styles.moreAccountsButtonText, { color: theme.textPrimary }]}>
+                                                    Daha fazla göster
+                                                </Text>
+                                            </Pressable>
+                                        </>
+                                    ) : (
+                                        <View style={styles.sectionSpacer} />
+                                    )}
                                     {postsError ? null : (!isLoading && (isPostsLoading || postResults.length > 0)) ? (
                                         <>
                                             <PostsHeader />
@@ -948,7 +1203,7 @@ export default function SearchScreen() {
                                     onPress={() => commitHashtagFullSearch(hashtag.name)}
                                 >
                                     <View style={[styles.searchBubble, { backgroundColor: inputColors.backgroundColor }]}>
-                                        <Hash size={20} color={inputColors.iconColor} />
+                                        <Hash size={SEARCH_BUBBLE_ICON_SIZE} color={inputColors.iconColor} />
                                     </View>
                                     <View style={styles.resultInfo}>
                                         <Text style={[styles.resultTitle, { color: theme.textPrimary }]} numberOfLines={1}>
@@ -976,7 +1231,52 @@ export default function SearchScreen() {
                             showsVerticalScrollIndicator={false}
                         />
                     )}
-                    {selectedTab !== 'Senin İçin' && selectedTab !== 'Hesaplar' && selectedTab !== 'Etiketler' && (
+                    {selectedTab === 'Yerler' && (
+                        <FlatList
+                            data={placeResults}
+                            keyExtractor={(item) => item.id}
+                            renderItem={({ item: place }) => (
+                                <Pressable
+                                    style={styles.resultRow}
+                                    onPress={() => {
+                                        setQuery(place.name);
+                                        commitSearch(place.name, {
+                                            force: true,
+                                            preferredTab: 'Senin İçin',
+                                            mode: 'location',
+                                        });
+                                    }}
+                                >
+                                    <View style={[styles.searchBubble, { backgroundColor: inputColors.backgroundColor }]}>
+                                        <MapPinCheckInside size={SEARCH_BUBBLE_ICON_SIZE} color={inputColors.iconColor} />
+                                    </View>
+                                    <View style={styles.resultInfo}>
+                                        <Text style={[styles.resultTitle, { color: theme.textPrimary }]} numberOfLines={1}>
+                                            {place.name}
+                                        </Text>
+                                        <Text style={[styles.resultMeta, { color: theme.textSecondary }]} numberOfLines={1}>
+                                            {place.address}
+                                        </Text>
+                                    </View>
+                                </Pressable>
+                            )}
+                            contentContainerStyle={[styles.resultsContent, { paddingBottom: insets.bottom + 24 }]}
+                            ListEmptyComponent={
+                                isPlacesLoading ? (
+                                    <View style={styles.emptyState}>
+                                        <ActivityIndicator size="small" color={theme.textSecondary} />
+                                    </View>
+                                ) : (
+                                    <View style={styles.emptyState}>
+                                        <Text style={[styles.emptyText, { color: theme.textSecondary }]}>Yer bulunamadı</Text>
+                                    </View>
+                                )
+                            }
+                            keyboardShouldPersistTaps="handled"
+                            showsVerticalScrollIndicator={false}
+                        />
+                    )}
+                    {selectedTab !== 'Senin İçin' && selectedTab !== 'Hesaplar' && selectedTab !== 'Etiketler' && selectedTab !== 'Yerler' && (
                         <View style={[styles.resultsContent, { paddingBottom: insets.bottom + 24 }]} />
                     )}
                 </>
@@ -1209,6 +1509,17 @@ const styles = StyleSheet.create({
         borderWidth: 1,
     },
     retryText: {
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    moreAccountsButton: {
+        alignSelf: 'flex-start',
+        paddingHorizontal: 14,
+        paddingVertical: 9,
+        borderRadius: 18,
+        borderWidth: 1,
+    },
+    moreAccountsButtonText: {
         fontSize: 13,
         fontWeight: '600',
     },

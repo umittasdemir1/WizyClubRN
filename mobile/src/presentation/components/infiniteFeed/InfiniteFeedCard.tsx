@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, Dimensions, type GestureResponderEve
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { Volume2, VolumeX, MoreVertical, Plus } from 'lucide-react-native';
+import { Volume2, VolumeX, MoreVertical, Plus, MapPinCheckInside } from 'lucide-react-native';
 import VideoPlayer, { ViewType, type OnLoadData, type OnLoadStartData, type OnProgressData, type OnVideoErrorData } from 'react-native-video';
 import type { NetInfoStateType } from '@react-native-community/netinfo';
 import { getVideoUrl } from '../../../core/utils/videoUrl';
@@ -29,7 +29,7 @@ import {
     resolveSubtitleStyle,
 } from '../../../core/utils/subtitleOverlay';
 import { getRichTextVisibleLength, stripRichTextTags, truncateRichTextByVisibleLength } from '../../../core/utils/richText';
-import VideosIcon from '../../../../assets/icons/darkvideos.svg';
+import VideosIcon from '@assets/icons/navigation/darkvideos.svg';
 
 const DESCRIPTION_LIMIT = 70;
 const CARD_HORIZONTAL_PADDING = 16;
@@ -141,6 +141,7 @@ interface InfiniteFeedCardProps {
     onMore?: (videoId: string) => void;
     onTagPress?: (videoId: string) => void;
     onHashtagPress?: (hashtag: string) => void;
+    onLocationPress?: (query: string) => void;
     onCarouselTouchStart?: () => void;
     onCarouselTouchEnd?: () => void;
     isMeasurement?: boolean;
@@ -174,6 +175,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     onMore,
     onTagPress,
     onHashtagPress,
+    onLocationPress,
     onCarouselTouchStart,
     onCarouselTouchEnd,
     isMeasurement = false,
@@ -313,6 +315,53 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         () => (isNonEmptyString(item.user?.avatarUrl) ? item.user.avatarUrl : ''),
         [item.user?.avatarUrl]
     );
+    const hasLocationIndicator = (
+        isNonEmptyString(item.locationName)
+        || isNonEmptyString(item.locationAddress)
+        || (typeof item.locationLatitude === 'number' && Number.isFinite(item.locationLatitude))
+        || (typeof item.locationLongitude === 'number' && Number.isFinite(item.locationLongitude))
+    );
+    const locationLabel = isNonEmptyString(item.locationName)
+        ? item.locationName.trim()
+        : '';
+    const locationSearchQuery = isNonEmptyString(item.locationName)
+        ? item.locationName.trim()
+        : isNonEmptyString(item.locationAddress)
+            ? item.locationAddress.trim()
+            : '';
+    const locationIndicator = !isCleanScreen && hasLocationIndicator ? (
+        <View
+            style={styles.mediaLeftBottomLocation}
+            pointerEvents={locationSearchQuery && onLocationPress ? 'box-none' : 'none'}
+        >
+            {locationSearchQuery && onLocationPress ? (
+                <Pressable
+                    style={styles.locationPill}
+                    hitSlop={8}
+                    onPress={(event) => {
+                        event.stopPropagation?.();
+                        onLocationPress(locationSearchQuery);
+                    }}
+                >
+                    <MapPinCheckInside size={16} color="#FFFFFF" strokeWidth={1.8} />
+                    {locationLabel ? (
+                        <Text style={styles.locationLabel} numberOfLines={1}>
+                            {locationLabel}
+                        </Text>
+                    ) : null}
+                </Pressable>
+            ) : (
+                <View style={styles.locationPill}>
+                    <MapPinCheckInside size={16} color="#FFFFFF" strokeWidth={1.8} />
+                    {locationLabel ? (
+                        <Text style={styles.locationLabel} numberOfLines={1}>
+                            {locationLabel}
+                        </Text>
+                    ) : null}
+                </View>
+            )}
+        </View>
+    ) : null;
     const hasTaggedPeopleOverflow = (item.taggedPeople?.length ?? 0) > TAGGED_PEOPLE_PREVIEW_LIMIT;
     const visibleTaggedPeople = useMemo(
         () => (item.taggedPeople ?? []).slice(0, TAGGED_PEOPLE_PREVIEW_LIMIT),
@@ -1062,6 +1111,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                 </View>
                             </GestureDetector>
                         </View>
+                        {locationIndicator}
                     </View>
                 ) : (
                     <View
@@ -1221,6 +1271,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                 </Pressable>
                             </View>
                         )}
+                        {locationIndicator}
                         {isVideo && isActive && isVideoVisible && videoDurationDisplaySec != null && !disableTimeBadge && (
                             <View style={styles.mediaLeftBottomTime} pointerEvents="none">
                                 <Text style={styles.videoTimeBadgeText}>{videoTimeText}</Text>
@@ -1496,6 +1547,32 @@ const styles = StyleSheet.create({
         bottom: 12,
         alignItems: 'flex-end',
         zIndex: 6,
+    },
+    mediaLeftBottomLocation: {
+        position: 'absolute',
+        left: 12,
+        bottom: 12,
+        alignItems: 'flex-start',
+        zIndex: 6,
+    },
+    locationPill: {
+        minHeight: 30,
+        maxWidth: 180,
+        paddingLeft: 8,
+        paddingRight: 10,
+        borderRadius: 15,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.50)',
+        borderWidth: 0,
+        borderColor: 'transparent',
+        gap: 6,
+    },
+    locationLabel: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '500',
+        flexShrink: 1,
     },
     mediaLeftBottomTime: {
         position: 'absolute',

@@ -11,7 +11,7 @@ import Animated, {
     withTiming
 } from 'react-native-reanimated';
 import Video, { SelectedTrackType } from 'react-native-video';
-import MoreIcon from '../../../../assets/icons/more.svg';
+import MoreIcon from '@assets/icons/ui/more.svg';
 import { FeedPrefetchService } from '../../../../src/data/services/FeedPrefetchService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');

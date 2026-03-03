@@ -11,11 +11,11 @@ import { Image } from 'expo-image';
 import { Search } from 'lucide-react-native';
 
 // Import SVGs
-import HomeIcon from '../../assets/icons/home.svg';
-import DealIcon from '../../assets/icons/deal.svg';
-import ProfileIcon from '../../assets/icons/profile.svg';
-import VideosTabSvgIcon from '../../assets/icons/videos.svg';
-import DarkVideosTabSvgIcon from '../../assets/icons/darkvideos.svg';
+import HomeIcon from '@assets/icons/navigation/home.svg';
+import DealIcon from '@assets/icons/navigation/deal.svg';
+import ProfileIcon from '@assets/icons/navigation/profile.svg';
+import VideosTabSvgIcon from '@assets/icons/navigation/videos.svg';
+import DarkVideosTabSvgIcon from '@assets/icons/navigation/darkvideos.svg';
 
 const TAB_ICON_SIZE = 28;
 const TAB_ICON_ACTIVE_SIZE = 30;

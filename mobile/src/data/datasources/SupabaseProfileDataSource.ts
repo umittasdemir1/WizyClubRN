@@ -50,6 +50,61 @@ export class SupabaseProfileDataSource {
         return profiles;
     }
 
+    async searchProfilesByLocation(query: string, limit: number = 20, viewerId?: string): Promise<any[]> {
+        const trimmed = query.trim();
+        if (!trimmed) return [];
+
+        const normalized = trimmed.replace(/\s+/g, ' ').trim();
+        const escaped = normalized.replace(/[%_]/g, '\\$&');
+        const ilikeTerm = `%${escaped}%`;
+
+        const fetchLimit = Math.max(limit * 4, limit);
+        const { data, error } = await supabase
+            .from('videos')
+            .select('user_id, created_at, profiles(*)')
+            .is('deleted_at', null)
+            .or(`location_name.ilike.${ilikeTerm},location_address.ilike.${ilikeTerm}`)
+            .order('created_at', { ascending: false })
+            .limit(fetchLimit);
+
+        if (error) {
+            logError(LogCode.DB_QUERY_ERROR, 'Location profile search error', { query: normalized, error });
+            return [];
+        }
+
+        const uniqueProfiles = new Map<string, any>();
+        ((data as any[]) || []).forEach((row) => {
+            const profile = row?.profiles;
+            if (!profile?.id || uniqueProfiles.has(profile.id)) return;
+            uniqueProfiles.set(profile.id, profile);
+        });
+
+        const profiles = Array.from(uniqueProfiles.values()).slice(0, limit);
+        if (!profiles.length) return [];
+
+        if (viewerId) {
+            const ids = profiles.map((profile) => profile.id).filter(Boolean);
+            if (ids.length > 0) {
+                const { data: follows, error: followsError } = await supabase
+                    .from('follows')
+                    .select('following_id')
+                    .eq('follower_id', viewerId)
+                    .in('following_id', ids);
+
+                if (followsError) {
+                    logError(LogCode.DB_QUERY_ERROR, 'Location profile search follows error', { query: normalized, error: followsError });
+                } else {
+                    const followingSet = new Set((follows as Array<{ following_id: string }> | null)?.map((row) => row.following_id) || []);
+                    profiles.forEach((profile) => {
+                        profile.is_following = followingSet.has(profile.id);
+                    });
+                }
+            }
+        }
+
+        return profiles;
+    }
+
     async getProfile(userId: string, viewerId?: string): Promise<any> {
         // Single RPC call replaces 4 sequential queries:
         // 1. profiles.select(*) 2. follows.select(count) 3. stories.select(id) 4. story_views.select(count)

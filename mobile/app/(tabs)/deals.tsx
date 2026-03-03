@@ -8,6 +8,15 @@ import { SwipeWrapper } from '../../src/presentation/components/shared/SwipeWrap
 import { FontAwesome5 } from '@expo/vector-icons';
 import { COLORS } from '../../src/core/constants';
 import { TrendingHeader } from '../../src/presentation/components/explore/TrendingHeader';
+import HealthCategoryIcon from '@assets/categories/icons/health.svg';
+import SportsCategoryIcon from '@assets/categories/icons/sports.svg';
+import PetCategoryIcon from '@assets/categories/icons/pet.svg';
+import BabyCategoryIcon from '@assets/categories/icons/baby.svg';
+import NikeLogoIcon from '@assets/brands/logos/nike.svg';
+import AmazonLogoIcon from '@assets/brands/logos/amazon.svg';
+import StarbucksLogoIcon from '@assets/brands/logos/starbucks.svg';
+import AppleLogoIcon from '@assets/brands/logos/apple.svg';
+import SamsungLogoIcon from '@assets/brands/logos/samsung.svg';
 import {
     HeroBannerCarousel,
     CategoryCard,
@@ -61,25 +70,25 @@ export default function DealsScreen() {
 
     // Mock Data
     const adBanners = [
-        { id: '1', imageUrl: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/main/assets/icons/1_50.png' },
-        { id: '2', imageUrl: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/main/assets/icons/2_50.png' },
-        { id: '3', imageUrl: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/main/assets/icons/3_50.png' },
+        { id: '1', imageSource: require('../../assets/images/deals/1_50.png') },
+        { id: '2', imageSource: require('../../assets/images/deals/2_50.png') },
+        { id: '3', imageSource: require('../../assets/images/deals/3_50.png') },
     ];
 
     const categories = [
         { id: '1', title: 'Tüm\nKategoriler', iconType: 'dots', backgroundColor: isDark ? '#2d1a2e' : '#fce7f3' },
-        { id: '2', title: 'Sağlık', icon: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/icons/health.svg', backgroundColor: isDark ? '#1a2e1f' : '#f0fdf4' },
-        { id: '3', title: 'Spor', icon: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/icons/sports.svg', backgroundColor: isDark ? '#2e2419' : '#fff7ed' },
-        { id: '4', title: 'Evcil\nDostlar', icon: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/icons/pet.svg', backgroundColor: isDark ? '#1a2e28' : '#ecfdf5' },
-        { id: '5', title: 'Bebek', icon: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/icons/baby.svg', backgroundColor: isDark ? '#2a1f2e' : '#faf5ff' },
+        { id: '2', title: 'Sağlık', iconComponent: HealthCategoryIcon, backgroundColor: isDark ? '#1a2e1f' : '#f0fdf4' },
+        { id: '3', title: 'Spor', iconComponent: SportsCategoryIcon, backgroundColor: isDark ? '#2e2419' : '#fff7ed' },
+        { id: '4', title: 'Evcil\nDostlar', iconComponent: PetCategoryIcon, backgroundColor: isDark ? '#1a2e28' : '#ecfdf5' },
+        { id: '5', title: 'Bebek', iconComponent: BabyCategoryIcon, backgroundColor: isDark ? '#2a1f2e' : '#faf5ff' },
     ];
 
     const brands = [
-        { id: '1', name: 'Nike', discount: '25%', backgroundColor: '#FFFFFF', iconUrl: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/icons/nike.svg' },
-        { id: '2', name: 'Amazon', discount: '10%', backgroundColor: '#FFFFFF', iconUrl: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/icons/amazon.svg' },
-        { id: '3', name: 'Starbucks', discount: '50%', backgroundColor: '#FFFFFF', iconUrl: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/icons/starbucks.svg' },
-        { id: '4', name: 'Apple', discount: '30%', backgroundColor: '#FFFFFF', iconUrl: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/icons/apple.svg' },
-        { id: '5', name: 'Samsung', discount: '18%', backgroundColor: '#FFFFFF', iconUrl: 'https://raw.githubusercontent.com/umittasdemir1/WizyClubRN/refs/heads/main/assets/icons/samsung.svg' },
+        { id: '1', name: 'Nike', discount: '25%', backgroundColor: '#FFFFFF', iconComponent: NikeLogoIcon },
+        { id: '2', name: 'Amazon', discount: '10%', backgroundColor: '#FFFFFF', iconComponent: AmazonLogoIcon },
+        { id: '3', name: 'Starbucks', discount: '50%', backgroundColor: '#FFFFFF', iconComponent: StarbucksLogoIcon },
+        { id: '4', name: 'Apple', discount: '30%', backgroundColor: '#FFFFFF', iconComponent: AppleLogoIcon },
+        { id: '5', name: 'Samsung', discount: '18%', backgroundColor: '#FFFFFF', iconComponent: SamsungLogoIcon },
     ];
 
     const trendingDeals = [
@@ -149,7 +158,7 @@ export default function DealsScreen() {
                                     <CategoryCard
                                         key={cat.id}
                                         title={cat.title}
-                                        icon={cat.icon}
+                                        iconComponent={cat.iconComponent}
                                         iconType={cat.iconType as any}
                                         backgroundColor={cat.backgroundColor}
                                         isDark={isDark}
@@ -168,7 +177,7 @@ export default function DealsScreen() {
                                         brandName={brand.name}
                                         discount={brand.discount}
                                         backgroundColor={brand.backgroundColor}
-                                        iconUrl={brand.iconUrl}
+                                        iconComponent={brand.iconComponent}
                                     />
                                 ))}
                             </View>

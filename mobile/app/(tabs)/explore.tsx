@@ -15,11 +15,11 @@ import { Volume2, VolumeX } from 'lucide-react-native';
 import { LIGHT_COLORS, DARK_COLORS } from '../../src/core/constants';
 
 // Icons
-import LikeIcon from '../../assets/icons/like.svg';
-import SaveIcon from '../../assets/icons/save.svg';
-import ShareIcon from '../../assets/icons/share.svg';
-import ShoppingIcon from '../../assets/icons/shopping.svg';
-import MoreIcon from '../../assets/icons/more.svg';
+import LikeIcon from '@assets/icons/ui/like.svg';
+import SaveIcon from '@assets/icons/ui/save.svg';
+import ShareIcon from '@assets/icons/ui/share.svg';
+import ShoppingIcon from '@assets/icons/ui/shopping.svg';
+import MoreIcon from '@assets/icons/ui/more.svg';
 
 // New Components
 import { TrendingHeader } from '../../src/presentation/components/explore/TrendingHeader';

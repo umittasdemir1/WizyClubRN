@@ -1,8 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { CameraType } from 'expo-camera';
-import GoBackIcon from '../../../../../assets/icons/goback.svg';
-import GoFrontIcon from '../../../../../assets/icons/gofront.svg';
+import GoBackIcon from '@assets/icons/media/goback.svg';
+import GoFrontIcon from '@assets/icons/media/gofront.svg';
 
 interface CameraFlipButtonProps {
     facing: CameraType;

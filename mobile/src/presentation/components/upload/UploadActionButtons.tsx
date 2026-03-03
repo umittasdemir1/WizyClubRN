@@ -3,8 +3,8 @@ import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-nati
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { UploadComposerQuality, UploadComposerSubtitleLanguage } from '../../store/useUploadComposerStore';
-import CaptionsDarkIcon from '../../../../assets/icons/captions-dark.svg';
-import CaptionsLightIcon from '../../../../assets/icons/captions-light.svg';
+import CaptionsDarkIcon from '@assets/icons/editor/captions-dark.svg';
+import CaptionsLightIcon from '@assets/icons/editor/captions-light.svg';
 
 interface UploadActionButtonsProps {
     insets: { top: number; bottom: number; left: number; right: number };

@@ -17,9 +17,9 @@ import { Image } from 'expo-image';
 import { SystemBars } from 'react-native-edge-to-edge';
 import { RichEditor, actions } from 'react-native-pell-rich-editor';
 import { useVideoPlayer } from 'expo-video';
-import AiIcon from '../assets/icons/ai.svg';
-import CommunityIcon from '../assets/icons/community.svg';
-import PartnershipIcon from '../assets/icons/partnership.svg';
+import AiIcon from '@assets/icons/ui/ai.svg';
+import CommunityIcon from '@assets/icons/ui/community.svg';
+import PartnershipIcon from '@assets/icons/ui/partnership.svg';
 import { useThemeStore } from '../src/presentation/store/useThemeStore';
 import { useSurfaceTheme } from '../src/presentation/hooks/useSurfaceTheme';
 import { useUploadComposerStore } from '../src/presentation/store/useUploadComposerStore';
@@ -225,6 +225,7 @@ export default function UploadDetailsScreen() {
         reset: resetUploadState,
     } = useUploadStore();
     const draft = useUploadComposerStore((state) => state.draft);
+    const setDraft = useUploadComposerStore((state) => state.setDraft);
     const coverPreviewSource = useUploadComposerStore((state) => state.coverPreviewSource);
     const setCoverPreviewSource = useUploadComposerStore((state) => state.setCoverPreviewSource);
     const subtitleCache = useUploadComposerStore((state) => state.subtitleCache);
@@ -360,6 +361,26 @@ export default function UploadDetailsScreen() {
         previewAsset?.uri,
     ), [explicitSelectedPreviewUri, previewImageSource, previewAsset?.uri]);
     const canCreateCover = !isEditMode && previewAsset?.type === 'video';
+    const selectedLocation = useMemo(() => {
+        if (
+            typeof draft?.locationLatitude !== 'number' ||
+            typeof draft?.locationLongitude !== 'number'
+        ) {
+            return null;
+        }
+
+        return {
+            name: draft.locationName || 'Mevcut Konum',
+            address: draft.locationAddress || 'Konum eklendi',
+            latitude: draft.locationLatitude,
+            longitude: draft.locationLongitude,
+        };
+    }, [
+        draft?.locationAddress,
+        draft?.locationLatitude,
+        draft?.locationLongitude,
+        draft?.locationName,
+    ]);
 
     useEffect(() => {
         let isCancelled = false;
@@ -426,9 +447,24 @@ export default function UploadDetailsScreen() {
         setCoverPreviewSource(previewImageSource ?? null);
         router.push('/cover-create' as any);
     };
-    const handleAddLocation = () => {
-        Alert.alert('Bilgi', 'Konum ekleme seçimi sonraki adımda bağlanacak.');
-    };
+    const handleAddLocation = useCallback(() => {
+        if (isEditMode) {
+            Alert.alert('Bilgi', 'Mevcut gönderi için konum düzenleme sonraki adımda bağlanacak.');
+            return;
+        }
+        router.push('/location-picker' as any);
+    }, [isEditMode]);
+    const handleClearLocation = useCallback(() => {
+        if (!draft) return;
+
+        setDraft({
+            ...draft,
+            locationName: undefined,
+            locationAddress: undefined,
+            locationLatitude: undefined,
+            locationLongitude: undefined,
+        });
+    }, [draft, setDraft]);
     const handleSelectTopicSuggestion = useCallback((suggestion: string) => {
         if (activeTopicQuery === null) return;
 
@@ -594,6 +630,18 @@ export default function UploadDetailsScreen() {
         if (draft.trimEndSec > draft.trimStartSec) {
             formData.append('trimStartSec', String(draft.trimStartSec));
             formData.append('trimEndSec', String(draft.trimEndSec));
+        }
+        if (typeof draft.locationName === 'string' && draft.locationName.trim().length > 0) {
+            formData.append('locationName', draft.locationName.trim());
+        }
+        if (typeof draft.locationAddress === 'string' && draft.locationAddress.trim().length > 0) {
+            formData.append('locationAddress', draft.locationAddress.trim());
+        }
+        if (typeof draft.locationLatitude === 'number' && Number.isFinite(draft.locationLatitude)) {
+            formData.append('locationLatitude', String(draft.locationLatitude));
+        }
+        if (typeof draft.locationLongitude === 'number' && Number.isFinite(draft.locationLongitude)) {
+            formData.append('locationLongitude', String(draft.locationLongitude));
         }
 
         if (draft.taggedPeople && draft.taggedPeople.length > 0) {
@@ -1097,9 +1145,35 @@ export default function UploadDetailsScreen() {
                     <Pressable style={[styles.menuItem, { borderBottomColor: borderColor }]} onPress={handleAddLocation}>
                         <View style={styles.menuItemLeft}>
                             <MapPinCheckInside color={textColor} size={24} />
-                            <Text style={[styles.menuItemText, { color: textColor }]}>Konum ekle</Text>
+                            {selectedLocation ? (
+                                <View style={styles.locationItemContent}>
+                                    <Text style={[styles.menuItemText, { color: textColor }]} numberOfLines={1}>
+                                        {selectedLocation.name}
+                                    </Text>
+                                    <Text style={[styles.locationItemSubtitle, { color: subtextColor }]} numberOfLines={1}>
+                                        {selectedLocation.address}
+                                    </Text>
+                                </View>
+                            ) : (
+                                <Text style={[styles.menuItemText, { color: textColor }]}>Konum ekle</Text>
+                            )}
                         </View>
-                        <ChevronRight color={subtextColor} size={20} />
+                        <View style={styles.menuItemRight}>
+                            {selectedLocation ? (
+                                <Pressable
+                                    style={styles.locationRemoveButton}
+                                    hitSlop={8}
+                                    onPress={(event) => {
+                                        event.stopPropagation();
+                                        handleClearLocation();
+                                    }}
+                                >
+                                    <X color={subtextColor} size={18} />
+                                </Pressable>
+                            ) : (
+                                <ChevronRight color={subtextColor} size={20} />
+                            )}
+                        </View>
                     </Pressable>
 
                     <Pressable style={[styles.menuItem, { borderBottomColor: borderColor }]} onPress={handleClubsSelect}>
@@ -1144,6 +1218,7 @@ export default function UploadDetailsScreen() {
                         />
                     </View>
                 </View>
+
             </ScrollView>
 
             <View style={[styles.bottomButtons, { backgroundColor: bgColor, borderTopColor: borderColor, paddingBottom: insets.bottom + 12 }]}>
@@ -1356,6 +1431,22 @@ const styles = StyleSheet.create({
     menuItemLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
     menuItemText: { fontSize: 16, fontWeight: '500' },
     menuItemRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    locationItemContent: {
+        flex: 1,
+        gap: 2,
+        minWidth: 0,
+    },
+    locationItemSubtitle: {
+        fontSize: 12,
+        fontWeight: '400',
+    },
+    locationRemoveButton: {
+        width: 28,
+        height: 28,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 14,
+    },
     taggedPeoplePreview: { flexDirection: 'row', alignItems: 'center', marginRight: 2 },
     taggedPersonAvatar: {
         width: 30,
