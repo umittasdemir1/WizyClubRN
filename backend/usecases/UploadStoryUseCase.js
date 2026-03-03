@@ -23,13 +23,15 @@ class UploadStoryUseCase {
         this.logBanner = logBanner;
     }
 
-    async execute({ files, body, dbClient, authenticatedUserId }) {
-        const { userId, brandName, brandUrl, commercialType, taggedPeople } = body || {};
+    async execute({ files, body, dbClient, authenticatedUserId, thumbnailFile }) {
+        const { userId, brandName, brandUrl, commercialType, taggedPeople, coverIndex } = body || {};
         const parsedTaggedPeople = this.safeParseJsonArray(taggedPeople, [], (error) => {
             this.logLine('WARN', 'TAGS', 'Failed to parse taggedPeople payload', {
                 error: error?.message || error,
             });
         });
+        const parsedCoverIndex = Number.parseInt(String(coverIndex ?? '0'), 10);
+        const safeCoverIndex = Number.isFinite(parsedCoverIndex) && parsedCoverIndex >= 0 ? parsedCoverIndex : 0;
 
         if (!files || files.length === 0) {
             throw createHttpError(400, 'No files provided');
@@ -59,6 +61,38 @@ class UploadStoryUseCase {
 
         const storyRepository = this.createStoryRepository(dbClient);
         const tempPathsToCleanup = new Set();
+        if (thumbnailFile?.path) {
+            tempPathsToCleanup.add(thumbnailFile.path);
+        }
+        let customThumbnailConsumed = false;
+        const uploadCustomThumbnailIfSelected = async (itemIndex, baseKey) => {
+            if (
+                customThumbnailConsumed
+                || !thumbnailFile?.path
+                || itemIndex !== safeCoverIndex
+            ) {
+                return '';
+            }
+
+            customThumbnailConsumed = true;
+            const customThumbnailMimeType =
+                typeof thumbnailFile.mimetype === 'string' && thumbnailFile.mimetype.startsWith('image/')
+                    ? thumbnailFile.mimetype
+                    : 'image/jpeg';
+
+            const customThumbUrl = await this.storageAdapter.upload(
+                thumbnailFile.path,
+                `${baseKey}/thumb.jpg`,
+                customThumbnailMimeType
+            );
+
+            if (fs.existsSync(thumbnailFile.path)) {
+                fs.unlinkSync(thumbnailFile.path);
+            }
+            tempPathsToCleanup.delete(thumbnailFile.path);
+
+            return customThumbUrl;
+        };
 
         try {
             const mediaUrls = [];
@@ -86,7 +120,12 @@ class UploadStoryUseCase {
                     await this.mediaProcessingService.generateThumbnail(inputPath, thumbPath);
 
                     const thumbKey = `${baseKey}/thumb.jpg`;
-                    const thumbnailUrl = await this.storageAdapter.upload(thumbPath, thumbKey, 'image/jpeg');
+                    const customThumbUrl = await uploadCustomThumbnailIfSelected(i, baseKey);
+                    const thumbnailUrl = customThumbUrl || await this.storageAdapter.upload(
+                        thumbPath,
+                        thumbKey,
+                        'image/jpeg'
+                    );
                     const thumbDims = await this.mediaProcessingService.safeProbeDimensions(thumbPath);
                     const normalizedSourceDims = this.mediaProcessingService.normalizeDimensionsWithReference(
                         { width, height },
@@ -105,7 +144,7 @@ class UploadStoryUseCase {
                         normalized: `${safeWidth}x${safeHeight}`,
                     });
 
-                    if (i === 0) {
+                    if (i === safeCoverIndex) {
                         firstThumbUrl = thumbnailUrl;
                     }
 
@@ -127,15 +166,27 @@ class UploadStoryUseCase {
                 portraitBase = this.mediaProcessingService.pickMostPortrait(portraitBase, { width, height });
                 const imageKey = `${baseKey}/story.jpg`;
                 const imageUrl = await this.storageAdapter.upload(inputPath, imageKey, file.mimetype);
+                const customThumbUrl = await uploadCustomThumbnailIfSelected(i, baseKey);
 
-                if (i === 0) firstThumbUrl = imageUrl;
+                if (i === safeCoverIndex) firstThumbUrl = customThumbUrl || imageUrl;
                 mediaUrls.push({ url: imageUrl, type: 'image', width, height });
                 if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+            }
+
+            if (thumbnailFile?.path) {
+                tempPathsToCleanup.delete(thumbnailFile.path);
+                if (fs.existsSync(thumbnailFile.path)) {
+                    fs.unlinkSync(thumbnailFile.path);
+                }
             }
 
             if (portraitBase.width && portraitBase.height) {
                 finalWidth = portraitBase.width;
                 finalHeight = portraitBase.height;
+            }
+
+            if (!firstThumbUrl && mediaUrls[safeCoverIndex]?.thumbnail) {
+                firstThumbUrl = mediaUrls[safeCoverIndex].thumbnail;
             }
 
             const isCommercial = commercialType && commercialType !== 'Ä°ÅŸ BirliÄŸi Ä°Ã§ermiyor';

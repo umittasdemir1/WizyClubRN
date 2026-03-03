@@ -15,6 +15,7 @@ class UploadVideoUseCase {
         normalizeSubtitleStyleInput,
         subtitleGenerationService,
         uploadProgressService,
+        placesRepository,
         logLine,
         logBanner,
         tempOutputDir,
@@ -28,6 +29,7 @@ class UploadVideoUseCase {
         this.normalizeSubtitleStyleInput = normalizeSubtitleStyleInput;
         this.subtitleGenerationService = subtitleGenerationService;
         this.uploadProgressService = uploadProgressService;
+        this.placesRepository = placesRepository;
         this.logLine = logLine;
         this.logBanner = logBanner;
         this.tempOutputDir = tempOutputDir;
@@ -392,6 +394,24 @@ class UploadVideoUseCase {
                         videoId: uploadedVideo.id,
                     });
                 }
+            }
+
+            if (normalizedLocationName && this.placesRepository) {
+                const crypto = require('crypto');
+                const providerPlaceId = crypto.createHash('md5')
+                    .update(`${normalizedLocationName}${normalizedLocationLatitude || ''}${normalizedLocationLongitude || ''}`)
+                    .digest('hex');
+
+                this.placesRepository.upsertPlace({
+                    provider: 'legacy',
+                    providerPlaceId,
+                    name: normalizedLocationName,
+                    formattedAddress: normalizedLocationAddress,
+                    latitude: normalizedLocationLatitude,
+                    longitude: normalizedLocationLongitude,
+                }).catch(err => {
+                    this.logLine('WARN', 'PLACES', 'Failed to upsert location to places table', { error: err?.message });
+                });
             }
 
             phase = 'response_success';

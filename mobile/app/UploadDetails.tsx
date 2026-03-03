@@ -136,6 +136,27 @@ const pickPreferredUri = (...values: unknown[]): string | null => {
     return null;
 };
 
+const IMAGE_MIME_BY_EXTENSION: Record<string, string> = {
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+    webp: 'image/webp',
+    heic: 'image/heic',
+    heif: 'image/heif',
+};
+
+const buildUploadImageDescriptor = (uri: string, baseName: string) => {
+    const sanitizedUri = uri.split('?')[0]?.split('#')[0] ?? uri;
+    const extensionMatch = sanitizedUri.match(/\.([a-z0-9]+)$/i);
+    const normalizedExtension = extensionMatch?.[1]?.toLowerCase() ?? 'jpg';
+    const mimeType = IMAGE_MIME_BY_EXTENSION[normalizedExtension] ?? 'image/jpeg';
+    return {
+        uri,
+        type: mimeType,
+        name: `${baseName}.${normalizedExtension}`,
+    };
+};
+
 const decodeHtmlEntities = (input: string): string =>
     input
         .replace(/&#x([0-9a-f]+);/gi, (_, value: string) => {
@@ -668,6 +689,13 @@ export default function UploadDetailsScreen() {
                 name: `upload_${index}.${extension}`,
             } as any);
         });
+
+        if (explicitSelectedPreviewUri) {
+            formData.append(
+                'thumbnail',
+                buildUploadImageDescriptor(explicitSelectedPreviewUri, 'thumbnail') as any
+            );
+        }
 
         if (draft.subtitleLanguage !== 'none') {
             const manualSubtitles = preparedAssets

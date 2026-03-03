@@ -15,14 +15,21 @@ function createStoryRoutes({
     logLine,
 }) {
     const router = express.Router();
+    const uploadStoryMedia = upload.fields([
+        { name: 'video', maxCount: 10 },
+        { name: 'thumbnail', maxCount: 1 },
+    ]);
 
-    router.post('/upload-story', attachOptionalAuth, upload.array('video', 10), async (req, res) => {
+    router.post('/upload-story', attachOptionalAuth, uploadStoryMedia, async (req, res) => {
         try {
-            const dto = new UploadStoryDTO(req.body, req.files, req.user?.id || null);
+            const videoFiles = Array.isArray(req.files?.video) ? req.files.video : [];
+            const thumbnailFile = Array.isArray(req.files?.thumbnail) ? req.files.thumbnail[0] : null;
+            const dto = new UploadStoryDTO(req.body, videoFiles, req.user?.id || null);
             const requestPayload = dto.toRequest();
             const uploadedStory = await uploadStoryUseCase.execute({
                 files: requestPayload.files,
                 body: requestPayload.body,
+                thumbnailFile,
                 dbClient: req.dbClient || supabase,
                 authenticatedUserId: requestPayload.authenticatedUserId,
             });

@@ -28,6 +28,10 @@ const parsePositiveNumber = (value, fallback) => {
 function createPlacesRoutes({ placesService, logLine }) {
     const router = express.Router();
 
+    // -------------------------------------------------------
+    // GET /places/nearby
+    // DB-first → Google fallback
+    // -------------------------------------------------------
     router.get('/places/nearby', async (req, res) => {
         try {
             const latitude = parseRequiredCoordinate(req.query.latitude, 'latitude');
@@ -52,6 +56,10 @@ function createPlacesRoutes({ placesService, logLine }) {
         }
     });
 
+    // -------------------------------------------------------
+    // GET /places/autocomplete
+    // DB-first → Google fallback
+    // -------------------------------------------------------
     router.get('/places/autocomplete', async (req, res) => {
         try {
             const query = String(req.query.q || req.query.query || '').trim();
@@ -84,6 +92,10 @@ function createPlacesRoutes({ placesService, logLine }) {
         }
     });
 
+    // -------------------------------------------------------
+    // GET /places/details/:placeId
+    // cache → DB → Google fallback
+    // -------------------------------------------------------
     router.get('/places/details/:placeId', async (req, res) => {
         try {
             const placeId = String(req.params.placeId || '').trim();
@@ -105,6 +117,66 @@ function createPlacesRoutes({ placesService, logLine }) {
             return res
                 .status(error?.statusCode || 500)
                 .json({ success: false, error: error?.message || 'Failed to fetch place details' });
+        }
+    });
+
+    // -------------------------------------------------------
+    // GET /places/recents
+    // User's recently selected places
+    // -------------------------------------------------------
+    router.get('/places/recents', async (req, res) => {
+        try {
+            const userId = String(req.query.userId || '').trim();
+            if (!userId) {
+                throw createHttpError(400, 'userId is required');
+            }
+
+            const limit = parsePositiveNumber(req.query.limit, 5);
+            const recents = await placesService.getUserRecents({ userId, limit });
+
+            return res.json({ success: true, data: { places: recents } });
+        } catch (error) {
+            logLine('ERR', 'PLACES', 'Failed to fetch recent places', {
+                error: error?.message || error,
+            });
+            return res
+                .status(error?.statusCode || 500)
+                .json({ success: false, error: error?.message || 'Failed to fetch recent places' });
+        }
+    });
+
+    // -------------------------------------------------------
+    // POST /places/usage
+    // Record that a user selected a place
+    // -------------------------------------------------------
+    router.post('/places/usage', async (req, res) => {
+        try {
+            const userId = String(req.body.userId || '').trim();
+            const providerPlaceId = String(req.body.providerPlaceId || req.body.placeId || '').trim();
+            const kind = String(req.body.kind || 'recent').trim();
+
+            if (!userId) {
+                throw createHttpError(400, 'userId is required');
+            }
+
+            if (!providerPlaceId) {
+                throw createHttpError(400, 'providerPlaceId is required');
+            }
+
+            await placesService.recordPlaceUsage({
+                userId,
+                providerPlaceId,
+                kind,
+            });
+
+            return res.json({ success: true });
+        } catch (error) {
+            logLine('ERR', 'PLACES', 'Failed to record place usage', {
+                error: error?.message || error,
+            });
+            return res
+                .status(error?.statusCode || 500)
+                .json({ success: false, error: error?.message || 'Failed to record place usage' });
         }
     });
 

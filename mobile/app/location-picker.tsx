@@ -16,6 +16,7 @@ import { SystemBars } from 'react-native-edge-to-edge';
 import { useThemeStore } from '../src/presentation/store/useThemeStore';
 import { useSurfaceTheme } from '../src/presentation/hooks/useSurfaceTheme';
 import { useUploadComposerStore } from '../src/presentation/store/useUploadComposerStore';
+import { useAuthStore } from '../src/presentation/store/useAuthStore';
 import { LogCode, logError } from '@/core/services/Logger';
 import { CONFIG } from '../src/core/config';
 
@@ -329,6 +330,45 @@ async function fetchNearbyPlaces(
     return normalized;
 }
 
+async function fetchRecentPlaces(
+    userId: string
+): Promise<UploadLocationSelection[]> {
+    try {
+        const response = await fetch(`${CONFIG.API_URL}/places/recents?userId=${encodeURIComponent(userId)}&limit=5`);
+        const payload = (await response.json().catch(() => ({}))) as PlacesListResponse;
+
+        if (!response.ok || payload.success === false) {
+            return [];
+        }
+
+        return normalizePlacesList(payload.data?.places, 'recent');
+    } catch {
+        return [];
+    }
+}
+
+async function recordPlaceUsage({
+    userId,
+    place,
+}: {
+    userId: string;
+    place: UploadLocationSelection;
+}) {
+    try {
+        const providerPlaceId = place.placeId || place.id;
+        // Don't record fake device coordinates
+        if (!providerPlaceId || providerPlaceId.startsWith('device:')) return;
+
+        await fetch(`${CONFIG.API_URL}/places/usage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, providerPlaceId, kind: 'recent' }),
+        });
+    } catch {
+        // Silently fail, best-effort metrics
+    }
+}
+
 async function fetchAutocompleteSuggestions(
     query: string,
     latitude: number | undefined,
@@ -449,6 +489,9 @@ export default function LocationPickerScreen() {
     const [selectedLocation, setSelectedLocation] = useState<UploadLocationSelection | null>(storedLocation);
     const [searchResults, setSearchResults] = useState<LocationSuggestion[]>([]);
     const [nearbyPlaces, setNearbyPlaces] = useState<UploadLocationSelection[]>([]);
+    const [recentPlaces, setRecentPlaces] = useState<UploadLocationSelection[]>([]);
+
+    const user = useAuthStore((state) => state.user);
 
     const bgColor = modalTheme.fullScreenBackground;
     const textColor = modalTheme.textPrimary;
@@ -471,9 +514,15 @@ export default function LocationPickerScreen() {
     const visibleSecondaryPlaces = useMemo(() => {
         const baseList: LocationSuggestion[] = trimmedQuery.length >= MIN_SEARCH_CHARACTERS
             ? searchResults
-            : nearbyPlaces;
+            : dedupeLocations(nearbyPlaces);
         return baseList.filter((item) => !isSameLocation(item, primaryLocation));
     }, [nearbyPlaces, primaryLocation, searchResults, trimmedQuery]);
+
+    const visibleRecentPlaces = useMemo(() => {
+        if (trimmedQuery.length >= MIN_SEARCH_CHARACTERS) return [];
+        return dedupeLocations(recentPlaces).filter((item) => !isSameLocation(item, primaryLocation));
+    }, [primaryLocation, recentPlaces, trimmedQuery]);
+
     const getDistanceFromCurrent = useCallback((item: LocationSuggestion): number | undefined => {
         if (Number.isFinite(item.distanceMeters)) {
             return item.distanceMeters;
@@ -490,6 +539,7 @@ export default function LocationPickerScreen() {
 
         return undefined;
     }, [currentLocation]);
+
     const sortedSecondaryPlaces = useMemo(
         () => [...visibleSecondaryPlaces].sort((left, right) => {
             const leftDistance = getDistanceFromCurrent(left);
@@ -568,6 +618,18 @@ export default function LocationPickerScreen() {
         hasAutoRequestedRef.current = true;
         void resolveCurrentLocation(!selectedLocation);
     }, [currentLocation, draft, resolveCurrentLocation, selectedLocation]);
+
+    useEffect(() => {
+        let isCancelled = false;
+
+        if (user?.id) {
+            fetchRecentPlaces(user.id).then(recents => {
+                if (!isCancelled) setRecentPlaces(recents);
+            });
+        }
+
+        return () => { isCancelled = true; };
+    }, [user?.id]);
 
     useEffect(() => {
         let isCancelled = false;
@@ -673,8 +735,12 @@ export default function LocationPickerScreen() {
             return;
         }
 
+        if (user?.id && selectedLocation) {
+            void recordPlaceUsage({ userId: user.id, place: selectedLocation });
+        }
+
         router.back();
-    }, [persistSelectedLocation]);
+    }, [persistSelectedLocation, selectedLocation, user?.id]);
 
     const handleSelectItem = useCallback(async (item: LocationSuggestion) => {
         if (isResolvingSelection) return;
@@ -715,6 +781,7 @@ export default function LocationPickerScreen() {
         options?: {
             onPress?: () => void;
             assistiveLabel?: string;
+            isRecent?: boolean;
         }
     ) => {
         const isSelected = isSameLocation(selectedLocation, item);
@@ -722,11 +789,14 @@ export default function LocationPickerScreen() {
         const distanceLabel = resolvedDistanceMeters !== undefined
             ? formatDistance(resolvedDistanceMeters)
             : null;
-        const subtitle = [
-            options?.assistiveLabel,
-            distanceLabel,
-            item.address,
-        ].filter((part): part is string => typeof part === 'string' && part.length > 0).join(' · ');
+
+        const subtitleParts = [];
+        if (options?.assistiveLabel) subtitleParts.push(options.assistiveLabel);
+        if (options?.isRecent) subtitleParts.push('Sık ziyaret edilen');
+        if (distanceLabel) subtitleParts.push(distanceLabel);
+        if (item.address) subtitleParts.push(item.address);
+
+        const subtitle = subtitleParts.join(' • ');
 
         return (
             <Pressable
@@ -848,25 +918,33 @@ export default function LocationPickerScreen() {
                 </View>
 
                 <View style={styles.listBlock}>
-                    {primaryLocation ? (
-                        renderLocationRow(primaryLocation, {
-                            onPress: () => setSelectedLocation(primaryLocation),
-                            assistiveLabel: currentLocation ? 'Mevcut konum' : 'Seçili konum',
-                        })
-                    ) : (
-                        <Pressable
-                            style={styles.emptyRow}
-                            onPress={() => {
-                                void resolveCurrentLocation(true);
-                            }}
-                        >
-                            <Text style={[styles.emptyRowTitle, { color: textColor }]}>
-                                Mevcut konumunu kullan
-                            </Text>
-                            <Text style={[styles.emptyRowSubtitle, { color: subtextColor }]}>
-                                Dokunarak cihazının mevcut konumunu alabilirsin.
-                            </Text>
-                        </Pressable>
+                    {!isSearching && visibleRecentPlaces.length > 0 && (
+                        <View style={styles.resultsList}>
+                            {visibleRecentPlaces.map((item) => renderLocationRow(item, { isRecent: true }))}
+                        </View>
+                    )}
+
+                    {!isSearching && (
+                        primaryLocation ? (
+                            renderLocationRow(primaryLocation, {
+                                onPress: () => setSelectedLocation(primaryLocation),
+                                assistiveLabel: currentLocation ? 'Mevcut konum' : 'Seçili konum',
+                            })
+                        ) : (
+                            <Pressable
+                                style={styles.emptyRow}
+                                onPress={() => {
+                                    void resolveCurrentLocation(true);
+                                }}
+                            >
+                                <Text style={[styles.emptyRowTitle, { color: textColor }]}>
+                                    Mevcut konumunu kullan
+                                </Text>
+                                <Text style={[styles.emptyRowSubtitle, { color: subtextColor }]}>
+                                    Dokunarak cihazının mevcut konumunu alabilirsin.
+                                </Text>
+                            </Pressable>
+                        )
                     )}
 
                     {isSearching ? (

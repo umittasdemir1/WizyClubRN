@@ -16,6 +16,10 @@ function createVideoRoutes({
     restoreVideoUseCase,
 }) {
     const router = express.Router();
+    const uploadPostMedia = upload.fields([
+        { name: 'video', maxCount: 10 },
+        { name: 'thumbnail', maxCount: 1 },
+    ]);
 
     router.get('/upload-progress/:id', (req, res) => {
         try {
@@ -26,13 +30,16 @@ function createVideoRoutes({
         }
     });
 
-    router.post('/upload-hls', upload.array('video', 10), async (req, res) => {
+    router.post('/upload-hls', uploadPostMedia, async (req, res) => {
         try {
-            const dto = new UploadVideoDTO(req.body, req.files);
+            const videoFiles = Array.isArray(req.files?.video) ? req.files.video : [];
+            const thumbnailFile = Array.isArray(req.files?.thumbnail) ? req.files.thumbnail[0] : null;
+            const dto = new UploadVideoDTO(req.body, videoFiles);
             const requestPayload = dto.toRequest();
             const result = await uploadVideoUseCase.execute({
                 files: requestPayload.files,
                 body: requestPayload.body,
+                thumbnailFile,
                 dbClient: supabase,
             });
             return res.json({ success: true, data: result.data, uploadId: result.uploadId });
