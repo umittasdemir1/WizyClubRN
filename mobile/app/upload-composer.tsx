@@ -815,6 +815,7 @@ export default function UploadComposerScreen() {
             uploadMode,
             coverAssetIndex: safeCoverIndex,
             coverTimeSec: previousDraft?.coverTimeSec ?? 0,
+            selectedThumbnailUri: previousDraft?.selectedThumbnailUri,
             playbackRate: previousDraft?.playbackRate ?? 1,
             videoVolume: previousDraft?.videoVolume ?? 1,
             cropRatio: previousDraft?.cropRatio ?? '9:16',
@@ -910,6 +911,7 @@ export default function UploadComposerScreen() {
                         style={styles.content}
                         scrollEnabled={!isSubtitleEditorVisible}
                         showsVerticalScrollIndicator={false}
+                        removeClippedSubviews
                     >
                         <View style={styles.previewSection}>
                             <ScrollView
@@ -919,6 +921,7 @@ export default function UploadComposerScreen() {
                                 showsHorizontalScrollIndicator={false}
                                 onScroll={onScroll}
                                 scrollEventThrottle={16}
+                                removeClippedSubviews
                                 contentContainerStyle={{ paddingHorizontal: PREVIEW_SIDE_PADDING }}
                             >
                                 {selectedAssets.map((asset, index) => (
@@ -926,6 +929,13 @@ export default function UploadComposerScreen() {
                                         key={asset.uri || index}
                                         style={[styles.previewPage, { width: PREVIEW_ITEM_WIDTH }]}
                                     >
+                                        {(() => {
+                                            const isActivePreview = activePreviewIndex === index;
+                                            const shouldRenderImagePreview =
+                                                asset.type !== 'video' && Math.abs(activePreviewIndex - index) <= 1;
+                                            const shouldRenderLivePreview = isActivePreview || shouldRenderImagePreview;
+
+                                            return (
                                         <Animated.View
                                             style={[
                                                 styles.previewContainer,
@@ -936,7 +946,8 @@ export default function UploadComposerScreen() {
                                                 previewContainerAnimatedStyle,
                                             ]}
                                         >
-                                            {asset.type === 'video' ? (
+                                            {shouldRenderLivePreview ? (
+                                                asset.type === 'video' ? (
                                                 <View
                                                     collapsable={false}
                                                     style={{ flex: 1 }}
@@ -982,15 +993,22 @@ export default function UploadComposerScreen() {
                                                         />
                                                     )}
                                                 </View>
-                                            ) : (
+                                                ) : (
                                                 <Image
                                                     source={{ uri: asset.uri }}
                                                     style={styles.previewMedia}
                                                     contentFit="cover"
                                                 />
+                                                )
+                                            ) : (
+                                                <View style={[styles.previewMedia, styles.previewMediaPlaceholder]}>
+                                                    <Text style={styles.previewMediaPlaceholderText}>
+                                                        {asset.type === 'video' ? 'Video hazir' : 'Gorsel hazir'}
+                                                    </Text>
+                                                </View>
                                             )}
 
-                                            {asset.type === 'video' && !isSubtitleEditorVisible && (
+                                            {asset.type === 'video' && isActivePreview && !isSubtitleEditorVisible && (
                                                 <UploadActionButtons
                                                     insets={insets}
                                                     isDark={isDark}
@@ -1034,6 +1052,8 @@ export default function UploadComposerScreen() {
                                                 </Pressable>
                                             )}
                                         </Animated.View>
+                                            );
+                                        })()}
                                     </View>
                                 ))}
                             </ScrollView>
@@ -1237,6 +1257,17 @@ const styles = StyleSheet.create({
     },
     previewMedia: {
         flex: 1,
+    },
+    previewMediaPlaceholder: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#12161D',
+    },
+    previewMediaPlaceholderText: {
+        color: 'rgba(255,255,255,0.72)',
+        fontSize: 14,
+        fontWeight: '600',
     },
     mediaSideActions: {
         position: 'absolute',

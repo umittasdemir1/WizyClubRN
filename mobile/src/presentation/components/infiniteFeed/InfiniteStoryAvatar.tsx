@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
     createButton: {
         position: 'absolute',
         right: -3,
-        bottom: -3,
+        bottom: 5,
         width: CREATE_BUTTON_SIZE,
         height: CREATE_BUTTON_SIZE,
         borderRadius: CREATE_BUTTON_SIZE / 2,

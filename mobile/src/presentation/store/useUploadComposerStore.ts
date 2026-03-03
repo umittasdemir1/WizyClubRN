@@ -25,6 +25,7 @@ export interface UploadComposerDraft {
     uploadMode: 'story' | 'video';
     coverAssetIndex: number;
     coverTimeSec?: number;
+    selectedThumbnailUri?: string;
     playbackRate: number;
     videoVolume: number;
     cropRatio: UploadComposerCropRatio;
@@ -49,12 +50,14 @@ export type SubtitleSttState = 'loading' | 'ready' | 'no_audio' | 'error';
 
 interface UploadComposerState {
     draft: UploadComposerDraft | null;
+    coverPreviewSource: unknown | null;
     subtitleCache: Record<string, SubtitleCacheEntry>;
     subtitlePresentationCache: Record<string, SubtitlePresentation>;
     subtitleStyleCache: Record<string, SubtitleStyle>;
     subtitleSttState: Record<string, SubtitleSttState>;
     setDraft: (draft: UploadComposerDraft) => void;
     clearDraft: () => void;
+    setCoverPreviewSource: (source: unknown | null) => void;
     updateSubtitleCache: (uri: string, segments: SubtitleSegment[]) => void;
     updateSubtitlePresentation: (uri: string, presentation: SubtitlePresentation) => void;
     updateSubtitleStyle: (uri: string, style: SubtitleStyle) => void;
@@ -67,12 +70,14 @@ export const useUploadComposerStore = create<UploadComposerState>()(
     persist(
         (set) => ({
             draft: null,
+            coverPreviewSource: null,
             subtitleCache: {},
             subtitlePresentationCache: {},
             subtitleStyleCache: {},
             subtitleSttState: {},
-            setDraft: (draft) => set({ draft }),
-            clearDraft: () => set({ draft: null }),
+            setDraft: (draft) => set({ draft, coverPreviewSource: null }),
+            clearDraft: () => set({ draft: null, coverPreviewSource: null }),
+            setCoverPreviewSource: (coverPreviewSource) => set({ coverPreviewSource }),
             updateSubtitleCache: (uri, segments) => set((state) => ({
                 subtitleCache: {
                     ...state.subtitleCache,
@@ -127,6 +132,13 @@ export const useUploadComposerStore = create<UploadComposerState>()(
         {
             name: 'upload-composer-storage',
             storage: createJSONStorage(() => AsyncStorage),
+            partialize: (state) => ({
+                draft: state.draft,
+                subtitleCache: state.subtitleCache,
+                subtitlePresentationCache: state.subtitlePresentationCache,
+                subtitleStyleCache: state.subtitleStyleCache,
+                subtitleSttState: state.subtitleSttState,
+            }),
         }
     )
 );

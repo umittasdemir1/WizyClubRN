@@ -103,6 +103,7 @@ const PREVIEW_COLLAPSED_MARGIN_BOTTOM =
     PREVIEW_MENU_GAP_WHEN_DESCRIPTION_EDITOR_OPEN -
     (PREVIEW_HEIGHT * (1 - PREVIEW_SCALE_WHEN_DESCRIPTION_EDITOR_OPEN)) / 2 +
     (PREVIEW_SCALE_WHEN_DESCRIPTION_EDITOR_OPEN * PREVIEW_COLLAPSED_TRANSLATE_Y);
+const PREVIEW_OVERLAY_UI_SCALE = 1 / PREVIEW_SCALE_WHEN_DESCRIPTION_EDITOR_OPEN;
 const HTML_NAMED_ENTITIES: Record<string, string> = {
     '&nbsp;': ' ',
     '&amp;': '&',
@@ -224,6 +225,8 @@ export default function UploadDetailsScreen() {
         reset: resetUploadState,
     } = useUploadStore();
     const draft = useUploadComposerStore((state) => state.draft);
+    const coverPreviewSource = useUploadComposerStore((state) => state.coverPreviewSource);
+    const setCoverPreviewSource = useUploadComposerStore((state) => state.setCoverPreviewSource);
     const subtitleCache = useUploadComposerStore((state) => state.subtitleCache);
     const subtitlePresentationCache = useUploadComposerStore((state) => state.subtitlePresentationCache);
     const subtitleStyleCache = useUploadComposerStore((state) => state.subtitleStyleCache);
@@ -343,7 +346,20 @@ export default function UploadDetailsScreen() {
     const shouldGeneratePreviewThumbnail = previewAsset?.type === 'video' && !explicitPreviewImageSource;
     const previewVideoUriForThumbnail = shouldGeneratePreviewThumbnail && previewAsset ? previewAsset.uri : null;
     const previewThumbnailPlayer = useVideoPlayer(previewVideoUriForThumbnail);
-    const previewImageSource = explicitPreviewImageSource ?? generatedPreviewImageSource;
+    const previewImageSource = (coverPreviewSource as PreviewImageSource) ?? explicitPreviewImageSource ?? generatedPreviewImageSource;
+    const explicitSelectedPreviewUri = useMemo(() => {
+        const draftRecord = draft as Record<string, unknown> | null;
+        return pickPreferredUri(
+            draftRecord?.selectedThumbnailUri,
+            draftRecord?.manualThumbnailUri,
+        );
+    }, [draft]);
+    const uploadPreviewThumbnailUri = useMemo(() => pickPreferredUri(
+        explicitSelectedPreviewUri,
+        previewImageSource,
+        previewAsset?.uri,
+    ), [explicitSelectedPreviewUri, previewImageSource, previewAsset?.uri]);
+    const canCreateCover = !isEditMode && previewAsset?.type === 'video';
 
     useEffect(() => {
         let isCancelled = false;
@@ -404,6 +420,11 @@ export default function UploadDetailsScreen() {
     }, []);
     const handleAddPerson = () => {
         router.push('/tag-people' as any);
+    };
+    const handleOpenCoverCreator = () => {
+        if (!canCreateCover) return;
+        setCoverPreviewSource(previewImageSource ?? null);
+        router.push('/cover-create' as any);
     };
     const handleAddLocation = () => {
         Alert.alert('Bilgi', 'Konum ekleme seçimi sonraki adımda bağlanacak.');
@@ -519,7 +540,7 @@ export default function UploadDetailsScreen() {
                 userId: user.id,
                 mediaUri: draft.selectedAssets[0].uri,
                 mediaType: draft.selectedAssets[0].type === 'video' ? 'video' : 'image',
-                thumbnailUri: draft.selectedAssets[0].uri,
+                thumbnailUri: explicitSelectedPreviewUri ?? draft.selectedAssets[0].uri,
                 description,
                 commercialType: commercialType || undefined,
                 brandName,
@@ -554,7 +575,7 @@ export default function UploadDetailsScreen() {
 
         setIsSubmitting(true);
         startUpload();
-        if (draft.selectedAssets[0]?.uri) setThumbnailUri(draft.selectedAssets[0].uri);
+        setThumbnailUri(uploadPreviewThumbnailUri ?? draft.selectedAssets[0]?.uri ?? null);
         setTaggedPeoplePreview(draft.taggedPeople ?? []);
 
         router.replace('/(tabs)' as any);
@@ -852,6 +873,16 @@ export default function UploadDetailsScreen() {
                                         </Text>
                                     </View>
                                 )}
+                                {canCreateCover ? (
+                                    <View pointerEvents="box-none" style={styles.previewOverlayActions}>
+                                        <Pressable
+                                            onPress={handleOpenCoverCreator}
+                                            style={styles.coverCreateButton}
+                                        >
+                                            <Text style={styles.coverCreateButtonText}>Kapak Oluştur</Text>
+                                        </Pressable>
+                                    </View>
+                                ) : null}
                             </View>
                         </View>
                     </View>
@@ -1225,6 +1256,26 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '500',
         textAlign: 'center',
+    },
+    previewOverlayActions: {
+        ...StyleSheet.absoluteFillObject,
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        paddingBottom: 16 * PREVIEW_OVERLAY_UI_SCALE,
+    },
+    coverCreateButton: {
+        minHeight: 40 * PREVIEW_OVERLAY_UI_SCALE,
+        paddingHorizontal: 18 * PREVIEW_OVERLAY_UI_SCALE,
+        borderRadius: 20 * PREVIEW_OVERLAY_UI_SCALE,
+        backgroundColor: 'rgba(8,10,15,0.72)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    coverCreateButtonText: {
+        color: '#FFFFFF',
+        fontSize: 14 * PREVIEW_OVERLAY_UI_SCALE,
+        fontWeight: '700',
+        letterSpacing: 0.2 * PREVIEW_OVERLAY_UI_SCALE,
     },
     descriptionSection: { marginHorizontal: 20, marginTop: 14, position: 'relative' },
     descriptionEditor: {

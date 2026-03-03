@@ -1,0 +1,36 @@
+# Final Package Stack
+
+- `expo-location` - Konum alma ve reverse geocoding - Gonderiye konum ekleme, yakin firsatlar, magaza konumu, kullaniciya yakin kampanyalari bulma
+- `react-native-maps` - Harita gosterimi - Kullanici paylastigi konumu, magaza pinlerini, yakin kampanyalari ve harita tabanli kesif ekranlarini gosterme
+- `expo-contacts` - Rehber erisimi - Taniyor olabilecegin kisiler, arkadas daveti, rehber eslestirme, arkadasin katildi akislari
+- `expo-auth-session` - OAuth giris akislari - Google/Facebook benzeri giris, web tabanli auth redirect, sosyal login
+- `expo-crypto` - Kriptografik yardimcilar - Auth state, PKCE, token state, request imzalama ve guvenli auth yardimcilari
+- `react-native-get-random-values` - Kriptografik random polyfill - `@segment/analytics-react-native` ve random/UUID tabanli native moduller icin giris noktasinda gerekli altyapi
+- `expo-clipboard` - Panoya kopyalama - Kupon kodunu tek dokunusla kopyalama, promosyon kodu kopyalama
+- `expo-sharing` - Sistem paylasim penceresi - Kupon, gonderi, kampanya gorseli ve linklerini sistem share sheet ile paylasma
+- `react-native-share` - Gelismis native paylasim - Belirli uygulamalara hedefli paylasim, dosya ve link paylasimi, sosyal kanal bazli share
+- `expo-sqlite` - Yerel veritabani ve hizli cache - Offline kupon listesi, draft cache, son gorulenler, arama gecmisi, local sync ve kalici local veri
+- `@shopify/react-native-skia` - Yuksek performansli canvas ve overlay - Foto/video ustune yazi, sticker, cizim, creator edit UI, ozel gorsel katmanlar
+- `react-native-view-shot` - Gorunum capture - Foto ustune eklenen yazi ve sticker kompozisyonunu tek gorsel olarak export etme, editor sonucunu capture etme
+- `expo-image-manipulator` - Crop, resize, rotate, export - Paylasim oncesi gorsel duzenleme, optimize export, hizli resim isleme
+- `expo-task-manager` - Arka plan gorev runtime'i - Background location, background notification isleyici, veri senkronu ve arka plan gorevleri
+- `expo-background-task` - Zamanlanmis arka plan gorevleri - Kupon yenileme, suresi bitecek kampanyalari kontrol etme, sessiz veri guncelleme
+- `expo-local-authentication` - Biyometrik dogrulama - Kupon cuzdanı, odeme oncesi dogrulama, hassas hesap ve cihaz isleri
+- `react-hook-form` - Performansli form yonetimi - Kampanya olusturma, kupon ekleme, marka paneli, profil duzenleme, uzun form akislari
+- `@storybook/react-native` - Izole UI gelistirme ve test - Reklam kartlari, analytics kartlari, kupon bilesenleri, feed kartlari ve tasarim varyantlari
+- `react-native-keyboard-controller` - Gelismis keyboard kontrolu - Yorum, aciklama, arama, form ve mesajlasma benzeri ekranlarda keyboard davranisini duzeltme
+- `react-native-modal-datetime-picker` - Modal tarih/saat secici - Kupon bitis tarihi, kampanya baslangic saati, zamanlanmis paylasim, takvim tabanli form alanlari
+- `@react-native-community/datetimepicker` - Native tarih/saat secici altyapisi - `react-native-modal-datetime-picker` altinda iOS ve Android native date/time picker saglama
+- `react-native-calendars` - Takvim UI - Kampanya takvimi, kupon gecerlilik gunleri, takvim bazli kesif ve tarih secimli ekranlar
+- `react-native-device-info` - Cihaz bilgisi ve cihaz siniflandirma - Crash debug, analytics segmentasyonu, performansi cihaz modeline gore analiz etme
+- `react-native-image-crop-picker` - Gelismis medya secimi ve crop - `expo-image-picker` yetersiz kalirsa daha guclu crop, coklu secim, kamera ve medya secim akislari
+- `react-native-permissions` - Granuler izin yonetimi - Kamera, konum, rehber ve bildirim izinlerini detayli kontrol etme, ozel izin akislari kurma
+- `@segment/analytics-react-native` - Event toplama ve analytics router - View, 3s view, complete view, save, profile visit, coupon click, copy code, redeem event'lerini standartlastirma
+- `@segment/sovran-react-native` - Segment native state/store katmani - `@segment/analytics-react-native` Android ve iOS native modulu icin zorunlu peer bagimlilik
+- `react-native-gifted-charts` - Analytics chart'lari - Icerik uretici panelinde goruntulenme, CTR, conversion, gelir ve performans grafikleri
+- `react-native-chart-kit` - Hafif chart alternatifi - Basit analytics ekranlari, hizli line/bar/pie chart ihtiyaci
+- `react-native-nitro-modules` - Nitro module altyapisi - `react-native-mmkv` ve diger nitro tabanli native paketler icin gerekli altyapi
+- `react-native-mmkv` - Cok hizli key-value storage - Sicak yol verileri, anlik flag'ler, kucuk ama cok sik okunan cache katmani
+- `react-native-reanimated-carousel` - Yuksek performansli carousel - Onboarding, promosyon slider, hikaye seridi, creator koleksiyonlari ve kampanya kaydiricilari
+- `react-native-video-trim` - Cihaz ici trim editor - Upload oncesi kullanicinin videoyu backend olmadan kendi cihazinda kesmesi
+- `react-native-create-thumbnail` - Video thumbnail uretimi - `react-native-compressor` thumbnail akisi sorun cikarirsa fallback thumbnail motoru

@@ -1,40 +1,32 @@
-# Exclude backup zips explicitly (even if deleted, good habit)
-*.zip
-*.tar.gz
+# EAS uploads only the mobile project directory.
+# Keep the archive limited to source, assets, and required config.
 
-# Exclude native builds 
+# Generated / local-only folders
+node_modules/
+.expo/
+dist/
+web-build/
 android/
 ios/
 
-# Exclude node_modules
-node_modules/
-
-# Exclude backend and parent environment from EAS build
-../backend/
-../backups/
-../maintenance_scripts/
-../r2-mcp/
-../.git/
-
-# Exclude local logs and temporary files
+# Local diagnostics and logs
 doctor_output*.txt
 doctor_full*.txt
 doctor_utf8*.txt
 doctor_final*.txt
-doctor_full.txt
-doctor_output.txt
 *.log
 npm-debug.*
+yarn-debug.*
 yarn-error.*
 
-# Exclude native and generated folders (EAS will regenerate if needed)
-android/
-ios/
-.expo/
-dist/
-web-build/
-node_modules/
-backend/
-backups/
-maintenance_scripts/
-r2-mcp/
+# Local editor / OS noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Archives and temporary artifacts
+*.zip
+*.tar.gz
+*.tmp
