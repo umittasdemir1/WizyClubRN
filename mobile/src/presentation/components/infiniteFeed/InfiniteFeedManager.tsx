@@ -6,10 +6,12 @@ import {
     Alert,
     RefreshControl,
     Dimensions,
+    Platform,
     unstable_batchedUpdates,
     type NativeSyntheticEvent,
     type NativeScrollEvent,
 } from 'react-native';
+import { InteractionManager } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -48,6 +50,7 @@ import { useUploadComposerStore } from '../../store/useUploadComposerStore';
 import { useSubtitlePreferencesStore, type SubtitlePreferenceMode } from '../../store/useSubtitlePreferencesStore';
 import { CONFIG } from '../../../core/config';
 import { ThinSpinner } from '../shared/ThinSpinner';
+import { useInfiniteFeedResolvedSourceStore } from './hooks/useInfiniteFeedResolvedSourceStore';
 
 interface InfiniteFeedManagerProps {
     videos: InfiniteFeedVideo[];
@@ -68,17 +71,21 @@ interface InfiniteFeedManagerProps {
     homeReselectTrigger?: number;
 }
 
+const SCREEN_WIDTH = Dimensions.get('window').width;
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const ESTIMATED_CARD_HEIGHT = Math.round(SCREEN_HEIGHT * 0.82);
+const ESTIMATED_LIST_SIZE = { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } as const;
 const THUMBNAIL_PREFETCH_OFFSETS = [-2, -1, 1, 2, 3];
 const FlashListAny = FlashList as any;
 const INFINITE_WINDOW_SIZE = 5;
 const INFINITE_MAX_RENDER_BATCH = 4;
 const INFINITE_DRAW_DISTANCE = ESTIMATED_CARD_HEIGHT * 2;
-const INFINITE_MINIMUM_VIEW_TIME_MS = 0;
+const INFINITE_MINIMUM_VIEW_TIME_MS = 120;
+const SCROLL_DIRECTION_COMMIT_DELTA_PX = 12;
 const FLASH_LIST_CONTENT_CONTAINER_STYLE = { paddingBottom: 0 } as const;
 const SUBTITLE_AVAILABILITY_CACHE_TTL_MS = 5 * 60 * 1000;
 const SUBTITLE_AVAILABILITY_PENDING_RETRY_MS = 3000;
+const getInfiniteFeedItemType = (item: InfiniteFeedVideo) => item.postType === 'carousel' ? 'carousel' : 'video';
 
 const getPrefetchIndices = (activeIndex: number, videosLength: number): number[] => {
     const indices = new Set<number>();
@@ -187,15 +194,15 @@ export function InfiniteFeedManager({
     });
 
     const [isCarouselInteracting, setIsCarouselInteracting] = useState(false);
-    const [isFeedScrolling, setIsFeedScrolling] = useState(false);
+    // ✅ [PERF] isFeedScrolling is ref-only — no state needed, eliminates 4 re-renders per scroll gesture
     const isFeedScrollingRef = useRef(false);
-    const [resolvedVideoSources, setResolvedVideoSources] = useState<Record<string, string>>({});
-    const resolvedVideoSourcesRef = useRef<Record<string, string>>({});
     const activeInlineIdRef = useRef<string | null>(null);
     const activeInlineIndexRef = useRef<number>(0);
     const pendingActiveIdRef = useRef<string | null>(null);
     const pendingActiveIndexRef = useRef<number>(0);
     const momentumStartedRef = useRef(false);
+    const isDraggingRef = useRef(false);
+    const dragStartOffsetYRef = useRef(0);
     const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const scrollStartAtRef = useRef<number | null>(null);
     const sourceResolveGenerationRef = useRef(0);
@@ -235,6 +242,10 @@ export function InfiniteFeedManager({
 
     useEffect(() => {
         videosRef.current = videos;
+    }, [videos]);
+
+    useEffect(() => {
+        useInfiniteFeedResolvedSourceStore.getState().pruneResolvedSources(videos.map((video) => video.id));
     }, [videos]);
 
     useEffect(() => {
@@ -282,6 +293,21 @@ export function InfiniteFeedManager({
         // StoryBar already gates presses with hasStory; avoid a second guard here
         // because it can become stale and block valid story navigation.
         router.push(`/story/${userId}` as any);
+    }, [router]);
+
+    const handleHeaderUploadPress = useCallback(() => {
+        router.push('/upload');
+    }, [router]);
+
+    const handleHeaderCreateStoryPress = useCallback(() => {
+        router.push({
+            pathname: '/upload',
+            params: { storyOnly: '1' },
+        });
+    }, [router]);
+
+    const handleHeaderNotificationPress = useCallback(() => {
+        router.push('/notifications');
     }, [router]);
 
     const handleOpenShopping = useCallback((videoId: string) => {
@@ -575,21 +601,8 @@ export function InfiniteFeedManager({
     );
 
     const setResolvedSourceForId = useCallback((videoId: string, source: string | null) => {
-        setResolvedVideoSources((prev) => {
-            if (!source) {
-                if (!(videoId in prev)) return prev;
-                const next = { ...prev };
-                delete next[videoId];
-                return next;
-            }
-            if (prev[videoId] === source) return prev;
-            return { ...prev, [videoId]: source };
-        });
+        useInfiniteFeedResolvedSourceStore.getState().setResolvedSource(videoId, source);
     }, []);
-
-    // Sync ref inline so renderItem always reads the latest resolved sources
-    // without needing resolvedVideoSources in its dependency array.
-    resolvedVideoSourcesRef.current = resolvedVideoSources;
 
     const clearSettleTimer = useCallback(() => {
         if (!settleTimerRef.current) return;
@@ -601,7 +614,6 @@ export function InfiniteFeedManager({
         clearSettleTimer();
         momentumStartedRef.current = false;
         isFeedScrollingRef.current = false;
-        setIsFeedScrolling(false);
         scrollStartAtRef.current = null;
         scrollDirectionRef.current = 'down';
         lastScrollOffsetYRef.current = 0;
@@ -729,22 +741,6 @@ export function InfiniteFeedManager({
     }, [netInfo.type]);
 
     useEffect(() => {
-        const ids = new Set(videos.map((video) => video.id));
-        setResolvedVideoSources((prev) => {
-            let changed = false;
-            const next: Record<string, string> = {};
-            Object.entries(prev).forEach(([videoId, source]) => {
-                if (ids.has(videoId)) {
-                    next[videoId] = source;
-                } else {
-                    changed = true;
-                }
-            });
-            return changed ? next : prev;
-        });
-    }, [videos]);
-
-    useEffect(() => {
         if (!videos.length || activeInlineIndex < 0 || activeInlineIndex >= videos.length) {
             return;
         }
@@ -754,21 +750,7 @@ export function InfiniteFeedManager({
         const keepIds = new Set<string>();
         if (activeVideoId) keepIds.add(activeVideoId);
         if (nextVideoId) keepIds.add(nextVideoId);
-
-        setResolvedVideoSources((prev) => {
-            let changed = false;
-            const next: Record<string, string> = {};
-
-            Object.entries(prev).forEach(([videoId, source]) => {
-                if (keepIds.has(videoId)) {
-                    next[videoId] = source;
-                    return;
-                }
-                changed = true;
-            });
-
-            return changed ? next : prev;
-        });
+        useInfiniteFeedResolvedSourceStore.getState().pruneResolvedSources(Array.from(keepIds));
     }, [activeInlineIndex, videos]);
 
     useEffect(() => {
@@ -827,7 +809,10 @@ export function InfiniteFeedManager({
 
     useEffect(() => () => {
         clearSettleTimer();
+        useInfiniteFeedResolvedSourceStore.getState().clearResolvedSources();
     }, [clearSettleTimer]);
+
+
 
     useEffect(() => {
         if (homeReselectTrigger <= 0) return;
@@ -839,7 +824,6 @@ export function InfiniteFeedManager({
         clearSettleTimer();
         momentumStartedRef.current = false;
         isFeedScrollingRef.current = false;
-        setIsFeedScrolling(false);
         scrollStartAtRef.current = null;
         scrollDirectionRef.current = 'down';
         lastScrollOffsetYRef.current = 0;
@@ -867,7 +851,8 @@ export function InfiniteFeedManager({
     useEffect(() => {
         if (!videos.length || activeInlineIndex < 0 || activeInlineIndex >= videos.length) return;
 
-        if (isFeedScrolling) {
+        // ✅ [PERF] Read from ref — no useState dependency needed
+        if (isFeedScrollingRef.current) {
             const nextVideo = videos[activeInlineIndex + 1];
             if (nextVideo?.thumbnailUrl) {
                 ExpoImage.prefetch(nextVideo.thumbnailUrl);
@@ -900,7 +885,7 @@ export function InfiniteFeedManager({
             } else {
                 // Active video loading from network — throttle prefetch to prioritize playback
                 prefetchService.pauseForActiveVideo();
-                const previousResolved = resolvedVideoSourcesRef.current[activeVideo.id] ?? null;
+                const previousResolved = useInfiniteFeedResolvedSourceStore.getState().sources[activeVideo.id] ?? null;
                 const hasResolvedFallback = Boolean(previousResolved);
                 prefetchService.cacheVideoNow(activeVideoUrl)
                     .then((cachedPath) => {
@@ -929,55 +914,60 @@ export function InfiniteFeedManager({
             }
         }
 
-        THUMBNAIL_PREFETCH_OFFSETS.forEach((offset) => {
-            const video = videos[activeInlineIndex + offset];
-            if (!video?.thumbnailUrl) return;
-            ExpoImage.prefetch(video.thumbnailUrl);
-        });
+        // ✅ [PERF] Defer neighbor prefetch to avoid blocking active video playback start
+        InteractionManager.runAfterInteractions(() => {
+            THUMBNAIL_PREFETCH_OFFSETS.forEach((offset) => {
+                const video = videos[activeInlineIndex + offset];
+                if (!video?.thumbnailUrl) return;
+                ExpoImage.prefetch(video.thumbnailUrl);
+            });
 
-        const prefetchIndices = getPrefetchIndices(activeInlineIndex, videos.length).filter((idx) => {
-            const video = videos[idx];
-            return Boolean(video && video.postType !== 'carousel' && getVideoUrl(video));
-        });
-        if (prefetchIndices.length > 0) {
-            prefetchService.queueVideos(videos, prefetchIndices, activeInlineIndex);
-        }
-        const nextPlayableIndex = activeInlineIndex + 1;
-        const nextResolvedCandidateIndex = prefetchIndices.find((idx) => idx > activeInlineIndex) ?? null;
-        prefetchIndices.forEach((idx) => {
-            const neighborVideo = videos[idx];
-            if (!neighborVideo) return;
-
-            const url = getVideoUrl(neighborVideo);
-            if (!url) return;
-
-            VideoCacheService.warmupCache(url);
-            const shouldPublishResolvedSource = idx === nextResolvedCandidateIndex;
-
-            const memoryCached = VideoCacheService.getMemoryCachedPath(url);
-            if (memoryCached) {
-                if (shouldPublishResolvedSource) {
-                    setResolvedSourceForId(neighborVideo.id, memoryCached);
-                }
-                return;
+            const prefetchIndices = getPrefetchIndices(activeInlineIndex, videos.length).filter((idx) => {
+                const video = videos[idx];
+                return Boolean(video && video.postType !== 'carousel' && getVideoUrl(video));
+            });
+            if (prefetchIndices.length > 0) {
+                prefetchService.queueVideos(videos, prefetchIndices, activeInlineIndex);
             }
+            const nextPlayableIndex = activeInlineIndex + 1;
+            const nextResolvedCandidateIndex = prefetchIndices.find((idx) => idx > activeInlineIndex) ?? null;
+            prefetchIndices.forEach((idx) => {
+                const neighborVideo = videos[idx];
+                if (!neighborVideo) return;
 
-            const hasResolvedSource = Boolean(resolvedVideoSourcesRef.current[neighborVideo.id]);
-            const shouldForceImmediateCache = idx === nextPlayableIndex && !hasResolvedSource;
-            const resolvePromise = shouldForceImmediateCache
-                ? prefetchService.cacheVideoNow(url).then((cachedPath) => cachedPath ?? prefetchService.getCachedPath(url))
-                : prefetchService.getCachedPath(url);
+                const url = getVideoUrl(neighborVideo);
+                if (!url) return;
 
-            resolvePromise
-                .then((cachedPath) => {
-                    if (!cachedPath || !shouldPublishResolvedSource) return;
-                    setResolvedSourceForId(neighborVideo.id, cachedPath);
-                })
-                .catch(() => {
-                    // best effort: nearby cache resolve failures should not block playback
-                });
+                VideoCacheService.warmupCache(url);
+                const shouldPublishResolvedSource = idx === nextResolvedCandidateIndex;
+
+                const memoryCached = VideoCacheService.getMemoryCachedPath(url);
+                if (memoryCached) {
+                    if (shouldPublishResolvedSource) {
+                        setResolvedSourceForId(neighborVideo.id, memoryCached);
+                    }
+                    return;
+                }
+
+                const hasResolvedSource = Boolean(useInfiniteFeedResolvedSourceStore.getState().sources[neighborVideo.id]);
+                const shouldForceImmediateCache = idx === nextPlayableIndex && !hasResolvedSource;
+                const resolvePromise = shouldForceImmediateCache
+                    ? prefetchService.cacheVideoNow(url).then((cachedPath) => cachedPath ?? prefetchService.getCachedPath(url))
+                    : prefetchService.getCachedPath(url);
+
+                resolvePromise
+                    .then((cachedPath) => {
+                        if (!cachedPath || !shouldPublishResolvedSource) return;
+                        setResolvedSourceForId(neighborVideo.id, cachedPath);
+                    })
+                    .catch(() => {
+                        // best effort: nearby cache resolve failures should not block playback
+                    });
+            });
         });
-    }, [activeInlineIndex, isFeedScrolling, videos, setResolvedSourceForId]);
+        // ✅ [PERF] isFeedScrolling removed from deps — ref-only; effect re-runs when
+        // activeInlineIndex changes (which happens after scroll commits via commitPendingActive)
+    }, [activeInlineIndex, videos, setResolvedSourceForId]);
 
 
     const handleCarouselTouchStart = useCallback(() => {
@@ -1104,13 +1094,12 @@ export function InfiniteFeedManager({
                 onShare={handlers.onShare}
                 onShop={handlers.onShop}
                 onWatchMoreClips={handlers.onWatchMoreClips}
-                onTagPress={() => handlers.onTagPress?.(item.id)}
+                onTagPress={handlers.onTagPress}
                 onHashtagPress={handlers.onHashtagPress}
                 onLocationPress={handlers.onLocationPress}
                 onCarouselTouchStart={handlers.onCarouselTouchStart}
                 onCarouselTouchEnd={handlers.onCarouselTouchEnd}
                 isMeasurement={target === 'Measurement'}
-                resolvedVideoSource={resolvedVideoSourcesRef.current[item.id] ?? null}
                 networkType={networkType}
                 shouldShowSubtitle={shouldShowSubtitle}
             />
@@ -1135,6 +1124,12 @@ export function InfiniteFeedManager({
     }: {
         viewableItems: ViewToken<InfiniteFeedVideo>[];
     }) => {
+        // Ignore idle/lifecycle viewability churn while feed is not actively scrolling.
+        // This prevents active video from flapping and restarting due to tiny layout shifts.
+        if (!isFeedScrollingRef.current && !momentumStartedRef.current && activeInlineIdRef.current) {
+            return;
+        }
+
         const visiblePlayableTokens = (viewableItems ?? []).filter((token) => {
             if (!token?.isViewable || !token.item || typeof token.index !== 'number') return false;
             return token.item.postType === 'carousel' || !!getVideoUrl(token.item);
@@ -1145,11 +1140,17 @@ export function InfiniteFeedManager({
         const sortedVisible = [...visiblePlayableTokens].sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
         const currentActiveId = activeInlineIdRef.current;
         const currentActiveIndex = activeInlineIndexRef.current;
+        const isCurrentActiveStillVisible = Boolean(
+            currentActiveId && sortedVisible.some((token) => (
+                token.item?.id === currentActiveId
+                && typeof token.index === 'number'
+                && token.index === currentActiveIndex
+            ))
+        );
 
-        let nextViewable = scrollDirectionRef.current === 'up'
-            ? sortedVisible[0]
-            : sortedVisible[sortedVisible.length - 1];
-
+        // Requirement: when next video reaches visibility threshold (30%), it should take over.
+        // So prefer directional "next" candidate first.
+        let nextViewable: ViewToken<InfiniteFeedVideo> | undefined;
         if (currentActiveId) {
             if (scrollDirectionRef.current === 'up') {
                 for (let i = sortedVisible.length - 1; i >= 0; i -= 1) {
@@ -1171,6 +1172,20 @@ export function InfiniteFeedManager({
                     }
                 }
             }
+        }
+
+        // If no directional candidate is available and current is still visible, keep current.
+        if (!nextViewable && isCurrentActiveStillVisible) return;
+
+        // Fast fling / edge case fallback: choose nearest visible item.
+        if (!nextViewable) {
+            nextViewable = [...sortedVisible].sort((a, b) => {
+                const indexA = typeof a.index === 'number' ? a.index : Number.MAX_SAFE_INTEGER;
+                const indexB = typeof b.index === 'number' ? b.index : Number.MAX_SAFE_INTEGER;
+                const distanceA = Math.abs(indexA - currentActiveIndex);
+                const distanceB = Math.abs(indexB - currentActiveIndex);
+                return distanceA - distanceB;
+            })[0];
         }
 
         const candidate = nextViewable?.item;
@@ -1198,11 +1213,13 @@ export function InfiniteFeedManager({
 
     const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
         const offsetY = event.nativeEvent.contentOffset.y ?? 0;
-        const diff = offsetY - lastScrollOffsetYRef.current;
-        if (diff > 1) {
-            scrollDirectionRef.current = 'down';
-        } else if (diff < -1) {
-            scrollDirectionRef.current = 'up';
+        if (isDraggingRef.current) {
+            const dragDelta = offsetY - dragStartOffsetYRef.current;
+            if (dragDelta > SCROLL_DIRECTION_COMMIT_DELTA_PX) {
+                scrollDirectionRef.current = 'down';
+            } else if (dragDelta < -SCROLL_DIRECTION_COMMIT_DELTA_PX) {
+                scrollDirectionRef.current = 'up';
+            }
         }
         lastScrollOffsetYRef.current = offsetY;
     }, []);
@@ -1210,38 +1227,35 @@ export function InfiniteFeedManager({
     const handleScrollBeginDrag = useCallback(() => {
         clearSettleTimer();
         momentumStartedRef.current = false;
+        isDraggingRef.current = true;
+        dragStartOffsetYRef.current = lastScrollOffsetYRef.current;
         scrollStartAtRef.current = Date.now();
-        if (!isFeedScrollingRef.current) {
-            isFeedScrollingRef.current = true;
-            setIsFeedScrolling(true);
-        }
+        isFeedScrollingRef.current = true;
     }, [clearSettleTimer]);
 
     const handleMomentumScrollBegin = useCallback(() => {
         momentumStartedRef.current = true;
+        isDraggingRef.current = false;
         if (!scrollStartAtRef.current) {
             scrollStartAtRef.current = Date.now();
         }
-        if (!isFeedScrollingRef.current) {
-            isFeedScrollingRef.current = true;
-            setIsFeedScrolling(true);
-        }
+        isFeedScrollingRef.current = true;
     }, []);
 
     const handleMomentumScrollEnd = useCallback(() => {
         clearSettleTimer();
         momentumStartedRef.current = false;
+        isDraggingRef.current = false;
         isFeedScrollingRef.current = false;
-        setIsFeedScrolling(false);
         commitPendingActive('momentum-end');
     }, [clearSettleTimer, commitPendingActive]);
 
     const handleScrollEndDrag = useCallback((_event: NativeSyntheticEvent<NativeScrollEvent>) => {
         clearSettleTimer();
+        isDraggingRef.current = false;
         settleTimerRef.current = setTimeout(() => {
             if (momentumStartedRef.current) return;
             isFeedScrollingRef.current = false;
-            setIsFeedScrolling(false);
             commitPendingActive('drag-end-no-momentum');
         }, 32);
     }, [clearSettleTimer, commitPendingActive]);
@@ -1278,6 +1292,40 @@ export function InfiniteFeedManager({
         </View>
     );
 
+    const listHeaderComponent = useMemo(() => {
+        if (FEED_FLAGS.INF_DISABLE_HEADER_TABS) {
+            return <View style={{ height: insets.top }} />;
+        }
+
+        return (
+            <InfiniteFeedHeader
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                colors={themeColors}
+                insetTop={insets.top}
+                onUploadPress={handleHeaderUploadPress}
+                onCreateStoryPress={handleHeaderCreateStoryPress}
+                onNotificationPress={handleHeaderNotificationPress}
+                storyUsers={storyUsers}
+                onStoryAvatarPress={handleStoryAvatarPress}
+            />
+        );
+    }, [
+        activeTab,
+        handleHeaderCreateStoryPress,
+        handleHeaderNotificationPress,
+        handleHeaderUploadPress,
+        handleStoryAvatarPress,
+        insets.top,
+        storyUsers,
+        themeColors,
+    ]);
+
+    const listFooterComponent = useMemo(() => {
+        if (!isLoadingMore) return null;
+        return <ThinSpinner size={48} color={themeColors.textPrimary} style={styles.footerLoader} />;
+    }, [isLoadingMore, themeColors.textPrimary]);
+
     return (
         <SwipeWrapper
             onSwipeRight={() => router.push('/upload')}
@@ -1290,6 +1338,7 @@ export function InfiniteFeedManager({
                     ref={listRef}
                     data={videos}
                     renderItem={renderItem}
+                    getItemType={getInfiniteFeedItemType}
                     keyExtractor={(item: InfiniteFeedVideo) => item.id}
                     extraData={flashListExtraData}
                     viewabilityConfig={viewabilityConfig}
@@ -1300,31 +1349,15 @@ export function InfiniteFeedManager({
                     onMomentumScrollEnd={handleMomentumScrollEnd}
                     onScroll={handleScroll}
                     scrollEventThrottle={32}
+                    estimatedListSize={ESTIMATED_LIST_SIZE}
                     estimatedItemSize={ESTIMATED_CARD_HEIGHT}
-                    removeClippedSubviews={false}
+                    removeClippedSubviews={Platform.OS === 'android'}
                     maxToRenderPerBatch={INFINITE_MAX_RENDER_BATCH}
                     windowSize={INFINITE_WINDOW_SIZE}
                     drawDistance={INFINITE_DRAW_DISTANCE}
                     showsVerticalScrollIndicator={false}
                     scrollEnabled={!isCarouselInteracting}
-                    ListHeaderComponent={!FEED_FLAGS.INF_DISABLE_HEADER_TABS ? (
-                        <InfiniteFeedHeader
-                            activeTab={activeTab}
-                            onTabChange={setActiveTab}
-                            colors={themeColors}
-                            insetTop={insets.top}
-                            onUploadPress={() => router.push('/upload')}
-                            onCreateStoryPress={() => router.push({
-                                pathname: '/upload',
-                                params: { storyOnly: '1' },
-                            })}
-                            onNotificationPress={() => router.push('/notifications')}
-                            storyUsers={storyUsers}
-                            onStoryAvatarPress={handleStoryAvatarPress}
-                        />
-                    ) : (
-                        <View style={{ height: insets.top }} />
-                    )}
+                    ListHeaderComponent={listHeaderComponent}
                     refreshControl={
                         <RefreshControl
                             refreshing={isRefreshing}
@@ -1334,11 +1367,7 @@ export function InfiniteFeedManager({
                     }
                     onEndReached={hasMore ? loadMore : undefined}
                     onEndReachedThreshold={0.6}
-                    ListFooterComponent={
-                        isLoadingMore ? (
-                            <ThinSpinner size={48} color={themeColors.textPrimary} style={styles.footerLoader} />
-                        ) : null
-                    }
+                    ListFooterComponent={listFooterComponent}
                     ListEmptyComponent={listEmpty}
                     contentContainerStyle={FLASH_LIST_CONTENT_CONTAINER_STYLE}
                 />

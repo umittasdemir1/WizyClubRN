@@ -35,7 +35,7 @@ class UploadVideoUseCase {
         this.tempOutputDir = tempOutputDir;
     }
 
-    async execute({ files, body, dbClient }) {
+    async execute({ files, body, thumbnailFile, dbClient }) {
         const {
             userId,
             description,
@@ -46,6 +46,7 @@ class UploadVideoUseCase {
             trimEndSec,
             qualityPreset,
             coverIndex,
+            coverTimeSec,
             subtitleLanguage,
             manualSubtitles,
             locationName,
@@ -66,6 +67,8 @@ class UploadVideoUseCase {
 
         const parsedCoverIndex = Number.parseInt(String(coverIndex ?? '0'), 10);
         const safeCoverIndex = Number.isFinite(parsedCoverIndex) && parsedCoverIndex >= 0 ? parsedCoverIndex : 0;
+        const parsedCoverTimeSec = Number.parseFloat(String(coverTimeSec ?? '0'));
+        const safeCoverTimeSec = Number.isFinite(parsedCoverTimeSec) && parsedCoverTimeSec >= 0 ? parsedCoverTimeSec : 0;
         const parsedTrimStartSec = Number.parseFloat(String(trimStartSec ?? '0'));
         const parsedTrimEndSec = Number.parseFloat(String(trimEndSec ?? '0'));
         const parsedLocationLatitude = Number.parseFloat(String(locationLatitude ?? ''));
@@ -167,10 +170,15 @@ class UploadVideoUseCase {
                     const processedThumbPath = path.join(this.tempOutputDir, `thumb_${uniqueId}_${i}.jpg`);
                     tempPathsToCleanup.add(processedThumbPath);
                     phase = `item_${i}_thumb_generate`;
-                    await this.mediaProcessingService.generateThumbnail(sourcePath, processedThumbPath, {
-                        size: '1080x?',
-                        qualityOptions: ['-q:v 2'],
-                    });
+                    if (i === safeCoverIndex && thumbnailFile) {
+                        fs.copyFileSync(thumbnailFile.path, processedThumbPath);
+                    } else {
+                        await this.mediaProcessingService.generateThumbnail(sourcePath, processedThumbPath, {
+                            size: '1080x?',
+                            qualityOptions: ['-q:v 2'],
+                            timestamp: i === safeCoverIndex ? safeCoverTimeSec : 0,
+                        });
+                    }
 
                     const thumbDims = await this.mediaProcessingService.safeProbeDimensions(processedThumbPath);
                     const normalizedSourceDims = this.mediaProcessingService.normalizeDimensionsWithReference(
@@ -355,18 +363,10 @@ class UploadVideoUseCase {
                         segments: normalizedSegments.length,
                     });
                 }
-            } else if (
-                uploadedVideo.post_type === 'video'
-                && uploadedVideo.video_url
-                && this.subtitleGenerationService?.trigger
-            ) {
-                this.subtitleGenerationService.trigger(
-                    uploadedVideo.id,
-                    uploadedVideo.video_url,
-                    'upload-hls-auto',
-                    { language: normalizedSubtitleLanguage }
-                );
             }
+            // NOTE: Automatic subtitle generation removed.
+            // Subtitles are only generated when the user explicitly
+            // requests it via the captions button (stt-preview endpoint).
 
             if (parsedTags.length > 0) {
                 try {

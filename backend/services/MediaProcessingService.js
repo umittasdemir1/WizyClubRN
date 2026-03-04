@@ -154,6 +154,7 @@ function createMediaProcessingService({ ffmpeg, logLine }) {
         const {
             size = '?x480',
             qualityOptions = [],
+            timestamp = null,
         } = options;
 
         return new Promise((resolve, reject) => {
@@ -165,13 +166,20 @@ function createMediaProcessingService({ ffmpeg, logLine }) {
                 command.outputOptions(qualityOptions);
             }
 
+            const screenshotConfig = {
+                folder: outputFolder,
+                filename,
+                size,
+            };
+
+            if (typeof timestamp === 'number' && timestamp >= 0) {
+                screenshotConfig.timestamps = [timestamp];
+            } else {
+                screenshotConfig.count = 1;
+            }
+
             command
-                .screenshots({
-                    count: 1,
-                    folder: outputFolder,
-                    filename,
-                    size,
-                })
+                .screenshots(screenshotConfig)
                 .on('end', () => resolve(outputPath))
                 .on('error', reject);
         });

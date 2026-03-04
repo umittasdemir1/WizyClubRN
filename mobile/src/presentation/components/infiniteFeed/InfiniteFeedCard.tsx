@@ -19,6 +19,7 @@ import { getBufferConfig } from '../../../core/utils/bufferConfig';
 import { shadowStyle } from '@/core/utils/shadow';
 import { PerformanceLogger } from '../../../core/services/PerformanceLogger';
 import { useSubtitles } from '../../hooks/useSubtitles';
+import { useInfiniteFeedResolvedSourceStore } from './hooks/useInfiniteFeedResolvedSourceStore';
 import {
     SUBTITLE_BORDER_RADIUS,
     SUBTITLE_SIDE_MARGIN,
@@ -48,9 +49,8 @@ const END_GUARD_TOLERANCE_SEC = 1;
 const END_GUARD_MIN_DURATION_SEC = 3;
 const END_GUARD_MIN_PROGRESS_SEC = 1;
 const INACTIVE_RESUME_WINDOW_MS = 3000;
-const ACTIVE_WAKEUP_SEEK_DELAY_MS = 400;
-const ACTIVE_WAKEUP_MIN_PROGRESS_SEC = 0.2;
 const DEFAULT_VIDEO_ASPECT_RATIO = 9 / 16;
+const VIDEO_MOUNT_RANGE = 1;
 const MIN_VALID_ASPECT_RATIO = 0.2;
 const MAX_VALID_ASPECT_RATIO = 5;
 const SUBTITLE_MAX_WIDTH = Dimensions.get('window').width - (SUBTITLE_SIDE_MARGIN * 2);
@@ -146,10 +146,133 @@ interface InfiniteFeedCardProps {
     onCarouselTouchEnd?: () => void;
     isMeasurement?: boolean;
     isCleanScreen?: boolean;
-    resolvedVideoSource?: string | null;
     networkType?: NetInfoStateType | null;
     shouldShowSubtitle?: boolean;
 }
+
+interface VideoMediaLayerProps {
+    shouldShowBaseThumbnail: boolean;
+    thumbnail: string;
+    thumbnailCacheKey?: string;
+    onThumbnailLoad: (event: { source?: { width?: unknown; height?: unknown } }) => void;
+    placeholderStyle: any;
+    shouldMountVideo: boolean;
+    videoSource: any;
+    isRecycledRender: boolean;
+    videoRef: { current: any };
+    isVideoHidden: boolean;
+    shouldPlayVideo: boolean;
+    isMuted: boolean;
+    progressUpdateIntervalMs: number;
+    onVideoLoadStart: (event: OnLoadStartData) => void;
+    onVideoLoad: (data: OnLoadData) => void;
+    onVideoReadyForDisplay: () => void;
+    onVideoProgress: (event: OnProgressData) => void;
+    onVideoEnd: () => void;
+    onVideoError: (error: OnVideoErrorData) => void;
+    showPoster: boolean;
+    onPress: () => void;
+}
+
+const VideoMediaLayer = React.memo(function VideoMediaLayer({
+    shouldShowBaseThumbnail,
+    thumbnail,
+    thumbnailCacheKey,
+    onThumbnailLoad,
+    placeholderStyle,
+    shouldMountVideo,
+    videoSource,
+    isRecycledRender,
+    videoRef,
+    isVideoHidden,
+    shouldPlayVideo,
+    isMuted,
+    progressUpdateIntervalMs,
+    onVideoLoadStart,
+    onVideoLoad,
+    onVideoReadyForDisplay,
+    onVideoProgress,
+    onVideoEnd,
+    onVideoError,
+    showPoster,
+    onPress,
+}: VideoMediaLayerProps) {
+    return (
+        <>
+            {shouldShowBaseThumbnail ? (
+                <Image
+                    source={{ uri: thumbnail, cacheKey: thumbnailCacheKey }}
+                    style={styles.media}
+                    contentFit="cover"
+                    transition={0}
+                    cachePolicy="memory-disk"
+                    onLoad={onThumbnailLoad}
+                />
+            ) : (
+                <View style={placeholderStyle} />
+            )}
+            {shouldMountVideo && videoSource && !isRecycledRender ? (
+                <VideoPlayer
+                    ref={videoRef}
+                    source={videoSource}
+                    style={[
+                        styles.media,
+                        styles.videoOverlay,
+                        isVideoHidden && styles.videoHidden,
+                    ]}
+                    resizeMode="contain"
+                    repeat={false}
+                    paused={!shouldPlayVideo}
+                    muted={isMuted}
+                    playInBackground={false}
+                    playWhenInactive={false}
+                    progressUpdateInterval={progressUpdateIntervalMs}
+                    onLoadStart={onVideoLoadStart}
+                    onLoad={onVideoLoad}
+                    onReadyForDisplay={onVideoReadyForDisplay}
+                    onProgress={onVideoProgress}
+                    onEnd={onVideoEnd}
+                    onError={onVideoError}
+                    hideShutterView={true}
+                    shutterColor="transparent"
+                    poster={showPoster ? { source: { uri: thumbnail }, resizeMode: 'cover' } : undefined}
+                    viewType={ViewType.TEXTURE}
+                    automaticallyWaitsToMinimizeStalling={false}
+                    preferredForwardBufferDuration={4}
+                    preventsDisplaySleepDuringVideoPlayback={false}
+                />
+            ) : null}
+            <Pressable
+                style={styles.mediaTapLayer}
+                onPress={onPress}
+            />
+        </>
+    );
+}, (prevProps, nextProps) => {
+    if (prevProps.shouldShowBaseThumbnail !== nextProps.shouldShowBaseThumbnail) return false;
+    if (prevProps.thumbnail !== nextProps.thumbnail) return false;
+    if (prevProps.thumbnailCacheKey !== nextProps.thumbnailCacheKey) return false;
+    if (prevProps.onThumbnailLoad !== nextProps.onThumbnailLoad) return false;
+    if (prevProps.placeholderStyle !== nextProps.placeholderStyle) return false;
+    if (prevProps.shouldMountVideo !== nextProps.shouldMountVideo) return false;
+    if (prevProps.videoSource !== nextProps.videoSource) return false;
+    if (prevProps.isRecycledRender !== nextProps.isRecycledRender) return false;
+    if (prevProps.videoRef !== nextProps.videoRef) return false;
+    if (prevProps.isVideoHidden !== nextProps.isVideoHidden) return false;
+    if (prevProps.shouldPlayVideo !== nextProps.shouldPlayVideo) return false;
+    if (prevProps.isMuted !== nextProps.isMuted) return false;
+    if (prevProps.progressUpdateIntervalMs !== nextProps.progressUpdateIntervalMs) return false;
+    if (prevProps.onVideoLoadStart !== nextProps.onVideoLoadStart) return false;
+    if (prevProps.onVideoLoad !== nextProps.onVideoLoad) return false;
+    if (prevProps.onVideoReadyForDisplay !== nextProps.onVideoReadyForDisplay) return false;
+    if (prevProps.onVideoProgress !== nextProps.onVideoProgress) return false;
+    if (prevProps.onVideoEnd !== nextProps.onVideoEnd) return false;
+    if (prevProps.onVideoError !== nextProps.onVideoError) return false;
+    if (prevProps.showPoster !== nextProps.showPoster) return false;
+    if (prevProps.onPress !== nextProps.onPress) return false;
+
+    return true;
+});
 
 export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     item,
@@ -180,7 +303,6 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     onCarouselTouchEnd,
     isMeasurement = false,
     isCleanScreen = false,
-    resolvedVideoSource = null,
     networkType = null,
     shouldShowSubtitle = false,
 }: InfiniteFeedCardProps) {
@@ -213,15 +335,13 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     const readyFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const inactiveSinceRef = useRef<number | null>(null);
     const inactivePauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const activeWakeupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const hasAppliedActiveWakeupRef = useRef(false);
-    const hasActiveProgressRef = useRef(false);
     const lastSubtitleTimeMsRef = useRef(0);
 
     const [activeSubtitleText, setActiveSubtitleText] = useState<string | null>(null);
     const activeSubtitleTextRef = useRef<string | null>(null);
     const [subtitleLayoutBounds, setSubtitleLayoutBounds] = useState({ width: 0, height: 0 });
-    const { subtitles, getActiveSubtitle } = useSubtitles(isActive ? item.id : undefined);
+    const subtitleVideoId = shouldShowSubtitle && isActive ? item.id : undefined;
+    const { subtitles, getActiveSubtitle } = useSubtitles(subtitleVideoId);
     const subtitlePresentationStyle = useMemo(() => {
         return getSubtitlePresentationPixelStyle(
             subtitles?.presentation,
@@ -291,11 +411,6 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         if (!inactivePauseTimerRef.current) return;
         clearTimeout(inactivePauseTimerRef.current);
         inactivePauseTimerRef.current = null;
-    }, []);
-    const clearActiveWakeupTimer = useCallback(() => {
-        if (!activeWakeupTimerRef.current) return;
-        clearTimeout(activeWakeupTimerRef.current);
-        activeWakeupTimerRef.current = null;
     }, []);
 
     const thumbnail = useMemo(() => {
@@ -425,6 +540,9 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         );
     }, [hasTaggedPeopleOverflow, visibleTaggedPeople, onTagPress, item.id]);
 
+    const resolvedVideoSource = useInfiniteFeedResolvedSourceStore(
+        useCallback((state) => state.sources[item.id] ?? null, [item.id])
+    );
     const sourceVideoUrl = getVideoUrl(item);
     const videoUrl = isNonEmptyString(resolvedVideoSource) ? resolvedVideoSource : sourceVideoUrl;
     const isCarousel = item.postType === 'carousel' && (item.mediaUrls?.length ?? 0) > 0;
@@ -450,7 +568,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     }, [effectiveVideoSourceUrl, bufferConfig]);
     // âœ… Distance-based mount: unmount when 3+ cards away to save resources
     const distanceFromActive = Math.abs(index - activeIndex);
-    const isInMountRange = distanceFromActive <= 2;
+    const isInMountRange = distanceFromActive <= VIDEO_MOUNT_RANGE;
     const shouldMountVideo = isVideo && isInMountRange && !disableInlineVideo && !isMeasurement;
     const shouldDecodePrewarm =
         allowDecodePrewarm &&
@@ -655,7 +773,6 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         }
 
         if (!isActive) return;
-        hasActiveProgressRef.current = true;
         const durationSec = videoDurationSecRef.current;
         const nextProgressSec = Math.max(
             0,
@@ -810,8 +927,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     useEffect(() => () => {
         clearReadyFallbackTimer();
         clearInactivePauseTimer();
-        clearActiveWakeupTimer();
-    }, [clearActiveWakeupTimer, clearInactivePauseTimer, clearReadyFallbackTimer]);
+    }, [clearInactivePauseTimer, clearReadyFallbackTimer]);
 
     useEffect(() => {
         if (!shouldMountVideo) {
@@ -887,48 +1003,14 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     }, [clearReadyFallbackTimer, isActive, isDecodePrewarmDone, isVideo]);
 
     useEffect(() => {
-        if (!isVideo || !isActive || !shouldPlayVideo) {
-            clearActiveWakeupTimer();
-            hasAppliedActiveWakeupRef.current = false;
-            return;
-        }
-        if (hasAppliedActiveWakeupRef.current) return;
-
-        clearActiveWakeupTimer();
-        activeWakeupTimerRef.current = setTimeout(() => {
-            activeWakeupTimerRef.current = null;
-            if (!wasActiveRef.current) return;
-            if (hasReachedLoopLimit) return;
-            // If we already received a progress event while active, the decoder
-            // is running fine — no need to nudge it.
-            if (hasActiveProgressRef.current) return;
-            try {
-                // Android can occasionally miss the first resume edge after feed insertions.
-                // A tiny seek nudges the decoder without visible jump.
-                videoRef.current?.seek?.(0.01);
-                hasAppliedActiveWakeupRef.current = true;
-            } catch {
-                // best effort
-            }
-        }, ACTIVE_WAKEUP_SEEK_DELAY_MS);
-
-        return () => {
-            clearActiveWakeupTimer();
-        };
-    }, [clearActiveWakeupTimer, hasReachedLoopLimit, isActive, isVideo, shouldPlayVideo]);
-
-    useEffect(() => {
         const wasActive = wasActiveRef.current;
 
         if (!isVideo) {
-            clearActiveWakeupTimer();
             wasActiveRef.current = isActive;
             return;
         }
 
         if (!isActive && wasActive) {
-            clearActiveWakeupTimer();
-            hasAppliedActiveWakeupRef.current = false;
             inactiveSinceRef.current = Date.now();
             clearInactivePauseTimer();
             // âœ… 3-second threshold: mark for reset later (when video goes out of view)
@@ -943,8 +1025,6 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         }
 
         if (isActive && !wasActive) {
-            hasAppliedActiveWakeupRef.current = false;
-            hasActiveProgressRef.current = false;
             // âœ… Immediately mark video as seen when it becomes active
             // This prevents thumbnail from showing on first scroll
             firstFrameSeenRef.current = true;
@@ -965,7 +1045,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         }
 
         wasActiveRef.current = isActive;
-    }, [clearActiveWakeupTimer, clearInactivePauseTimer, isActive, isVideo]);
+    }, [clearInactivePauseTimer, isActive, isVideo]);
 
     // âœ… [PERF] Memoize dynamic styles to prevent object reference churn
     const effectiveAspectRatio = isCarousel ? CAROUSEL_ASPECT_RATIO : aspectRatio;
@@ -1016,6 +1096,8 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         if (videoDurationDisplaySec == null) return '';
         return `${formatPlaybackClock(videoProgressSec)} | ${formatPlaybackClock(videoDurationDisplaySec)}`;
     }, [videoDurationDisplaySec, videoProgressSec]);
+    const progressUpdateIntervalMs = shouldShowSubtitle ? 250 : disableTimeBadge ? 1000 : 500;
+    const isVideoHidden = ((!isActive && shouldPlayVideo) || (shouldGateVideoVisibility && !isVideoVisible));
     const commercialTagText = useMemo(() => {
         if (!item.isCommercial) return '';
         const commercialTypeLabel = item.commercialType ? item.commercialType : 'İş Birliği';
@@ -1121,51 +1203,27 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                         <View
                             style={styles.videoContainer}
                         >
-                            {shouldShowBaseThumbnail ? (
-                                <Image
-                                    source={{ uri: thumbnail, cacheKey: thumbnailCacheKey }}
-                                    style={styles.media}
-                                    contentFit="cover"
-                                    transition={0}
-                                    cachePolicy="memory-disk"
-                                    onLoad={handleMediaLoad}
-                                />
-                            ) : (
-                                <View style={themedStyles.mediaPlaceholder} />
-                            )}
-                            {shouldMountVideo && videoSource && !isRecycledRender ? (
-                                <VideoPlayer
-                                    ref={videoRef}
-                                    source={videoSource as any}
-                                    style={[
-                                        styles.media,
-                                        styles.videoOverlay,
-                                        ((!isActive && shouldPlayVideo) || (shouldGateVideoVisibility && !isVideoVisible)) && styles.videoHidden,
-                                    ]}
-                                    resizeMode="contain"
-                                    repeat={false}
-                                    paused={!shouldPlayVideo}
-                                    muted={isMuted}
-                                    playInBackground={false}
-                                    playWhenInactive={false}
-                                    progressUpdateInterval={250}
-                                    onLoadStart={handleVideoLoadStart}
-                                    onLoad={handleVideoLoad}
-                                    onReadyForDisplay={handleVideoReadyForDisplay}
-                                    onProgress={handleVideoProgress}
-                                    onEnd={handleVideoEnd}
-                                    onError={handleVideoError}
-                                    hideShutterView={true}
-                                    shutterColor="transparent"
-                                    poster={!disableThumbnail && hasThumbnail ? { source: { uri: thumbnail }, resizeMode: 'cover' } : undefined}
-                                    viewType={ViewType.TEXTURE}
-                                    automaticallyWaitsToMinimizeStalling={false}
-                                    preferredForwardBufferDuration={4}
-                                    preventsDisplaySleepDuringVideoPlayback={false}
-                                />
-                            ) : null}
-                            <Pressable
-                                style={styles.mediaTapLayer}
+                            <VideoMediaLayer
+                                shouldShowBaseThumbnail={shouldShowBaseThumbnail}
+                                thumbnail={thumbnail}
+                                thumbnailCacheKey={thumbnailCacheKey}
+                                onThumbnailLoad={handleMediaLoad}
+                                placeholderStyle={themedStyles.mediaPlaceholder}
+                                shouldMountVideo={shouldMountVideo}
+                                videoSource={videoSource as any}
+                                isRecycledRender={isRecycledRender}
+                                videoRef={videoRef}
+                                isVideoHidden={isVideoHidden}
+                                shouldPlayVideo={shouldPlayVideo}
+                                isMuted={isMuted}
+                                progressUpdateIntervalMs={progressUpdateIntervalMs}
+                                onVideoLoadStart={handleVideoLoadStart}
+                                onVideoLoad={handleVideoLoad}
+                                onVideoReadyForDisplay={handleVideoReadyForDisplay}
+                                onVideoProgress={handleVideoProgress}
+                                onVideoEnd={handleVideoEnd}
+                                onVideoError={handleVideoError}
+                                showPoster={!disableThumbnail && hasThumbnail}
                                 onPress={handleOpen}
                             />
                             {isVideo && isActive && hasReachedLoopLimit && (
@@ -1345,6 +1403,49 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
             </View>
         </View>
     );
+}, (prevProps, nextProps) => {
+    // ✅ [PERF] Fast-path: item reference changed → must re-render (FlashList recycle)
+    if (prevProps.item !== nextProps.item) return false;
+    if (prevProps.index !== nextProps.index) return false;
+
+    const wasWithinMountRange = Math.abs(prevProps.index - prevProps.activeIndex) <= VIDEO_MOUNT_RANGE;
+    const isWithinMountRange = Math.abs(nextProps.index - nextProps.activeIndex) <= VIDEO_MOUNT_RANGE;
+    if (wasWithinMountRange !== isWithinMountRange) return false;
+
+    // ✅ [PERF] Fast-path for inactive cards far from active index:
+    // If this card was NOT active/pending before, and is still NOT active/pending,
+    // and mount range didn't change → only visual props matter (colors, muted, paused)
+    const wasInactive = !prevProps.isActive && !prevProps.isPendingActive && !wasWithinMountRange;
+    const isInactive = !nextProps.isActive && !nextProps.isPendingActive && !isWithinMountRange;
+    if (wasInactive && isInactive) {
+        // Inactive distant card: only re-render if visual display props changed
+        if (prevProps.colors !== nextProps.colors) return false;
+        if (prevProps.isCleanScreen !== nextProps.isCleanScreen) return false;
+        if (prevProps.hasActiveStory !== nextProps.hasActiveStory) return false;
+        // Everything else (muted, paused, subtitles, handlers) — irrelevant for distant cards
+        return true;
+    }
+
+    if (prevProps.colors !== nextProps.colors) return false;
+    if (prevProps.isActive !== nextProps.isActive) return false;
+    if (prevProps.isPendingActive !== nextProps.isPendingActive) return false;
+    if (prevProps.allowDecodePrewarm !== nextProps.allowDecodePrewarm) return false;
+    if (prevProps.isMuted !== nextProps.isMuted) return false;
+    if (prevProps.isPaused !== nextProps.isPaused) return false;
+    if (prevProps.currentUserId !== nextProps.currentUserId) return false;
+    if (prevProps.hasActiveStory !== nextProps.hasActiveStory) return false;
+
+    // ✅ [PERF] Handler callbacks come from cardActionHandlersRef (stable ref).
+    // Skip comparing them — they never change identity between renders.
+    // If they did change, the renderItem useCallback would have a new identity,
+    // causing FlashList to re-render items via extraData anyway.
+
+    if (prevProps.isMeasurement !== nextProps.isMeasurement) return false;
+    if (prevProps.isCleanScreen !== nextProps.isCleanScreen) return false;
+    if (prevProps.networkType !== nextProps.networkType) return false;
+    if (prevProps.shouldShowSubtitle !== nextProps.shouldShowSubtitle) return false;
+
+    return true;
 });
 
 const styles = StyleSheet.create({

@@ -75,10 +75,37 @@ class FeedPrefetchService {
     if (isVideoCacheDisabled()) return;
 
     if (typeof currentIndex === 'number' && currentIndex !== this.activeIndex) {
+      const prevIndex = this.activeIndex;
       this.activeIndex = currentIndex;
       this.generation += 1;
-      this.queue = [];
-      this.queued.clear();
+
+      // ✅ [PERF] Incremental queue pruning instead of full reset.
+      // Keep items close to new currentIndex, remove only distant ones.
+      const KEEP_DISTANCE = 5;
+      const prunedQueue: PrefetchItem[] = [];
+      const prunedQueued = new Set<string>();
+
+      for (const item of this.queue) {
+        // Re-calculate priority based on new currentIndex
+        // We can't know the original feed index from the queue item alone,
+        // so we keep items and let the priority sort handle ordering.
+        // Only prune items that were queued far from the NEW position
+        // heuristic: if priority was high (far away), remove
+        const estimatedOldDistance = item.priority >= 2 ? item.priority - 2 : item.priority;
+        const directionShift = prevIndex != null ? Math.abs(currentIndex - prevIndex) : 0;
+        const estimatedNewDistance = Math.abs(estimatedOldDistance - directionShift);
+
+        if (estimatedNewDistance <= KEEP_DISTANCE) {
+          // Re-prioritize based on estimated new distance
+          item.priority = estimatedNewDistance <= 1 ? estimatedNewDistance : 2 + estimatedNewDistance;
+          prunedQueue.push(item);
+          prunedQueued.add(item.cacheKey);
+        }
+        // else: item is too far from new position, drop it
+      }
+
+      this.queue = prunedQueue;
+      this.queued = prunedQueued;
     }
 
     indices.forEach((index) => {

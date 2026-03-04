@@ -10,7 +10,8 @@
     "test:jest": "jest --runInBand",
     "test:all": "npm run test && npm run test:jest",
     "smoke": "node scripts/smoke-test.js",
-    "verify:mobile-rpcs": "node scripts/verify-mobile-rpcs.js"
+    "verify:mobile-rpcs": "node scripts/verify-mobile-rpcs.js",
+    "notify": "node scripts/notification-manager.js"
   },
   "keywords": [],
   "author": "",

@@ -14,6 +14,7 @@ import * as MediaLibrary from 'expo-media-library';
 import type * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Audio as CompressorAudio } from 'react-native-compressor';
+
 import {
     ArrowLeft,
     Check,
@@ -28,7 +29,7 @@ import {
 } from 'lucide-react-native';
 import { useGalleryPickerStore } from '../src/presentation/store/useGalleryPickerStore';
 import { useUploadComposerStore } from '../src/presentation/store/useUploadComposerStore';
-import { CONFIG } from '../src/core/config';
+
 import { MediaFilterDropdown, MediaFilter, FILTER_OPTIONS } from '../src/presentation/components/upload/gallery/MediaFilterDropdown';
 import { MediaGrid, CELL_WIDTH, CELL_HEIGHT } from '../src/presentation/components/upload/gallery/MediaGrid';
 
@@ -48,81 +49,40 @@ export default function GalleryPickerScreen() {
     const setFilterCache = useGalleryPickerStore((state) => state.setFilterCache);
     const getFilterCache = useGalleryPickerStore((state) => state.getFilterCache);
 
-    const startSilentSubtitlePrefetch = useCallback((mappedAssets: ImagePicker.ImagePickerAsset[]) => {
+    // Pre-extract audio from selected videos in the background.
+    // Only local extraction happens here — NO Google STT API calls.
+    // The extracted audio is stored so it's instantly available
+    // when the user taps the captions button in upload-composer.
+    const preExtractAudioForVideos = useCallback((mappedAssets: ImagePicker.ImagePickerAsset[]) => {
+        const store = useUploadComposerStore.getState();
         mappedAssets.forEach((asset) => {
             if (asset.type !== 'video') return;
             const uri = asset.uri;
             if (!uri) return;
-
-            const store = useUploadComposerStore.getState();
-            const existingSubtitle = store.subtitleCache[uri];
-            const existingState = store.subtitleSttState[uri];
-            if (existingSubtitle || existingState === 'loading' || existingState === 'ready' || existingState === 'no_audio') {
+            if (store.preExtractedAudioCache[uri]) {
+                console.log('[PRE-EXTRACT] Audio already cached for', uri.substring(uri.length - 30));
                 return;
             }
 
-            store.setSubtitleSttState(uri, 'loading');
+            console.log('[PRE-EXTRACT] Starting audio extraction for', uri.substring(uri.length - 30));
 
             void (async () => {
                 try {
-                    let audioUri: string | null = null;
-                    try {
-                        audioUri = await CompressorAudio.compress(uri, {
-                            quality: 'low',
-                            bitrate: 64000,
-                            channels: 1,
-                            samplerate: 44100,
-                        } as any);
-                    } catch {
-                        audioUri = null;
-                    }
-
-                    const requestPreview = async (payloadType: 'audio' | 'video') => {
-                        const formData = new FormData();
-                        if (payloadType === 'audio' && audioUri) {
-                            formData.append('audio', {
-                                uri: audioUri,
-                                name: 'preview_audio.m4a',
-                                type: 'audio/m4a',
-                            } as any);
-                        } else {
-                            formData.append('video', {
-                                uri,
-                                name: 'preview_video.mp4',
-                                type: 'video/mp4',
-                            } as any);
-                        }
-                        formData.append('language', 'auto');
-                        const response = await fetch(`${CONFIG.API_URL}/stt-preview`, {
-                            method: 'POST',
-                            body: formData,
-                        });
-                        if (!response.ok) return null;
-                        return response.json();
-                    };
-
-                    let result: any;
+                    const t0 = Date.now();
+                    const audioUri = await CompressorAudio.compress(uri, {
+                        quality: 'low',
+                        bitrate: 64000,
+                        channels: 1,
+                        samplerate: 44100,
+                    } as any);
+                    const elapsed = Date.now() - t0;
                     if (audioUri) {
-                        result = await requestPreview('audio');
-                        if (!result?.success && result?.reason === 'AUDIO_TOO_SMALL') {
-                            result = await requestPreview('video');
-                        }
-                    } else {
-                        result = await requestPreview('video');
+                        useUploadComposerStore.getState().setPreExtractedAudio(uri, audioUri);
+                        console.log(`[PRE-EXTRACT] Audio ready in ${elapsed}ms →`, audioUri.substring(audioUri.length - 40));
                     }
-
-                    if (!result) {
-                        store.setSubtitleSttState(uri, 'error');
-                        return;
-                    }
-
-                    if (result.success && Array.isArray(result.segments) && result.segments.length > 0) {
-                        store.updateSubtitleCache(uri, result.segments);
-                    } else {
-                        store.setSubtitleSttState(uri, 'no_audio');
-                    }
-                } catch {
-                    store.setSubtitleSttState(uri, 'error');
+                } catch (err) {
+                    console.log('[PRE-EXTRACT] Extraction failed (will fallback):', err);
+                    // Silently ignore — captions will fall back to video upload
                 }
             })();
         });
@@ -280,7 +240,7 @@ export default function GalleryPickerScreen() {
     const commitSingleSelection = useCallback((asset: MediaLibrary.Asset) => {
         const mapped = [mapAssetToPickerAsset(asset)];
         setPickedAssets(mapped);
-        startSilentSubtitlePrefetch(mapped);
+
 
         // Match resolveCreateMode logic from upload.tsx
         const uploadMode = (createMode === 'story') ? 'story' : 'video';
@@ -299,8 +259,10 @@ export default function GalleryPickerScreen() {
             trimEndSec: 0,
         });
 
+        preExtractAudioForVideos(mapped);
+
         router.push('/upload-composer');
-    }, [createMode, mapAssetToPickerAsset, setPickedAssets, startSilentSubtitlePrefetch]);
+    }, [createMode, mapAssetToPickerAsset, setPickedAssets, preExtractAudioForVideos]);
 
     const commitMultiSelection = useCallback(() => {
         if (selectedIds.length === 0) {
@@ -315,7 +277,7 @@ export default function GalleryPickerScreen() {
 
         const mapped = selectedAssets.map(mapAssetToPickerAsset);
         setPickedAssets(mapped);
-        startSilentSubtitlePrefetch(mapped);
+
 
         // Match resolveCreateMode logic from upload.tsx
         const uploadMode = (createMode === 'story') ? 'story' : 'video';
@@ -334,8 +296,10 @@ export default function GalleryPickerScreen() {
             trimEndSec: 0,
         });
 
+        preExtractAudioForVideos(mapped);
+
         router.push('/upload-composer');
-    }, [assets, createMode, mapAssetToPickerAsset, selectedIds, setPickedAssets, startSilentSubtitlePrefetch]);
+    }, [assets, createMode, mapAssetToPickerAsset, selectedIds, setPickedAssets, preExtractAudioForVideos]);
 
     if (permissionGranted === false) {
         return (

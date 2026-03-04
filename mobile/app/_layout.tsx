@@ -44,6 +44,8 @@ import { LogCode, logAuth, logError } from '@/core/services/Logger';
 import { PerformanceLogger } from '../src/core/services/PerformanceLogger';
 import { ProfileRepositoryImpl } from '../src/data/repositories/ProfileRepositoryImpl';
 import { QUERY_KEYS } from '../src/core/query/queryClient';
+import Constants from 'expo-constants';
+import { supabase } from '../src/core/supabase';
 
 configureReanimatedLogger({
     level: ReanimatedLogLevel.warn,
@@ -163,6 +165,94 @@ function RootNavigator() {
                 staleTime: 1000 * 60, // 1 minute
             });
         }
+    }, [user?.id]);
+
+    useEffect(() => {
+        if (!user?.id) return;
+
+        const registerForPushNotificationsAsync = async () => {
+            if (Platform.OS === 'android') {
+                await Notifications.setNotificationChannelAsync('default', {
+                    name: 'default',
+                    importance: Notifications.AndroidImportance.MAX,
+                    vibrationPattern: [0, 250, 250, 250],
+                    lightColor: '#FF231F7C',
+                });
+            }
+
+            const { status: existingStatus } = await Notifications.getPermissionsAsync();
+            let finalStatus = existingStatus;
+            if (existingStatus !== 'granted') {
+                const { status } = await Notifications.requestPermissionsAsync();
+                finalStatus = status;
+            }
+            if (finalStatus !== 'granted') {
+                return;
+            }
+
+            try {
+                const projectId =
+                    Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
+
+                const tokenResponse = await Notifications.getExpoPushTokenAsync({
+                    projectId,
+                });
+                const token = tokenResponse.data;
+
+                if (token) {
+                    await supabase.rpc('update_expo_push_token', {
+                        p_user_id: user.id,
+                        p_token: token
+                    });
+                }
+            } catch (error: any) {
+                if (error.message?.includes('FirebaseApp')) {
+                    console.log('Firebase is not initialized. Skipping remote push token registration for local dev.');
+                } else {
+                    logError(LogCode.ERROR_CAUGHT, 'Push token registration failed', error);
+                }
+            }
+        };
+
+        registerForPushNotificationsAsync();
+    }, [user?.id]);
+
+    useEffect(() => {
+        if (!user?.id) return;
+
+        // Gerçek zamanlı (Local/Dev) bildirim testleri için Supabase dinleyici
+        const channel = supabase
+            .channel(`notifications:user_id=eq.${user.id}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'notifications',
+                    filter: `user_id=eq.${user.id}`,
+                },
+                (payload) => {
+                    console.log('Realtime Notification Received:', payload.new);
+                    const { title, message, content } = payload.new;
+                    const finalMessage = message || content;
+
+                    if (finalMessage) {
+                        Notifications.scheduleNotificationAsync({
+                            content: {
+                                title: title || 'WizyClub',
+                                body: finalMessage,
+                                sound: 'default',
+                            },
+                            trigger: null,
+                        });
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel).catch(() => { });
+        };
     }, [user?.id]);
 
     useEffect(() => {

@@ -59,6 +59,7 @@ interface UploadComposerState {
     subtitlePresentationCache: Record<string, SubtitlePresentation>;
     subtitleStyleCache: Record<string, SubtitleStyle>;
     subtitleSttState: Record<string, SubtitleSttState>;
+    preExtractedAudioCache: Record<string, string>;
     setDraft: (draft: UploadComposerDraft) => void;
     clearDraft: () => void;
     setCoverPreviewSource: (source: unknown | null) => void;
@@ -67,6 +68,7 @@ interface UploadComposerState {
     updateSubtitleStyle: (uri: string, style: SubtitleStyle) => void;
     removeSubtitleData: (uri: string) => void;
     setSubtitleSttState: (uri: string, state: SubtitleSttState) => void;
+    setPreExtractedAudio: (videoUri: string, audioUri: string) => void;
     clearCache: () => void;
 }
 
@@ -79,6 +81,7 @@ export const useUploadComposerStore = create<UploadComposerState>()(
             subtitlePresentationCache: {},
             subtitleStyleCache: {},
             subtitleSttState: {},
+            preExtractedAudioCache: {},
             setDraft: (draft) => set({ draft, coverPreviewSource: null }),
             clearDraft: () => set({ draft: null, coverPreviewSource: null }),
             setCoverPreviewSource: (coverPreviewSource) => set({ coverPreviewSource }),
@@ -126,11 +129,18 @@ export const useUploadComposerStore = create<UploadComposerState>()(
                     [uri]: nextState,
                 }
             })),
+            setPreExtractedAudio: (videoUri, audioUri) => set((state) => ({
+                preExtractedAudioCache: {
+                    ...state.preExtractedAudioCache,
+                    [videoUri]: audioUri,
+                },
+            })),
             clearCache: () => set({
                 subtitleCache: {},
                 subtitlePresentationCache: {},
                 subtitleStyleCache: {},
                 subtitleSttState: {},
+                preExtractedAudioCache: {},
             }),
         }),
         {

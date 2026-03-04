@@ -25,6 +25,7 @@ interface PoolFeedMetadataLayerHandlers {
 interface PoolFeedMetadataLayerProps {
     data: PoolFeedMetadataLayerData;
     handlers: PoolFeedMetadataLayerHandlers;
+    bottomOffset?: number;
 }
 
 const BASE_BOTTOM_POSITION = 80; // Aligned exactly with seekbar center (80px touch area / 2)
@@ -35,11 +36,12 @@ const DESCRIPTION_PREVIEW_LIMIT = 70;
 export function PoolFeedMetadataLayer({
     data,
     handlers,
+    bottomOffset = 0,
 }: PoolFeedMetadataLayerProps) {
     const { video, currentUserId, hasActiveStory } = data;
     const { onAvatarPress, onFollowPress, onReadMorePress, onCommercialTagPress } = handlers;
     const insets = useSafeAreaInsets();
-    const bottom = Math.max(BASE_BOTTOM_POSITION, insets.bottom + SAFE_AREA_OFFSET);
+    const bottom = Math.max(BASE_BOTTOM_POSITION, insets.bottom + SAFE_AREA_OFFSET) + bottomOffset;
 
     // Hide follow button if:
     // 1. User is already following

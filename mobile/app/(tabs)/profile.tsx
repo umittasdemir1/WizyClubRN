@@ -512,7 +512,7 @@ export default function ProfileScreen() {
   const GRID_GAP = 2;
   const GRID_PADDING = 2;
 
-  const totalGridItems = postsData.length + 1;
+  const totalGridItems = postsData.length + (drafts?.length ? 1 : 0);
   const gridItemSize = Math.floor(
     (SCREEN_WIDTH - GRID_PADDING * 2 - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS
   );
@@ -642,14 +642,17 @@ export default function ProfileScreen() {
     router.navigate('/videos' as any);
   }, [router, setActiveVideo]);
 
-  const draftsHeader = useMemo(() => (
-    <DraftsFolderCard
-      drafts={drafts}
-      isDark={isDark}
-      itemWidth={gridItemSize}
-      onPress={handleDraftsFolderPress}
-    />
-  ), [drafts, isDark, gridItemSize, handleDraftsFolderPress]);
+  const draftsHeader = useMemo(() => {
+    if (!drafts?.length) return null;
+    return (
+      <DraftsFolderCard
+        drafts={drafts}
+        isDark={isDark}
+        itemWidth={gridItemSize}
+        onPress={handleDraftsFolderPress}
+      />
+    );
+  }, [drafts, isDark, gridItemSize, handleDraftsFolderPress]);
 
   const videosPageItems = useMemo(
     () => videosData.map((video) => ({ ...video, type: 'video' as const })),

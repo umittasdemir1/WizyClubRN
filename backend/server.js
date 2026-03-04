@@ -34,6 +34,7 @@ const server = app.listen(port, '0.0.0.0', () => {
     schedulers.startStoryCleanupScheduler();
     schedulers.startDraftCleanupScheduler();
     schedulers.startSoftDeletedStoryCleanupScheduler();
+    schedulers.startNotificationScheduler(30000); // Check every 30 seconds
 });
 
 registerGracefulShutdown({ server, logLine });

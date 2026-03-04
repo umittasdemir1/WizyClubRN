@@ -11,6 +11,7 @@
  */
 
 import { useCallback, useRef } from 'react';
+import { InteractionManager } from 'react-native';
 import { useSharedValue, useAnimatedScrollHandler, SharedValue } from 'react-native-reanimated';
 import type { ViewToken } from 'react-native';
 import { Image } from 'expo-image';
@@ -204,48 +205,52 @@ export function usePoolFeedScroll(options: UseFeedScrollOptions): UseFeedScrollR
         setCleanScreen(false);
         setIsCarouselInteracting(false);
 
-        // Cache current/next videos
-        if (!isActiveCarousel) {
-            const currentUrl = isFeedVideoItem(newVideo) ? getVideoUrl(newVideo) : null;
-            const nextVideo = videosRef.current[newIndex + 1];
-            const nextUrl = isFeedVideoItem(nextVideo) ? getVideoUrl(nextVideo) : null;
-            if (currentUrl) {
-                VideoCacheService.warmupCache(currentUrl);
-            }
-            if (nextUrl) {
-                VideoCacheService.warmupCache(nextUrl);
-                VideoCacheService.cacheVideo(nextUrl).catch(() => { });
-            }
-        }
-
-        // Prefetch next thumbnails for faster poster display
-        [newIndex - 1, newIndex + 1, newIndex + 2].forEach((idx) => {
-            const video = videosRef.current[idx];
-            if (video?.thumbnailUrl) {
-                Image.prefetch(video.thumbnailUrl);
-            }
-            if (isFeedVideoItem(video)) {
-                const url = getVideoUrl(video);
-                if (url) {
-                    VideoCacheService.warmupCache(url);
+        // ✅ [PERF] Defer cache/prefetch/thumbnail work out of scroll callback.
+        // Store updates above are synchronous for instant UI response;
+        // heavy I/O operations run after the current interaction finishes.
+        InteractionManager.runAfterInteractions(() => {
+            // Cache current/next videos
+            if (!isActiveCarousel) {
+                const currentUrl = isFeedVideoItem(newVideo) ? getVideoUrl(newVideo) : null;
+                const nextVideo = videosRef.current[newIndex + 1];
+                const nextUrl = isFeedVideoItem(nextVideo) ? getVideoUrl(nextVideo) : null;
+                if (currentUrl) {
+                    VideoCacheService.warmupCache(currentUrl);
+                }
+                if (nextUrl) {
+                    VideoCacheService.warmupCache(nextUrl);
+                    VideoCacheService.cacheVideo(nextUrl).catch(() => { });
                 }
             }
-        });
 
-        // Defer prefetch to avoid blocking scroll
-        if (!isActiveCarousel) {
-            setTimeout(() => {
+            // Prefetch next thumbnails for faster poster display
+            [newIndex - 1, newIndex + 1, newIndex + 2].forEach((idx) => {
+                const video = videosRef.current[idx];
+                if (video?.thumbnailUrl) {
+                    Image.prefetch(video.thumbnailUrl);
+                }
+                if (isFeedVideoItem(video)) {
+                    const url = getVideoUrl(video);
+                    if (url) {
+                        VideoCacheService.warmupCache(url);
+                    }
+                }
+            });
+
+            // Queue deeper prefetch
+            if (!isActiveCarousel) {
                 const prefetchIndices = getPrefetchIndices(newIndex).filter((idx) =>
                     isFeedVideoItem(videosRef.current[idx])
                 );
-                if (prefetchIndices.length === 0) return;
-                FeedPrefetchService.getInstance().queueVideos(
-                    videosRef.current,
-                    prefetchIndices,
-                    newIndex
-                );
-            }, 0);
-        }
+                if (prefetchIndices.length > 0) {
+                    FeedPrefetchService.getInstance().queueVideos(
+                        videosRef.current,
+                        prefetchIndices,
+                        newIndex
+                    );
+                }
+            }
+        });
     }, [
         videosRef,
         setActiveVideo,

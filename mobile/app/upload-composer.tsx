@@ -608,16 +608,25 @@ export default function UploadComposerScreen() {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         setSubtitleSttState(uri, 'loading');
         try {
-            let audioUri: string | null = null;
-            try {
-                audioUri = await CompressorAudio.compress(uri, {
-                    quality: 'low',
-                    bitrate: 64000,
-                    channels: 1,
-                    samplerate: 44100,
-                } as any);
-            } catch {
-                audioUri = null;
+            // Use pre-extracted audio from gallery picker if available,
+            // otherwise fall back to on-the-spot compression.
+            let audioUri: string | null =
+                useUploadComposerStore.getState().preExtractedAudioCache[uri] || null;
+
+            if (audioUri) {
+                console.log('[CAPTIONS] Using pre-extracted audio (instant!) →', audioUri.substring(audioUri.length - 40));
+            } else {
+                console.log('[CAPTIONS] No pre-extracted audio, compressing on the spot...');
+                try {
+                    audioUri = await CompressorAudio.compress(uri, {
+                        quality: 'low',
+                        bitrate: 64000,
+                        channels: 1,
+                        samplerate: 44100,
+                    } as any);
+                } catch {
+                    audioUri = null;
+                }
             }
 
             const requestPreview = async (payloadType: 'audio' | 'video') => {
@@ -940,122 +949,122 @@ export default function UploadComposerScreen() {
                                             const shouldRenderLivePreview = isActivePreview || shouldRenderImagePreview;
 
                                             return (
-                                        <Animated.View
-                                            style={[
-                                                styles.previewContainer,
-                                                {
-                                                    width: PREVIEW_ITEM_WIDTH,
-                                                    height: PREVIEW_BASE_HEIGHT,
-                                                },
-                                                previewContainerAnimatedStyle,
-                                            ]}
-                                        >
-                                            {shouldRenderLivePreview ? (
-                                                asset.type === 'video' ? (
-                                                <View
-                                                    collapsable={false}
-                                                    style={{ flex: 1 }}
+                                                <Animated.View
+                                                    style={[
+                                                        styles.previewContainer,
+                                                        {
+                                                            width: PREVIEW_ITEM_WIDTH,
+                                                            height: PREVIEW_BASE_HEIGHT,
+                                                        },
+                                                        previewContainerAnimatedStyle,
+                                                    ]}
                                                 >
-                                                    <VideoPlayerPreview
-                                                        uri={asset.uri}
-                                                        isActive={activePreviewIndex === index}
-                                                        isMuted={isMuted}
-                                                        isPaused={
-                                                            !isFocused
-                                                            || isDraggingSubtitle
-                                                            || (isEditingSubtitle && !isSubtitlePreviewPlaying)
-                                                        }
-                                                        progressUpdateIntervalMs={isSubtitleEditorVisible ? 34 : 90}
-                                                        seekRequest={previewSeekRequest?.uri === asset.uri ? previewSeekRequest : null}
-                                                        onProgress={handlePreviewProgress}
-                                                    />
-                                                    {assetSubtitles[asset.uri] && subtitleLanguage !== 'none' && (
-                                                        <DraggableSubtitleOverlay
-                                                            segments={assetSubtitles[asset.uri]}
-                                                            presentation={subtitlePresentationCache[asset.uri]}
-                                                            textStyle={subtitleStyleCache[asset.uri] || DEFAULT_SUBTITLE_STYLE}
-                                                            currentTimeMs={currentVideoTimeMs}
-                                                            isEditingSessionActive={isEditingSubtitle}
-                                                            onDragStart={() => setIsDraggingSubtitle(true)}
-                                                            onDragEnd={() => setIsDraggingSubtitle(false)}
-                                                            onEditingChange={(isEditing) => {
-                                                                setIsEditingSubtitle(isEditing);
-                                                                if (isEditing) {
-                                                                    setSubtitleEditorTab('text');
+                                                    {shouldRenderLivePreview ? (
+                                                        asset.type === 'video' ? (
+                                                            <View
+                                                                collapsable={false}
+                                                                style={{ flex: 1 }}
+                                                            >
+                                                                <VideoPlayerPreview
+                                                                    uri={asset.uri}
+                                                                    isActive={activePreviewIndex === index}
+                                                                    isMuted={isMuted}
+                                                                    isPaused={
+                                                                        !isFocused
+                                                                        || isDraggingSubtitle
+                                                                        || (isEditingSubtitle && !isSubtitlePreviewPlaying)
+                                                                    }
+                                                                    progressUpdateIntervalMs={isSubtitleEditorVisible ? 34 : 90}
+                                                                    seekRequest={previewSeekRequest?.uri === asset.uri ? previewSeekRequest : null}
+                                                                    onProgress={handlePreviewProgress}
+                                                                />
+                                                                {assetSubtitles[asset.uri] && subtitleLanguage !== 'none' && (
+                                                                    <DraggableSubtitleOverlay
+                                                                        segments={assetSubtitles[asset.uri]}
+                                                                        presentation={subtitlePresentationCache[asset.uri]}
+                                                                        textStyle={subtitleStyleCache[asset.uri] || DEFAULT_SUBTITLE_STYLE}
+                                                                        currentTimeMs={currentVideoTimeMs}
+                                                                        isEditingSessionActive={isEditingSubtitle}
+                                                                        onDragStart={() => setIsDraggingSubtitle(true)}
+                                                                        onDragEnd={() => setIsDraggingSubtitle(false)}
+                                                                        onEditingChange={(isEditing) => {
+                                                                            setIsEditingSubtitle(isEditing);
+                                                                            if (isEditing) {
+                                                                                setSubtitleEditorTab('text');
+                                                                            } else {
+                                                                                setSubtitleEditorTab(null);
+                                                                            }
+                                                                        }}
+                                                                        onTextEditingChange={(isTextEditing) => {
+                                                                            if (isTextEditing) {
+                                                                                setIsEditingSubtitle(true);
+                                                                                setSubtitleEditorTab('text');
+                                                                            }
+                                                                        }}
+                                                                        onUpdateSubtitle={(idx, text) => handleUpdateSubtitle(asset.uri, idx, text)}
+                                                                        onPresentationChange={(value) => updateSubtitlePresentation(asset.uri, value)}
+                                                                    />
+                                                                )}
+                                                            </View>
+                                                        ) : (
+                                                            <Image
+                                                                source={{ uri: asset.uri }}
+                                                                style={styles.previewMedia}
+                                                                contentFit="cover"
+                                                            />
+                                                        )
+                                                    ) : (
+                                                        <View style={[styles.previewMedia, styles.previewMediaPlaceholder]}>
+                                                            <Text style={styles.previewMediaPlaceholderText}>
+                                                                {asset.type === 'video' ? 'Video hazir' : 'Gorsel hazir'}
+                                                            </Text>
+                                                        </View>
+                                                    )}
+
+                                                    {asset.type === 'video' && isActivePreview && !isSubtitleEditorVisible && (
+                                                        <UploadActionButtons
+                                                            insets={insets}
+                                                            isDark={isDark}
+                                                            isQualityMenuOpen={isQualityMenuOpen}
+                                                            setIsQualityMenuOpen={setIsQualityMenuOpen}
+                                                            qualityPreset={qualityPreset}
+                                                            setQualityPreset={setQualityPreset}
+                                                            isCaptionsMenuOpen={isCaptionsMenuOpen}
+                                                            setIsCaptionsMenuOpen={setIsCaptionsMenuOpen}
+                                                            subtitleLanguage={subtitleLanguage}
+                                                            setSubtitleLanguage={setSubtitleLanguage}
+                                                            hasSubtitles={!!assetSubtitles[asset.uri]}
+                                                            isSttLoading={captionRequestedByUri[asset.uri] && subtitleSttState[asset.uri] === 'loading'}
+                                                            onToggleCaptionsTap={() => {
+                                                                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                                                const activeUri = selectedAssets[activePreviewIndex].uri;
+                                                                if (!assetSubtitles[activeUri]) {
+                                                                    setSubtitleLanguage((prev) => (prev === 'none' ? 'auto' : prev));
+                                                                    setCaptionRequestedByUri((prev) => ({ ...prev, [activeUri]: true }));
+                                                                    void generateSubtitles(activePreviewIndex, {
+                                                                        forceRetry: subtitleSttState[activeUri] === 'no_audio',
+                                                                    });
                                                                 } else {
-                                                                    setSubtitleEditorTab(null);
-                                                                }
-                                                            }}
-                                                            onTextEditingChange={(isTextEditing) => {
-                                                                if (isTextEditing) {
                                                                     setIsEditingSubtitle(true);
                                                                     setSubtitleEditorTab('text');
+                                                                    setSubtitleLanguage((prev) => (prev === 'none' ? 'auto' : prev));
+                                                                    setIsCaptionsMenuOpen(false);
                                                                 }
+                                                                setIsQualityMenuOpen(false);
                                                             }}
-                                                            onUpdateSubtitle={(idx, text) => handleUpdateSubtitle(asset.uri, idx, text)}
-                                                            onPresentationChange={(value) => updateSubtitlePresentation(asset.uri, value)}
+                                                            hideQuality={isEditMode}
                                                         />
                                                     )}
-                                                </View>
-                                                ) : (
-                                                <Image
-                                                    source={{ uri: asset.uri }}
-                                                    style={styles.previewMedia}
-                                                    contentFit="cover"
-                                                />
-                                                )
-                                            ) : (
-                                                <View style={[styles.previewMedia, styles.previewMediaPlaceholder]}>
-                                                    <Text style={styles.previewMediaPlaceholderText}>
-                                                        {asset.type === 'video' ? 'Video hazir' : 'Gorsel hazir'}
-                                                    </Text>
-                                                </View>
-                                            )}
 
-                                            {asset.type === 'video' && isActivePreview && !isSubtitleEditorVisible && (
-                                                <UploadActionButtons
-                                                    insets={insets}
-                                                    isDark={isDark}
-                                                    isQualityMenuOpen={isQualityMenuOpen}
-                                                    setIsQualityMenuOpen={setIsQualityMenuOpen}
-                                                    qualityPreset={qualityPreset}
-                                                    setQualityPreset={setQualityPreset}
-                                                    isCaptionsMenuOpen={isCaptionsMenuOpen}
-                                                    setIsCaptionsMenuOpen={setIsCaptionsMenuOpen}
-                                                    subtitleLanguage={subtitleLanguage}
-                                                    setSubtitleLanguage={setSubtitleLanguage}
-                                                    hasSubtitles={!!assetSubtitles[asset.uri]}
-                                                    isSttLoading={captionRequestedByUri[asset.uri] && subtitleSttState[asset.uri] === 'loading'}
-                                                    onToggleCaptionsTap={() => {
-                                                        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                                        const activeUri = selectedAssets[activePreviewIndex].uri;
-                                                        if (!assetSubtitles[activeUri]) {
-                                                            setSubtitleLanguage((prev) => (prev === 'none' ? 'auto' : prev));
-                                                            setCaptionRequestedByUri((prev) => ({ ...prev, [activeUri]: true }));
-                                                            void generateSubtitles(activePreviewIndex, {
-                                                                forceRetry: subtitleSttState[activeUri] === 'no_audio',
-                                                            });
-                                                        } else {
-                                                            setIsEditingSubtitle(true);
-                                                            setSubtitleEditorTab('text');
-                                                            setSubtitleLanguage((prev) => (prev === 'none' ? 'auto' : prev));
-                                                            setIsCaptionsMenuOpen(false);
-                                                        }
-                                                        setIsQualityMenuOpen(false);
-                                                    }}
-                                                    hideQuality={isEditMode}
-                                                />
-                                            )}
-
-                                            {selectedAssets.length > 1 && !isEditMode && (
-                                                <Pressable
-                                                    style={styles.removeAssetBtn}
-                                                    onPress={() => removeAsset(index)}
-                                                >
-                                                    <Trash2 color="#FFF" size={20} />
-                                                </Pressable>
-                                            )}
-                                        </Animated.View>
+                                                    {selectedAssets.length > 1 && !isEditMode && (
+                                                        <Pressable
+                                                            style={styles.removeAssetBtn}
+                                                            onPress={() => removeAsset(index)}
+                                                        >
+                                                            <Trash2 color="#FFF" size={20} />
+                                                        </Pressable>
+                                                    )}
+                                                </Animated.View>
                                             );
                                         })()}
                                     </View>

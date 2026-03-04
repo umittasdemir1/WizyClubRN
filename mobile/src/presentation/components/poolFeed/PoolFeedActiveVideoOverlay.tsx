@@ -249,8 +249,9 @@ export const PoolFeedActiveVideoOverlay = memo(function PoolFeedActiveVideoOverl
     // Transform to follow video position (sync with PoolFeedVideoPlayerPool)
     const transformStyle = useAnimatedStyle(() => {
         const targetY = activeIndex * SCREEN_HEIGHT;
+        const currentScrollY = Math.max(0, scrollY.value);
         return {
-            transform: [{ translateY: targetY - scrollY.value }]
+            transform: [{ translateY: targetY - currentScrollY }]
         };
     }, [activeIndex, scrollY]);
 
@@ -404,6 +405,7 @@ export const PoolFeedActiveVideoOverlay = memo(function PoolFeedActiveVideoOverl
                                 onReadMorePress: onOpenDescription,
                                 onCommercialTagPress: () => { },
                             }}
+                            bottomOffset={60 + insets.bottom - 13}
                         />
                         {shouldShowSubtitlePreference && showUiOverlays && activeSubtitleText && (
                             <View

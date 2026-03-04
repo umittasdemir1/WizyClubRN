@@ -86,21 +86,78 @@ class SubtitleService {
     }
 
     /**
-     * Transcribe audio using Google Cloud Speech-to-Text v2
-     * Returns array of segments: [{ startMs, endMs, text }]
+     * Probe audio duration in seconds using FFprobe
      */
-    async transcribeAudio(audioPath, languageCode = 'auto') {
-        if (!this.isAvailable()) {
-            throw new Error('Google Cloud STT is not configured. Set GOOGLE_APPLICATION_CREDENTIALS and GOOGLE_CLOUD_PROJECT_ID.');
+    async _probeAudioDuration(audioPath) {
+        return new Promise((resolve, reject) => {
+            ffmpeg.ffprobe(audioPath, (err, metadata) => {
+                if (err) return reject(err);
+                const duration = parseFloat(metadata?.format?.duration || '0');
+                resolve(duration);
+            });
+        });
+    }
+
+    /**
+     * Split audio file into chunks of chunkDurationSec seconds using FFmpeg.
+     * Returns array of { chunkPath, offsetMs }.
+     */
+    async _splitAudioIntoChunks(audioPath, chunkDurationSec = 55) {
+        const totalDuration = await this._probeAudioDuration(audioPath);
+        const chunks = [];
+        const ext = path.extname(audioPath);
+        const baseName = path.basename(audioPath, ext);
+        const dir = path.dirname(audioPath);
+
+        if (totalDuration <= chunkDurationSec) {
+            return [{ chunkPath: audioPath, offsetMs: 0, isOriginal: true }];
         }
 
-        const audioContent = fs.readFileSync(audioPath);
-        const audioBase64 = audioContent.toString('base64');
+        let startSec = 0;
+        let chunkIndex = 0;
 
-        // Build recognition config
-        const languageCodes = languageCode === 'auto'
-            ? ['tr-TR', 'en-US']  // Auto-detect between Turkish and English
-            : [languageCode];
+        while (startSec < totalDuration) {
+            const chunkPath = path.join(dir, `${baseName}_chunk${chunkIndex}${ext}`);
+            const duration = Math.min(chunkDurationSec, totalDuration - startSec);
+
+            await new Promise((resolve, reject) => {
+                ffmpeg(audioPath)
+                    .setStartTime(startSec)
+                    .duration(duration)
+                    .audioChannels(1)
+                    .audioFrequency(16000)
+                    .audioCodec('pcm_s16le')
+                    .format('wav')
+                    .on('end', () => resolve())
+                    .on('error', (err) => reject(err))
+                    .save(chunkPath);
+            });
+
+            chunks.push({
+                chunkPath,
+                offsetMs: Math.round(startSec * 1000),
+                isOriginal: false,
+            });
+
+            startSec += chunkDurationSec;
+            chunkIndex++;
+        }
+
+        this.logLine('INFO', 'STT_CHUNK', 'Audio split into chunks', {
+            totalDuration: `${totalDuration.toFixed(1)}s`,
+            chunkCount: chunks.length,
+            chunkDuration: `${chunkDurationSec}s`,
+        });
+
+        return chunks;
+    }
+
+    /**
+     * Transcribe a single audio buffer using Google Cloud Speech-to-Text v2.
+     * Returns raw response results.
+     */
+    async _transcribeSingleBuffer(audioBuffer, languageCodes) {
+        const audioBase64 = audioBuffer.toString('base64');
 
         const recognitionConfig = {
             autoDecodingConfig: {},
@@ -114,98 +171,191 @@ class SubtitleService {
 
         const recognizer = `projects/${this.projectId}/locations/global/recognizers/_`;
 
-        this.logLine('INFO', 'STT_API', 'Sending audio to Google STT', {
-            audioSize: `${(audioContent.length / 1024 / 1024).toFixed(2)}MB`,
-            languages: languageCodes.join(','),
+        const [response] = await this.speechClient.recognize({
+            recognizer,
+            config: recognitionConfig,
+            content: audioBase64,
         });
 
+        return response;
+    }
+
+    /**
+     * Parse Google STT response results into subtitle segments.
+     * offsetMs is added to all timestamps (for chunk support).
+     */
+    _parseResultsToSegments(results, offsetMs = 0) {
+        const segments = [];
+        let detectedLanguage = null;
+
+        if (!results) return { segments, detectedLanguage };
+
+        for (const result of results) {
+            if (!result.alternatives || result.alternatives.length === 0) continue;
+
+            const alt = result.alternatives[0];
+
+            if (result.languageCode && !detectedLanguage) {
+                detectedLanguage = result.languageCode;
+            }
+
+            if (alt.words && alt.words.length > 0) {
+                let currentSegment = { startMs: 0, endMs: 0, words: [] };
+
+                for (const word of alt.words) {
+                    const startMs = this._durationToMs(word.startOffset) + offsetMs;
+                    const endMs = this._durationToMs(word.endOffset) + offsetMs;
+
+                    if (currentSegment.words.length === 0) {
+                        currentSegment.startMs = startMs;
+                    }
+
+                    currentSegment.words.push(word.word);
+                    currentSegment.endMs = endMs;
+
+                    const segmentDuration = currentSegment.endMs - currentSegment.startMs;
+                    const endsWithPunctuation = /[.!?]$/.test(word.word);
+
+                    if (
+                        segmentDuration >= SUBTITLE_SEGMENT_DURATION_MS
+                        || (
+                            segmentDuration >= (SUBTITLE_SEGMENT_DURATION_MS / 2)
+                            && endsWithPunctuation
+                        )
+                    ) {
+                        segments.push({
+                            startMs: currentSegment.startMs,
+                            endMs: currentSegment.endMs,
+                            text: currentSegment.words.join(' '),
+                        });
+                        currentSegment = { startMs: 0, endMs: 0, words: [] };
+                    }
+                }
+
+                if (currentSegment.words.length > 0) {
+                    segments.push({
+                        startMs: currentSegment.startMs,
+                        endMs: currentSegment.endMs,
+                        text: currentSegment.words.join(' '),
+                    });
+                }
+            } else if (alt.transcript) {
+                const endMs = this._durationToMs(result.resultEndOffset) + offsetMs;
+                const startMs = endMs - 5000;
+
+                segments.push({
+                    startMs: Math.max(0, startMs),
+                    endMs,
+                    text: alt.transcript.trim(),
+                });
+            }
+        }
+
+        return { segments, detectedLanguage };
+    }
+
+    /**
+     * Transcribe audio using Google Cloud Speech-to-Text v2.
+     * Automatically splits audio into chunks if longer than 55 seconds.
+     * Returns { segments: [{ startMs, endMs, text }], detectedLanguage }
+     */
+    async transcribeAudio(audioPath, languageCode = 'auto') {
+        if (!this.isAvailable()) {
+            throw new Error('Google Cloud STT is not configured. Set GOOGLE_APPLICATION_CREDENTIALS and GOOGLE_CLOUD_PROJECT_ID.');
+        }
+
+        const languageCodes = languageCode === 'auto'
+            ? ['tr-TR', 'en-US']
+            : [languageCode];
+
+        const STT_CHUNK_DURATION_SEC = 55;
+        const chunkTempPaths = [];
+
         try {
-            const [response] = await this.speechClient.recognize({
-                recognizer,
-                config: recognitionConfig,
-                content: audioBase64,
+            const chunks = await this._splitAudioIntoChunks(audioPath, STT_CHUNK_DURATION_SEC);
+
+            // Track temp chunk files for cleanup
+            for (const chunk of chunks) {
+                if (!chunk.isOriginal) chunkTempPaths.push(chunk.chunkPath);
+            }
+
+            const isSingleChunk = chunks.length === 1;
+
+            if (isSingleChunk) {
+                // Single chunk: original flow (no splitting needed)
+                const audioContent = fs.readFileSync(chunks[0].chunkPath);
+                this.logLine('INFO', 'STT_API', 'Sending audio to Google STT', {
+                    audioSize: `${(audioContent.length / 1024 / 1024).toFixed(2)}MB`,
+                    languages: languageCodes.join(','),
+                });
+
+                const response = await this._transcribeSingleBuffer(audioContent, languageCodes);
+                const { segments, detectedLanguage } = this._parseResultsToSegments(response.results, 0);
+
+                this.logLine('OK', 'STT_API', 'Transcription completed', {
+                    segments: segments.length,
+                    detectedLanguage: detectedLanguage || languageCode,
+                });
+
+                return { segments, detectedLanguage: detectedLanguage || languageCode };
+            }
+
+            // Multi-chunk: process each chunk sequentially
+            this.logLine('INFO', 'STT_API', 'Starting chunked transcription', {
+                chunks: chunks.length,
+                languages: languageCodes.join(','),
             });
 
-            const segments = [];
-            let detectedLanguage = languageCode;
+            const allSegments = [];
+            let finalDetectedLanguage = languageCode;
 
-            if (response.results) {
-                for (const result of response.results) {
-                    if (!result.alternatives || result.alternatives.length === 0) continue;
+            for (let i = 0; i < chunks.length; i++) {
+                const chunk = chunks[i];
+                const audioContent = fs.readFileSync(chunk.chunkPath);
 
-                    const alt = result.alternatives[0];
+                this.logLine('INFO', 'STT_CHUNK', `Transcribing chunk ${i + 1}/${chunks.length}`, {
+                    audioSize: `${(audioContent.length / 1024 / 1024).toFixed(2)}MB`,
+                    offsetMs: chunk.offsetMs,
+                });
 
-                    // Detect language from first result
-                    if (result.languageCode) {
-                        detectedLanguage = result.languageCode;
-                    }
+                try {
+                    const response = await this._transcribeSingleBuffer(audioContent, languageCodes);
+                    const { segments, detectedLanguage } = this._parseResultsToSegments(
+                        response.results,
+                        chunk.offsetMs,
+                    );
 
-                    if (alt.words && alt.words.length > 0) {
-                        // Word-level timestamps available → group into ~3 second segments
-                        let currentSegment = { startMs: 0, endMs: 0, words: [] };
+                    if (detectedLanguage) finalDetectedLanguage = detectedLanguage;
+                    allSegments.push(...segments);
 
-                        for (const word of alt.words) {
-                            const startMs = this._durationToMs(word.startOffset);
-                            const endMs = this._durationToMs(word.endOffset);
-
-                            if (currentSegment.words.length === 0) {
-                                currentSegment.startMs = startMs;
-                            }
-
-                            currentSegment.words.push(word.word);
-                            currentSegment.endMs = endMs;
-
-                            // Split segments at ~3 seconds or punctuation
-                            const segmentDuration = currentSegment.endMs - currentSegment.startMs;
-                            const endsWithPunctuation = /[.!?]$/.test(word.word);
-
-                            if (
-                                segmentDuration >= SUBTITLE_SEGMENT_DURATION_MS
-                                || (
-                                    segmentDuration >= (SUBTITLE_SEGMENT_DURATION_MS / 2)
-                                    && endsWithPunctuation
-                                )
-                            ) {
-                                segments.push({
-                                    startMs: currentSegment.startMs,
-                                    endMs: currentSegment.endMs,
-                                    text: currentSegment.words.join(' '),
-                                });
-                                currentSegment = { startMs: 0, endMs: 0, words: [] };
-                            }
-                        }
-
-                        // Push remaining words
-                        if (currentSegment.words.length > 0) {
-                            segments.push({
-                                startMs: currentSegment.startMs,
-                                endMs: currentSegment.endMs,
-                                text: currentSegment.words.join(' '),
-                            });
-                        }
-                    } else if (alt.transcript) {
-                        // No word-level timestamps, use result-level
-                        const startMs = this._durationToMs(result.resultEndOffset) - 5000;
-                        const endMs = this._durationToMs(result.resultEndOffset);
-
-                        segments.push({
-                            startMs: Math.max(0, startMs),
-                            endMs,
-                            text: alt.transcript.trim(),
-                        });
-                    }
+                    this.logLine('OK', 'STT_CHUNK', `Chunk ${i + 1}/${chunks.length} completed`, {
+                        segments: segments.length,
+                    });
+                } catch (chunkErr) {
+                    this.logLine('WARN', 'STT_CHUNK', `Chunk ${i + 1}/${chunks.length} failed, skipping`, {
+                        error: chunkErr?.message || chunkErr,
+                    });
+                    // Continue with remaining chunks even if one fails
                 }
             }
 
-            this.logLine('OK', 'STT_API', 'Transcription completed', {
-                segments: segments.length,
-                detectedLanguage,
+            this.logLine('OK', 'STT_API', 'Chunked transcription completed', {
+                totalSegments: allSegments.length,
+                chunks: chunks.length,
+                detectedLanguage: finalDetectedLanguage,
             });
 
-            return { segments, detectedLanguage };
+            return { segments: allSegments, detectedLanguage: finalDetectedLanguage };
         } catch (err) {
             this.logLine('ERR', 'STT_API', 'Google STT API error', { error: err?.message || err });
             throw err;
+        } finally {
+            // Cleanup temp chunk files
+            for (const tempPath of chunkTempPaths) {
+                if (fs.existsSync(tempPath)) {
+                    try { fs.unlinkSync(tempPath); } catch { /* ignore */ }
+                }
+            }
         }
     }
 

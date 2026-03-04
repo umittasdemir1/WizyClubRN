@@ -145,8 +145,9 @@ const PlayerSlotRenderer = memo(function PlayerSlotRenderer({
     // Transform animation - uses full window height for positioning
     const animatedStyle = useAnimatedStyle(() => {
         const targetY = slot.index * WINDOW_HEIGHT;
+        const currentScrollY = Math.max(0, scrollY.value);
         return {
-            transform: [{ translateY: targetY - scrollY.value }]
+            transform: [{ translateY: targetY - currentScrollY }]
         };
     }, [slot.index, scrollY]);
 
@@ -234,7 +235,7 @@ const PlayerSlotRenderer = memo(function PlayerSlotRenderer({
                 ignoreSilentSwitch="ignore"
                 mixWithOthers={isMuted ? "mix" : undefined}
                 disableFocus={isMuted}
-                progressUpdateInterval={33}
+                progressUpdateInterval={100}
                 automaticallyWaitsToMinimizeStalling={false}
                 shutterColor="transparent"
                 // ✅ Allow background buffering optimization
@@ -525,81 +526,75 @@ export const PoolFeedVideoPlayerPool = memo(forwardRef<PoolFeedVideoPlayerPoolRe
                 };
             };
 
-            const applySlotUpdate = (slotIndex: number, nextSlot: PlayerSlot) => {
+            // ✅ [PERF] Build ALL slots in parallel, then apply in a single batched setSlots.
+            // This reduces 2-3 separate setSlots → 1, cutting re-renders proportionally.
+            const allSlotResults = await Promise.all(
+                [0, 1, 2].map(async (slotIndex) => ({
+                    slotIndex,
+                    nextSlot: await buildSlotForIndex(slotIndex, targetIndices[slotIndex]),
+                }))
+            );
+
+            if (currentRecycleId !== recycleCounterRef.current) return;
+            if (!isMountedRef.current) return;
+
+            // Pause players that are being swapped to a different video
+            for (const { slotIndex, nextSlot } of allSlotResults) {
+                if (!nextSlot) continue;
                 const prevSlot = slotsRef.current[slotIndex];
                 if (prevSlot && prevSlot.videoId && prevSlot.videoId !== nextSlot.videoId) {
                     playerRefs[slotIndex]?.current?.pause();
                 }
-                setSlots((prev) => {
-                    const prevSlotState = prev[slotIndex];
-                    if (prevSlotState && slotsEqual(prevSlotState, nextSlot)) return prev;
-                    const next = [...prev];
-                    next[slotIndex] = nextSlot;
-                    return next;
-                });
-            };
+            }
 
+            // Single batched state update
+            setSlots((prev) => {
+                let next = prev;
+                for (const { slotIndex, nextSlot } of allSlotResults) {
+                    if (!nextSlot) continue;
+                    const prevSlot = next[slotIndex];
+                    if (prevSlot && slotsEqual(prevSlot, nextSlot)) continue;
+                    if (next === prev) next = [...prev];
+                    next[slotIndex] = nextSlot;
+                }
+                return next;
+            });
+
+            // Deferred disk-cache upgrade for active slot (async, separate update — unavoidable)
             const activeSlotIndexForUpdate = currentIdx == null
                 ? -1
                 : targetIndices.findIndex((idx) => idx === currentIdx);
             const activeVideo = currentIdx != null ? videos[currentIdx] : null;
             const activeVideoUrl = activeVideo ? getVideoUrl(activeVideo) : null;
 
-            if (activeSlotIndexForUpdate >= 0) {
-                const nextSlot = await buildSlotForIndex(activeSlotIndexForUpdate, currentIdx);
-                if (nextSlot) {
-                    applySlotUpdate(activeSlotIndexForUpdate, nextSlot);
-
-                    if (
-                        activeVideoUrl &&
-                        nextSlot.videoId === activeVideo?.id &&
-                        nextSlot.source === activeVideoUrl &&
-                        activeVideoUrl.startsWith('http')
-                    ) {
-                        VideoCacheService.getCachedVideoPath(activeVideoUrl)
-                            .then((diskCached) => {
-                                if (!diskCached || !isValidSource(diskCached)) return;
-                                if (!isMountedRef.current) return;
-                                if (currentRecycleId !== recycleCounterRef.current) return;
-                                setSlots((prev) => {
-                                    const prevSlot = prev[activeSlotIndexForUpdate];
-                                    if (!prevSlot || prevSlot.videoId !== activeVideo.id) return prev;
-                                    if (prevSlot.isLoaded || prevSlot.isReadyForDisplay) return prev;
-                                    if (prevSlot.source === diskCached) return prev;
-                                    const next = [...prev];
-                                    next[activeSlotIndexForUpdate] = {
-                                        ...prevSlot,
-                                        source: diskCached,
-                                    };
-                                    return next;
-                                });
-                            })
-                            .catch(() => { });
-                    }
+            if (
+                activeSlotIndexForUpdate >= 0 &&
+                activeVideoUrl &&
+                activeVideoUrl.startsWith('http')
+            ) {
+                const builtActiveSlot = allSlotResults.find(r => r.slotIndex === activeSlotIndexForUpdate)?.nextSlot;
+                if (builtActiveSlot && builtActiveSlot.videoId === activeVideo?.id && builtActiveSlot.source === activeVideoUrl) {
+                    VideoCacheService.getCachedVideoPath(activeVideoUrl)
+                        .then((diskCached) => {
+                            if (!diskCached || !isValidSource(diskCached)) return;
+                            if (!isMountedRef.current) return;
+                            if (currentRecycleId !== recycleCounterRef.current) return;
+                            setSlots((prev) => {
+                                const prevSlot = prev[activeSlotIndexForUpdate];
+                                if (!prevSlot || prevSlot.videoId !== activeVideo!.id) return prev;
+                                if (prevSlot.isLoaded || prevSlot.isReadyForDisplay) return prev;
+                                if (prevSlot.source === diskCached) return prev;
+                                const upgraded = [...prev];
+                                upgraded[activeSlotIndexForUpdate] = {
+                                    ...prevSlot,
+                                    source: diskCached,
+                                };
+                                return upgraded;
+                            });
+                        })
+                        .catch(() => { });
                 }
             }
-
-            // ✅ Update other slots in background without blocking active slot render
-            const otherSlotIndices = [0, 1, 2].filter((slotIndex) => slotIndex !== activeSlotIndexForUpdate);
-            Promise.all(
-                otherSlotIndices.map(async (slotIndex) => ({
-                    slotIndex,
-                    nextSlot: await buildSlotForIndex(slotIndex, targetIndices[slotIndex]),
-                }))
-            ).then((results) => {
-                if (!isMountedRef.current || currentRecycleId !== recycleCounterRef.current) return;
-                setSlots((prev) => {
-                    let next = prev;
-                    results.forEach(({ slotIndex, nextSlot }) => {
-                        if (!nextSlot) return;
-                        const prevSlot = next[slotIndex];
-                        if (prevSlot && slotsEqual(prevSlot, nextSlot)) return;
-                        if (next === prev) next = [...prev];
-                        next[slotIndex] = nextSlot;
-                    });
-                    return next;
-                });
-            });
         };
 
         if (recycleTimeoutRef.current) {
@@ -746,6 +741,35 @@ export const PoolFeedVideoPlayerPool = memo(forwardRef<PoolFeedVideoPlayerPoolRe
         // ✅ Logging disabled for performance
     }, []);
 
+    // ✅ [PERF] Stable callback map — prevents PlayerSlotRenderer memo invalidation.
+    // Reads slot data from slotsRef.current at call-time instead of closure-capturing
+    // slot.videoId/slot.index, so the callback references never change.
+    const slotCallbacks = useMemo(() =>
+        [0, 1, 2].map((si) => ({
+            onLoad: (data: OnLoadData) => {
+                const s = slotsRef.current[si];
+                if (s) handleLoad(si, s.videoId, s.index, data);
+            },
+            onError: (error: OnVideoErrorData) => {
+                const s = slotsRef.current[si];
+                if (s) handleError(si, s.videoId, error);
+            },
+            onProgress: (data: OnProgressData) => {
+                const s = slotsRef.current[si];
+                if (s) handleProgress(si, s.videoId, data);
+            },
+            onEnd: () => {
+                const s = slotsRef.current[si];
+                if (s) handleEnd(si, s.videoId, s.index);
+            },
+            onReadyForDisplay: () => {
+                const s = slotsRef.current[si];
+                if (s) handleReadyForDisplay(si, s.videoId);
+            },
+        })),
+        [handleLoad, handleError, handleProgress, handleEnd, handleReadyForDisplay]
+    );
+
     const activeSlotIndex = activeVideoIndex != null
         ? slots.findIndex((slot) => slot.index === activeVideoIndex)
         : -1;
@@ -758,7 +782,6 @@ export const PoolFeedVideoPlayerPool = memo(forwardRef<PoolFeedVideoPlayerPoolRe
         const slot = slots[slotIndex];
 
         // ✅ CRITICAL FIX: Only ONE slot can be active at a time
-        // Find the FIRST slot that matches active video index
         const isActiveSlot = hasActiveVideo && resolvedActiveSlotIndex === slotIndex;
         const isNearActive = hasActiveVideo && Math.abs(slot.index - resolvedActiveFeedIndex) <= 1;
         const activeSlot = hasActiveVideo ? slots[resolvedActiveSlotIndex] : undefined;
@@ -768,8 +791,6 @@ export const PoolFeedVideoPlayerPool = memo(forwardRef<PoolFeedVideoPlayerPoolRe
         const isOnTop = hasActiveVideo && (activeReady
             ? isActiveSlot
             : fallbackSlotIndex === slotIndex);
-
-        // ✅ Remove console.log for performance (blocks JS thread)
 
         return (
             <PlayerSlotRenderer
@@ -789,11 +810,11 @@ export const PoolFeedVideoPlayerPool = memo(forwardRef<PoolFeedVideoPlayerPoolRe
                 scrollY={scrollY}
                 insets={insets}
                 netInfo={netInfo}
-                onLoad={(data) => handleLoad(slotIndex, slot.videoId, slot.index, data)}
-                onError={(error) => handleError(slotIndex, slot.videoId, error)}
-                onProgress={(data) => handleProgress(slotIndex, slot.videoId, data)}
-                onEnd={() => handleEnd(slotIndex, slot.videoId, slot.index)}
-                onReadyForDisplay={() => handleReadyForDisplay(slotIndex, slot.videoId)}
+                onLoad={slotCallbacks[slotIndex].onLoad}
+                onError={slotCallbacks[slotIndex].onError}
+                onProgress={slotCallbacks[slotIndex].onProgress}
+                onEnd={slotCallbacks[slotIndex].onEnd}
+                onReadyForDisplay={slotCallbacks[slotIndex].onReadyForDisplay}
             />
         );
     };

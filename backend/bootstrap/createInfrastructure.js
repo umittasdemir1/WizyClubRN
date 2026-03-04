@@ -14,6 +14,20 @@ const { createSubtitleRepository } = require('../repositories/SubtitleRepository
 const { createCleanupService } = require('../services/CleanupService');
 const { createMediaProcessingService } = require('../services/MediaProcessingService');
 const { createR2CleanupService } = require('../services/R2CleanupService');
+const { createNotificationService } = require('../services/NotificationService');
+
+function tryExtractJwtRole(token) {
+    if (!token || typeof token !== 'string' || !token.includes('.')) return null;
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+
+    try {
+        const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+        return typeof payload?.role === 'string' ? payload.role : null;
+    } catch {
+        return null;
+    }
+}
 
 function createInfrastructure({ envConfig, ffmpeg, logLine }) {
     const upload = multer({ dest: 'temp_uploads/' });
@@ -43,11 +57,16 @@ function createInfrastructure({ envConfig, ffmpeg, logLine }) {
 
     logLine('BOOT', 'INIT', 'Initializing Supabase client');
     const supabaseKey = envConfig.supabaseServiceKey;
+    const detectedRole = tryExtractJwtRole(supabaseKey);
 
-    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    if (detectedRole && detectedRole !== 'service_role') {
+        throw new Error(`Supabase key role must be service_role for backend operations (detected: ${detectedRole})`);
+    }
+
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY || detectedRole === 'service_role') {
         logLine('INFO', 'INIT', 'Using Service Role Key for backend operations (RLS Bypass)');
     } else {
-        logLine('WARN', 'INIT', 'Service Role Key not found! Using Anon Key. RLS policies may block writes.');
+        logLine('WARN', 'INIT', 'Could not verify service-role key from SUPABASE_KEY. Ensure backend key has service_role privileges.');
     }
 
     const supabase = createClient(envConfig.supabaseUrl, supabaseKey);
@@ -73,6 +92,15 @@ function createInfrastructure({ envConfig, ffmpeg, logLine }) {
     });
     const requireSubtitleDeletableVideo = createRequireVideoOwnership(supabase, {
         forbiddenMessage: 'You can only delete subtitles for your own videos',
+    });
+
+    const {
+        sendExpoPushNotifications,
+        processScheduledNotifications,
+        startNotificationScheduler,
+    } = createNotificationService({
+        supabase,
+        logLine,
     });
 
     const {
@@ -124,6 +152,7 @@ function createInfrastructure({ envConfig, ffmpeg, logLine }) {
             startStoryCleanupScheduler,
             startDraftCleanupScheduler,
             startSoftDeletedStoryCleanupScheduler,
+            startNotificationScheduler,
         },
     };
 }
