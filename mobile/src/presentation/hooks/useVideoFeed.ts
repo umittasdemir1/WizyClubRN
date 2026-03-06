@@ -95,6 +95,8 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
     const pendingLikeVideoIdsRef = useRef<Set<string>>(new Set());
     const pendingSaveVideoIdsRef = useRef<Set<string>>(new Set());
     const personalizedFeedUserIdRef = useRef<string | null>(initialUserId);
+    const isPrimaryFetchInFlightRef = useRef(false);
+    const loadMoreRequestKeyRef = useRef<string | null>(null);
 
     // Auth User
     const { user, isInitialized } = useAuthStore();
@@ -213,6 +215,9 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
     }, [cursor, filterUserId, hasMore, isInitialized, safePageSize, videos, user?.id]);
 
     const fetchFeed = useCallback(async () => {
+        if (isPrimaryFetchInFlightRef.current) return;
+        isPrimaryFetchInFlightRef.current = true;
+
         try {
             setIsLoading(true);
             setError(null);
@@ -244,6 +249,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
                 logError(LogCode.FETCH_ERROR, 'Feed fetch error', err);
             }
         } finally {
+            isPrimaryFetchInFlightRef.current = false;
             if (isMounted.current) {
                 setIsLoading(false);
             }
@@ -252,6 +258,8 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
 
     const refreshFeed = useCallback(async () => {
         if (isRefreshing) return;
+        if (isPrimaryFetchInFlightRef.current) return;
+        isPrimaryFetchInFlightRef.current = true;
 
         try {
             setIsRefreshing(true);
@@ -286,6 +294,7 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
                 logError(LogCode.FETCH_ERROR, 'Feed refresh error', err);
             }
         } finally {
+            isPrimaryFetchInFlightRef.current = false;
             if (isMounted.current) {
                 setIsRefreshing(false);
             }
@@ -294,12 +303,14 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
 
     const loadMore = useCallback(async () => {
         if (isLoadingMore || !hasMore || isLoading || !cursor) return;
+        const freshUserId = useAuthStore.getState().user?.id || 'anon';
+        const cursorSignature = `${freshUserId}::${filterUserId || 'all'}::${cursor.createdAt}::${cursor.id}`;
+        if (loadMoreRequestKeyRef.current === cursorSignature) return;
+        loadMoreRequestKeyRef.current = cursorSignature;
 
         try {
             setIsLoadingMore(true);
 
-            // Get fresh userId from store
-            const freshUserId = useAuthStore.getState().user?.id || 'anon';
             const feedResult = await getVideoFeedUseCase.execute(safePageSize, freshUserId, filterUserId, cursor);
             const fetchedVideos = applyDescriptionOverridesToVideos(feedResult.videos, descriptionByVideoId);
             syncVideoCountersFromServer(fetchedVideos);
@@ -335,6 +346,9 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
         } catch (err) {
             logError(LogCode.FETCH_ERROR, 'Load more error', err);
         } finally {
+            if (loadMoreRequestKeyRef.current === cursorSignature) {
+                loadMoreRequestKeyRef.current = null;
+            }
             if (isMounted.current) {
                 setIsLoadingMore(false);
             }

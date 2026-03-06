@@ -46,8 +46,4 @@ export const styles = StyleSheet.create({
         ...StyleSheet.absoluteFillObject,
         zIndex: 9999,
     },
-    sheetDismissOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'transparent',
-    },
 });

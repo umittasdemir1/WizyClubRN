@@ -32,8 +32,10 @@ import type { InfiniteFeedVideo } from './InfiniteFeedVideoTypes';
 import { SwipeWrapper } from '../shared/SwipeWrapper';
 import { InfiniteFeedHeader, FeedTab } from './InfiniteFeedHeader';
 import { InfiniteFeedCard } from './InfiniteFeedCard';
-import { InfiniteFeedMoreOptionsSheet } from './InfiniteFeedMoreOptionsSheet';
-import { InfiniteFeedDeleteConfirmationModal } from './InfiniteFeedDeleteConfirmationModal';
+import {
+    InfiniteFeedMoreOptionsOverlay,
+    type InfiniteFeedMoreOptionsOverlayHandle,
+} from './InfiniteFeedMoreOptionsOverlay';
 import { TaggedPeopleSheet } from './TaggedPeopleSheet';
 import { styles } from './InfiniteFeedManager.styles';
 import { FEED_FLAGS, FEED_CONFIG } from './hooks/useInfiniteFeedConfig';
@@ -80,7 +82,7 @@ const FlashListAny = FlashList as any;
 const INFINITE_WINDOW_SIZE = 5;
 const INFINITE_MAX_RENDER_BATCH = 4;
 const INFINITE_DRAW_DISTANCE = ESTIMATED_CARD_HEIGHT * 2;
-const INFINITE_MINIMUM_VIEW_TIME_MS = 120;
+const INFINITE_MINIMUM_VIEW_TIME_MS = 0;
 const SCROLL_DIRECTION_COMMIT_DELTA_PX = 12;
 const FLASH_LIST_CONTENT_CONTAINER_STYLE = { paddingBottom: 0 } as const;
 const SUBTITLE_AVAILABILITY_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -147,9 +149,6 @@ export function InfiniteFeedManager({
     const isScreenFocused = useInfiniteFeedActiveVideoStore((state) => state.isScreenFocused);
 
     const [activeTab, setActiveTab] = useState<FeedTab>('Sana Özel');
-    const [selectedMoreVideoId, setSelectedMoreVideoId] = useState<string | null>(null);
-    const [isMoreDeleteConfirmationVisible, setMoreDeleteConfirmationVisible] = useState(false);
-    const [isMoreSheetOpen, setIsMoreSheetOpen] = useState(false);
     const [selectedTaggedVideoId, setSelectedTaggedVideoId] = useState<string | null>(null);
     const [subtitleAvailabilityByVideoId, setSubtitleAvailabilityByVideoId] = useState<
         Record<string, { hasSubtitles: boolean; fetchedAt: number; isProcessing?: boolean }>
@@ -206,10 +205,12 @@ export function InfiniteFeedManager({
     const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const scrollStartAtRef = useRef<number | null>(null);
     const sourceResolveGenerationRef = useRef(0);
+    const interactionPrefetchGenerationRef = useRef(0);
+    const interactionPrefetchHandleRef = useRef<ReturnType<typeof InteractionManager.runAfterInteractions> | null>(null);
     const scrollDirectionRef = useRef<'up' | 'down'>('down');
     const lastScrollOffsetYRef = useRef(0);
     const listRef = useRef<any>(null);
-    const moreOptionsSheetRef = useRef<BottomSheetModal>(null);
+    const moreOptionsOverlayRef = useRef<InfiniteFeedMoreOptionsOverlayHandle>(null);
     const taggedPeopleSheetRef = useRef<BottomSheetModal>(null);
     const lastHandledReselectRef = useRef(0);
 
@@ -219,6 +220,10 @@ export function InfiniteFeedManager({
     const isMutedRef = useRef(isMuted);
     const netInfoTypeRef = useRef(netInfo.type);
     const subtitleModeRef = useRef(subtitleMode);
+    const isInAppBrowserVisibleRef = useRef(isInAppBrowserVisible);
+    const globalIsPausedRef = useRef(globalIsPaused);
+    const isScreenFocusedRef = useRef(isScreenFocused);
+    const isRouteFocusedRef = useRef(isRouteFocused);
     const activeStoryUserIdsRef = useRef<Set<string>>(new Set());
     const effectivePendingInlineIdRef = useRef<string | null>(null);
     const effectivePendingInlineIndexRef = useRef<number>(0);
@@ -344,11 +349,14 @@ export function InfiniteFeedManager({
     }, [router]);
 
     const handleOpenMoreOptions = useCallback((videoId: string) => {
-        setSelectedMoreVideoId(videoId);
-        moreOptionsSheetRef.current?.present();
-
         const selectedVideo = videosRef.current.find((video) => video.id === videoId);
         if (!selectedVideo) return;
+
+        moreOptionsOverlayRef.current?.open({
+            currentUserId,
+            showSubtitleOption: Boolean(subtitleAvailabilityRef.current[videoId]?.hasSubtitles),
+            video: selectedVideo,
+        });
 
         if (selectedVideo.postType !== 'video') {
             setSubtitleAvailabilityByVideoId((prev) => (
@@ -356,6 +364,7 @@ export function InfiniteFeedManager({
                     ? prev
                     : { ...prev, [videoId]: { hasSubtitles: false, fetchedAt: Date.now() } }
             ));
+            moreOptionsOverlayRef.current?.updateSubtitleOption(videoId, false);
             return;
         }
 
@@ -405,33 +414,21 @@ export function InfiniteFeedManager({
                         isProcessing: hasPendingSubtitles && !hasCompletedSubtitles,
                     },
                 }));
+                moreOptionsOverlayRef.current?.updateSubtitleOption(videoId, hasCompletedSubtitles);
             } catch {
                 setSubtitleAvailabilityByVideoId((prev) => ({
                     ...prev,
                     [videoId]: { hasSubtitles: false, fetchedAt: Date.now(), isProcessing: false },
                 }));
+                moreOptionsOverlayRef.current?.updateSubtitleOption(videoId, false);
             }
         })();
-    }, []);
+    }, [currentUserId]);
 
-    const handleMoreSheetDelete = useCallback(() => {
-        const selectedVideo = videos.find((video) => video.id === selectedMoreVideoId);
-        const isOwnVideo = !!currentUserId && selectedVideo?.user?.id === currentUserId;
+    const handleMoreSheetEdit = useCallback(async (selectedVideo: InfiniteFeedVideo) => {
+        const targetId = selectedVideo.id;
+        const isOwnVideo = !!currentUserId && selectedVideo.user?.id === currentUserId;
         if (!isOwnVideo) return;
-
-        moreOptionsSheetRef.current?.dismiss();
-        setMoreDeleteConfirmationVisible(true);
-    }, [currentUserId, selectedMoreVideoId, videos]);
-
-    const handleMoreSheetEdit = useCallback(async () => {
-        const targetId = selectedMoreVideoId;
-        if (!targetId) return;
-
-        const selectedVideo = videos.find((video) => video.id === targetId);
-        const isOwnVideo = !!currentUserId && selectedVideo?.user?.id === currentUserId;
-        if (!isOwnVideo || !selectedVideo) return;
-
-        moreOptionsSheetRef.current?.dismiss();
 
         // Fetch hashtags for this video
         let editTags: string[] = [];
@@ -514,40 +511,15 @@ export function InfiniteFeedManager({
         } else {
             router.push('/upload-composer' as any);
         }
-    }, [currentUserId, router, selectedMoreVideoId, videos]);
+    }, [currentUserId, router]);
 
-    const handleCancelMoreDelete = useCallback(() => {
-        setMoreDeleteConfirmationVisible(false);
-    }, []);
+    const handleConfirmMoreDelete = useCallback((videoId: string) => {
+        void deleteVideo(videoId);
+    }, [deleteVideo]);
 
-    const handleConfirmMoreDelete = useCallback(() => {
-        const targetId = selectedMoreVideoId;
-        if (targetId) {
-            void deleteVideo(targetId);
-        }
-        setMoreDeleteConfirmationVisible(false);
-        setSelectedMoreVideoId(null);
-    }, [deleteVideo, selectedMoreVideoId]);
-
-    const isOwnMoreOptionsVideo = useMemo(() => {
-        if (!selectedMoreVideoId || !currentUserId) return false;
-        const selectedVideo = videos.find((video) => video.id === selectedMoreVideoId);
-        return selectedVideo?.user?.id === currentUserId;
-    }, [currentUserId, selectedMoreVideoId, videos]);
-    const isFollowingMoreOptionsVideo = useMemo(() => {
-        if (!selectedMoreVideoId) return false;
-        const selectedVideo = videos.find((video) => video.id === selectedMoreVideoId);
-        if (!selectedVideo?.user) return false;
-        if (currentUserId && selectedVideo.user.id === currentUserId) return false;
-        return Boolean(selectedVideo.user.isFollowing);
-    }, [currentUserId, selectedMoreVideoId, videos]);
-
-    const handleMoreSheetUnfollow = useCallback(() => {
-        const targetId = selectedMoreVideoId;
-        if (!targetId) return;
-        if (!isFollowingMoreOptionsVideo) return;
-        toggleFollow(targetId);
-    }, [isFollowingMoreOptionsVideo, selectedMoreVideoId, toggleFollow]);
+    const handleMoreSheetUnfollow = useCallback((videoId: string) => {
+        toggleFollow(videoId);
+    }, [toggleFollow]);
 
     const handleMoreSheetWhyThisPost = useCallback(() => {
         Alert.alert('Neden bu gönderi?', 'Takip ettiğin hesaplar ve ilgi alanlarına göre öneriler gösteriyoruz.');
@@ -557,28 +529,17 @@ export function InfiniteFeedManager({
         Alert.alert('Tercihin kaydedildi', 'Bu tarz gönderileri daha fazla göstereceğiz.');
     }, []);
 
-    const handleMoreSheetSave = useCallback(() => {
-        const targetId = selectedMoreVideoId;
-        if (!targetId) return;
-        toggleSave(targetId);
-    }, [selectedMoreVideoId, toggleSave]);
+    const handleMoreSheetSave = useCallback((videoId: string) => {
+        toggleSave(videoId);
+    }, [toggleSave]);
 
     const handleMoreSheetQrCode = useCallback(() => {
         Alert.alert('QR kodu', 'Bu içerik için QR kodu yakında eklenecek.');
     }, []);
 
-    const handleMoreSheetAboutAccount = useCallback(() => {
-        const selectedVideo = videos.find((video) => video.id === selectedMoreVideoId);
-        const targetUserId = selectedVideo?.user?.id;
-        if (!targetUserId) return;
-        moreOptionsSheetRef.current?.dismiss();
-        handleOpenProfile(targetUserId);
-    }, [handleOpenProfile, selectedMoreVideoId, videos]);
-
-    const shouldShowSubtitleOptionInMoreSheet = useMemo(() => {
-        if (!selectedMoreVideoId) return false;
-        return Boolean(subtitleAvailabilityByVideoId[selectedMoreVideoId]?.hasSubtitles);
-    }, [selectedMoreVideoId, subtitleAvailabilityByVideoId]);
+    const handleMoreSheetAboutAccount = useCallback((userId: string) => {
+        handleOpenProfile(userId);
+    }, [handleOpenProfile]);
 
     const handleMoreSheetSubtitleModeChange = useCallback((mode: SubtitlePreferenceMode) => {
         setSubtitleMode(mode);
@@ -809,6 +770,8 @@ export function InfiniteFeedManager({
 
     useEffect(() => () => {
         clearSettleTimer();
+        interactionPrefetchHandleRef.current?.cancel?.();
+        interactionPrefetchHandleRef.current = null;
         useInfiniteFeedResolvedSourceStore.getState().clearResolvedSources();
     }, [clearSettleTimer]);
 
@@ -850,17 +813,57 @@ export function InfiniteFeedManager({
 
     useEffect(() => {
         if (!videos.length || activeInlineIndex < 0 || activeInlineIndex >= videos.length) return;
+        interactionPrefetchHandleRef.current?.cancel?.();
+        interactionPrefetchHandleRef.current = null;
+        const prefetchGeneration = ++interactionPrefetchGenerationRef.current;
 
         // ✅ [PERF] Read from ref — no useState dependency needed
+        const prefetchService = FeedPrefetchService.getInstance();
         if (isFeedScrollingRef.current) {
-            const nextVideo = videos[activeInlineIndex + 1];
-            if (nextVideo?.thumbnailUrl) {
-                ExpoImage.prefetch(nextVideo.thumbnailUrl);
-            }
+            const candidateIndices = scrollDirectionRef.current === 'up'
+                ? [activeInlineIndex - 1, activeInlineIndex - 2, activeInlineIndex + 1]
+                : [activeInlineIndex + 1, activeInlineIndex + 2, activeInlineIndex - 1];
+
+            candidateIndices.forEach((candidateIndex, order) => {
+                if (candidateIndex < 0 || candidateIndex >= videos.length) return;
+                const candidateVideo = videos[candidateIndex];
+                if (!candidateVideo) return;
+
+                if (candidateVideo.thumbnailUrl) {
+                    ExpoImage.prefetch(candidateVideo.thumbnailUrl);
+                }
+
+                if (candidateVideo.postType === 'carousel') return;
+                const candidateUrl = getVideoUrl(candidateVideo);
+                if (!candidateUrl) return;
+
+                const priority = order === 0 ? 0 : (order === 1 ? 1 : 2);
+                prefetchService.bumpPriority(candidateUrl, priority);
+                prefetchService.queueSingleVideo(candidateUrl, priority);
+                VideoCacheService.warmupCache(candidateUrl);
+
+                if (order !== 0) return;
+                const memoryCached = VideoCacheService.getMemoryCachedPath(candidateUrl);
+                if (memoryCached) {
+                    setResolvedSourceForId(candidateVideo.id, memoryCached);
+                    return;
+                }
+
+                const hasResolvedSource = Boolean(useInfiniteFeedResolvedSourceStore.getState().sources[candidateVideo.id]);
+                if (hasResolvedSource) return;
+
+                prefetchService.cacheVideoNow(candidateUrl)
+                    .then((cachedPath) => {
+                        if (interactionPrefetchGenerationRef.current !== prefetchGeneration) return;
+                        if (!cachedPath) return;
+                        setResolvedSourceForId(candidateVideo.id, cachedPath);
+                    })
+                    .catch(() => {
+                        // best effort: avoid blocking scroll if eager cache fails
+                    });
+            });
             return;
         }
-
-        const prefetchService = FeedPrefetchService.getInstance();
         const activeVideo = videos[activeInlineIndex];
         const activeVideoUrl = activeVideo && activeVideo.postType !== 'carousel'
             ? getVideoUrl(activeVideo)
@@ -915,7 +918,8 @@ export function InfiniteFeedManager({
         }
 
         // ✅ [PERF] Defer neighbor prefetch to avoid blocking active video playback start
-        InteractionManager.runAfterInteractions(() => {
+        interactionPrefetchHandleRef.current = InteractionManager.runAfterInteractions(() => {
+            if (interactionPrefetchGenerationRef.current !== prefetchGeneration) return;
             THUMBNAIL_PREFETCH_OFFSETS.forEach((offset) => {
                 const video = videos[activeInlineIndex + offset];
                 if (!video?.thumbnailUrl) return;
@@ -957,6 +961,7 @@ export function InfiniteFeedManager({
 
                 resolvePromise
                     .then((cachedPath) => {
+                        if (interactionPrefetchGenerationRef.current !== prefetchGeneration) return;
                         if (!cachedPath || !shouldPublishResolvedSource) return;
                         setResolvedSourceForId(neighborVideo.id, cachedPath);
                     })
@@ -967,6 +972,10 @@ export function InfiniteFeedManager({
         });
         // ✅ [PERF] isFeedScrolling removed from deps — ref-only; effect re-runs when
         // activeInlineIndex changes (which happens after scroll commits via commitPendingActive)
+        return () => {
+            interactionPrefetchHandleRef.current?.cancel?.();
+            interactionPrefetchHandleRef.current = null;
+        };
     }, [activeInlineIndex, videos, setResolvedSourceForId]);
 
 
@@ -1039,6 +1048,10 @@ export function InfiniteFeedManager({
         isMutedRef.current = isMuted;
         netInfoTypeRef.current = netInfo.type;
         subtitleModeRef.current = subtitleMode;
+        isInAppBrowserVisibleRef.current = isInAppBrowserVisible;
+        globalIsPausedRef.current = globalIsPaused;
+        isScreenFocusedRef.current = isScreenFocused;
+        isRouteFocusedRef.current = isRouteFocused;
         activeStoryUserIdsRef.current = activeStoryUserIds;
     });
 
@@ -1053,10 +1066,10 @@ export function InfiniteFeedManager({
         const colors = themeColorsRef.current;
         const userId = currentUserIdRef.current;
         const muted = isMutedRef.current;
-        const browserVisible = isInAppBrowserVisible;
-        const pausedByLifecycle = globalIsPaused || !isScreenFocused || !isRouteFocused;
+        const browserVisible = isInAppBrowserVisibleRef.current;
+        const pausedByLifecycle = globalIsPausedRef.current || !isScreenFocusedRef.current || !isRouteFocusedRef.current;
         const networkType = (netInfoTypeRef.current ?? null) as NetInfoStateType | null;
-        const shouldShowSubtitle = subtitleMode !== 'off';
+        const shouldShowSubtitle = subtitleModeRef.current !== 'off';
 
         const pendingIdx = effectivePendingInlineIndexRef.current;
         const pendingId = effectivePendingInlineIdRef.current;
@@ -1077,7 +1090,7 @@ export function InfiniteFeedManager({
                 index={index}
                 activeIndex={activeInlineIndexRef.current}
                 colors={colors}
-                isActive={item.id === activeInlineId}
+                isActive={item.id === activeInlineIdRef.current}
                 isPendingActive={item.id === pendingId || isPendingWindow}
                 allowDecodePrewarm={allowDecodePrewarm}
                 isMuted={muted}
@@ -1104,14 +1117,7 @@ export function InfiniteFeedManager({
                 shouldShowSubtitle={shouldShowSubtitle}
             />
         );
-    }, [
-        activeInlineId,
-        globalIsPaused,
-        isInAppBrowserVisible,
-        isRouteFocused,
-        isScreenFocused,
-        subtitleMode, // Dependency eklendi
-    ]);
+    }, []);
 
     // Active item changes when card visibility crosses threshold
     const viewabilityConfig = useRef({
@@ -1348,7 +1354,7 @@ export function InfiniteFeedManager({
                     onMomentumScrollBegin={handleMomentumScrollBegin}
                     onMomentumScrollEnd={handleMomentumScrollEnd}
                     onScroll={handleScroll}
-                    scrollEventThrottle={32}
+                    scrollEventThrottle={16}
                     estimatedListSize={ESTIMATED_LIST_SIZE}
                     estimatedItemSize={ESTIMATED_CARD_HEIGHT}
                     removeClippedSubviews={Platform.OS === 'android'}
@@ -1380,37 +1386,20 @@ export function InfiniteFeedManager({
                 />
                 <View
                     style={styles.sheetsContainer}
-                    pointerEvents={isMoreSheetOpen || isMoreDeleteConfirmationVisible ? 'box-none' : 'none'}
+                    pointerEvents="box-none"
                 >
-                    {isMoreSheetOpen && !isMoreDeleteConfirmationVisible ? (
-                        <Pressable
-                            style={styles.sheetDismissOverlay}
-                            onPress={() => {
-                                setIsMoreSheetOpen(false);
-                                moreOptionsSheetRef.current?.dismiss();
-                            }}
-                        />
-                    ) : null}
-                    <InfiniteFeedMoreOptionsSheet
-                        ref={moreOptionsSheetRef}
+                    <InfiniteFeedMoreOptionsOverlay
+                        ref={moreOptionsOverlayRef}
                         onSavePress={handleMoreSheetSave}
                         onQrCodePress={handleMoreSheetQrCode}
-                        onEditPress={isOwnMoreOptionsVideo ? handleMoreSheetEdit : undefined}
-                        onDeletePress={isOwnMoreOptionsVideo ? handleMoreSheetDelete : undefined}
-                        onUnfollowPress={isFollowingMoreOptionsVideo ? handleMoreSheetUnfollow : undefined}
+                        onEditPress={handleMoreSheetEdit}
+                        onDeleteConfirm={handleConfirmMoreDelete}
+                        onUnfollowPress={handleMoreSheetUnfollow}
                         onWhyThisPostPress={handleMoreSheetWhyThisPost}
                         onShowMorePress={handleMoreSheetShowMore}
                         onAboutAccountPress={handleMoreSheetAboutAccount}
-                        showSubtitleOption={shouldShowSubtitleOptionInMoreSheet}
                         subtitleMode={subtitleMode}
                         onSubtitleModeChange={handleMoreSheetSubtitleModeChange}
-                        isFollowingCreator={isFollowingMoreOptionsVideo}
-                        onSheetStateChange={setIsMoreSheetOpen}
-                    />
-                    <InfiniteFeedDeleteConfirmationModal
-                        visible={isMoreDeleteConfirmationVisible}
-                        onCancel={handleCancelMoreDelete}
-                        onConfirm={handleConfirmMoreDelete}
                     />
                     <TaggedPeopleSheet
                         sheetRef={taggedPeopleSheetRef}

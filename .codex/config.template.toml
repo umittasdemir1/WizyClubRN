@@ -13,14 +13,29 @@
 [mcp_servers.openaiDeveloperDocs]
 url = "https://developers.openai.com/mcp"
 
+[mcp_servers.filesystem]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-filesystem", "/absolute/workspace/path"]
+
 [mcp_servers.r2-local]
 command = "node"
 args = ["/absolute/workspace/path/r2-mcp/custom-r2-server.js"]
+
+# Optional if GITHUB_PERSONAL_ACCESS_TOKEN exists in root .env.
+[mcp_servers.github]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-github"]
+env = { GITHUB_PERSONAL_ACCESS_TOKEN = "your_github_personal_access_token" }
 
 # Optional if SUPABASE_MCP_ACCESS_TOKEN exists in root .env.
 [mcp_servers.supabase-mcp-server]
 command = "npx"
 args = ["-y", "@supabase/mcp-server-supabase@latest", "--access-token", "your_supabase_mcp_access_token"]
+
+# Optional if POSTGRES_MCP_URL exists in root .env.
+[mcp_servers.postgres]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-postgres", "postgresql://user:password@host:5432/database"]
 
 [mcp_servers.netlify]
 command = "npx"

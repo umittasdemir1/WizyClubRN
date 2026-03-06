@@ -4,6 +4,7 @@ const path = require("path");
 const {
     BEGIN_MARKER,
     buildServers,
+    getManagedBlockHealth,
     loadManifest,
     normalizePath,
     parseDotEnv,
@@ -31,12 +32,26 @@ function main() {
     assert(fs.existsSync(configPath), `Codex config not found: ${configPath}`);
     const configContent = fs.readFileSync(configPath, "utf8");
     assert(configContent.includes(BEGIN_MARKER), "Managed MCP block is missing from Codex config.");
+    const managedBlockHealth = getManagedBlockHealth(configContent);
+    assert(
+        managedBlockHealth.isBalanced,
+        `Managed MCP block is malformed in Codex config (begin=${managedBlockHealth.beginCount}, end=${managedBlockHealth.endCount}).`
+    );
 
     configured.forEach((server) => {
         assert(
             configContent.includes(`[mcp_servers.${server.name}]`),
             `Configured MCP server missing from config: ${server.name}`
         );
+
+        if (server.env) {
+            Object.keys(server.env).forEach((key) => {
+                assert(
+                    configContent.includes(`${key} = `),
+                    `Configured MCP server is missing env forwarding for ${server.name}: ${key}`
+                );
+            });
+        }
     });
 
     assert(fs.existsSync(r2EnvPath), `r2-mcp/.env not found: ${r2EnvPath}`);

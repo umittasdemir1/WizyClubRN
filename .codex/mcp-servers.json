@@ -8,6 +8,20 @@
       "description": "Official OpenAI developer docs MCP."
     },
     {
+      "name": "filesystem",
+      "type": "command",
+      "command": {
+        "default": "npx",
+        "win32": "npx.cmd"
+      },
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "{workspace}"
+      ],
+      "description": "Workspace-scoped filesystem MCP rooted at the repo."
+    },
+    {
       "name": "r2-local",
       "type": "command",
       "command": {
@@ -22,6 +36,26 @@
         "R2_SECRET_ACCESS_KEY"
       ],
       "description": "Repo-managed local R2 MCP server."
+    },
+    {
+      "name": "github",
+      "type": "command",
+      "command": {
+        "default": "npx",
+        "win32": "npx.cmd"
+      },
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "{env:GITHUB_PERSONAL_ACCESS_TOKEN}"
+      },
+      "requiresEnv": [
+        "GITHUB_PERSONAL_ACCESS_TOKEN"
+      ],
+      "optional": true,
+      "description": "GitHub MCP enabled when GITHUB_PERSONAL_ACCESS_TOKEN exists."
     },
     {
       "name": "supabase-mcp-server",
@@ -41,6 +75,24 @@
       ],
       "optional": true,
       "description": "Supabase MCP server enabled when SUPABASE_MCP_ACCESS_TOKEN exists."
+    },
+    {
+      "name": "postgres",
+      "type": "command",
+      "command": {
+        "default": "npx",
+        "win32": "npx.cmd"
+      },
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "{env:POSTGRES_MCP_URL}"
+      ],
+      "requiresEnv": [
+        "POSTGRES_MCP_URL"
+      ],
+      "optional": true,
+      "description": "Direct Postgres MCP enabled when POSTGRES_MCP_URL exists."
     },
     {
       "name": "netlify",

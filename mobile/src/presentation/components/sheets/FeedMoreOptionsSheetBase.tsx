@@ -1,6 +1,11 @@
 import React, { forwardRef, useCallback, useMemo } from 'react';
 import { StyleSheet, Dimensions } from 'react-native';
-import { BottomSheetModal, BottomSheetView } from '@gorhom/bottom-sheet';
+import {
+    BottomSheetBackdrop,
+    BottomSheetModal,
+    BottomSheetView,
+    type BottomSheetBackdropProps,
+} from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSurfaceTheme } from '../../hooks/useSurfaceTheme';
 
@@ -36,6 +41,15 @@ export const FeedMoreOptionsSheetBase = forwardRef<BottomSheetModal, FeedMoreOpt
             onSheetStateChange?.(index >= 0);
         }, [onSheetStateChange]);
 
+        const renderBackdrop = useCallback((props: BottomSheetBackdropProps) => (
+            <BottomSheetBackdrop
+                {...props}
+                appearsOnIndex={0}
+                disappearsOnIndex={-1}
+                pressBehavior="close"
+            />
+        ), []);
+
         return (
             <BottomSheetModal
                 ref={ref}
@@ -43,6 +57,7 @@ export const FeedMoreOptionsSheetBase = forwardRef<BottomSheetModal, FeedMoreOpt
                 snapPoints={snapPoints}
                 onChange={handleChange}
                 onDismiss={() => onSheetStateChange?.(false)}
+                backdropComponent={renderBackdrop}
                 enablePanDownToClose={true}
                 enableContentPanningGesture={true}
                 enableHandlePanningGesture={true}

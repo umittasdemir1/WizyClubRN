@@ -59,8 +59,9 @@ function createStoryRepository(dbClient) {
                 query = query.eq('user_id', userId);
             }
 
-            const { error } = await query;
+            const { data, error } = await query.select('id');
             if (error) throw error;
+            return Array.isArray(data) ? data : [];
         },
 
         async restoreStory(storyId, userId) {
@@ -80,7 +81,7 @@ function createStoryRepository(dbClient) {
         async listRecentlyDeletedStories(userId, cutoff) {
             const { data, error } = await dbClient
                 .from('stories')
-                .select('*, profiles(*)')
+                .select('id, user_id, video_url, thumbnail_url, media_urls, post_type, deleted_at, created_at, expires_at')
                 .eq('user_id', userId)
                 .not('deleted_at', 'is', null)
                 .gt('deleted_at', cutoff)

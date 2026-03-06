@@ -112,6 +112,7 @@ test('GenerateVideoSubtitlesUseCase logs and continues when status lookup fails 
 test('DeleteStoryUseCase rejects when the authenticated user does not own the story', async () => {
     const useCase = new DeleteStoryUseCase({
         createStoryRepository: () => ({
+            softDeleteStory: async () => [],
             findStoryById: async () => ({
                 id: 'story-1',
                 user_id: 'owner-1',

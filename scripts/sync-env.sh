@@ -82,6 +82,12 @@ write_backend_env() {
         if [[ -n "${GOOGLE_CLOUD_PROJECT_ID:-}" ]]; then
             echo "GOOGLE_CLOUD_PROJECT_ID=${GOOGLE_CLOUD_PROJECT_ID}"
         fi
+        if [[ -n "${GOOGLE_PLACES_API_KEY:-}" ]]; then
+            echo "GOOGLE_PLACES_API_KEY=${GOOGLE_PLACES_API_KEY}"
+        fi
+        if [[ -n "${GOOGLE_MAPS_API_KEY:-}" ]]; then
+            echo "GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}"
+        fi
     } > "$BACKEND_ENV_FILE"
 
     echo "[env] backend/.env generated from root .env"
@@ -103,6 +109,15 @@ write_mobile_env() {
         echo "EXPO_PUBLIC_API_URL=${mobile_api_url}"
         echo "EXPO_PUBLIC_SUPABASE_URL=${mobile_supabase_url}"
         echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=${mobile_supabase_key}"
+        if [[ -n "${GOOGLE_MAPS_API_KEY:-}" ]]; then
+            echo "GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}"
+        fi
+        if [[ -n "${GOOGLE_MAPS_ANDROID_API_KEY:-}" ]]; then
+            echo "GOOGLE_MAPS_ANDROID_API_KEY=${GOOGLE_MAPS_ANDROID_API_KEY}"
+        fi
+        if [[ -n "${GOOGLE_MAPS_IOS_API_KEY:-}" ]]; then
+            echo "GOOGLE_MAPS_IOS_API_KEY=${GOOGLE_MAPS_IOS_API_KEY}"
+        fi
         if [[ -n "${EXPO_PUBLIC_REVENUECAT_IOS_API_KEY:-}" ]]; then
             echo "EXPO_PUBLIC_REVENUECAT_IOS_API_KEY=${EXPO_PUBLIC_REVENUECAT_IOS_API_KEY}"
         fi

@@ -11,9 +11,13 @@ function createRequireVideoOwnership(supabase, options = {}) {
         try {
             const videoId = req.params.id;
             const client = req.dbClient || supabase;
+            const resolvedSelect = typeof select === 'function' ? select(req) : select;
+            const selectClause = typeof resolvedSelect === 'string' && resolvedSelect.trim()
+                ? resolvedSelect
+                : 'id, user_id';
             const { data: video, error } = await client
                 .from('videos')
-                .select(select)
+                .select(selectClause)
                 .eq('id', videoId)
                 .single();
 

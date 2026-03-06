@@ -79,9 +79,17 @@ function createInfrastructure({ envConfig, ffmpeg, logLine }) {
     const requireEditableVideo = createRequireVideoOwnership(supabase, {
         forbiddenMessage: 'You can only edit your own videos',
     });
+    const deleteVideoSelect = (req) => (
+        req?.query?.force === 'true'
+            ? 'id, user_id, video_url, thumbnail_url, sprite_url, media_urls'
+            : 'id, user_id'
+    );
     const requireDeletableVideo = createRequireVideoOwnership(supabase, {
-        select: '*',
+        select: deleteVideoSelect,
         forbiddenMessage: 'You can only delete your own videos',
+    });
+    const requireRestorableVideo = createRequireVideoOwnership(supabase, {
+        forbiddenMessage: 'You can only restore your own videos',
     });
     const requireSubtitleGenerationVideo = createRequireVideoOwnership(supabase, {
         select: 'id, user_id, video_url, post_type',
@@ -140,6 +148,7 @@ function createInfrastructure({ envConfig, ffmpeg, logLine }) {
         attachOptionalAuth,
         requireEditableVideo,
         requireDeletableVideo,
+        requireRestorableVideo,
         requireSubtitleGenerationVideo,
         requireSubtitleEditableVideo,
         requireSubtitleDeletableVideo,

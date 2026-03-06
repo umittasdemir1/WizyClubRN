@@ -109,6 +109,14 @@ function resolveToken(value, env, workspacePath) {
     return value.replace(/\{workspace\}/g, workspacePath);
 }
 
+function resolveEnvMap(envMap, env, workspacePath) {
+    const resolved = {};
+    Object.entries(envMap || {}).forEach(([key, value]) => {
+        resolved[key] = resolveToken(value, env, workspacePath);
+    });
+    return resolved;
+}
+
 function buildServers(manifest, env, workspacePath) {
     const configured = [];
     const skipped = [];
@@ -140,12 +148,14 @@ function buildServers(manifest, env, workspacePath) {
 
         const command = pickCommand(server.command);
         const args = (server.args || []).map((arg) => resolveToken(arg, env, workspacePath));
+        const serverEnv = resolveEnvMap(server.env, env, workspacePath);
 
         configured.push({
             name: server.name,
             type: "command",
             command,
             args,
+            env: serverEnv,
             description: server.description || ""
         });
     }
@@ -155,6 +165,15 @@ function buildServers(manifest, env, workspacePath) {
 
 function tomlString(value) {
     return JSON.stringify(value);
+}
+
+function tomlInlineTable(map) {
+    const entries = Object.entries(map || {});
+    if (entries.length === 0) {
+        return "{}";
+    }
+
+    return `{ ${entries.map(([key, value]) => `${key} = ${tomlString(value)}`).join(", ")} }`;
 }
 
 function renderManagedBlock(servers) {
@@ -176,6 +195,9 @@ function renderManagedBlock(servers) {
         } else {
             lines.push(`command = ${tomlString(server.command)}`);
             lines.push(`args = [${server.args.map((arg) => tomlString(arg)).join(", ")}]`);
+            if (server.env && Object.keys(server.env).length > 0) {
+                lines.push(`env = ${tomlInlineTable(server.env)}`);
+            }
         }
 
         if (index !== servers.length - 1) {
@@ -187,17 +209,53 @@ function renderManagedBlock(servers) {
     return `${lines.join("\n")}\n`;
 }
 
-function upsertManagedBlock(existingContent, block) {
-    const pattern = new RegExp(
-        `${escapeRegExp(BEGIN_MARKER)}[\\s\\S]*?${escapeRegExp(END_MARKER)}\\n?`,
-        "m"
-    );
+function countOccurrences(content, marker) {
+    const matches = content.match(new RegExp(escapeRegExp(marker), "g"));
+    return matches ? matches.length : 0;
+}
 
-    if (pattern.test(existingContent)) {
-        return existingContent.replace(pattern, block);
+function getManagedBlockHealth(content) {
+    const beginCount = countOccurrences(content, BEGIN_MARKER);
+    const endCount = countOccurrences(content, END_MARKER);
+    const firstBegin = content.indexOf(BEGIN_MARKER);
+    const lastEnd = content.lastIndexOf(END_MARKER);
+    const isBalanced = beginCount === 1 && endCount === 1 && firstBegin >= 0 && lastEnd > firstBegin;
+
+    return {
+        beginCount,
+        endCount,
+        isBalanced
+    };
+}
+
+function stripManagedBlock(existingContent) {
+    const lines = existingContent.split(/\r?\n/);
+    const kept = [];
+    let skipping = false;
+
+    for (const line of lines) {
+        if (line.includes(BEGIN_MARKER)) {
+            skipping = true;
+            continue;
+        }
+
+        if (line.includes(END_MARKER)) {
+            skipping = false;
+            continue;
+        }
+
+        if (!skipping) {
+            kept.push(line);
+        }
     }
 
-    const trimmed = existingContent.trimEnd();
+    return kept.join("\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+}
+
+function upsertManagedBlock(existingContent, block) {
+    const trimmed = stripManagedBlock(existingContent);
     if (!trimmed) {
         return block;
     }
@@ -254,6 +312,8 @@ module.exports = {
     readRootEnv,
     renderManagedBlock,
     resolveConfigPath,
+    getManagedBlockHealth,
+    stripManagedBlock,
     stripServerSections,
     syncR2Env,
     upsertManagedBlock

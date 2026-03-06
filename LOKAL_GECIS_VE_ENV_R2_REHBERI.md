@@ -48,9 +48,7 @@ npm --prefix r2-mcp ci
 npm --prefix backend run test:all
 npm --prefix backend run verify:mobile-rpcs
 npx --prefix mobile tsc --noEmit -p mobile/tsconfig.json
-bash scripts/sync-env.sh r2-mcp
 node -c r2-mcp/custom-r2-server.js
-node -c r2-mcp/run-r2-mcp.js
 ```
 
 6. Merkezi MCP kurulumunu uygula:
@@ -65,8 +63,11 @@ codex mcp list
 ```
 Beklenen aktif kayıtlar:
 - `openaiDeveloperDocs`
+- `filesystem`
 - `r2-local`
+- `github` (yalnızca `GITHUB_PERSONAL_ACCESS_TOKEN` varsa)
 - `supabase-mcp-server` (yalnızca `SUPABASE_MCP_ACCESS_TOKEN` varsa)
+- `postgres` (yalnızca `POSTGRES_MCP_URL` varsa)
 - `netlify`
 
 Not:
@@ -100,4 +101,6 @@ Projeye ait örnek şablon:
 ## 7) Hızlı Sorun Giderme
 - `codex mcp list` boşsa: MCP kayıtlarını tekrar ekle.
 - `r2-local` çalışmıyorsa: `node scripts/setup-codex-mcp.js` çalıştır, sonra `node scripts/doctor-codex-mcp.js` ile doğrula.
+- `github` görünmüyorsa: kök `.env` içine `GITHUB_PERSONAL_ACCESS_TOKEN` ekle, sonra setup/doctor akışını tekrar çalıştır.
+- `postgres` görünmüyorsa: kök `.env` içine `POSTGRES_MCP_URL` ekle, sonra setup/doctor akışını tekrar çalıştır.
 - `sync-env` başarısızsa: kök `.env` içindeki zorunlu anahtarları tamamla.

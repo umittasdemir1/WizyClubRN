@@ -578,7 +578,13 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         !disableInlineVideo &&
         !isMeasurement &&
         !isDecodePrewarmDone;
-    const shouldPlayVideo = isVideo && !disableInlineVideo && !isMeasurement && isActive && !isPaused;
+    const shouldDecodePrewarmPlayback = shouldDecodePrewarm && !isPaused;
+    const shouldPlayVideo =
+        isVideo &&
+        !disableInlineVideo &&
+        !isMeasurement &&
+        ((isActive && !isPaused) || shouldDecodePrewarmPlayback);
+    const videoOutputMuted = isMuted || shouldDecodePrewarmPlayback;
     const hasMedia = isCarousel || isVideo || Boolean(thumbnail);
     const hasThumbnail = Boolean(thumbnail);
     // âœ… Only gate video visibility BEFORE first frame is seen
@@ -667,12 +673,13 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         [handleMore]
     );
 
-    const revealVideoLayer = useCallback(() => {
+    const revealVideoLayer = useCallback((options?: { markDecodeReady?: boolean }) => {
+        const markDecodeReady = options?.markDecodeReady ?? false;
         if (!shouldGateVideoVisibility) {
             firstFrameSeenRef.current = true;
             clearReadyFallbackTimer();
             setIsVideoVisible(true);
-            if (shouldDecodePrewarm) {
+            if (markDecodeReady && shouldDecodePrewarm) {
                 setIsDecodePrewarmDone(true);
             }
             return;
@@ -681,7 +688,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         firstFrameSeenRef.current = true;
         clearReadyFallbackTimer();
         setIsVideoVisible(true);
-        if (shouldDecodePrewarm) {
+        if (markDecodeReady && shouldDecodePrewarm) {
             setIsDecodePrewarmDone(true);
         }
     }, [clearReadyFallbackTimer, shouldDecodePrewarm, shouldGateVideoVisibility]);
@@ -696,13 +703,16 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         firstFrameSeenRef.current = false;
         setIsVideoVisible(false);
         clearReadyFallbackTimer();
+        if (shouldDecodePrewarm) {
+            return;
+        }
         readyFallbackTimerRef.current = setTimeout(() => {
             revealVideoLayer();
         }, FIRST_FRAME_FALLBACK_MS);
-    }, [clearReadyFallbackTimer, revealVideoLayer, shouldGateVideoVisibility]);
+    }, [clearReadyFallbackTimer, revealVideoLayer, shouldDecodePrewarm, shouldGateVideoVisibility]);
 
     const handleVideoReadyForDisplay = useCallback(() => {
-        revealVideoLayer();
+        revealVideoLayer({ markDecodeReady: true });
         if (!isVideo || !isActive) return;
 
         const sourceType = effectiveVideoSourceUrl && isLocalFilePath(effectiveVideoSourceUrl)
@@ -749,7 +759,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
     const handleVideoProgress = useCallback((event: OnProgressData) => {
         lastSubtitleTimeMsRef.current = event.currentTime * 1000;
         if (!firstFrameSeenRef.current && event.currentTime >= 0) {
-            revealVideoLayer();
+            revealVideoLayer({ markDecodeReady: true });
         }
 
         const progressData = event as OnProgressData & {
@@ -1029,6 +1039,12 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
             // This prevents thumbnail from showing on first scroll
             firstFrameSeenRef.current = true;
             setIsVideoVisible(true);
+            if (isDecodePrewarmDone) {
+                const sourceType = effectiveVideoSourceUrl && isLocalFilePath(effectiveVideoSourceUrl)
+                    ? 'disk-cache'
+                    : 'network';
+                PerformanceLogger.endTransition(item.id, sourceType);
+            }
 
             const inactiveSince = inactiveSinceRef.current;
             const inactiveDurationMs = inactiveSince == null ? 0 : Date.now() - inactiveSince;
@@ -1045,7 +1061,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
         }
 
         wasActiveRef.current = isActive;
-    }, [clearInactivePauseTimer, isActive, isVideo]);
+    }, [clearInactivePauseTimer, effectiveVideoSourceUrl, isActive, isDecodePrewarmDone, isVideo, item.id]);
 
     // âœ… [PERF] Memoize dynamic styles to prevent object reference churn
     const effectiveAspectRatio = isCarousel ? CAROUSEL_ASPECT_RATIO : aspectRatio;
@@ -1215,7 +1231,7 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                 videoRef={videoRef}
                                 isVideoHidden={isVideoHidden}
                                 shouldPlayVideo={shouldPlayVideo}
-                                isMuted={isMuted}
+                                isMuted={videoOutputMuted}
                                 progressUpdateIntervalMs={progressUpdateIntervalMs}
                                 onVideoLoadStart={handleVideoLoadStart}
                                 onVideoLoad={handleVideoLoad}

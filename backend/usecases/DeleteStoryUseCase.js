@@ -19,21 +19,22 @@ class DeleteStoryUseCase {
 
         try {
             const storyRepository = this.createStoryRepository(dbClient);
-            const story = await storyRepository.findStoryById(storyId);
-
-            if (!story) {
-                const notFoundError = new Error('Story not found');
-                notFoundError.statusCode = 404;
-                throw notFoundError;
-            }
-
-            if (story.user_id !== userId) {
-                const forbiddenError = new Error('Forbidden');
-                forbiddenError.statusCode = 403;
-                throw forbiddenError;
-            }
 
             if (force) {
+                const story = await storyRepository.findStoryById(storyId);
+
+                if (!story) {
+                    const notFoundError = new Error('Story not found');
+                    notFoundError.statusCode = 404;
+                    throw notFoundError;
+                }
+
+                if (story.user_id !== userId) {
+                    const forbiddenError = new Error('Forbidden');
+                    forbiddenError.statusCode = 403;
+                    throw forbiddenError;
+                }
+
                 await this.cleanupStoryAssetsFromR2(story, { scope: 'DELETE_STORY', storyId });
                 const deletedRows = await storyRepository.hardDeleteStory(storyId, userId);
 
@@ -47,7 +48,25 @@ class DeleteStoryUseCase {
                 return { message: 'Story deleted permanently' };
             }
 
-            await storyRepository.softDeleteStory(storyId, userId, new Date().toISOString());
+            const softDeletedRows = await storyRepository.softDeleteStory(storyId, userId, new Date().toISOString());
+            if (softDeletedRows.length === 0) {
+                const ownershipStory = await storyRepository.findStoryById(storyId, {
+                    select: 'id, user_id',
+                });
+
+                if (!ownershipStory) {
+                    const notFoundError = new Error('Story not found');
+                    notFoundError.statusCode = 404;
+                    throw notFoundError;
+                }
+
+                if (ownershipStory.user_id !== userId) {
+                    const forbiddenError = new Error('Forbidden');
+                    forbiddenError.statusCode = 403;
+                    throw forbiddenError;
+                }
+            }
+
             this.logLine('OK', 'DELETE_STORY', 'Story soft deleted (moved to trash)', { storyId, userId });
             return { message: 'Story moved to trash' };
         } catch (error) {

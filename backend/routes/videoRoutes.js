@@ -11,6 +11,7 @@ function createVideoRoutes({
     requireAuth,
     requireEditableVideo,
     requireDeletableVideo,
+    requireRestorableVideo,
     editVideoUseCase,
     deleteVideoUseCase,
     restoreVideoUseCase,
@@ -82,7 +83,7 @@ function createVideoRoutes({
         }
     });
 
-    router.post('/videos/:id/restore', requireAuth, requireDeletableVideo, async (req, res) => {
+    router.post('/videos/:id/restore', requireAuth, requireRestorableVideo, async (req, res) => {
         try {
             const { id } = new VideoIdParamDTO(req.params).toParams();
             const result = await restoreVideoUseCase.execute({
