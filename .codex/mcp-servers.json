@@ -1,0 +1,60 @@
+{
+  "managedBlockName": "WIZYCLUB MANAGED MCP",
+  "servers": [
+    {
+      "name": "openaiDeveloperDocs",
+      "type": "url",
+      "url": "https://developers.openai.com/mcp",
+      "description": "Official OpenAI developer docs MCP."
+    },
+    {
+      "name": "r2-local",
+      "type": "command",
+      "command": {
+        "default": "node"
+      },
+      "args": [
+        "{workspace}/r2-mcp/custom-r2-server.js"
+      ],
+      "requiresEnv": [
+        "R2_ACCOUNT_ID",
+        "R2_ACCESS_KEY_ID",
+        "R2_SECRET_ACCESS_KEY"
+      ],
+      "description": "Repo-managed local R2 MCP server."
+    },
+    {
+      "name": "supabase-mcp-server",
+      "type": "command",
+      "command": {
+        "default": "npx",
+        "win32": "npx.cmd"
+      },
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase@latest",
+        "--access-token",
+        "{env:SUPABASE_MCP_ACCESS_TOKEN}"
+      ],
+      "requiresEnv": [
+        "SUPABASE_MCP_ACCESS_TOKEN"
+      ],
+      "optional": true,
+      "description": "Supabase MCP server enabled when SUPABASE_MCP_ACCESS_TOKEN exists."
+    },
+    {
+      "name": "netlify",
+      "type": "command",
+      "command": {
+        "default": "npx",
+        "win32": "npx.cmd"
+      },
+      "args": [
+        "-y",
+        "@netlify/mcp"
+      ],
+      "optional": true,
+      "description": "Netlify MCP server."
+    }
+  ]
+}

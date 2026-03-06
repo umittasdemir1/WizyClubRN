@@ -1,10 +1,42 @@
+const fs = require("fs");
+const path = require("path");
 const { Server } = require("@modelcontextprotocol/sdk/server/index.js");
 const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
 const { CallToolRequestSchema, ListToolsRequestSchema } = require("@modelcontextprotocol/sdk/types.js");
 const { S3Client, ListBucketsCommand, ListObjectsV2Command } = require("@aws-sdk/client-s3");
 
+function parseDotEnv(filePath) {
+    const out = {};
+    if (!fs.existsSync(filePath)) {
+        return out;
+    }
+    const raw = fs.readFileSync(filePath, "utf8");
+    for (const line of raw.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) {
+            continue;
+        }
+        const idx = trimmed.indexOf("=");
+        if (idx <= 0) {
+            continue;
+        }
+        const key = trimmed.slice(0, idx).trim();
+        let value = trimmed.slice(idx + 1).trim();
+        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+            value = value.slice(1, -1);
+        }
+        out[key] = value;
+    }
+    return out;
+}
+
+const mergedEnv = {
+    ...parseDotEnv(path.join(__dirname, ".env")),
+    ...process.env,
+};
+
 function getRequiredEnv(name) {
-    const value = process.env[name];
+    const value = mergedEnv[name];
     if (!value || !value.trim()) {
         throw new Error(`Missing required environment variable: ${name}`);
     }

@@ -14,9 +14,10 @@ Kod tarafındaki mimari kurulum tamamlandı.
   - `r2-mcp/AGENTS.md`
 - Proje içi skill mimarisi kuruldu: `.codex/skills/`
 - OpenAI curated skill’lerin kritik seti projeye vendor edildi.
-- Codex MCP kayıtları tanımlandı:
-  - `openaiDeveloperDocs`
-  - `r2-local`
+- Codex MCP kayıtları artık repodan merkezi olarak üretiliyor.
+- Tek kaynak: `.codex/mcp-servers.json`
+- Kurulum scripti: `node scripts/setup-codex-mcp.js`
+- Doğrulama scripti: `node scripts/doctor-codex-mcp.js`
 
 ## 3) Evde Local Makinede Yapılacaklar (Adım Adım)
 1. Depoyu güncelle:
@@ -52,19 +53,25 @@ node -c r2-mcp/custom-r2-server.js
 node -c r2-mcp/run-r2-mcp.js
 ```
 
-6. MCP kurulumunu doğrula:
+6. Merkezi MCP kurulumunu uygula:
+```bash
+node scripts/setup-codex-mcp.js
+node scripts/doctor-codex-mcp.js
+```
+
+7. MCP kurulumunu doğrula:
 ```bash
 codex mcp list
 ```
 Beklenen aktif kayıtlar:
 - `openaiDeveloperDocs`
 - `r2-local`
+- `supabase-mcp-server` (yalnızca `SUPABASE_MCP_ACCESS_TOKEN` varsa)
+- `netlify`
 
-Eğer görünmüyorsa ekle:
-```bash
-codex mcp add openaiDeveloperDocs --url https://developers.openai.com/mcp
-codex mcp add r2-local -- node /home/user/WizyClubRN/r2-mcp/run-r2-mcp.js
-```
+Not:
+- Artık önerilen yol `codex mcp add ...` ile tek tek kayıt açmak değil.
+- Repo standardı `node scripts/setup-codex-mcp.js` ile managed block üretmektir.
 
 ## 4) R2 Tarafı (Önemli)
 `r2-mcp` artık şu env değişkenlerini zorunlu ister:
@@ -92,5 +99,5 @@ Projeye ait örnek şablon:
 
 ## 7) Hızlı Sorun Giderme
 - `codex mcp list` boşsa: MCP kayıtlarını tekrar ekle.
-- `r2-local` çalışmıyorsa: `npm --prefix r2-mcp ci` çalıştır, sonra `bash scripts/sync-env.sh r2-mcp` ile `r2-mcp/.env` üret.
+- `r2-local` çalışmıyorsa: `node scripts/setup-codex-mcp.js` çalıştır, sonra `node scripts/doctor-codex-mcp.js` ile doğrula.
 - `sync-env` başarısızsa: kök `.env` içindeki zorunlu anahtarları tamamla.
