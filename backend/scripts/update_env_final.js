@@ -5,13 +5,22 @@ const backendRoot = path.resolve(__dirname, '..');
 const envPath = path.join(backendRoot, '.env');
 let content = fs.readFileSync(envPath, 'utf8');
 
-const updates = {
-    R2_ACCOUNT_ID: '952ab1046bdcb041ec23ef25f74d33a5',
-    R2_ACCESS_KEY_ID: '83698d552e80464187972e34ebd99fec',
-    R2_SECRET_ACCESS_KEY: '568611ad81e89caa08be658c80f4afd83818a5dcfc260e778123d5b667efbfa7',
-    R2_BUCKET_NAME: 'wizy-club-staging',
-    R2_PUBLIC_URL: 'http://pub-426c6d2d3e914041a80d464249339e3c.r2.dev'
-};
+const requiredKeys = [
+    'R2_ACCOUNT_ID',
+    'R2_ACCESS_KEY_ID',
+    'R2_SECRET_ACCESS_KEY',
+    'R2_BUCKET_NAME',
+    'R2_PUBLIC_URL'
+];
+
+const updates = {};
+for (const key of requiredKeys) {
+    const value = process.env[key];
+    if (!value || !value.trim()) {
+        throw new Error(`Missing required env var: ${key}`);
+    }
+    updates[key] = value;
+}
 
 for (const [key, value] of Object.entries(updates)) {
     const regex = new RegExp(`^${key}=.*$`, 'm');

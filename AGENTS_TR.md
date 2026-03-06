@@ -10,7 +10,7 @@ Bu depo çok paketli bir çalışma alanıdır:
 
 ## Derleme, Test ve Geliştirme Komutları
 Komutları depo kökünden çalıştırın:
-- `cp .env.example .env && bash scripts/sync-env.sh all`: `backend/.env` ve `mobile/.env` dosyalarını üretir.
+- `cp .env.example .env && bash scripts/sync-env.sh all`: `backend/.env`, `mobile/.env` ve `r2-mcp/.env` dosyalarını üretir.
 - `npm --prefix backend ci`: backend bağımlılıklarını temiz kurar.
 - `npm --prefix backend run start`: backend sunucusunu başlatır.
 - `npm --prefix backend run test:all`: Node test runner + Jest testlerini çalıştırır.
@@ -41,3 +41,11 @@ Komutları depo kökünden çalıştırın:
 - `.env`, kimlik bilgisi JSON dosyaları veya ham anahtarları commit etmeyin.
 - Kök `.env` dosyasını tek kaynak olarak kullanın; uygulama `.env` dosyalarını `bash scripts/sync-env.sh all` ile yeniden üretin.
 - `r2-mcp/` altındaki kimlik bilgisi/konfigürasyonları hassas kabul edin; paylaşmadan önce temizleyin.
+
+## Ajan Hiyerarşisi
+- Kök `AGENTS.md`, depo genelindeki varsayılan kuralları tanımlar.
+- Paket özelindeki kurallar, kendi dizinlerinde kök kuralları override eder:
+  - `backend/AGENTS.md`
+  - `mobile/AGENTS.md`
+  - `r2-mcp/AGENTS.md`
+- `AGENTS.override.md` sadece kısa ömürlü sprint kısıtları için kullanılmalıdır.

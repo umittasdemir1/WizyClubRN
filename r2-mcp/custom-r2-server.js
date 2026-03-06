@@ -1,19 +1,26 @@
 const { Server } = require("@modelcontextprotocol/sdk/server/index.js");
 const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
 const { CallToolRequestSchema, ListToolsRequestSchema } = require("@modelcontextprotocol/sdk/types.js");
-const { S3Client, ListBucketsCommand, ListObjectsV2Command, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");
+const { S3Client, ListBucketsCommand, ListObjectsV2Command } = require("@aws-sdk/client-s3");
 
-// Credentials
-const ACCOUNT_ID = '952ab1046bdcb041ec23ef25f74d33a5';
-const ACCESS_KEY_ID = '83698d552e80464187972e34ebd99fec';
-const SECRET_ACCESS_KEY = '568611ad81e89caa08be658c80f4afd83818a5dcfc260e778123d5b667efbfa7';
+function getRequiredEnv(name) {
+    const value = process.env[name];
+    if (!value || !value.trim()) {
+        throw new Error(`Missing required environment variable: ${name}`);
+    }
+    return value;
+}
+
+const accountId = getRequiredEnv("R2_ACCOUNT_ID");
+const accessKeyId = getRequiredEnv("R2_ACCESS_KEY_ID");
+const secretAccessKey = getRequiredEnv("R2_SECRET_ACCESS_KEY");
 
 const s3 = new S3Client({
-    region: 'auto',
-    endpoint: `https://${ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    region: "auto",
+    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
     credentials: {
-        accessKeyId: ACCESS_KEY_ID,
-        secretAccessKey: SECRET_ACCESS_KEY,
+        accessKeyId,
+        secretAccessKey,
     },
 });
 
@@ -35,17 +42,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         tools: [
             {
                 name: "list_buckets",
-                description: "Cloudflare R2 sepetlerini listele",
+                description: "List Cloudflare R2 buckets",
                 inputSchema: { type: "object", properties: {} }
             },
             {
                 name: "list_objects",
-                description: "Bir sepetteki dosyaları listele",
+                description: "List objects in a bucket",
                 inputSchema: {
                     type: "object",
                     properties: {
-                        bucket: { type: "string", description: "Sepet adı" },
-                        prefix: { type: "string", description: "Klasör ön eki" }
+                        bucket: { type: "string", description: "Bucket name" },
+                        prefix: { type: "string", description: "Object prefix filter" }
                     },
                     required: ["bucket"]
                 }
@@ -67,6 +74,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
 
         if (name === "list_objects") {
+            if (!args || typeof args.bucket !== "string" || !args.bucket.trim()) {
+                throw new Error("Invalid 'bucket' argument");
+            }
             const data = await s3.send(new ListObjectsV2Command({
                 Bucket: args.bucket,
                 Prefix: args.prefix
@@ -88,7 +98,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main() {
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    process.stderr.write("R2 MCP Server running via Custom Script...\n");
+    process.stderr.write("R2 MCP server started.\n");
 }
 
 main().catch((error) => {

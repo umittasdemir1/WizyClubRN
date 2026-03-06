@@ -7,18 +7,20 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 ROOT_ENV_FILE="$ROOT_DIR/.env"
 BACKEND_ENV_FILE="$ROOT_DIR/backend/.env"
 MOBILE_ENV_FILE="$ROOT_DIR/mobile/.env"
+R2_MCP_ENV_FILE="$ROOT_DIR/r2-mcp/.env"
 
 usage() {
     cat <<'EOF'
-Usage: scripts/sync-env.sh [all|backend|mobile]
+Usage: scripts/sync-env.sh [all|backend|mobile|r2-mcp]
 
 Reads the root .env file and generates:
   - backend/.env
   - mobile/.env
+  - r2-mcp/.env
 EOF
 }
 
-if [[ "$TARGET" != "all" && "$TARGET" != "backend" && "$TARGET" != "mobile" ]]; then
+if [[ "$TARGET" != "all" && "$TARGET" != "backend" && "$TARGET" != "mobile" && "$TARGET" != "r2-mcp" ]]; then
     usage >&2
     exit 1
 fi
@@ -112,15 +114,39 @@ write_mobile_env() {
     echo "[env] mobile/.env generated from root .env"
 }
 
+write_r2_mcp_env() {
+    check_required_vars "r2-mcp" \
+        R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY
+
+    {
+        echo "# Auto-generated from ../.env by scripts/sync-env.sh"
+        echo "R2_ACCOUNT_ID=${R2_ACCOUNT_ID}"
+        echo "R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID}"
+        echo "R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY}"
+        if [[ -n "${R2_BUCKET_NAME:-}" ]]; then
+            echo "R2_BUCKET_NAME=${R2_BUCKET_NAME}"
+        fi
+        if [[ -n "${R2_PUBLIC_URL:-}" ]]; then
+            echo "R2_PUBLIC_URL=${R2_PUBLIC_URL}"
+        fi
+    } > "$R2_MCP_ENV_FILE"
+
+    echo "[env] r2-mcp/.env generated from root .env"
+}
+
 case "$TARGET" in
     all)
         write_backend_env
         write_mobile_env
+        write_r2_mcp_env
         ;;
     backend)
         write_backend_env
         ;;
     mobile)
         write_mobile_env
+        ;;
+    r2-mcp)
+        write_r2_mcp_env
         ;;
 esac

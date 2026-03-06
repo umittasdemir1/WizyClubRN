@@ -10,7 +10,7 @@ This repo is a multi-package workspace:
 
 ## Build, Test, and Development Commands
 Run from repo root:
-- `cp .env.example .env && bash scripts/sync-env.sh all`: generate `backend/.env` and `mobile/.env`.
+- `cp .env.example .env && bash scripts/sync-env.sh all`: generate `backend/.env`, `mobile/.env`, and `r2-mcp/.env`.
 - `npm --prefix backend ci`: install backend dependencies.
 - `npm --prefix backend run start`: start backend server.
 - `npm --prefix backend run test:all`: run Node test runner + Jest suites.
@@ -41,3 +41,11 @@ Run from repo root:
 - Never commit `.env`, credential JSON files, or raw keys.
 - Use root `.env` as source of truth; regenerate app envs via `bash scripts/sync-env.sh all`.
 - Treat `r2-mcp/` credentials/config as sensitive local tooling and sanitize before sharing.
+
+## Agent Hierarchy
+- Root `AGENTS.md` defines repo-wide defaults.
+- Package-specific rules override root defaults when working inside:
+  - `backend/AGENTS.md`
+  - `mobile/AGENTS.md`
+  - `r2-mcp/AGENTS.md`
+- Use `AGENTS.override.md` only for short-lived sprint constraints.
