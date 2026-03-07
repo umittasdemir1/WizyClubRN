@@ -24,12 +24,12 @@ Core MCPler:
 - `openaiDeveloperDocs`
 - `filesystem`
 - `r2-local`
-- `netlify`
 
 Opsiyonel MCPler:
 - `github` if `GITHUB_PERSONAL_ACCESS_TOKEN` exists
 - `supabase-mcp-server` if `SUPABASE_MCP_ACCESS_TOKEN` exists
 - `postgres` if `POSTGRES_MCP_URL` exists
+- `netlify` if `NETLIFY_MCP_ENABLED` exists
 
 Bu secim bilincli yapildi:
 - `filesystem` repo icinde dogrudan dosya okuma ve refactor icin yuksek getirili.
@@ -37,6 +37,7 @@ Bu secim bilincli yapildi:
 - `supabase-mcp-server` mevcut backend ve veri katmani icin birincil DB/Auth aracidir.
 - `postgres` dogrudan SQL ve query tuning ihtiyaclari icin ikinci katman olarak sunulur.
 - `r2-local` generic Cloudflare MCP yerine repo-ozel ve env-guvenli R2 server'idir.
+- `netlify` startup timeout uyarisi urettigi icin varsayilan setten cikarildi; yalnizca acik opt-in ile eklenir.
 
 Simdilik standart sete alinmayanlar:
 - `shell`: Codex zaten native shell araci ile geliyor; ayni yetkiyi bir MCP ile tekrar acmak gereksiz.
@@ -56,6 +57,7 @@ Opsiyonel MCP env anahtarlari:
 - `GITHUB_PERSONAL_ACCESS_TOKEN`
 - `SUPABASE_MCP_ACCESS_TOKEN`
 - `POSTGRES_MCP_URL`
+- `NETLIFY_MCP_ENABLED`
 
 Not:
 - `SUPABASE_URL` ve `SUPABASE_KEY` uygulama icindir.

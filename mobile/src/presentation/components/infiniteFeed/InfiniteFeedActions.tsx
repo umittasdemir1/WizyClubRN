@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState, useMemo } from 'react';
+import React, { startTransition, useCallback, useEffect, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import Animated, {
     useSharedValue,
@@ -94,22 +94,38 @@ const ActionButton = React.memo(function ActionButton({
     burstColors = LIKE_PARTICLE_COLORS,
     onLongPress,
 }: ActionButtonProps) {
-    const [localActive, setLocalActive] = useState(active);
+    const activeRef = useRef(active);
     const scale = useSharedValue(1);
+    const activeProgress = useSharedValue(active ? 1 : 0);
     const burst = useSharedValue(0);
 
     useEffect(() => {
-        setLocalActive(active);
-    }, [active]);
+        activeRef.current = active;
+        activeProgress.value = withTiming(active ? 1 : 0, {
+            duration: active ? 90 : 120,
+            easing: Easing.out(Easing.ease),
+        });
+    }, [active, activeProgress]);
 
     const triggerBurst = useCallback(() => {
         if (!enableBurst) return;
         burst.value = 0;
         burst.value = withTiming(1, { duration: BURST_DURATION, easing: Easing.out(Easing.ease) });
-    }, [enableBurst, burst]);
+    }, [burst, enableBurst]);
 
     const animatedStyle = useAnimatedStyle(() => ({
         transform: [{ scale: scale.value }],
+    }));
+    const inactiveIconStyle = useAnimatedStyle(() => ({
+        opacity: canToggle ? 1 - activeProgress.value : 1,
+    }));
+    const activeIconStyle = useAnimatedStyle(() => ({
+        opacity: activeProgress.value,
+        transform: [
+            {
+                scale: interpolate(activeProgress.value, [0, 1], [0.92, 1], Extrapolation.CLAMP),
+            },
+        ],
     }));
 
     const handlePressIn = useCallback(() => {
@@ -127,9 +143,13 @@ const ActionButton = React.memo(function ActionButton({
     }, [scale]);
 
     const handlePress = useCallback(() => {
-        const nextActive = canToggle ? !localActive : localActive;
+        const nextActive = canToggle ? !activeRef.current : activeRef.current;
         if (canToggle) {
-            setLocalActive(nextActive);
+            activeRef.current = nextActive;
+            activeProgress.value = withTiming(nextActive ? 1 : 0, {
+                duration: 90,
+                easing: Easing.out(Easing.ease),
+            });
         }
 
         // ✅ Animations controlled by INF_DISABLE_ACTION_ANIMATIONS flag
@@ -145,12 +165,17 @@ const ActionButton = React.memo(function ActionButton({
                 triggerBurst();
             }
         }
-        onPress?.();
-    }, [canToggle, localActive, triggerBurst, onPress]);
+        if (!onPress) return;
+        if (FEED_FLAGS.INF_DISABLE_ACTION_ANIMATIONS) {
+            onPress();
+            return;
+        }
 
-    const iconColor = localActive && activeColor ? activeColor : colors.textPrimary;
-    const iconFill = localActive && activeColor ? activeColor : 'none';
-    const strokeWidth = localActive ? 2 : 1.2;
+        startTransition(() => {
+            onPress();
+        });
+    }, [activeProgress, canToggle, onPress, scale, triggerBurst]);
+
     const formattedCount = useMemo(() => formatCount(count), [count]);
     const isZeroCount = formattedCount === '0';
     const shouldShowCount = !isZeroCount || Boolean(zeroText);
@@ -173,9 +198,18 @@ const ActionButton = React.memo(function ActionButton({
             style={[styles.actionButton, isZeroCount && zeroText ? styles.actionButtonZeroState : null]}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
-            <Animated.View style={[styles.iconWrapper, animatedStyle]}>
-                {enableBurst && localActive && !FEED_FLAGS.INF_DISABLE_ACTION_ANIMATIONS && (
-                    <View style={styles.particles}>
+            <Animated.View
+                style={[styles.iconWrapper, animatedStyle]}
+                renderToHardwareTextureAndroid
+                shouldRasterizeIOS
+            >
+                {enableBurst && !FEED_FLAGS.INF_DISABLE_ACTION_ANIMATIONS && (
+                    <View
+                        style={styles.particles}
+                        pointerEvents="none"
+                        renderToHardwareTextureAndroid
+                        shouldRasterizeIOS
+                    >
                         {PARTICLE_ANGLES.map((angle, index) => (
                             <BurstParticle
                                 key={index}
@@ -186,12 +220,35 @@ const ActionButton = React.memo(function ActionButton({
                         ))}
                     </View>
                 )}
-                <Icon
-                    size={ACTION_ICON_SIZE}
-                    color={iconColor}
-                    fill={iconFill}
-                    strokeWidth={strokeWidth}
-                />
+                {canToggle ? (
+                    <>
+                        <Animated.View style={[styles.iconLayer, inactiveIconStyle]} pointerEvents="none">
+                            <Icon
+                                size={ACTION_ICON_SIZE}
+                                color={colors.textPrimary}
+                                fill="none"
+                                strokeWidth={1.2}
+                            />
+                        </Animated.View>
+                        <Animated.View style={[styles.iconLayer, styles.iconOverlay, activeIconStyle]} pointerEvents="none">
+                            <Icon
+                                size={ACTION_ICON_SIZE}
+                                color={activeColor || colors.textPrimary}
+                                fill={activeColor || colors.textPrimary}
+                                strokeWidth={2}
+                            />
+                        </Animated.View>
+                    </>
+                ) : (
+                    <View style={styles.iconLayer} pointerEvents="none">
+                        <Icon
+                            size={ACTION_ICON_SIZE}
+                            color={colors.textPrimary}
+                            fill="none"
+                            strokeWidth={1.2}
+                        />
+                    </View>
+                )}
             </Animated.View>
             {shouldShowCount ? (
                 <View style={[styles.countContainer, isZeroCount && zeroText ? styles.countContainerBelowIcon : null]}>
@@ -204,6 +261,20 @@ const ActionButton = React.memo(function ActionButton({
             ) : null}
         </Pressable>
     );
+}, (prevProps, nextProps) => {
+    if (prevProps.icon !== nextProps.icon) return false;
+    if (prevProps.count !== nextProps.count) return false;
+    if (prevProps.zeroText !== nextProps.zeroText) return false;
+    if (prevProps.onPress !== nextProps.onPress) return false;
+    if (prevProps.onLongPress !== nextProps.onLongPress) return false;
+    if (prevProps.colors.textPrimary !== nextProps.colors.textPrimary) return false;
+    if (prevProps.active !== nextProps.active) return false;
+    if (prevProps.activeColor !== nextProps.activeColor) return false;
+    if (prevProps.canToggle !== nextProps.canToggle) return false;
+    if (prevProps.enableBurst !== nextProps.enableBurst) return false;
+    if (prevProps.burstColors !== nextProps.burstColors) return false;
+
+    return true;
 });
 
 // ✅ [PERF] Memoized InfiniteFeedActions
@@ -300,6 +371,22 @@ export const InfiniteFeedActions = React.memo(function InfiniteFeedActions({
             ) : null}
         </Animated.View>
     );
+}, (prevProps, nextProps) => {
+    if (prevProps.colors.textPrimary !== nextProps.colors.textPrimary) return false;
+    if (prevProps.likesCount !== nextProps.likesCount) return false;
+    if (prevProps.savesCount !== nextProps.savesCount) return false;
+    if (prevProps.sharesCount !== nextProps.sharesCount) return false;
+    if (prevProps.isLiked !== nextProps.isLiked) return false;
+    if (prevProps.isSaved !== nextProps.isSaved) return false;
+    if (prevProps.showCommercialTag !== nextProps.showCommercialTag) return false;
+    if (prevProps.showShopIcon !== nextProps.showShopIcon) return false;
+    if (prevProps.shopTagText !== nextProps.shopTagText) return false;
+    if (prevProps.onLike !== nextProps.onLike) return false;
+    if (prevProps.onSave !== nextProps.onSave) return false;
+    if (prevProps.onShare !== nextProps.onShare) return false;
+    if (prevProps.onShop !== nextProps.onShop) return false;
+
+    return true;
 });
 
 const styles = StyleSheet.create({
@@ -327,9 +414,22 @@ const styles = StyleSheet.create({
         alignItems: 'flex-start',
     },
     iconWrapper: {
+        width: ACTION_ICON_SIZE,
+        height: ACTION_ICON_SIZE,
         justifyContent: 'center',
         alignItems: 'center',
         position: 'relative',
+    },
+    iconLayer: {
+        width: ACTION_ICON_SIZE,
+        height: ACTION_ICON_SIZE,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    iconOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
     },
     particles: {
         position: 'absolute',

@@ -1041,19 +1041,18 @@ export function InfiniteFeedManager({
         handleLocationPress,
     ]);
 
-    // ✅ [PERF] Sync volatile refs for renderItem (no re-render trigger)
-    useEffect(() => {
-        themeColorsRef.current = themeColors;
-        currentUserIdRef.current = currentUserId;
-        isMutedRef.current = isMuted;
-        netInfoTypeRef.current = netInfo.type;
-        subtitleModeRef.current = subtitleMode;
-        isInAppBrowserVisibleRef.current = isInAppBrowserVisible;
-        globalIsPausedRef.current = globalIsPaused;
-        isScreenFocusedRef.current = isScreenFocused;
-        isRouteFocusedRef.current = isRouteFocused;
-        activeStoryUserIdsRef.current = activeStoryUserIds;
-    });
+    // Keep renderItem refs in sync during render so extraData-driven re-renders
+    // always see the current mute/playback values on the same frame.
+    themeColorsRef.current = themeColors;
+    currentUserIdRef.current = currentUserId;
+    isMutedRef.current = isMuted;
+    netInfoTypeRef.current = netInfo.type;
+    subtitleModeRef.current = subtitleMode;
+    isInAppBrowserVisibleRef.current = isInAppBrowserVisible;
+    globalIsPausedRef.current = globalIsPaused;
+    isScreenFocusedRef.current = isScreenFocused;
+    isRouteFocusedRef.current = isRouteFocused;
+    activeStoryUserIdsRef.current = activeStoryUserIds;
 
     const effectivePendingInlineId = immediateActiveCommit ? activeInlineId : pendingInlineId;
     const effectivePendingInlineIndex = immediateActiveCommit ? activeInlineIndex : pendingInlineIndex;

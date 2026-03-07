@@ -37,6 +37,7 @@ args = ["-y", "@supabase/mcp-server-supabase@latest", "--access-token", "your_su
 command = "npx"
 args = ["-y", "@modelcontextprotocol/server-postgres", "postgresql://user:password@host:5432/database"]
 
+# Optional if NETLIFY_MCP_ENABLED exists in root .env.
 [mcp_servers.netlify]
 command = "npx"
 args = ["-y", "@netlify/mcp"]

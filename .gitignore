@@ -39,3 +39,6 @@ ngrok
 ngrok-v3-stable-linux-amd64.tgz
 # Expo local state
 .expo/
+
+# Codex runtime artifacts
+.codex/runtime/

@@ -372,10 +372,8 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
         const optimisticIsLiked = !previousIsLiked;
         const likeDelta = optimisticIsLiked ? 1 : -1;
         const optimisticLikesCount = Math.max(0, previousLikesCount + likeDelta);
-        applyVideoCounterDelta(videoId, 'likesCount', likeDelta);
-
-        // Optimistic update
         unstable_batchedUpdates(() => {
+            applyVideoCounterDelta(videoId, 'likesCount', likeDelta);
             setVideosWithDescriptionOverrides((prevVideos) =>
                 prevVideos.map((video) => {
                     if (video.id === videoId) {
@@ -396,11 +394,10 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
             const finalLikesCount = Math.max(0, previousLikesCount + (serverIsLiked ? 1 : -1));
             const correctionDelta = finalLikesCount - optimisticLikesCount;
 
-            if (correctionDelta !== 0) {
-                applyVideoCounterDelta(videoId, 'likesCount', correctionDelta);
-            }
-
             unstable_batchedUpdates(() => {
+                if (correctionDelta !== 0) {
+                    applyVideoCounterDelta(videoId, 'likesCount', correctionDelta);
+                }
                 setVideosWithDescriptionOverrides((prevVideos) =>
                     prevVideos.map((video) => {
                         if (video.id === videoId) {
@@ -420,19 +417,21 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
         } catch (err) {
             // Rollback on error
             logError(LogCode.DB_UPDATE, 'Toggle like failed, reverting', err);
-            applyVideoCounterDelta(videoId, 'likesCount', -likeDelta);
-            setVideosWithDescriptionOverrides((prevVideos) =>
-                prevVideos.map((video) => {
-                    if (video.id === videoId) {
-                        return {
-                            ...video,
-                            isLiked: previousIsLiked,
-                            likesCount: previousLikesCount,
-                        };
-                    }
-                    return video;
-                })
-            );
+            unstable_batchedUpdates(() => {
+                applyVideoCounterDelta(videoId, 'likesCount', -likeDelta);
+                setVideosWithDescriptionOverrides((prevVideos) =>
+                    prevVideos.map((video) => {
+                        if (video.id === videoId) {
+                            return {
+                                ...video,
+                                isLiked: previousIsLiked,
+                                likesCount: previousLikesCount,
+                            };
+                        }
+                        return video;
+                    })
+                );
+            });
         } finally {
             pendingLikeVideoIdsRef.current.delete(videoId);
         }
@@ -454,10 +453,8 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
         const optimisticIsSaved = !previousIsSaved;
         const saveDelta = optimisticIsSaved ? 1 : -1;
         const optimisticSavesCount = Math.max(0, previousSavesCount + saveDelta);
-        applyVideoCounterDelta(videoId, 'savesCount', saveDelta);
-
-        // Optimistic update
         unstable_batchedUpdates(() => {
+            applyVideoCounterDelta(videoId, 'savesCount', saveDelta);
             setVideosWithDescriptionOverrides((prevVideos) =>
                 prevVideos.map((video) => {
                     if (video.id === videoId) {
@@ -478,11 +475,10 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
             const finalSavesCount = Math.max(0, previousSavesCount + (serverIsSaved ? 1 : -1));
             const correctionDelta = finalSavesCount - optimisticSavesCount;
 
-            if (correctionDelta !== 0) {
-                applyVideoCounterDelta(videoId, 'savesCount', correctionDelta);
-            }
-
             unstable_batchedUpdates(() => {
+                if (correctionDelta !== 0) {
+                    applyVideoCounterDelta(videoId, 'savesCount', correctionDelta);
+                }
                 setVideosWithDescriptionOverrides((prevVideos) =>
                     prevVideos.map((video) => {
                         if (video.id === videoId) {
@@ -502,20 +498,21 @@ export function useVideoFeed(filterUserId?: string, pageSize: number = 10): UseV
             queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PROFILE(freshUserId) });
         } catch (err) {
             logError(LogCode.DB_UPDATE, 'Toggle save failed, reverting', err);
-            applyVideoCounterDelta(videoId, 'savesCount', -saveDelta);
-            // Rollback
-            setVideosWithDescriptionOverrides((prevVideos) =>
-                prevVideos.map((video) => {
-                    if (video.id === videoId) {
-                        return {
-                            ...video,
-                            isSaved: previousIsSaved,
-                            savesCount: previousSavesCount,
-                        };
-                    }
-                    return video;
-                })
-            );
+            unstable_batchedUpdates(() => {
+                applyVideoCounterDelta(videoId, 'savesCount', -saveDelta);
+                setVideosWithDescriptionOverrides((prevVideos) =>
+                    prevVideos.map((video) => {
+                        if (video.id === videoId) {
+                            return {
+                                ...video,
+                                isSaved: previousIsSaved,
+                                savesCount: previousSavesCount,
+                            };
+                        }
+                        return video;
+                    })
+                );
+            });
         } finally {
             pendingSaveVideoIdsRef.current.delete(videoId);
         }

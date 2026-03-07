@@ -68,7 +68,7 @@ Beklenen aktif kayıtlar:
 - `github` (yalnızca `GITHUB_PERSONAL_ACCESS_TOKEN` varsa)
 - `supabase-mcp-server` (yalnızca `SUPABASE_MCP_ACCESS_TOKEN` varsa)
 - `postgres` (yalnızca `POSTGRES_MCP_URL` varsa)
-- `netlify`
+- `netlify` (yalnızca `NETLIFY_MCP_ENABLED` varsa)
 
 Not:
 - Artık önerilen yol `codex mcp add ...` ile tek tek kayıt açmak değil.

@@ -4,7 +4,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { Volume2, VolumeX, MoreVertical, Plus, MapPinCheckInside } from 'lucide-react-native';
-import VideoPlayer, { ViewType, type OnLoadData, type OnLoadStartData, type OnProgressData, type OnVideoErrorData } from 'react-native-video';
+import VideoPlayer, { SelectedTrackType, ViewType, type OnLoadData, type OnLoadStartData, type OnProgressData, type OnVideoErrorData } from 'react-native-video';
 import type { NetInfoStateType } from '@react-native-community/netinfo';
 import { getVideoUrl } from '../../../core/utils/videoUrl';
 import { Video as VideoEntity } from '../../../domain/entities/Video';
@@ -224,8 +224,12 @@ const VideoMediaLayer = React.memo(function VideoMediaLayer({
                     repeat={false}
                     paused={!shouldPlayVideo}
                     muted={isMuted}
+                    selectedAudioTrack={isMuted ? { type: SelectedTrackType.DISABLED } : undefined}
                     playInBackground={false}
                     playWhenInactive={false}
+                    ignoreSilentSwitch="ignore"
+                    mixWithOthers={isMuted ? 'mix' : undefined}
+                    disableFocus={isMuted}
                     progressUpdateInterval={progressUpdateIntervalMs}
                     onLoadStart={onVideoLoadStart}
                     onLoad={onVideoLoad}
@@ -1335,12 +1339,13 @@ export const InfiniteFeedCard = React.memo(function InfiniteFeedCard({
                                         event.stopPropagation?.();
                                         handleToggleMute();
                                     }}
-                                    hitSlop={15}
+                                    hitSlop={18}
+                                    pressRetentionOffset={18}
                                 >
                                     {isMuted ? (
-                                        <VolumeX size={18} color="#FFFFFF" strokeWidth={1.6} />
+                                        <VolumeX size={20} color="#FFFFFF" strokeWidth={1.8} />
                                     ) : (
-                                        <Volume2 size={18} color="#FFFFFF" strokeWidth={1.6} />
+                                        <Volume2 size={20} color="#FFFFFF" strokeWidth={1.8} />
                                     )}
                                 </Pressable>
                             </View>
@@ -1698,9 +1703,9 @@ const styles = StyleSheet.create({
         zIndex: 6,
     },
     volumeButton: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
+        width: 38,
+        height: 38,
+        borderRadius: 19,
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: 'rgba(0,0,0,0.50)',

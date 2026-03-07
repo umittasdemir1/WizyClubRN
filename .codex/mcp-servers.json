@@ -105,8 +105,11 @@
         "-y",
         "@netlify/mcp"
       ],
+      "requiresEnv": [
+        "NETLIFY_MCP_ENABLED"
+      ],
       "optional": true,
-      "description": "Netlify MCP server."
+      "description": "Netlify MCP server enabled only when NETLIFY_MCP_ENABLED exists."
     }
   ]
 }
