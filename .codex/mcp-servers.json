@@ -110,6 +110,24 @@
       ],
       "optional": true,
       "description": "Netlify MCP server enabled only when NETLIFY_MCP_ENABLED exists."
+    },
+    {
+      "name": "doppler",
+      "type": "command",
+      "description": "Official Doppler MCP server for secret management",
+      "optional": true,
+      "sourceUrl": "https://github.com/DopplerHQ/mcp-server",
+      "requiresEnv": [
+        "DOPPLER_TOKEN"
+      ],
+      "command": {
+        "default": "npx",
+        "win32": "npx.cmd"
+      },
+      "args": [
+        "-y",
+        "@dopplerhq/mcp-server"
+      ]
     }
   ]
 }

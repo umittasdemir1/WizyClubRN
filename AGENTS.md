@@ -11,6 +11,7 @@ This repo is a multi-package workspace:
 ## Build, Test, and Development Commands
 Run from repo root:
 - `cp .env.example .env && bash scripts/sync-env.sh all`: generate `backend/.env`, `mobile/.env`, and `r2-mcp/.env`.
+- `node scripts/update-env-from-doppler.js`: refresh root `.env` from Doppler and regenerate package env files.
 - `npm --prefix backend ci`: install backend dependencies.
 - `npm --prefix backend run start`: start backend server.
 - `npm --prefix backend run test:all`: run Node test runner + Jest suites.
@@ -40,6 +41,7 @@ Run from repo root:
 ## Security & Configuration Tips
 - Never commit `.env`, credential JSON files, or raw keys.
 - Use root `.env` as source of truth; regenerate app envs via `bash scripts/sync-env.sh all`.
+- For multi-machine env sync, prefer Doppler as the shared source of truth and use `node scripts/update-env-from-doppler.js`.
 - Treat `r2-mcp/` credentials/config as sensitive local tooling and sanitize before sharing.
 
 ## Agent Hierarchy

@@ -7,6 +7,7 @@ Available skills:
 - `codex-mcp-cross-env`
 - `docs-navigator`
 - `env-sync-release`
+- `doppler-env-sync`
 - `mcp-researcher`
 - `mobile-feed-perf`
 - `r2-mcp-ops`

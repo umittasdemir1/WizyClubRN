@@ -118,6 +118,103 @@ Telegram wrapper env'leri:
 - `CODEX_TELEGRAM_BOT_TOKEN`
 - `CODEX_TELEGRAM_CHAT_ID`
 
+Doppler env sync env'leri:
+- `DOPPLER_TOKEN`
+- `DOPPLER_PROJECT`
+- `DOPPLER_CONFIG`
+
+## Doppler Env Sync
+
+Bu repoda iki farkli sey vardir:
+- `doppler` MCP: Codex'in Doppler API tool'larini kullanmasi icin
+- `doppler-env-sync` skill + `scripts/update-env-from-doppler.js`: root `.env` ve package `.env` dosyalarini Doppler'dan cekip yerelde uretmek icin
+
+Source of truth kuralı:
+- paylasilan secret kaynagi Doppler'dir
+- root `.env` local cache'tir
+- `backend/.env`, `mobile/.env`, `r2-mcp/.env` root `.env`'den uretilen turev dosyalardir
+
+Tek komut:
+
+```bash
+node scripts/update-env-from-doppler.js
+```
+
+Bu komut su isi yapar:
+- `DOPPLER_TOKEN`, `DOPPLER_PROJECT`, `DOPPLER_CONFIG` degerlerini root `.env`'den okur
+- Doppler API'den root `.env` iceriğini indirir
+- `DOPPLER_*` anahtarlarini yerelde korur
+- `backend/.env`, `mobile/.env`, `r2-mcp/.env` dosyalarini native JS ile yeniden uretir
+- root `.env` icin `.bak.<timestamp>` yedegi birakir
+
+Onemli not:
+- Bu akis artik `doppler` CLI veya `bash scripts/sync-env.sh all` bagimliligi istemez
+- yani Windows PowerShell oturumunda da dogrudan calisir
+
+## Doppler Bootstrap Kaydi
+
+2026-03-08 tarihinde su durum olusturuldu:
+- official `doppler` MCP managed config'e eklendi
+- `.codex/skills/doppler-env-sync/` skill'i eklendi
+- `scripts/update-env-from-doppler.js` yazildi
+- Doppler tarafinda `wizyclub` project'i olusturuldu
+- `dev` config'i kullanildi
+- mevcut local root `.env` degerleri ilk kez Doppler'a yollandı
+- ilk pull sync basarili calisti
+- izole ikinci makine simulasyonu `.tmp_doppler_second_machine_test/` icinde basarili calisti
+- sadece `DOPPLER_TOKEN`, `DOPPLER_PROJECT`, `DOPPLER_CONFIG` ile root ve package `.env` dosyalari yeniden uretildi
+
+Ilk bootstrap'tan sonra yeni makinede gerekenler:
+1. Root `.env` icine sadece minimum Doppler bootstrap anahtarlarini yaz:
+   `DOPPLER_TOKEN`, `DOPPLER_PROJECT`, `DOPPLER_CONFIG`
+2. Sonra tek komut calistir:
+
+```bash
+node scripts/update-env-from-doppler.js
+```
+
+Beklenen:
+- root `.env` Doppler'dan dolar
+- package `.env` dosyalari ayni oturumda uretilir
+
+## Firebase Studio Sifir Sorun Checklist
+
+Firebase Studio'da yeni workspace acildiginda su sirayi uygula:
+
+1. Root `.env` dosyasini olustur ve doldur:
+
+```bash
+cp .env.example .env
+```
+
+2. En azindan bu anahtarlarin bos olmadigini dogrula:
+- `R2_ACCOUNT_ID`
+- `R2_ACCESS_KEY_ID`
+- `R2_SECRET_ACCESS_KEY`
+
+3. Once dry-run benzeri kontrol calistir:
+
+```bash
+node scripts/bootstrap-codex-mcp.js --check-only --no-list
+node scripts/install-codex-shell-integration.js --check-only
+```
+
+4. Sonra gercek kurulum:
+
+```bash
+node scripts/install-codex-shell-integration.js
+node scripts/bootstrap-codex-mcp.js
+```
+
+5. Yeni terminal ac, sonra:
+
+```bash
+type codex
+codex mcp list
+```
+
+Bu akista amac, kurulumdan once eksikleri yakalayip Firebase tarafinda ilk acilista hata olasiligini dusurmektir.
+
 ## Windows Kurulum
 
 Hedef:
@@ -142,6 +239,12 @@ Eger backend/mobile env dosyalarini da kok `.env`'den uretmek istiyorsan ve Git 
 bash scripts/sync-env.sh all
 ```
 
+PowerShell'de `bash` PATH'te degilse su fallback komutu kullan:
+
+```powershell
+& "C:\\Program Files\\Git\\bin\\bash.exe" scripts/sync-env.sh all
+```
+
 Windows'ta installer sunlari yapar:
 - PowerShell Core profilini gunceller
 - Windows PowerShell profilini gunceller
@@ -158,6 +261,21 @@ Bu durumda iki secenek vardir:
 Windows'ta kurulumdan sonra:
 - yeni terminal ac
 - `codex mcp list` calistir
+
+PowerShell profilinin yuklenebilmesi icin (bir kez) execution policy su sekilde olmalidir:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+```
+
+Kontrol:
+
+```powershell
+Get-ExecutionPolicy -List
+```
+
+Beklenen:
+- `CurrentUser` degeri `RemoteSigned`
 
 Beklenen sonuc:
 - `codex` komutu wrapper uzerinden gelir
@@ -249,6 +367,7 @@ Kurulumdan sonra:
 - yeni terminal ac
 - `type codex`
 - `codex mcp list`
+- terminali yeniden acamiyorsan gecici olarak `source ~/.bashrc` calistir
 
 Beklenen sonuc:
 - `codex is a function` veya esdeger wrapper tanimi gorunur
@@ -384,7 +503,12 @@ Eger hala sorun varsa:
 - `doctor-codex-mcp` `Managed MCP block is missing` diyorsa setup bu makinede calismamistir
 - Windows `cmd.exe` kullaniyorsan kalici alias bekleme; `scripts\\codex-with-mcp.cmd` kullan
 - `bash scripts/sync-env.sh all` Windows'ta calismiyorsa Git Bash veya WSL kullan
+- PowerShell'de `running scripts is disabled on this system` gorursen `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned` calistirip terminali yeniden ac
+- PowerShell `bash` komutunu bulamiyorsa `& "C:\\Program Files\\Git\\bin\\bash.exe" scripts/sync-env.sh all` ile devam et
 - `node` veya `npx` yoksa once lokal Node.js kurulumunu duzelt
+- Firebase/Linux'ta `Root .env not found` alirsan `cp .env.example .env` ile dosyayi olusturup gerekli R2 anahtarlarini doldur
+- Firebase/Linux'ta `codex: command not found` alirsan once Codex CLI kurulumunu dogrula; gecici olarak `bash scripts/codex-with-mcp.sh` ile wrapper akisini test et
+- Firebase/Linux'ta shell entegrasyonu kurulup `type codex` hala function gostermuyorsa yeni terminal ac veya `source ~/.bashrc` calistir
 
 ## Operasyon Kurali
 
