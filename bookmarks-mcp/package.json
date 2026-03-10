@@ -1,0 +1,10 @@
+{
+  "name": "bookmarks-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "test": "node --test *.test.js",
+    "smoke": "node smoke-test.js"
+  }
+}

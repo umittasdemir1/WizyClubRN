@@ -1,0 +1,16 @@
+{
+  "name": "x-bookmarks-local",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local X bookmarks importer and viewer powered by Playwright",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/server.js",
+    "import": "node src/cli-import.js",
+    "test": "node --test tests/*.test.js",
+    "browser:install": "npx playwright install chromium"
+  },
+  "dependencies": {
+    "playwright": "^1.50.0"
+  }
+}

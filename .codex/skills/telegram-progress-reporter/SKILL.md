@@ -41,6 +41,8 @@ Prefer short checkpoint-style Telegram updates over raw terminal streaming.
 - Mention the affected scope or package.
 - Mention command/result only when it changes confidence.
 - Prefer `ok`, `fail`, and `info`.
+- Write Telegram summaries in Turkish.
+- Use Turkey time for any explicit time reference.
 - Do not paste source code into Telegram by default.
 
 ## Commands

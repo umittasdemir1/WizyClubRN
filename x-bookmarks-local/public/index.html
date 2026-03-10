@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>X Bookmarks Local</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <main class="app-shell">
+        <section class="hero-panel">
+            <div class="hero-copy">
+                <p class="eyebrow">Local Bookmark Vault</p>
+                <h1>X bookmarks, tek sayfa, local.</h1>
+                <p class="hero-text">
+                    Cloud workspace icinde browser-import ile bookmarklarini topla,
+                    tek sayfada ara. Headless login burada opsiyonel kalir.
+                </p>
+            </div>
+            <div class="panel-stack">
+                <section class="hero-actions">
+                    <p class="panel-title">1. Headless Login (optional)</p>
+                    <label class="input-stack" for="auth-username">
+                        <span>X email / username</span>
+                        <input id="auth-username" type="text" autocomplete="username">
+                    </label>
+                    <label class="input-stack" for="auth-password">
+                        <span>Password</span>
+                        <input id="auth-password" type="password" autocomplete="current-password">
+                    </label>
+                    <label class="input-stack" for="auth-secondary">
+                        <span>Secondary identifier (optional)</span>
+                        <input id="auth-secondary" type="text" placeholder="username / phone">
+                    </label>
+                    <label class="input-stack" for="auth-code">
+                        <span>Verification code (optional)</span>
+                        <input id="auth-code" type="text" placeholder="2FA code">
+                    </label>
+                    <div class="action-row">
+                        <button id="auth-login-button" class="primary-button" type="button">Login & Save Session</button>
+                        <button id="auth-clear-button" class="secondary-button" type="button">Clear Session</button>
+                    </div>
+                    <p id="auth-message" class="hint">Session yok.</p>
+                </section>
+
+                <section class="hero-actions">
+                    <p class="panel-title">2. Headless Import</p>
+                    <label class="input-stack" for="max-items">
+                        <span>Max import</span>
+                        <input id="max-items" type="number" min="10" step="10" value="400">
+                    </label>
+                    <button id="import-button" class="primary-button" type="button">Import from X</button>
+                    <p class="hint">Import, kayitli session ile headless calisir.</p>
+                </section>
+
+                <section class="hero-actions">
+                    <p class="panel-title">Recommended: Browser Import</p>
+                    <p class="hint">
+                        X headless login cloud ortaminda hata verirse, asagidaki scripti X bookmarks
+                        sayfasi acikken browser console'una yapistir. Acik oturumundaki bookmarklari
+                        bu workspace'e yollar.
+                    </p>
+                    <textarea id="browser-script" class="script-box" readonly></textarea>
+                    <button id="copy-script-button" class="secondary-button" type="button">Copy Browser Script</button>
+                </section>
+            </div>
+        </section>
+
+        <section class="toolbar-panel">
+            <label class="search-field" for="search-input">
+                <span>Search</span>
+                <input id="search-input" type="search" placeholder="ai coding, agents, rag...">
+            </label>
+            <div class="stats-grid">
+                <article class="stat-card">
+                    <span class="stat-label">Stored</span>
+                    <strong id="stored-count">0</strong>
+                </article>
+                <article class="stat-card">
+                    <span class="stat-label">Last import</span>
+                    <strong id="last-import-count">0</strong>
+                </article>
+                <article class="stat-card">
+                    <span class="stat-label">Status</span>
+                    <strong id="status-phase">Idle</strong>
+                </article>
+            </div>
+        </section>
+
+        <section class="status-panel">
+            <p id="status-message">Ready.</p>
+            <p id="status-meta" class="status-meta"></p>
+        </section>
+
+        <section id="bookmark-list" class="bookmark-grid"></section>
+    </main>
+
+    <template id="bookmark-template">
+        <article class="bookmark-card">
+            <div class="bookmark-topline">
+                <div>
+                    <p class="author-name"></p>
+                    <p class="author-handle"></p>
+                </div>
+                <a class="open-link" target="_blank" rel="noreferrer">Open on X</a>
+            </div>
+            <p class="bookmark-text"></p>
+            <div class="bookmark-meta">
+                <span class="created-at"></span>
+                <span class="external-count"></span>
+            </div>
+        </article>
+    </template>
+
+    <script src="/app.js"></script>
+</body>
+</html>

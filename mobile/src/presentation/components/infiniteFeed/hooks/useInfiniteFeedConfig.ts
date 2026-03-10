@@ -22,7 +22,7 @@ export const INFINITE_FEED_FLAGS = {
     /** Disable description text */
     INF_DISABLE_DESCRIPTION: false,
     /** Disable action button animations (particle burst, heartbeat) */
-    INF_DISABLE_ACTION_ANIMATIONS: false,
+    INF_DISABLE_ACTION_ANIMATIONS: true,
     /** Disable header tabs (Senin Icin / Takip) */
     INF_DISABLE_HEADER_TABS: false,
     /** Disable thumbnail/poster display during video loading */

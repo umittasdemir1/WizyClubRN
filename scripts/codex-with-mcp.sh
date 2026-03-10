@@ -5,5 +5,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 cd "$REPO_ROOT"
+node scripts/prompt-doppler-sync.js
 node scripts/bootstrap-codex-mcp.js --no-list
 exec codex "$@"

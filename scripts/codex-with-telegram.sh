@@ -6,6 +6,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 NOTIFIER="node .codex/skills/telegram-progress-reporter/scripts/telegram_progress_notifier.js"
 
 cd "$REPO_ROOT"
+node scripts/prompt-doppler-sync.js
 node scripts/bootstrap-codex-mcp.js --no-list
 
 SESSION_ID="$($NOTIFIER start --print-session-id)"

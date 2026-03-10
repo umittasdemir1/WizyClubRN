@@ -1,0 +1,46 @@
+{
+  "openaiDeveloperDocs": {
+    "type": "url",
+    "url": "https://developers.openai.com/mcp"
+  },
+  "filesystem": {
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]
+  },
+  "r2-local": {
+    "type": "stdio",
+    "command": "node",
+    "args": ["./r2-mcp/custom-r2-server.js"]
+  },
+  "github": {
+    "type": "stdio",
+    "command": "node",
+    "args": ["./scripts/mcp/github-wrapper.js"]
+  },
+  "supabase-mcp-server": {
+    "type": "stdio",
+    "command": "node",
+    "args": ["./scripts/mcp/supabase-wrapper.js"]
+  },
+  "postgres": {
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-postgres"]
+  },
+  "netlify": {
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "@netlify/mcp"]
+  },
+  "doppler": {
+    "type": "stdio",
+    "command": "node",
+    "args": ["./scripts/mcp/doppler-wrapper.js"]
+  },
+  "bookmarks-local": {
+    "type": "stdio",
+    "command": "node",
+    "args": ["./scripts/mcp/bookmarks-wrapper.js"]
+  }
+}

@@ -43,6 +43,8 @@ Run from repo root:
 - Use root `.env` as source of truth; regenerate app envs via `bash scripts/sync-env.sh all`.
 - For multi-machine env sync, prefer Doppler as the shared source of truth and use `node scripts/update-env-from-doppler.js`.
 - Treat `r2-mcp/` credentials/config as sensitive local tooling and sanitize before sharing.
+- If the user says they created, rotated, or updated a key/token/API secret in Doppler during chat, ask one short confirmation question and, on confirmation, run `node scripts/update-env-from-doppler.js`.
+- If sending Telegram progress/checkpoint messages for this repo, keep the message body in Turkish and use Turkey time for explicit timestamps.
 
 ## Agent Hierarchy
 - Root `AGENTS.md` defines repo-wide defaults.

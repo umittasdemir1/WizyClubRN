@@ -9,6 +9,7 @@ description: Use when root .env must be refreshed from Doppler and immediately p
 - You switch between two machines and want the same env quickly.
 - Root `.env` drifted and should be replaced from Doppler as source of truth.
 - You need one command that both updates root `.env` and runs package env sync.
+- The user says they added, rotated, or edited a key/token/API secret in Doppler and wants local env files refreshed.
 
 ## Preconditions
 - `DOPPLER_TOKEN` is available in root `.env` or passed with `--token`.
@@ -18,6 +19,12 @@ description: Use when root .env must be refreshed from Doppler and immediately p
 1. Pull root `.env` from Doppler with the helper command.
 2. Automatically regenerate `backend/.env`, `mobile/.env`, and `r2-mcp/.env` unless `--no-sync` is requested.
 3. Validate the generated package env files before running app/test commands.
+4. If the user says they already changed Doppler secrets, ask one short confirmation question and then run sync immediately on confirmation.
+
+## Confirmation rule
+- Ask only one short question: `Doppler'a yazdin mi? Evetse simdi sync calistirayim.`
+- If the user confirms, run `node scripts/update-env-from-doppler.js` directly.
+- Do not ask for individual key names unless the sync fails.
 
 ## Commands
 - `node scripts/update-env-from-doppler.js --project <project> --config <config>`

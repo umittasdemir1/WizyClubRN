@@ -6,6 +6,8 @@ Bu dokuman, OpenAI Codex CLI kullanan iki hedef ortam icin yazildi:
 
 Durum:
 - Bu akis 2026-03-07 tarihinde Firebase Studio uzerinde dogrulandi.
+- 2026-03-08 tarihinde Doppler env sync akisi ve official `doppler` MCP kaydi eklendi.
+- 2026-03-10 tarihinde Telegram `.env.bak` backup akisi sadeleştirildi; backup dosyalari Telegram'a plaintext document olarak gider ve restore icin ek key gerekmez.
 - Windows tarafi icin gerekli scriptler ve kalici shell entegrasyonu repoya eklendi.
 - Ama her makinede tek seferlik kurulum yine o makinenin icinde yapilmalidir.
 
@@ -46,6 +48,13 @@ Otomatik bootstrap + Telegram bildirimli Codex acilisi:
 Kalici shell entegrasyonu:
 - tum destekli shell'ler icin: `node scripts/install-codex-shell-integration.js`
 
+2026-03-10 itibariyla wrapper startup davranisi:
+- `codex` veya `codex-with-*` acilisinda Doppler bootstrap hazirsa once kisa bir soru gorunur
+- soru: `Doppler'a yeni key/token/api girdin mi? Sync calistirayim mi? [e/H]`
+- `e` dersen `node scripts/update-env-from-doppler.js` otomatik calisir
+- sonra normal MCP bootstrap ve Codex acilisi devam eder
+- bu prompt'u kapatmak istersen root `.env` icine `CODEX_DOPPLER_SYNC_PROMPT=0` yazabilirsin
+
 ## Telegram Wrapper Ne Zaman Calisir
 
 Bu repoda 3 farkli acilis davranisi vardir:
@@ -57,6 +66,7 @@ Telegram wrapper'in anlami:
 - oturum baslangicinda Telegram mesaji gonderir
 - oturum bitisinde final ozet gonderir
 - Linux/Firebase Studio tarafinda periyodik workspace ozeti de gonderir
+- `update-env-from-doppler` kullanilirsa eski root `.env` kopyasini Telegram'a plaintext document olarak da yollayabilir
 
 Onemli not:
 - shell entegrasyonu kuruluysa ve `CODEX_TELEGRAM_ENABLED=1` ise plain `codex` da otomatik Telegram bildirimi ile acilir
@@ -64,6 +74,7 @@ Onemli not:
 - shell entegrasyonu yoksa plain `codex` normal Codex binary'sini acar; otomatik Telegram bildirimi gelmez
 - `codex-with-mcp` kullanirsan otomatik Telegram bildirimi gelmez
 - buna ragmen ajan, oturum sirasinda acikca "Telegram'a gonder" diye yonlendirilirse manuel mesaj yine yollayabilir
+- Telegram backup akisi plaintext oldugu icin dosya icindeki secret'lar Telegram document olarak saklanir; bu bilincli bir tradeoff'tur
 
 ## Platform Matrisi
 
@@ -88,6 +99,7 @@ Env varsa aktif olabilecek opsiyoneller:
 - `supabase-mcp-server`
 - `postgres`
 - `netlify`
+- `doppler`
 
 R2 icin managed config'in isaret etmesi gereken dogru server:
 - `r2-mcp/custom-r2-server.js`
@@ -112,11 +124,16 @@ Opsiyonel MCP env'leri:
 - `SUPABASE_MCP_ACCESS_TOKEN`
 - `POSTGRES_MCP_URL`
 - `NETLIFY_MCP_ENABLED`
+- `DOPPLER_TOKEN`
 
 Telegram wrapper env'leri:
 - `CODEX_TELEGRAM_ENABLED=1`
 - `CODEX_TELEGRAM_BOT_TOKEN`
 - `CODEX_TELEGRAM_CHAT_ID`
+- `CODEX_DOPPLER_SYNC_PROMPT=0` sadece startup sorusunu kapatmak istersen
+
+Opsiyonel Telegram backup env'leri:
+- `CODEX_TELEGRAM_BACKUP_ENABLED=1`
 
 Doppler env sync env'leri:
 - `DOPPLER_TOKEN`
@@ -146,10 +163,23 @@ Bu komut su isi yapar:
 - `DOPPLER_*` anahtarlarini yerelde korur
 - `backend/.env`, `mobile/.env`, `r2-mcp/.env` dosyalarini native JS ile yeniden uretir
 - root `.env` icin `.bak.<timestamp>` yedegi birakir
+- Telegram backup akisi aktifse bu `.bak` dosyasini Telegram'a yollar ve local kopyayi siler
 
 Onemli not:
 - Bu akis artik `doppler` CLI veya `bash scripts/sync-env.sh all` bagimliligi istemez
 - yani Windows PowerShell oturumunda da dogrudan calisir
+- backup'i acmak icin restore komutu kullanilir; ek key gerekmez
+
+Telegram backup restore komutu:
+
+```bash
+node .codex/skills/telegram-progress-reporter/scripts/telegram_progress_notifier.js restore-backup
+node .codex/skills/telegram-progress-reporter/scripts/telegram_progress_notifier.js restore-backup --backup-id <id> --output <path>
+```
+
+Not:
+- 2026-03-10 ve sonrasinda olusan backup'lar plaintext formatta archive edilir ve dogrudan restore edilir
+- daha eski encrypted legacy backup kayitlari varsa `restore-backup` bunlari acmaz; once yeni bir plaintext backup olusmasi gerekir
 
 ## Doppler Bootstrap Kaydi
 
@@ -231,6 +261,13 @@ Windows'ta bir kez calistir:
 git pull origin main
 node scripts/install-codex-shell-integration.js
 node scripts/bootstrap-codex-mcp.js
+```
+
+Iki makinede de birebir ayni env istiyorsan ve root `.env` icinde
+`DOPPLER_TOKEN`, `DOPPLER_PROJECT`, `DOPPLER_CONFIG` tanimliysa tercih edilen komut:
+
+```powershell
+node scripts/bootstrap-codex-mcp.js --full-env-sync
 ```
 
 Eger backend/mobile env dosyalarini da kok `.env`'den uretmek istiyorsan ve Git Bash varsa:
@@ -352,6 +389,13 @@ node scripts/install-codex-shell-integration.js
 node scripts/bootstrap-codex-mcp.js
 ```
 
+Iki makinede de birebir ayni env istiyorsan ve root `.env` icinde
+`DOPPLER_TOKEN`, `DOPPLER_PROJECT`, `DOPPLER_CONFIG` tanimliysa tercih edilen komut:
+
+```bash
+node scripts/bootstrap-codex-mcp.js --full-env-sync
+```
+
 Eger package env dosyalarini da tam senkronlamak istiyorsan:
 
 ```bash
@@ -388,11 +432,13 @@ Opsiyonel ekler:
 - `supabase-mcp-server` yalnizca `SUPABASE_MCP_ACCESS_TOKEN` varsa
 - `postgres` yalnizca `POSTGRES_MCP_URL` varsa
 - `netlify` yalnizca `NETLIFY_MCP_ENABLED` varsa
+- `doppler` yalnizca `DOPPLER_TOKEN` varsa
 
 Ornek:
 - hic opsiyonel env yoksa 3 MCP gorursun
 - `github` + `supabase-mcp-server` + `postgres` aciksa 6 MCP gorursun
 - `netlify` opt-in aciksa buna 1 tane daha eklenir
+- `doppler` da aciksa buna 1 tane daha eklenir
 
 ## Tek Komutluk Kisa Yollar
 
@@ -415,6 +461,12 @@ Tam env + MCP bootstrap icin:
 node scripts/bootstrap-codex-mcp.js --full-env-sync
 ```
 
+Bu komutun davranisi:
+- `DOPPLER_TOKEN`, `DOPPLER_PROJECT`, `DOPPLER_CONFIG` tam ise once `scripts/update-env-from-doppler.js` calisir
+- sonra `backend/.env`, `mobile/.env`, `r2-mcp/.env` ayni akista uretilir
+- Doppler bootstrap yoksa fallback olarak `bash scripts/sync-env.sh all` kullanilir
+- Telegram backup aktifse eski root `.env` icin `.bak.<timestamp>` dosyasi Telegram'a gonderilir ve local kopya silinir
+
 Codex'i wrapper ile tek seferlik acmak icin:
 - Linux/Firebase Studio: `bash scripts/codex-with-mcp.sh`
 - Windows: `scripts\\codex-with-mcp.cmd`
@@ -423,9 +475,14 @@ Codex'i Telegram wrapper ile tek seferlik acmak icin:
 - Linux/Firebase Studio: `bash scripts/codex-with-telegram.sh`
 - Windows: `scripts\\codex-with-telegram.cmd`
 
+Telegram'dan son `.env` backup'ini geri almak icin:
+- `node .codex/skills/telegram-progress-reporter/scripts/telegram_progress_notifier.js restore-backup`
+- `node .codex/skills/telegram-progress-reporter/scripts/telegram_progress_notifier.js restore-backup --backup-id <id> --output <path>`
+
 Shell entegrasyonu kuruluysa plain `codex` davranisi:
 - `CODEX_TELEGRAM_ENABLED=1` ise `scripts/codex-with-telegram.*`
 - aksi halde `scripts/codex-with-mcp.*`
+- her iki wrapper da acilista ayni Doppler sync sorusunu kullanir
 
 ## Installer Ne Yapar
 
@@ -453,6 +510,8 @@ Ortak kural:
 
 `node scripts/bootstrap-codex-mcp.js` su akisi calistirir:
 - ortami algilar: Windows, Linux, VSCode, Firebase Studio
+- `--full-env-sync` verildiyse ve Doppler bootstrap tam ise once root `.env` Doppler'dan yenilenir
+- `--full-env-sync` verildiyse ama Doppler bootstrap yoksa fallback olarak `scripts/sync-env.sh all` calistirilir
 - gerekirse `r2-mcp` bagimliliklarini kurar
 - `node scripts/setup-codex-mcp.js` calistirir
 - `node scripts/doctor-codex-mcp.js` calistirir
@@ -472,7 +531,7 @@ Telegram wrapper aktifse ek beklenen durum:
 - Linux/Firebase Studio tarafinda periyodik ozet mesajlari da gelir
 
 Opsiyonel durum:
-- `github`, `supabase-mcp-server`, `postgres` gorunmeyebilir
+- `github`, `supabase-mcp-server`, `postgres`, `netlify`, `doppler` gorunmeyebilir
 - bu normaldir; ilgili token veya URL tanimli degilse eklenmezler
 
 ## Sorun Giderme
@@ -501,6 +560,8 @@ codex mcp list
 
 Eger hala sorun varsa:
 - `doctor-codex-mcp` `Managed MCP block is missing` diyorsa setup bu makinede calismamistir
+- `node scripts/bootstrap-codex-mcp.js --full-env-sync` sirasinda `Doppler bootstrap is partial` gorursen root `.env` icinde `DOPPLER_TOKEN`, `DOPPLER_PROJECT`, `DOPPLER_CONFIG` anahtarlarini birlikte doldur
+- `restore-backup` sirasinda `unsupported legacy format` gorursen secilen backup 2026-03-10 oncesi eski encrypted akistan kalmadir; yeni bir plaintext backup olusturup onu kullan
 - Windows `cmd.exe` kullaniyorsan kalici alias bekleme; `scripts\\codex-with-mcp.cmd` kullan
 - `bash scripts/sync-env.sh all` Windows'ta calismiyorsa Git Bash veya WSL kullan
 - PowerShell'de `running scripts is disabled on this system` gorursen `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned` calistirip terminali yeniden ac

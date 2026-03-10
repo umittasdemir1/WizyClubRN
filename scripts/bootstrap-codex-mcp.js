@@ -2,7 +2,7 @@
 const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
-const { resolveConfigPath } = require("./lib/codex-mcp");
+const { readRootEnv, resolveConfigPath } = require("./lib/codex-mcp");
 
 const repoRoot = path.resolve(__dirname, "..");
 const rootEnvPath = path.join(repoRoot, ".env");
@@ -13,6 +13,7 @@ const requiredR2Modules = [
     path.join(r2NodeModulesPath, "@aws-sdk", "client-s3"),
     path.join(r2NodeModulesPath, "@modelcontextprotocol", "sdk")
 ];
+const dopplerBootstrapKeys = ["DOPPLER_TOKEN", "DOPPLER_PROJECT", "DOPPLER_CONFIG"];
 
 function parseArgs(argv) {
     return {
@@ -152,16 +153,45 @@ function hasRequiredR2Modules() {
     return requiredR2Modules.every((modulePath) => fs.existsSync(modulePath));
 }
 
+function getMissingKeys(env, keys) {
+    return keys.filter((key) => !env[key] || !String(env[key]).trim());
+}
+
+function describeDopplerBootstrap(env) {
+    const missing = getMissingKeys(env, dopplerBootstrapKeys);
+    if (missing.length === 0) {
+        return "ready";
+    }
+
+    if (missing.length === dopplerBootstrapKeys.length) {
+        return "not-configured";
+    }
+
+    return `partial (missing: ${missing.join(", ")})`;
+}
+
 function maybeRunFullEnvSync(options) {
     if (!options.fullEnvSync) {
         return false;
     }
 
+    const env = readRootEnv(repoRoot);
+    const missingDopplerKeys = getMissingKeys(env, dopplerBootstrapKeys);
+    if (missingDopplerKeys.length === 0) {
+        runStep("refresh root env from Doppler and sync package envs", "node", ["scripts/update-env-from-doppler.js"]);
+        return true;
+    }
+
+    if (missingDopplerKeys.length < dopplerBootstrapKeys.length) {
+        throw new Error(`Cannot run full env sync: Doppler bootstrap is partial. Missing key(s): ${missingDopplerKeys.join(", ")}`);
+    }
+
     if (!commandExists("bash", ["--version"])) {
-        console.log("[codex-mcp-bootstrap] bash not found; skipping full env sync.");
+        console.log("[codex-mcp-bootstrap] Doppler bootstrap is not configured and bash is unavailable; skipping full env sync.");
         return false;
     }
 
+    console.log("[codex-mcp-bootstrap] Doppler bootstrap is not configured; falling back to scripts/sync-env.sh all.");
     runStep("sync root env into backend/mobile/r2-mcp", "bash", ["scripts/sync-env.sh", "all"]);
     return true;
 }
@@ -177,17 +207,26 @@ function ensurePreconditions() {
 }
 
 function inspectState() {
+    const dopplerBootstrap = fs.existsSync(rootEnvPath)
+        ? describeDopplerBootstrap(readRootEnv(repoRoot))
+        : "missing-root-env";
     const state = {
         rootEnv: fs.existsSync(rootEnvPath),
         r2Env: fs.existsSync(r2EnvPath),
         r2NodeModules: fs.existsSync(r2NodeModulesPath),
         r2Deps: hasRequiredR2Modules(),
         codexConfig: fs.existsSync(resolveConfigPath()),
+        dopplerBootstrap,
     };
 
     console.log("[codex-mcp-bootstrap] state");
     Object.entries(state).forEach(([key, value]) => {
-        console.log(`- ${key}: ${value ? "yes" : "no"}`);
+        if (typeof value === "boolean") {
+            console.log(`- ${key}: ${value ? "yes" : "no"}`);
+            return;
+        }
+
+        console.log(`- ${key}: ${value}`);
     });
 
     return state;

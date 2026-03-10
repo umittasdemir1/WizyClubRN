@@ -3,11 +3,13 @@
 const fs = require("fs");
 const https = require("https");
 const path = require("path");
+const { spawnSync } = require("child_process");
 const repoRoot = path.resolve(__dirname, "..");
 const rootEnvPath = path.join(repoRoot, ".env");
 const backendEnvPath = path.join(repoRoot, "backend", ".env");
 const mobileEnvPath = path.join(repoRoot, "mobile", ".env");
 const r2EnvPath = path.join(repoRoot, "r2-mcp", ".env");
+const telegramNotifierPath = path.join(repoRoot, ".codex", "skills", "telegram-progress-reporter", "scripts", "telegram_progress_notifier.js");
 
 function printHelp() {
     console.log(`Usage:
@@ -286,6 +288,28 @@ function timestamp() {
     return new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14);
 }
 
+function archiveBackupToTelegram(backupPath) {
+    if (!backupPath || !fs.existsSync(backupPath) || !fs.existsSync(telegramNotifierPath)) {
+        return;
+    }
+
+    console.log("[doppler-env-sync] archiving backup to Telegram");
+    const result = spawnSync("node", [telegramNotifierPath, "archive-backup", "--file", backupPath, "--delete-plain"], {
+        cwd: repoRoot,
+        stdio: "inherit",
+        env: process.env
+    });
+
+    if (result.error) {
+        console.warn(`[doppler-env-sync] warning: Telegram backup archive failed: ${result.error.message}`);
+        return;
+    }
+
+    if (result.status !== 0) {
+        console.warn(`[doppler-env-sync] warning: Telegram backup archive exited with code ${result.status}`);
+    }
+}
+
 async function run() {
     try {
         const options = parseArgs(process.argv.slice(2));
@@ -333,6 +357,10 @@ async function run() {
         if (!options.noSync) {
             console.log("[doppler-env-sync] syncing root env into backend/mobile/r2-mcp");
             syncPackageEnvFiles(parseDotEnv(rootEnvPath));
+        }
+
+        if (backupPath) {
+            archiveBackupToTelegram(backupPath);
         }
 
         console.log("[doppler-env-sync] done");

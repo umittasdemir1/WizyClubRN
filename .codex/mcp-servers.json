@@ -41,16 +41,11 @@
       "name": "github",
       "type": "command",
       "command": {
-        "default": "npx",
-        "win32": "npx.cmd"
+        "default": "node"
       },
       "args": [
-        "-y",
-        "@modelcontextprotocol/server-github"
+        "{workspace}/scripts/mcp/github-wrapper.js"
       ],
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "{env:GITHUB_PERSONAL_ACCESS_TOKEN}"
-      },
       "requiresEnv": [
         "GITHUB_PERSONAL_ACCESS_TOKEN"
       ],
@@ -61,14 +56,10 @@
       "name": "supabase-mcp-server",
       "type": "command",
       "command": {
-        "default": "npx",
-        "win32": "npx.cmd"
+        "default": "node"
       },
       "args": [
-        "-y",
-        "@supabase/mcp-server-supabase@latest",
-        "--access-token",
-        "{env:SUPABASE_MCP_ACCESS_TOKEN}"
+        "{workspace}/scripts/mcp/supabase-wrapper.js"
       ],
       "requiresEnv": [
         "SUPABASE_MCP_ACCESS_TOKEN"
@@ -121,13 +112,27 @@
         "DOPPLER_TOKEN"
       ],
       "command": {
-        "default": "npx",
-        "win32": "npx.cmd"
+        "default": "node"
       },
       "args": [
-        "-y",
-        "@dopplerhq/mcp-server"
+        "{workspace}/scripts/mcp/doppler-wrapper.js"
       ]
+    },
+    {
+      "name": "bookmarks-local",
+      "type": "command",
+      "command": {
+        "default": "node"
+      },
+      "args": [
+        "{workspace}/bookmarks-mcp/server.js"
+      ],
+      "requiresEnv": [
+        "SUPABASE_URL",
+        "SUPABASE_SERVICE_ROLE_KEY"
+      ],
+      "optional": true,
+      "description": "Supabase-backed bookmarks MCP server for search and lookup."
     }
   ]
 }

@@ -1,82 +1,172 @@
 # MCP & Skills Guide (WizyClubRN)
 
-Last updated: 2026-03-06
+Last updated: 2026-03-10
 
-Index: [MCP_SKILLS_INDEX.md](./MCP_SKILLS_INDEX.md) | Turkish version: [MCP_VE_SKILL_REHBERI_TR.md](./MCP_VE_SKILL_REHBERI_TR.md)
+Index: [MCP_SKILLS_INDEX.md](./MCP_SKILLS_INDEX.md) | Turkish: [MCP_VE_SKILL_REHBERI_TR.md](./MCP_VE_SKILL_REHBERI_TR.md) | Setup: [CODEX_MCP_CROSS_PLATFORM_RUNBOOK.md](./CODEX_MCP_CROSS_PLATFORM_RUNBOOK.md)
 
-This guide explains the MCP integrations and Codex skills currently available in this repository, with practical examples.
+This guide documents all MCP integrations and Codex skills available in this repository.
+Manifest: `.codex/mcp-servers.json`
+Skills directory: `.codex/skills/`
 
-## 1) Available MCP Integrations
+---
 
-### OpenAI Developer Docs MCP
-Use this when you need current, official OpenAI documentation and API contract details.
+## 1) MCP Integrations
 
-- Main tools:
-  - `search_openai_docs`: Search OpenAI docs pages.
-  - `list_openai_docs`: Browse docs index pages.
-  - `fetch_openai_doc`: Pull full markdown for a docs page/section.
-  - `list_api_endpoints`: List available OpenAI API endpoint URLs.
-  - `get_openapi_spec`: Get endpoint OpenAPI schema and code samples.
-- Typical use cases:
-  - Find the latest Responses API patterns.
-  - Compare model/tooling capabilities.
-  - Pull exact request/response fields for implementation.
-- Example prompts:
-  - "Use OpenAI docs MCP to find the latest Responses API streaming example in Node.js."
-  - "Fetch the OpenAPI spec for the Responses endpoint and summarize required fields."
+### Always Active (3)
 
-### R2 Local MCP
-Use this when working with Cloudflare R2 storage operations in local workflow.
+#### openaiDeveloperDocs
+Official OpenAI developer documentation access.
+- Type: URL-based (`https://developers.openai.com/mcp`)
+- Tools: `search_openai_docs`, `list_openai_docs`, `fetch_openai_doc`, `list_api_endpoints`, `get_openapi_spec`
+- Use for: Model selection, API specs, migration notes, code samples.
 
-- Main tools:
-  - `list_buckets`: List buckets.
-  - `list_objects`: List objects in a bucket (optional prefix filter).
-- Typical use cases:
-  - Verify that upload targets exist.
-  - Check object structure before cleanup or migrations.
-- Example prompts:
-  - "List all R2 buckets and then list objects under prefix `videos/` in `media-prod`."
-  - "Check whether `mobile/assets/` keys exist in the configured bucket."
+#### filesystem
+Workspace-scoped file system access.
+- Type: Command (`@modelcontextprotocol/server-filesystem`)
+- Tools: File read, write, list (workspace-bounded).
+- Use for: Safe agent access to repository files.
 
-## 2) Available Skills
+#### r2-local
+Cloudflare R2 storage operations.
+- Type: Command (`r2-mcp/custom-r2-server.js`)
+- Tools: `list_buckets`, `list_objects`
+- Required env: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`
+- Use for: Bucket verification, object structure checks, upload target validation.
 
-Skills are reusable workflows. Trigger them by naming the skill directly (for example, `use gh-fix-ci`) or by asking a matching task.
+### Optional (6 - active when env vars are set)
 
-| Skill | What It Is For | Example Request |
+| MCP | Implementation | Required Env | Use For |
+|---|---|---|---|
+| `github` | Local wrapper (`scripts/mcp/github-wrapper.js`) | `GITHUB_PERSONAL_ACCESS_TOKEN` | PR, issue, repo operations |
+| `supabase-mcp-server` | Local wrapper (`scripts/mcp/supabase-wrapper.js`) | `SUPABASE_MCP_ACCESS_TOKEN` | Supabase project management |
+| `postgres` | `@modelcontextprotocol/server-postgres` | `POSTGRES_MCP_URL` | Direct SQL queries, schema inspection |
+| `netlify` | `@netlify/mcp` | `NETLIFY_MCP_ENABLED` | Deploy status, site management |
+| `doppler` | Local wrapper (`scripts/mcp/doppler-wrapper.js`) | `DOPPLER_TOKEN` | Secret listing, project/config management |
+| `bookmarks-local` | `bookmarks-mcp/server.js` | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Bookmark search, X/Twitter bookmark data access |
+
+---
+
+## 2) Skills (16 total)
+
+Skills are reusable workflows. Trigger with `use <skill-name>` or by requesting a matching task.
+
+### Backend & API
+
+| Skill | Purpose | Example |
 |---|---|---|
-| `backend-guardrails` | Backend refactors/API changes with route-layer boundaries and mandatory backend test discipline. | "Use backend-guardrails and refactor `backend/routes/feed.js` without breaking layer boundaries." |
-| `docs-navigator` | Targeted retrieval from `docs/` for large documentation analysis tasks. | "Use docs-navigator to find all docs related to notification delivery architecture." |
-| `env-sync-release` | Environment variable changes, release prep, and env propagation checks across packages. | "Use env-sync-release to add a new env var and sync to backend/mobile/r2-mcp." |
-| `gh-address-comments` | Resolve review comments on the open GitHub PR with `gh` workflow. | "Use gh-address-comments to address unresolved PR review comments." |
-| `gh-fix-ci` | Investigate failing GitHub Actions checks, summarize failures, then implement fixes after approval. | "Use gh-fix-ci to analyze why backend-ci failed on this branch." |
-| `mobile-feed-perf` | Feed scroll/render/prefetch/video performance improvements in `mobile/`. | "Use mobile-feed-perf to reduce dropped frames in the home feed." |
-| `openai-docs` | Up-to-date, official guidance for OpenAI API/ChatGPT integrations with citations. | "Use openai-docs to choose the right model and show migration notes for Responses API." |
-| `r2-mcp-ops` | Safe Cloudflare R2 MCP operations with env-based preflight checks. | "Use r2-mcp-ops to validate bucket setup before bulk object move." |
-| `security-best-practices` | Security-focused best-practice review for JS/TS, Python, or Go code. | "Run security-best-practices on backend auth middleware and suggest hardening." |
-| `security-threat-model` | Repository-grounded threat modeling with abuse paths and mitigations. | "Use security-threat-model for `backend/routes` and output a concise threat model." |
-| `supabase-rpc-contract` | Verify mobile-to-backend RPC compatibility when RPC usage changes. | "Use supabase-rpc-contract to validate RPC names/params used by mobile feed datasource." |
-| `skill-creator` | Create or improve a Codex skill package (`SKILL.md`, structure, guidance). | "Use skill-creator to draft a new skill for Expo release checklist automation." |
-| `skill-installer` | Install skills from curated list or GitHub into Codex skills directory. | "Use skill-installer to list installable skills and install one for API documentation QA." |
-| `slides` | Build/edit/export presentation decks via artifact tooling. | "Use slides to generate a product architecture deck from docs/ content." |
-| `spreadsheets` | Build/edit/recalculate/export spreadsheets via artifact tooling. | "Use spreadsheets to create a test matrix for backend and mobile regression coverage." |
+| `backend-guardrails` | Enforces route-layer boundaries and mandatory test execution for backend changes. Runs `npm --prefix backend run test:all`. | "Use backend-guardrails to refactor feed.js." |
+| `supabase-rpc-contract` | Verifies mobile-to-backend RPC contract compatibility. Runs `npm --prefix backend run verify:mobile-rpcs`. | "Use supabase-rpc-contract to validate feed datasource RPC params." |
 
-## 3) Recommended Quick Flows
+### CI & GitHub
 
-1. CI is failing:
-   - Start with `gh-fix-ci`.
-   - After fix, run backend/mobile verification commands.
-2. You changed RPC endpoints:
-   - Use `supabase-rpc-contract`.
-   - Then run mobile type-check and backend tests.
-3. You need OpenAI integration updates:
-   - Use `openai-docs`.
-   - Pull exact docs section with `fetch_openai_doc`.
-4. You are preparing release env updates:
-   - Use `env-sync-release`.
-   - Re-sync `.env` and run smoke checks.
+| Skill | Purpose | Example |
+|---|---|---|
+| `gh-fix-ci` | Analyzes failing GitHub Actions checks, extracts failure logs, proposes fixes. Uses `scripts/inspect_pr_checks.py`. | "Use gh-fix-ci to analyze why backend-ci failed." |
+| `gh-address-comments` | Resolves PR review comments using gh CLI. Uses `scripts/fetch_comments.py`. | "Use gh-address-comments to address unresolved PR comments." |
 
-## 4) Notes
+### Env & Secret Management
 
-- Prefer skill workflows when task matches exactly; they encode project-specific guardrails.
+| Skill | Purpose | Example |
+|---|---|---|
+| `env-sync-release` | Syncs root `.env` to backend/mobile/r2-mcp packages. Uses `sync-env.sh` + `check-env.js`. | "Use env-sync-release to propagate a new env var." |
+| `doppler-env-sync` | Pulls root `.env` from Doppler and distributes to all packages. Uses `scripts/update-env-from-doppler.js`. Requires `DOPPLER_TOKEN`. | "Use doppler-env-sync to pull env from Doppler." |
+
+### Security
+
+| Skill | Purpose | Example |
+|---|---|---|
+| `security-threat-model` | Repository-grounded threat modeling with abuse paths and mitigations. Uses reference templates. | "Use security-threat-model for backend/routes threat model." |
+| `security-best-practices` | Language/framework-specific security review. 10 reference files covering JS/TS, Python, Go. | "Use security-best-practices to review auth middleware." |
+
+### Performance
+
+| Skill | Purpose | Example |
+|---|---|---|
+| `mobile-feed-perf` | Mobile feed scroll/render/prefetch/video performance. Runs TypeScript checks + optional perf baseline. | "Use mobile-feed-perf to reduce dropped frames in home feed." |
+
+### Documentation & Knowledge
+
+| Skill | Purpose | Example |
+|---|---|---|
+| `openai-docs` | Official OpenAI guidance with MCP integration + 3 reference files (model selection, GPT-5.4 migration). | "Use openai-docs for Responses API migration notes." |
+| `docs-navigator` | Targeted retrieval from `docs/` directory using ripgrep. | "Use docs-navigator to find notification architecture docs." |
+
+### Infrastructure & DevOps
+
+| Skill | Purpose | Example |
+|---|---|---|
+| `r2-mcp-ops` | R2 MCP preflight checks (env validation + syntax check). | "Use r2-mcp-ops to validate bucket setup." |
+| `codex-mcp-cross-env` | Cross-platform (Windows/Linux/Firebase Studio) MCP bootstrap, repair, and validation. | "Use codex-mcp-cross-env to verify MCP setup." |
+
+### Communication & Reporting
+
+| Skill | Purpose | Example |
+|---|---|---|
+| `telegram-progress-reporter` | Sends session progress, test outcomes, blockers to Telegram. Supports backup/restore. Requires `CODEX_TELEGRAM_BOT_TOKEN`, `CODEX_TELEGRAM_CHAT_ID`, `CODEX_TELEGRAM_ENABLED`. | "Send session summary to Telegram." |
+
+### Discovery & Research
+
+| Skill | Purpose | Example |
+|---|---|---|
+| `skills-researcher` | Discovers and imports third-party skills from `awesome-agent-skills` catalog. | "Use skills-researcher to find new available skills." |
+| `mcp-researcher` | Discovers and registers new MCP servers from official + community catalogs. | "Use mcp-researcher to search for a Stripe MCP." |
+
+---
+
+## 3) Quick Flows
+
+### CI is failing
+1. `gh-fix-ci` to analyze failure logs.
+2. `backend-guardrails` to verify fixes.
+
+### RPC changes made
+1. `supabase-rpc-contract` for compatibility check.
+2. Run mobile type-check + backend tests.
+
+### Env changes / New machine setup
+1. With Doppler: `doppler-env-sync` to pull.
+2. Without Doppler: `env-sync-release` to sync.
+3. Full setup: see [CODEX_MCP_CROSS_PLATFORM_RUNBOOK.md](./CODEX_MCP_CROSS_PLATFORM_RUNBOOK.md)
+
+### Security review
+1. Code-level: `security-best-practices`
+2. Architecture-level: `security-threat-model`
+
+### Performance issue
+1. `mobile-feed-perf` for measure-optimize-validate loop.
+
+### Discover new skills/MCPs
+1. Skills: `skills-researcher`
+2. MCPs: `mcp-researcher`
+
+---
+
+## 4) Environment Variables Summary
+
+| Variable | Required | Used By |
+|---|---|---|
+| `R2_ACCOUNT_ID` | Yes | r2-local MCP, r2-mcp-ops |
+| `R2_ACCESS_KEY_ID` | Yes | r2-local MCP, r2-mcp-ops |
+| `R2_SECRET_ACCESS_KEY` | Yes | r2-local MCP, r2-mcp-ops |
+| `GITHUB_PERSONAL_ACCESS_TOKEN` | Optional | github MCP |
+| `SUPABASE_MCP_ACCESS_TOKEN` | Optional | supabase-mcp-server MCP |
+| `POSTGRES_MCP_URL` | Optional | postgres MCP |
+| `NETLIFY_MCP_ENABLED` | Optional | netlify MCP |
+| `DOPPLER_TOKEN` | Optional | doppler MCP, doppler-env-sync |
+| `DOPPLER_PROJECT` | Optional | doppler-env-sync |
+| `DOPPLER_CONFIG` | Optional | doppler-env-sync |
+| `CODEX_TELEGRAM_ENABLED` | Optional | telegram-progress-reporter |
+| `CODEX_TELEGRAM_BOT_TOKEN` | Optional | telegram-progress-reporter |
+| `CODEX_TELEGRAM_CHAT_ID` | Optional | telegram-progress-reporter |
+| `SUPABASE_URL` | Optional | bookmarks-local MCP |
+| `SUPABASE_SERVICE_ROLE_KEY` | Optional | bookmarks-local MCP |
+
+---
+
+## 5) Notes for Agents
+
+- When a task matches a skill, prefer the skill-based workflow - it encodes project-specific guardrails.
 - For sensitive operations (env, secrets, storage), always run preflight checks first.
-- For backend changes, `npm --prefix backend run test:all` should be the default verification step.
+- Default backend verification step: `npm --prefix backend run test:all`.
+- MCP change process: update `.codex/mcp-servers.json` > update `.env.example` > verify with `bootstrap-codex-mcp.js`.
+- Each skill's `SKILL.md` is the canonical reference; this guide is a summary.

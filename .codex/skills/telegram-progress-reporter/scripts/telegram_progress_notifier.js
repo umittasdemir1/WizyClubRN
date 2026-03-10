@@ -8,6 +8,9 @@ const { execFileSync } = require("child_process");
 
 const REPO_ROOT = path.resolve(__dirname, "../../../..");
 const RUNTIME_DIR = path.join(REPO_ROOT, ".codex", "runtime", "telegram-progress-reporter");
+const CONTROL_STATE_PATH = path.join(RUNTIME_DIR, "backup-control.json");
+const RESTORE_DIR = path.join(RUNTIME_DIR, "restored");
+const MAX_BACKUP_ENTRIES = 50;
 
 function main() {
     const options = parseArgs(process.argv.slice(2));
@@ -40,6 +43,12 @@ async function run(command, options, config) {
         case "finish":
             await runFinish(options, config);
             return;
+        case "archive-backup":
+            await runArchiveBackup(options, config);
+            return;
+        case "restore-backup":
+            await runRestoreBackup(options, config);
+            return;
         default:
             throw new Error(`Unknown command: ${command}`);
     }
@@ -51,6 +60,8 @@ function printHelp() {
   node .codex/skills/telegram-progress-reporter/scripts/telegram_progress_notifier.js watch --session-id <id>
   node .codex/skills/telegram-progress-reporter/scripts/telegram_progress_notifier.js checkpoint --summary "..." [--scope repo] [--status ok] [--command "..."] [--file path]
   node .codex/skills/telegram-progress-reporter/scripts/telegram_progress_notifier.js finish [--session-id <id>] [--status ok]
+  node .codex/skills/telegram-progress-reporter/scripts/telegram_progress_notifier.js archive-backup --file <path> [--delete-plain] [--dry-run]
+  node .codex/skills/telegram-progress-reporter/scripts/telegram_progress_notifier.js restore-backup [--backup-id <id>] [--output <path>]
 
 Environment:
   CODEX_TELEGRAM_ENABLED=1
@@ -58,7 +69,8 @@ Environment:
   CODEX_TELEGRAM_CHAT_ID=...
   CODEX_TELEGRAM_PROJECT_NAME=WizyClubRN
   CODEX_TELEGRAM_MAX_FILES=6
-  CODEX_TELEGRAM_POLL_SECONDS=180`);
+  CODEX_TELEGRAM_POLL_SECONDS=180
+  CODEX_TELEGRAM_BACKUP_ENABLED=1`);
 }
 
 function parseArgs(argv) {
@@ -127,15 +139,20 @@ function loadConfig() {
     return {
         enabled: isTruthy(env.CODEX_TELEGRAM_ENABLED),
         botToken: env.CODEX_TELEGRAM_BOT_TOKEN || env.TELEGRAM_BOT_TOKEN || "",
-        chatId: env.CODEX_TELEGRAM_CHAT_ID || env.TELEGRAM_CHAT_ID || "",
+        chatId: String(env.CODEX_TELEGRAM_CHAT_ID || env.TELEGRAM_CHAT_ID || ""),
         projectName: env.CODEX_TELEGRAM_PROJECT_NAME || path.basename(REPO_ROOT),
         maxFiles: toPositiveInteger(env.CODEX_TELEGRAM_MAX_FILES, 6),
-        pollSeconds: toPositiveInteger(env.CODEX_TELEGRAM_POLL_SECONDS, 180)
+        pollSeconds: toPositiveInteger(env.CODEX_TELEGRAM_POLL_SECONDS, 180),
+        backupEnabled: isTruthy(env.CODEX_TELEGRAM_ENABLED) && !isExplicitFalse(env.CODEX_TELEGRAM_BACKUP_ENABLED)
     };
 }
 
 function isTruthy(value) {
     return ["1", "true", "yes", "on"].includes(String(value || "").trim().toLowerCase());
+}
+
+function isExplicitFalse(value) {
+    return ["0", "false", "no", "off"].includes(String(value || "").trim().toLowerCase());
 }
 
 function toPositiveInteger(value, fallback) {
@@ -223,6 +240,28 @@ function appendEvent(sessionId, event) {
     ensureRuntimeDir();
     const { logPath } = getSessionPaths(sessionId);
     fs.appendFileSync(logPath, `${JSON.stringify(event)}\n`, "utf8");
+}
+
+function createInitialControlState() {
+    return {
+        backups: []
+    };
+}
+
+function loadControlState() {
+    ensureRuntimeDir();
+    if (!fs.existsSync(CONTROL_STATE_PATH)) {
+        return createInitialControlState();
+    }
+    return JSON.parse(fs.readFileSync(CONTROL_STATE_PATH, "utf8"));
+}
+
+function saveControlState(state) {
+    ensureRuntimeDir();
+    const next = {
+        backups: Array.isArray(state.backups) ? state.backups.slice(0, MAX_BACKUP_ENTRIES) : []
+    };
+    fs.writeFileSync(CONTROL_STATE_PATH, `${JSON.stringify(next, null, 2)}\n`, "utf8");
 }
 
 function mergeTouchedFiles(state, files) {
@@ -369,7 +408,15 @@ function hashValue(value) {
 }
 
 function formatTimestamp(value) {
-    return new Date(value).toISOString().replace("T", " ").slice(0, 16) + " UTC";
+    return new Intl.DateTimeFormat("tr-TR", {
+        timeZone: "Europe/Istanbul",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false
+    }).format(new Date(value)) + " TSİ";
 }
 
 function formatDuration(secondsValue) {
@@ -381,12 +428,33 @@ function formatDuration(secondsValue) {
     const minutes = Math.floor(seconds / 60);
     const secondsRemainder = seconds % 60;
     if (minutes > 0 && secondsRemainder > 0) {
-        return `${minutes}m ${secondsRemainder}s`;
+        return `${minutes} dk ${secondsRemainder} sn`;
     }
     if (minutes > 0) {
-        return `${minutes}m`;
+        return `${minutes} dk`;
     }
-    return `${secondsRemainder}s`;
+    return `${secondsRemainder} sn`;
+}
+
+function localizeKind(kind) {
+    const labels = {
+        start: "başlangıç",
+        checkpoint: "güncelleme",
+        finish: "bitiş",
+        auto: "otomatik"
+    };
+
+    return labels[kind] || kind;
+}
+
+function localizeStatus(status) {
+    const labels = {
+        ok: "tamam",
+        fail: "hata",
+        info: "bilgi"
+    };
+
+    return labels[status] || status;
 }
 
 function formatMessage(options) {
@@ -405,43 +473,43 @@ function formatMessage(options) {
     } = options;
 
     const lines = [
-        `${config.projectName} | ${kind}`,
+        `${config.projectName} | ${localizeKind(kind)}`,
         formatTimestamp(new Date().toISOString()),
-        `Session: ${state.sessionId}`
+        `Oturum: ${state.sessionId}`
     ];
 
     if (summary) {
-        lines.push(`Summary: ${sanitizeText(summary)}`);
+        lines.push(`Özet: ${sanitizeText(summary)}`);
     }
     if (scope) {
-        lines.push(`Scope: ${sanitizeText(scope)}`);
+        lines.push(`Kapsam: ${sanitizeText(scope)}`);
     }
     if (status) {
-        lines.push(`Status: ${sanitizeText(status)}`);
+        lines.push(`Durum: ${sanitizeText(localizeStatus(status))}`);
     }
     if (command) {
-        lines.push(`Command: ${sanitizeText(command)}`);
+        lines.push(`Komut: ${sanitizeText(command)}`);
     }
 
     const duration = formatDuration(durationSeconds);
     if (duration) {
-        lines.push(`Duration: ${duration}`);
+        lines.push(`Süre: ${duration}`);
     }
 
-    lines.push(`Workspace diff: ${snapshot.files.length} files, +${snapshot.totalAdded}/-${snapshot.totalRemoved}`);
-    lines.push(`Session touched: ${state.touchedFiles.length} files`);
+    lines.push(`Çalışma alanı farkı: ${snapshot.files.length} dosya, +${snapshot.totalAdded}/-${snapshot.totalRemoved}`);
+    lines.push(`Oturumda dokunulan: ${state.touchedFiles.length} dosya`);
 
     const visibleFiles = explicitFiles.length > 0
         ? explicitFiles
         : sessionFiles.slice(0, config.maxFiles);
     if (visibleFiles.length > 0) {
-        lines.push("Files:");
+        lines.push("Dosyalar:");
         visibleFiles.slice(0, config.maxFiles).forEach((filePath) => {
             lines.push(`- ${filePath}`);
         });
         const hiddenCount = Math.max(sessionFiles.length - visibleFiles.length, 0);
         if (hiddenCount > 0 && explicitFiles.length === 0) {
-            lines.push(`- +${hiddenCount} more`);
+            lines.push(`- +${hiddenCount} daha`);
         }
     }
 
@@ -458,50 +526,154 @@ async function sendIfConfigured(config, text, dryRun) {
         return false;
     }
 
-    if (!config.botToken || !config.chatId) {
-        console.error("[telegram-progress] Telegram is enabled but bot token or chat id is missing.");
-        return false;
-    }
-
+    ensureTelegramReady(config);
     await sendTelegramMessage(config, text);
     return true;
 }
 
-function sendTelegramMessage(config, text) {
-    const body = JSON.stringify({
+function ensureTelegramReady(config) {
+    if (!config.enabled) {
+        throw new Error("Telegram is disabled.");
+    }
+    if (!config.botToken || !config.chatId) {
+        throw new Error("Telegram is enabled but bot token or chat id is missing.");
+    }
+}
+
+async function sendTelegramMessage(config, text, extraPayload = {}) {
+    return telegramJsonRequest(config, "sendMessage", {
         chat_id: config.chatId,
         text,
-        disable_web_page_preview: true
+        disable_web_page_preview: true,
+        ...extraPayload
+    });
+}
+
+async function sendTelegramDocument(config, options) {
+    return telegramMultipartRequest(config, "sendDocument", {
+        chat_id: config.chatId,
+        caption: options.caption || "",
+        disable_content_type_detection: "true"
+    }, {
+        fieldName: "document",
+        filename: options.filename,
+        contentType: options.contentType || "application/octet-stream",
+        data: options.data
+    });
+}
+
+async function telegramJsonRequest(config, methodName, payload) {
+    const body = JSON.stringify(payload || {});
+    const responseBody = await httpRequestBuffer(
+        `https://api.telegram.org/bot${config.botToken}/${methodName}`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Content-Length": Buffer.byteLength(body)
+            }
+        },
+        Buffer.from(body, "utf8")
+    );
+
+    let parsed;
+    try {
+        parsed = JSON.parse(responseBody.toString("utf8"));
+    } catch (error) {
+        throw new Error(`Telegram API returned invalid JSON for ${methodName}`);
+    }
+
+    if (!parsed.ok) {
+        throw new Error(`Telegram API ${methodName} failed: ${JSON.stringify(parsed).slice(0, 240)}`);
+    }
+
+    return parsed.result;
+}
+
+async function telegramMultipartRequest(config, methodName, fields, file) {
+    const boundary = `----wizyclub-${crypto.randomBytes(12).toString("hex")}`;
+    const body = buildMultipartBody(boundary, fields, file);
+
+    const responseBody = await httpRequestBuffer(
+        `https://api.telegram.org/bot${config.botToken}/${methodName}`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": `multipart/form-data; boundary=${boundary}`,
+                "Content-Length": body.length
+            }
+        },
+        body
+    );
+
+    let parsed;
+    try {
+        parsed = JSON.parse(responseBody.toString("utf8"));
+    } catch (error) {
+        throw new Error(`Telegram API returned invalid JSON for ${methodName}`);
+    }
+
+    if (!parsed.ok) {
+        throw new Error(`Telegram API ${methodName} failed: ${JSON.stringify(parsed).slice(0, 240)}`);
+    }
+
+    return parsed.result;
+}
+
+function buildMultipartBody(boundary, fields, file) {
+    const chunks = [];
+
+    Object.entries(fields || {}).forEach(([key, value]) => {
+        if (value === undefined || value === null || value === "") {
+            return;
+        }
+        chunks.push(Buffer.from(`--${boundary}\r\n`, "utf8"));
+        chunks.push(Buffer.from(`Content-Disposition: form-data; name="${key}"\r\n\r\n`, "utf8"));
+        chunks.push(Buffer.from(String(value), "utf8"));
+        chunks.push(Buffer.from("\r\n", "utf8"));
     });
 
-    return new Promise((resolve, reject) => {
-        const request = https.request(
-            `https://api.telegram.org/bot${config.botToken}/sendMessage`,
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Content-Length": Buffer.byteLength(body)
-                }
-            },
-            (response) => {
-                const chunks = [];
-                response.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
-                response.on("end", () => {
-                    const statusCode = response.statusCode || 0;
-                    if (statusCode >= 200 && statusCode < 300) {
-                        resolve();
-                        return;
-                    }
+    chunks.push(Buffer.from(`--${boundary}\r\n`, "utf8"));
+    chunks.push(Buffer.from(`Content-Disposition: form-data; name="${file.fieldName}"; filename="${file.filename}"\r\n`, "utf8"));
+    chunks.push(Buffer.from(`Content-Type: ${file.contentType}\r\n\r\n`, "utf8"));
+    chunks.push(file.data);
+    chunks.push(Buffer.from("\r\n", "utf8"));
+    chunks.push(Buffer.from(`--${boundary}--\r\n`, "utf8"));
 
-                    const payload = Buffer.concat(chunks).toString("utf8");
-                    reject(new Error(`Telegram API returned HTTP ${statusCode}: ${payload.slice(0, 240)}`));
-                });
-            }
-        );
+    return Buffer.concat(chunks);
+}
+
+async function telegramDownloadFileById(config, fileId) {
+    const fileInfo = await telegramJsonRequest(config, "getFile", { file_id: fileId });
+    if (!fileInfo || !fileInfo.file_path) {
+        throw new Error("Telegram getFile did not return a file_path");
+    }
+
+    return httpRequestBuffer(`https://api.telegram.org/file/bot${config.botToken}/${fileInfo.file_path}`, {
+        method: "GET"
+    });
+}
+
+function httpRequestBuffer(url, options, bodyBuffer) {
+    return new Promise((resolve, reject) => {
+        const request = https.request(url, options, (response) => {
+            const chunks = [];
+            response.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+            response.on("end", () => {
+                const statusCode = response.statusCode || 0;
+                const payload = Buffer.concat(chunks);
+                if (statusCode >= 200 && statusCode < 300) {
+                    resolve(payload);
+                    return;
+                }
+                reject(new Error(`HTTP ${statusCode}: ${payload.toString("utf8").slice(0, 240)}`));
+            });
+        });
 
         request.on("error", reject);
-        request.write(body);
+        if (bodyBuffer && bodyBuffer.length > 0) {
+            request.write(bodyBuffer);
+        }
         request.end();
     });
 }
@@ -512,9 +684,10 @@ async function runStart(options, config) {
     const snapshot = readSnapshot();
     state.baselineFiles = snapshotToFileMap(snapshot);
     state.lastSentFingerprint = snapshot.fingerprint;
+
     saveState(sessionId, state);
 
-    const summary = firstOption(options.summary, "Codex session started");
+    const summary = firstOption(options.summary, "Codex oturumu başladı");
     const message = formatMessage({
         config,
         state,
@@ -545,6 +718,131 @@ async function runStart(options, config) {
 
     if (options["print-session-id"]) {
         process.stdout.write(`${sessionId}\n`);
+    }
+}
+
+function ensureBackupReady(config) {
+    ensureTelegramReady(config);
+    if (!config.backupEnabled) {
+        throw new Error("Telegram backup flow is disabled.");
+    }
+}
+
+async function runArchiveBackup(options, config) {
+    const filePath = firstOption(options.file);
+    if (!filePath) {
+        throw new Error("archive-backup requires --file");
+    }
+
+    if (!fs.existsSync(filePath)) {
+        throw new Error(`Backup file not found: ${filePath}`);
+    }
+
+    ensureBackupReady(config);
+
+    const absolutePath = path.resolve(filePath);
+    const plaintext = fs.readFileSync(absolutePath);
+    const backupId = `${new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14)}-${hashValue(plaintext)}`;
+    const sha256 = crypto.createHash("sha256").update(plaintext).digest("hex");
+
+    if (options["dry-run"]) {
+        console.log(`[telegram-progress] would archive plaintext backup ${backupId} from ${absolutePath}`);
+        return;
+    }
+
+    const result = await sendTelegramDocument(config, {
+        filename: path.basename(absolutePath),
+        contentType: "application/octet-stream",
+        data: plaintext,
+        caption: `${config.projectName} env yedeği\nYedek ID: ${backupId}`
+    });
+
+    const document = result && result.document ? result.document : null;
+    if (!document || !document.file_id) {
+        throw new Error("Telegram sendDocument succeeded but did not return a document file_id.");
+    }
+
+    const controlState = loadControlState();
+    upsertBackupEntry(controlState, {
+        backupId,
+        createdAt: new Date().toISOString(),
+        originalName: path.basename(absolutePath),
+        fileId: document.file_id,
+        fileUniqueId: document.file_unique_id || "",
+        messageId: result.message_id || 0,
+        sha256,
+        format: "plain"
+    });
+    saveControlState(controlState);
+
+    if (options["delete-plain"]) {
+        safeUnlink(absolutePath);
+    }
+
+    console.log(`[telegram-progress] archived plaintext backup ${backupId}`);
+}
+
+function upsertBackupEntry(controlState, entry) {
+    const current = Array.isArray(controlState.backups) ? controlState.backups : [];
+    const filtered = current.filter((item) => item.backupId !== entry.backupId);
+    filtered.unshift(entry);
+    filtered.sort((left, right) => String(right.createdAt).localeCompare(String(left.createdAt)));
+    controlState.backups = filtered.slice(0, MAX_BACKUP_ENTRIES);
+}
+
+function selectBackupEntry(controlState, requestedBackupId) {
+    const backups = Array.isArray(controlState.backups) ? controlState.backups : [];
+    if (backups.length === 0) {
+        return null;
+    }
+    if (!requestedBackupId) {
+        return backups[0];
+    }
+    return backups.find((entry) => entry.backupId === requestedBackupId) || null;
+}
+
+async function runRestoreBackup(options, config) {
+    ensureBackupReady(config);
+
+    const controlState = loadControlState();
+    const backup = selectBackupEntry(controlState, firstOption(options["backup-id"], ""));
+    if (!backup) {
+        throw new Error("No archived backup found.");
+    }
+    if (backup.format !== "plain") {
+        throw new Error(`Backup ${backup.backupId} uses unsupported legacy format. Create a new plaintext backup first.`);
+    }
+
+    const downloaded = await telegramDownloadFileById(config, backup.fileId);
+    const outputPath = resolveRestoreOutputPath(options, backup.backupId);
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+    fs.writeFileSync(outputPath, downloaded);
+    safeChmod(outputPath);
+    console.log(outputPath);
+}
+
+function resolveRestoreOutputPath(options, backupId) {
+    const explicit = firstOption(options.output);
+    if (explicit) {
+        return path.resolve(explicit);
+    }
+
+    return path.join(RESTORE_DIR, `${backupId}.env`);
+}
+
+function safeUnlink(filePath) {
+    try {
+        fs.unlinkSync(filePath);
+    } catch (error) {
+        // Ignore missing temp files.
+    }
+}
+
+function safeChmod(filePath) {
+    try {
+        fs.chmodSync(filePath, 0o600);
+    } catch (error) {
+        // Ignore platforms that do not support chmod semantics.
     }
 }
 
@@ -607,7 +905,7 @@ async function runFinish(options, config) {
     const status = firstOption(options.status, "ok");
     const summary = firstOption(
         options.summary,
-        status === "fail" ? "Codex session finished with a failure state" : "Codex session completed"
+        status === "fail" ? "Codex oturumu hata ile bitti" : "Codex oturumu tamamlandı"
     );
 
     const durationSeconds = Math.max(
@@ -633,6 +931,7 @@ async function runFinish(options, config) {
     if (sent) {
         state.notificationsSent += 1;
     }
+
     state.finishedAt = new Date().toISOString();
     state.lastSentFingerprint = snapshot.fingerprint;
     saveState(sessionId, state);
@@ -651,7 +950,6 @@ async function runFinish(options, config) {
 
 async function runWatch(options, config) {
     const sessionId = getSessionId(options);
-    const state = loadState(sessionId, config);
     let shouldStop = false;
     const dryRun = Boolean(options["dry-run"]);
 
@@ -678,7 +976,7 @@ async function runWatch(options, config) {
                 config,
                 state: freshState,
                 kind: "auto",
-                summary: "Workspace changes detected",
+                summary: "Çalışma alanı değişiklikleri algılandı",
                 scope: "",
                 status: "info",
                 command: "",
@@ -699,7 +997,7 @@ async function runWatch(options, config) {
             appendEvent(sessionId, {
                 ts: new Date().toISOString(),
                 type: "auto",
-                summary: "Workspace changes detected",
+                summary: "Çalışma alanı değişiklikleri algılandı",
                 sessionFiles,
                 sent,
                 snapshot
