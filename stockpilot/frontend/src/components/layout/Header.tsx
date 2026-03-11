@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ShieldCheck, ArrowRight } from "lucide-react";
 
 interface HeaderProps {
@@ -7,21 +7,32 @@ interface HeaderProps {
 
 export function Header({ dataSource }: HeaderProps) {
     const [isVisible, setIsVisible] = useState(true);
-    const [lastScrollY, setLastScrollY] = useState(0);
+    const lastScrollYRef = useRef(0);
 
     useEffect(() => {
         const handleScroll = () => {
             const currentScrollY = window.scrollY;
-            if (currentScrollY > lastScrollY && currentScrollY > 100) {
+            const hero = document.getElementById("hero");
+            const heroBottom = hero?.getBoundingClientRect().bottom ?? 0;
+
+            if (heroBottom > 120) {
+                setIsVisible(true);
+                lastScrollYRef.current = currentScrollY;
+                return;
+            }
+
+            if (currentScrollY > lastScrollYRef.current && currentScrollY > 100) {
                 setIsVisible(false);
             } else {
                 setIsVisible(true);
             }
-            setLastScrollY(currentScrollY);
+
+            lastScrollYRef.current = currentScrollY;
         };
+
         window.addEventListener("scroll", handleScroll, { passive: true });
         return () => window.removeEventListener("scroll", handleScroll);
-    }, [lastScrollY]);
+    }, []);
 
     const scrollToSection = (id: string) => {
         const element = document.getElementById(id);
@@ -37,7 +48,7 @@ export function Header({ dataSource }: HeaderProps) {
 
     return (
         <header 
-            className={`fixed top-0 left-0 right-0 z-50 bg-white/60 backdrop-blur-2xl border-b border-white/20 transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+            className={`fixed top-0 left-0 right-0 z-50 border-b border-white/20 bg-white/60 backdrop-blur-2xl transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                 isVisible ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0"
             }`}
         >

@@ -1,4 +1,4 @@
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useLayoutEffect, useTransition } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Download, ListChecks, ShieldAlert, Upload, ChevronDown, BarChart3, ArrowUpDown, Database, Zap, Layers, Globe } from "lucide-react";
 import { Header } from "./components/layout/Header";
@@ -102,6 +102,10 @@ function App() {
     });
     const typewriterText = useTypewriter(ROTATING_WORDS);
 
+    useLayoutEffect(() => {
+        window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    }, []);
+
     function handleUpload(file: File) {
         setCurrentFile(file);
         setUploadProgress(0);
@@ -153,7 +157,7 @@ function App() {
             <Header dataSource={result?.source ?? null} />
 
             {/* HERO SECTION */}
-            <section className="flex min-h-[100svh] flex-col items-center justify-start px-4 pt-24 pb-20 text-center sm:px-8 sm:pt-28 md:justify-center lg:pt-32">
+            <section id="hero" className="flex min-h-screen flex-col items-center justify-start px-4 pt-[130px] pb-20 text-center sm:px-8 sm:pt-[130px] lg:pt-[130px]">
                 <motion.div
                     initial={{ opacity: 0, y: 40 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -164,7 +168,7 @@ function App() {
                         Elite Inventory Orchestration
                     </p>
 
-                    <div className="mx-auto flex max-w-5xl flex-col items-center gap-8 sm:gap-10 lg:gap-12">
+                    <div className="mx-auto flex max-w-5xl flex-col items-center gap-6 sm:gap-8 lg:gap-10">
                         <h1 className="font-display text-4xl font-extralight leading-[1.08] tracking-tight text-ink sm:text-6xl lg:text-[6.5rem]">
                             <span className="block">Your spreadsheet,</span>
                             <span className="block">instant</span>
