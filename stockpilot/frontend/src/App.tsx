@@ -164,20 +164,25 @@ function App() {
                         Elite Inventory Orchestration
                     </p>
 
-                    <h1 className="font-display text-4xl font-extralight leading-[1.15] tracking-tight text-ink sm:text-6xl lg:text-[6.5rem]">
-                        Your spreadsheet,<br />
-                        instant<br />
-                        <span className="relative inline-flex items-baseline">
-                            <span className="text-gradient font-normal italic">
-                                {"\u200B"}{typewriterText}
-                            </span>
-                        </span>
-                    </h1>
+                    <div className="mx-auto flex max-w-5xl flex-col items-center gap-8 sm:gap-10 lg:gap-12">
+                        <h1 className="font-display text-4xl font-extralight leading-[1.08] tracking-tight text-ink sm:text-6xl lg:text-[6.5rem]">
+                            <span className="block">Your spreadsheet,</span>
+                            <span className="block">instant</span>
+                        </h1>
 
-                    <p className="mx-auto mt-16 max-w-4xl text-xl font-light leading-relaxed text-slate-500 sm:text-2xl">
-                        Ingest, analyze, and optimize your global inventory footprint. 
-                        High-fidelity insights for the modern enterprise, zero complexity.
-                    </p>
+                        <div className="flex min-h-[2.35em] w-full items-center justify-center text-center sm:min-h-[2.1em]">
+                            <span className="text-gradient font-display text-4xl font-normal italic leading-[1.05] tracking-tight sm:max-w-none sm:text-6xl lg:text-[6.5rem]">
+                                <span className="inline-block max-w-[11ch] sm:max-w-[12ch] lg:max-w-none">
+                                    {typewriterText}
+                                </span>
+                            </span>
+                        </div>
+
+                        <p className="mx-auto max-w-4xl text-xl font-light leading-relaxed text-slate-500 sm:text-2xl">
+                            Ingest, analyze, and optimize your global inventory footprint.
+                            High-fidelity insights for the modern enterprise, zero complexity.
+                        </p>
+                    </div>
 
                     <div className="mt-20 flex flex-wrap items-center justify-center gap-10">
                         <button
