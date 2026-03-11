@@ -171,7 +171,7 @@ function App() {
                         </h1>
 
                         <div className="flex min-h-[1.35em] items-center justify-center overflow-visible text-center">
-                            <span className="text-gradient inline-block w-max max-w-none whitespace-nowrap font-display text-[clamp(1.45rem,7vw,4.85rem)] font-normal italic leading-none tracking-[-0.055em]">
+                            <span className="text-gradient inline-block w-max max-w-none whitespace-nowrap font-display text-4xl font-normal italic leading-none tracking-[-0.06em] sm:text-6xl lg:text-[6.5rem]">
                                 <span className="inline-block whitespace-nowrap">
                                     {typewriterText}
                                 </span>
