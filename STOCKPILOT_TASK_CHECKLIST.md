@@ -64,10 +64,10 @@
 
 ## Phase 9: Deployment
 - [x] Create `netlify.toml` — build config + API proxy redirects
-- [ ] Deploy frontend to Netlify (via dist/)
+- [x] Deploy frontend to Netlify (via dist/)
 - [x] Create `render.yaml` — backend deploy config
-- [ ] Deploy backend to Render
-- [ ] Test end-to-end: frontend → backend API calls
+- [x] Deploy backend to Render
+- [x] Test end-to-end: frontend → backend API calls
 
 ## Phase 10: Polish & Verification
 - [x] Add Framer Motion animations (fade-in, slide-up, stagger)
@@ -75,6 +75,6 @@
 - [x] Verify frontend build (`npm run build` — no errors)
 - [x] Verify backend build (`npm run build` — no errors)
 - [ ] Browser test all 4 tabs
-- [ ] Test file upload with sample Excel
-- [ ] Verify Netlify deployment URL works
-- [ ] Verify Render backend `/api/health` responds
+- [x] Test file upload with sample Excel
+- [x] Verify Netlify deployment URL works
+- [x] Verify Render backend `/api/health` responds

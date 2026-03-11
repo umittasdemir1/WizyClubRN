@@ -48,6 +48,7 @@ path_log.txt
 # Local npm config
 .npmrc
 **/.npmrc
+stockpilot/frontend/dist.zip
 
 # Claude local state
 .claude/settings.local.json
