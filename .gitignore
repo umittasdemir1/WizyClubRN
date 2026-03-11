@@ -49,6 +49,8 @@ path_log.txt
 .npmrc
 **/.npmrc
 stockpilot/frontend/dist.zip
+stockpilot/frontend/*.zip
+.tmp_secret_tools/
 
 # Claude local state
 .claude/settings.local.json
