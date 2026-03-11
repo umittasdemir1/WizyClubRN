@@ -153,7 +153,7 @@ function App() {
             <Header dataSource={result?.source ?? null} />
 
             {/* HERO SECTION */}
-            <section className="flex min-h-screen flex-col items-center justify-center px-8 pt-28 pb-20 text-center sm:pt-32 lg:pt-36">
+            <section className="flex min-h-screen flex-col items-center justify-center px-4 pt-28 pb-20 text-center sm:px-8 sm:pt-32 lg:pt-36">
                 <motion.div
                     initial={{ opacity: 0, y: 40 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -171,7 +171,7 @@ function App() {
                         </h1>
 
                         <div className="flex min-h-[1.35em] items-center justify-center overflow-visible text-center">
-                            <span className="text-gradient inline-block w-max max-w-none whitespace-nowrap font-display text-[clamp(1.25rem,5.8vw,4.5rem)] font-normal italic leading-none tracking-[-0.04em]">
+                            <span className="text-gradient inline-block w-max max-w-none whitespace-nowrap font-display text-[clamp(1.45rem,7vw,4.85rem)] font-normal italic leading-none tracking-[-0.055em]">
                                 <span className="inline-block whitespace-nowrap">
                                     {typewriterText}
                                 </span>
