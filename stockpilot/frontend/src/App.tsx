@@ -170,9 +170,9 @@ function App() {
                             <span className="block">instant</span>
                         </h1>
 
-                        <div className="flex min-h-[2.35em] w-full items-center justify-center text-center sm:min-h-[2.1em]">
-                            <span className="text-gradient font-display text-4xl font-normal italic leading-[1.05] tracking-tight sm:max-w-none sm:text-6xl lg:text-[6.5rem]">
-                                <span className="inline-block max-w-[11ch] sm:max-w-[12ch] lg:max-w-none">
+                        <div className="flex min-h-[2.2em] w-full items-center justify-center overflow-visible text-center sm:min-h-[2.1em]">
+                            <span className="text-gradient whitespace-nowrap font-display text-[clamp(1.75rem,7.2vw,3.35rem)] font-normal italic leading-[1.05] tracking-tight sm:text-6xl lg:text-[6.5rem]">
+                                <span className="inline-block whitespace-nowrap">
                                     {typewriterText}
                                 </span>
                             </span>
