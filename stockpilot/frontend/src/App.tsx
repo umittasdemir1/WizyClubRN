@@ -153,7 +153,7 @@ function App() {
             <Header dataSource={result?.source ?? null} />
 
             {/* HERO SECTION */}
-            <section className="flex min-h-screen flex-col items-center justify-center px-4 pt-28 pb-20 text-center sm:px-8 sm:pt-32 lg:pt-36">
+            <section className="flex min-h-[100svh] flex-col items-center justify-start px-4 pt-24 pb-20 text-center sm:px-8 sm:pt-28 md:justify-center lg:pt-32">
                 <motion.div
                     initial={{ opacity: 0, y: 40 }}
                     animate={{ opacity: 1, y: 0 }}
