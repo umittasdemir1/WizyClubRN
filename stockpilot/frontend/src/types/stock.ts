@@ -1,4 +1,5 @@
 export type AppTab = "dashboard" | "analysis" | "transfers" | "planning";
+export type UploadStage = "idle" | "uploading" | "analyzing" | "local-processing" | "ready";
 
 export interface InventoryRecord {
     sku: string;

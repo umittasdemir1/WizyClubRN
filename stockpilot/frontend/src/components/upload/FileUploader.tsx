@@ -1,15 +1,42 @@
 import { motion } from "framer-motion";
-import { FileSpreadsheet, UploadCloud } from "lucide-react";
+import { FileSpreadsheet, UploadCloud, X } from "lucide-react";
 import { useDropzone } from "react-dropzone";
-import type { RecentUpload } from "../../types/stock";
+import type { RecentUpload, UploadStage } from "../../types/stock";
 
 interface FileUploaderProps {
+    currentFile: File | null;
     isLoading: boolean;
     onSelect: (file: File) => void;
+    onClear: () => void;
     latestUpload: RecentUpload | null;
+    uploadProgress: number;
+    uploadStage: UploadStage;
 }
 
-export function FileUploader({ isLoading, onSelect, latestUpload }: FileUploaderProps) {
+function getStatusLabel(stage: UploadStage) {
+    switch (stage) {
+        case "uploading":
+            return "Uploading dataset";
+        case "analyzing":
+            return "Running stock analysis";
+        case "local-processing":
+            return "Switching to local engine";
+        case "ready":
+            return "Ready";
+        default:
+            return "Awaiting file";
+    }
+}
+
+export function FileUploader({
+    currentFile,
+    isLoading,
+    onSelect,
+    onClear,
+    latestUpload,
+    uploadProgress,
+    uploadStage
+}: FileUploaderProps) {
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         multiple: false,
         accept: {
@@ -25,6 +52,9 @@ export function FileUploader({ isLoading, onSelect, latestUpload }: FileUploader
             }
         }
     });
+
+    const visibleFileName = currentFile?.name ?? latestUpload?.fileName ?? null;
+    const statusLabel = getStatusLabel(uploadStage);
 
     return (
         <div
@@ -77,14 +107,57 @@ export function FileUploader({ isLoading, onSelect, latestUpload }: FileUploader
                     </span>
                 </div>
 
-                {latestUpload ? (
-                    <div className="mt-6 flex items-center gap-5 rounded-[32px] border border-white/10 bg-white/5 px-8 py-6 text-base text-slate-300 shadow-xl">
-                        <FileSpreadsheet className="h-8 w-8 text-brand" />
-                        <div>
-                            <p className="font-semibold text-xl text-white leading-none mb-1">{latestUpload.fileName}</p>
-                            <p className="opacity-70 text-sm">
-                                {latestUpload.rowCount} rows processed via {latestUpload.source}
-                            </p>
+                {visibleFileName ? (
+                    <div className="relative mt-6 rounded-[32px] border border-white/10 bg-white/5 px-8 py-6 text-base text-slate-300 shadow-xl">
+                        {!isLoading ? (
+                            <button
+                                type="button"
+                                aria-label="Clear uploaded file"
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    onClear();
+                                }}
+                                className="absolute left-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-slate-950/40 text-slate-300 transition hover:border-white/20 hover:bg-slate-950/60 hover:text-white"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        ) : null}
+
+                        <div className="flex items-start gap-5">
+                            <FileSpreadsheet className="mt-1 h-8 w-8 shrink-0 text-brand" />
+                            <div className="min-w-0 flex-1">
+                                <p className="mb-1 truncate pr-10 font-semibold leading-none text-white sm:text-xl">
+                                    {visibleFileName}
+                                </p>
+
+                                {isLoading ? (
+                                    <div className="mt-4 space-y-3">
+                                        <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">
+                                            <span>{statusLabel}</span>
+                                            <span>{uploadProgress}%</span>
+                                        </div>
+                                        <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                                            <motion.div
+                                                className="h-full rounded-full bg-[linear-gradient(90deg,#FF9068_0%,#FFD93D_36%,#6BCF7F_68%,#4D96FF_100%)] shadow-[0_0_18px_rgba(77,150,255,0.35)]"
+                                                initial={false}
+                                                animate={{ width: `${Math.max(uploadProgress, 8)}%` }}
+                                                transition={{ duration: 0.28, ease: "easeOut" }}
+                                            />
+                                        </div>
+                                        <p className="text-sm text-slate-400">
+                                            Your inventory snapshot is being normalized and prepared for the workspace.
+                                        </p>
+                                    </div>
+                                ) : latestUpload ? (
+                                    <p className="text-sm opacity-70">
+                                        {latestUpload.rowCount} rows processed via {latestUpload.source}
+                                    </p>
+                                ) : (
+                                    <p className="text-sm opacity-70">
+                                        File ready for a fresh upload cycle.
+                                    </p>
+                                )}
+                            </div>
                         </div>
                     </div>
                 ) : null}

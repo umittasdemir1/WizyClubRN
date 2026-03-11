@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { type AxiosProgressEvent } from "axios";
 import type {
     AnalysisResult,
     InventoryRecord,
@@ -11,12 +11,28 @@ const api = axios.create({
     timeout: 30000
 });
 
-export async function uploadInventoryFile(file: File): Promise<ParsedInventoryPayload> {
+export async function uploadInventoryFile(
+    file: File,
+    onProgress?: (progress: number) => void
+): Promise<ParsedInventoryPayload> {
     const formData = new FormData();
     formData.append("file", file);
     const response = await api.post<ParsedInventoryPayload>("/upload", formData, {
         headers: {
             "Content-Type": "multipart/form-data"
+        },
+        onUploadProgress(event: AxiosProgressEvent) {
+            if (!onProgress) {
+                return;
+            }
+
+            if (!event.total) {
+                onProgress(20);
+                return;
+            }
+
+            const percent = Math.round((event.loaded * 68) / event.total);
+            onProgress(Math.max(6, Math.min(68, percent)));
         }
     });
 

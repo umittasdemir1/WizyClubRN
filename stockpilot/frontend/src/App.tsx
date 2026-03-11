@@ -6,7 +6,6 @@ import { TabNav } from "./components/layout/TabNav";
 import { Footer } from "./components/layout/Footer";
 import { FileUploader } from "./components/upload/FileUploader";
 import { EmptyState } from "./components/shared/EmptyState";
-import { Spinner } from "./components/shared/Spinner";
 import { MetricsGrid } from "./components/dashboard/MetricsGrid";
 import { CategoryDonutChart } from "./components/dashboard/CategoryDonutChart";
 import { StockHealthChart } from "./components/dashboard/StockHealthChart";
@@ -17,7 +16,7 @@ import { Button } from "./components/shared/Button";
 import { Card } from "./components/shared/Card";
 import { useFileUpload } from "./hooks/useFileUpload";
 import { exportAnalysisWorkbook } from "./utils/analysis";
-import type { AppTab, RecentUpload, UploadWorkflowResult } from "./types/stock";
+import type { AppTab, RecentUpload, UploadStage, UploadWorkflowResult } from "./types/stock";
 
 /* ── Typewriter rotating words ── */
 const ROTATING_WORDS = [
@@ -91,13 +90,23 @@ const FEATURES = [
 
 function App() {
     const [activeTab, setActiveTab] = useState<AppTab>("dashboard");
+    const [currentFile, setCurrentFile] = useState<File | null>(null);
     const [result, setResult] = useState<UploadWorkflowResult | null>(null);
     const [history, setHistory] = useState<RecentUpload[]>([]);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [uploadStage, setUploadStage] = useState<UploadStage>("idle");
     const [isSwitchPending, startTabTransition] = useTransition();
-    const uploadMutation = useFileUpload();
+    const uploadMutation = useFileUpload({
+        onProgressChange: setUploadProgress,
+        onStageChange: setUploadStage
+    });
     const typewriterText = useTypewriter(ROTATING_WORDS);
 
     function handleUpload(file: File) {
+        setCurrentFile(file);
+        setUploadProgress(0);
+        setUploadStage("uploading");
+
         uploadMutation.mutate(file, {
             onSuccess(nextResult) {
                 setResult(nextResult);
@@ -109,8 +118,23 @@ function App() {
                         source: nextResult.source,
                     }, ...current].slice(0, 5)
                 );
+                setUploadProgress(100);
+                setUploadStage("ready");
+            },
+            onError() {
+                setUploadProgress(0);
+                setUploadStage("idle");
             },
         });
+    }
+
+    function handleClearUpload() {
+        setCurrentFile(null);
+        setResult(null);
+        setHistory([]);
+        setUploadProgress(0);
+        setUploadStage("idle");
+        uploadMutation.reset();
     }
 
     function handleTabChange(tab: AppTab) {
@@ -250,9 +274,13 @@ function App() {
                         className="mt-20"
                     >
                         <FileUploader
+                            currentFile={currentFile}
                             isLoading={uploadMutation.isPending}
                             latestUpload={latestUpload}
                             onSelect={handleUpload}
+                            onClear={handleClearUpload}
+                            uploadProgress={uploadProgress}
+                            uploadStage={uploadStage}
                         />
                     </motion.div>
                 </div>
