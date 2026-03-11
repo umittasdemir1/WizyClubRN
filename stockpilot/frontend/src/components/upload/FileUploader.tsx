@@ -117,7 +117,7 @@ export function FileUploader({
                                     event.stopPropagation();
                                     onClear();
                                 }}
-                                className="absolute left-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-slate-950/40 text-slate-300 transition hover:border-white/20 hover:bg-slate-950/60 hover:text-white"
+                                className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-slate-950/40 text-slate-300 transition hover:border-white/20 hover:bg-slate-950/60 hover:text-white"
                             >
                                 <X className="h-4 w-4" />
                             </button>
