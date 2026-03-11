@@ -147,7 +147,6 @@ function App() {
                             <span className="text-gradient font-normal italic">
                                 {"\u200B"}{typewriterText}
                             </span>
-                            <span className="cursor-blink" />
                         </span>
                     </h1>
 
