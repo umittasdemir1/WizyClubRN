@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 const path = require("path");
-const { spawn } = require("child_process");
 
 const { loadRootEnv, requireEnv } = require("./load-root-env");
+const { spawnNpx } = require("./spawn-npx");
 
 const repoRoot = path.resolve(__dirname, "..", "..");
 const env = loadRootEnv(repoRoot);
 const token = requireEnv(env, "DOPPLER_TOKEN");
 
-const child = spawn(process.platform === "win32" ? "npx.cmd" : "npx", [
+const child = spawnNpx([
     "-y",
     "@dopplerhq/mcp-server"
 ], {
@@ -18,6 +18,11 @@ const child = spawn(process.platform === "win32" ? "npx.cmd" : "npx", [
         ...process.env,
         DOPPLER_TOKEN: token
     }
+});
+
+child.on("error", (error) => {
+    console.error(`[doppler-wrapper] failed to start child process: ${error.message}`);
+    process.exit(1);
 });
 
 child.on("exit", (code, signal) => {

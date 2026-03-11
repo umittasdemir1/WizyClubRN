@@ -101,12 +101,9 @@ function pickCommand(commandSpec) {
 }
 
 function resolveToken(value, env, workspacePath) {
-    const envMatch = value.match(/^\{env:([A-Z0-9_]+)\}$/);
-    if (envMatch) {
-        return env[envMatch[1]] || "";
-    }
-
-    return value.replace(/\{workspace\}/g, workspacePath);
+    return String(value)
+        .replace(/\{env:([A-Z0-9_]+)\}/g, (_, key) => env[key] || "")
+        .replace(/\{workspace\}/g, workspacePath);
 }
 
 function resolveEnvMap(envMap, env, workspacePath) {
@@ -137,11 +134,15 @@ function buildServers(manifest, env, workspacePath) {
         }
 
         if (server.type === "url") {
+            const headers = resolveEnvMap(server.headers, env, workspacePath);
+
             configured.push({
                 name: server.name,
                 type: "url",
-                url: server.url,
-                description: server.description || ""
+                url: resolveToken(server.url, env, workspacePath),
+                headers,
+                description: server.description || "",
+                startupTimeoutSec: server.startupTimeoutSec
             });
             continue;
         }
@@ -156,7 +157,8 @@ function buildServers(manifest, env, workspacePath) {
             command,
             args,
             env: serverEnv,
-            description: server.description || ""
+            description: server.description || "",
+            startupTimeoutSec: server.startupTimeoutSec
         });
     }
 
@@ -192,12 +194,19 @@ function renderManagedBlock(servers) {
 
         if (server.type === "url") {
             lines.push(`url = ${tomlString(server.url)}`);
+            if (server.headers && Object.keys(server.headers).length > 0) {
+                lines.push(`headers = ${tomlInlineTable(server.headers)}`);
+            }
         } else {
             lines.push(`command = ${tomlString(server.command)}`);
             lines.push(`args = [${server.args.map((arg) => tomlString(arg)).join(", ")}]`);
             if (server.env && Object.keys(server.env).length > 0) {
                 lines.push(`env = ${tomlInlineTable(server.env)}`);
             }
+        }
+
+        if (Number.isInteger(server.startupTimeoutSec) && server.startupTimeoutSec > 0) {
+            lines.push(`startup_timeout_sec = ${server.startupTimeoutSec}`);
         }
 
         if (index !== servers.length - 1) {

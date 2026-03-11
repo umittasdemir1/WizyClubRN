@@ -52,6 +52,15 @@ function main() {
                 );
             });
         }
+
+        if (server.headers) {
+            Object.entries(server.headers).forEach(([key, value]) => {
+                assert(
+                    configContent.includes(`${key} = ${JSON.stringify(value)}`),
+                    `Configured MCP server is missing header forwarding for ${server.name}: ${key}`
+                );
+            });
+        }
     });
 
     assert(fs.existsSync(r2EnvPath), `r2-mcp/.env not found: ${r2EnvPath}`);

@@ -1,0 +1,341 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@200;300;400;500;600;700;800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+    color: #15213a;
+    background-color: #fcfdfe;
+    font-family: "Inter", system-ui, -apple-system, sans-serif;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+    overflow-x: hidden;
+}
+
+body {
+    margin: 0;
+    min-width: 320px;
+    background: #fcfdfe;
+}
+
+/* ── Sophisticated Story Ring Background ── */
+.story-spectrum-bg {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+    background: #fcfdfe;
+}
+
+.story-spectrum-bg::before {
+    content: "";
+    position: absolute;
+    top: -20%;
+    left: -10%;
+    width: 60%;
+    height: 70%;
+    background: radial-gradient(circle, rgba(255, 65, 108, 0.05) 0%, transparent 70%);
+    filter: blur(100px);
+    animation: float-bg 20s infinite alternate ease-in-out;
+}
+
+.story-spectrum-bg::after {
+    content: "";
+    position: absolute;
+    bottom: -10%;
+    right: -5%;
+    width: 50%;
+    height: 60%;
+    background: radial-gradient(circle, rgba(77, 150, 255, 0.04) 0%, transparent 70%);
+    filter: blur(120px);
+    animation: float-bg 25s infinite alternate-reverse ease-in-out;
+}
+
+.bg-grid-pattern {
+    position: absolute;
+    inset: 0;
+    background-image: 
+        linear-gradient(to right, rgba(241, 245, 249, 0.82) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(241, 245, 249, 0.82) 1px, transparent 1px);
+    background-size: 144px 144px;
+}
+
+@keyframes float-bg {
+    0% { transform: translate(0, 0) scale(1); }
+    100% { transform: translate(5%, 5%) scale(1.1); }
+}
+
+.story-grid-pattern {
+    position: absolute;
+    
+    /* Grid çizgilerini mask (maske) olarak kullanıyoruz */
+    -webkit-mask-image: 
+        linear-gradient(to right, black 1.5px, transparent 1.5px),
+        linear-gradient(to bottom, black 1.5px, transparent 1.5px);
+    mask-image: 
+        linear-gradient(to right, black 1.5px, transparent 1.5px),
+        linear-gradient(to bottom, black 1.5px, transparent 1.5px);
+    -webkit-mask-size: 80px 80px; /* Aralıkları 40px'ten 80px'e çıkarttık */
+    mask-size: 80px 80px;
+
+    /* Arka plana STORY_RING_SPEC içindeki asıl renkleri ve büyüleyici bir akış animasyonu veriyoruz */
+    background: linear-gradient(to right, #FF416C, #FF9068, #FFD93D, #6BCF7F, #4D96FF, #FF416C);
+    background-size: 300% auto;
+    animation: shimmer 12s linear infinite;
+
+    transform: rotate(45deg);
+    width: 200%;
+    height: 200%;
+    top: -50%;
+    left: -50%;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* ── Premium Typewriter ── */
+.text-gradient {
+    background: linear-gradient(to right, #FF416C, #FF9068, #FFD93D, #6BCF7F, #4D96FF, #FF416C);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-size: 300% auto;
+    animation: shimmer 8s linear infinite;
+    padding-right: 0.15em; /* İtalik metinlerdeki text-clip sorununu onarır */
+    padding-bottom: 0.15em; /* 'g', 'y', 'p' gibi kuyruklu harflerin alttan kesilmesini önler */
+}
+
+@keyframes shimmer {
+    to { background-position: 300% center; }
+}
+
+.cursor-blink {
+    display: inline-block;
+    width: 6px; /* Thicker */
+    height: 0.8em; /* Shorter */
+    margin-left: 8px; /* Padding eklendiği için margin biraz kısıldı */
+    transform: skewX(-12deg);
+    vertical-align: baseline;
+    background: linear-gradient(to bottom, #FF9068, #FFD93D, #6BCF7F, #4D96FF); /* Gradient cursor with 4 open palette colors */
+    border-radius: 4px;
+    animation: blink 1.1s step-end infinite;
+}
+
+@keyframes blink {
+    from, to { opacity: 1; }
+    50% { opacity: 0; }
+}
+
+.plus-gradient-spin {
+    display: inline-block;
+    background: linear-gradient(to right, #FF416C, #FF9068, #FFD93D, #6BCF7F, #4D96FF, #FF416C);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-size: 200% auto;
+    animation: plusSpin 4s linear infinite, shimmer 6s linear infinite;
+    transform-origin: center 55%; /* Plus karakterinin merkezi tam ortada olmayabilir diye ufak ofset */
+}
+
+@keyframes plusSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* ── Premium Gradient Card System ── */
+.premium-card-gradient {
+    position: relative;
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(12px);
+    border-radius: 48px;
+    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.premium-card-gradient::before {
+    content: "";
+    position: absolute;
+    inset: -1.5px;
+    border-radius: inherit;
+    padding: 1.5px;
+    background: linear-gradient(145deg, #FF416C, #FF9068, #FFD93D, #6BCF7F, #4D96FF);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    opacity: 0.2;
+    transition: opacity 0.4s ease;
+}
+
+.premium-card-gradient:hover {
+    transform: translateY(-8px) scale(1.01);
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 40px 80px -20px rgba(0,0,0,0.08);
+}
+
+.premium-card-gradient:hover::before {
+    opacity: 0.8;
+}
+
+/* ── Dark Premium Card (For EmptyState & Uploader) ── */
+.premium-card-dark {
+    position: relative;
+    background: radial-gradient(circle at top left, #1a1c24 0%, #080a0f 100%);
+    backdrop-filter: blur(20px);
+    border-radius: 48px;
+    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    color: white;
+}
+
+.premium-card-dark::before {
+    content: "";
+    position: absolute;
+    inset: -1.5px;
+    border-radius: inherit;
+    padding: 1.5px;
+    background: linear-gradient(145deg, #FF416C, #FF9068, #FFD93D, #6BCF7F, #4D96FF);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    opacity: 0.4; /* More visible on dark */
+    transition: opacity 0.4s ease;
+}
+
+.premium-card-dark:hover {
+    transform: translateY(-8px) scale(1.01);
+    box-shadow: 0 40px 100px -20px rgba(0,0,0,0.4);
+}
+
+.premium-card-dark:hover::before {
+    opacity: 1;
+}
+
+/* 4-Card Feature Style (Untouched Design) */
+.premium-square-card {
+    position: relative;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    border-radius: 40px;
+    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    min-height: 320px; 
+}
+
+.premium-square-card::before {
+    content: "";
+    position: absolute;
+    inset: -1.5px;
+    border-radius: 41.5px;
+    padding: 1.5px;
+    background: linear-gradient(145deg, #FF416C, #FF9068, #FFD93D, #6BCF7F, #4D96FF);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    opacity: 0.15;
+    transition: opacity 0.4s ease;
+}
+
+.premium-square-card:hover {
+    transform: translateY(-8px) scale(1.02);
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 40px 80px -20px rgba(0,0,0,0.08);
+}
+
+.premium-square-card:hover::before {
+    opacity: 0.8;
+}
+
+/* ── UI Components ── */
+.btn-premium-solid {
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    background-color: #15213A; /* ink */
+    padding: 1.15rem 2.5rem;
+    font-size: 1rem;
+    font-weight: 500;
+    color: white;
+    transition: all 0.3s ease;
+}
+
+.btn-premium-solid:hover {
+    transform: translateY(-4px) scale(1.03);
+    box-shadow: 0 20px 40px -10px rgba(0,0,0,0.2), 0 0 1px 1px #4D96FF;
+}
+
+.btn-premium-outline {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    border: 2px solid #f1f5f9; /* slate-100 */
+    background-color: rgba(255, 255, 255, 0.4);
+    padding: 1.15rem 2.5rem;
+    font-size: 1rem;
+    font-weight: 500;
+    color: #475569; /* slate-600 */
+    backdrop-filter: blur(20px);
+    transition: all 0.3s ease;
+}
+
+.btn-premium-outline:hover {
+    border-color: #246BFD; /* brand */
+    color: #246BFD;
+    transform: translateY(-4px) scale(1.03);
+    background-color: rgba(255, 255, 255, 0.8);
+}
+
+/* ── Typography Adjustments ── */
+.section-tag {
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5em;
+    color: #246BFD; /* brand */
+    margin-bottom: 1.5rem;
+}
+
+.section-title {
+    font-family: "Plus Jakarta Sans", sans-serif;
+    font-weight: 200;
+    letter-spacing: -0.025em;
+    color: #15213A; /* ink */
+    margin-bottom: 2rem;
+    /* Hero is 120px (7.5rem). Target is 114px (approx 7.125rem) */
+    font-size: clamp(2.25rem, 8vw, 7.125rem);
+    line-height: 1.05;
+}
+
+.section-desc {
+    margin-left: auto;
+    margin-right: auto;
+    max-width: 56rem; /* max-w-4xl */
+    font-weight: 300;
+    line-height: 1.625;
+    color: #64748b; /* slate-500 */
+    margin-bottom: 4rem;
+    /* Hero desc is 24px. Target is 18px (text-lg) */
+    font-size: clamp(1.125rem, 2vw, 1.125rem); 
+}

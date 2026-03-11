@@ -4,12 +4,14 @@
     {
       "name": "openaiDeveloperDocs",
       "type": "url",
+      "startupTimeoutSec": 45,
       "url": "https://developers.openai.com/mcp",
       "description": "Official OpenAI developer docs MCP."
     },
     {
       "name": "filesystem",
       "type": "command",
+      "startupTimeoutSec": 30,
       "command": {
         "default": "npx",
         "win32": "npx.cmd"
@@ -24,6 +26,7 @@
     {
       "name": "r2-local",
       "type": "command",
+      "startupTimeoutSec": 20,
       "command": {
         "default": "node"
       },
@@ -40,6 +43,7 @@
     {
       "name": "github",
       "type": "command",
+      "startupTimeoutSec": 30,
       "command": {
         "default": "node"
       },
@@ -55,6 +59,7 @@
     {
       "name": "supabase-mcp-server",
       "type": "command",
+      "startupTimeoutSec": 30,
       "command": {
         "default": "node"
       },
@@ -70,6 +75,7 @@
     {
       "name": "postgres",
       "type": "command",
+      "startupTimeoutSec": 30,
       "command": {
         "default": "npx",
         "win32": "npx.cmd"
@@ -88,6 +94,7 @@
     {
       "name": "netlify",
       "type": "command",
+      "startupTimeoutSec": 90,
       "command": {
         "default": "npx",
         "win32": "npx.cmd"
@@ -97,14 +104,33 @@
         "@netlify/mcp"
       ],
       "requiresEnv": [
-        "NETLIFY_MCP_ENABLED"
+        "NETLIFY_MCP_ENABLED",
+        "NETLIFY_PERSONAL_ACCESS_TOKEN"
+      ],
+      "env": {
+        "NETLIFY_PERSONAL_ACCESS_TOKEN": "{env:NETLIFY_PERSONAL_ACCESS_TOKEN}"
+      },
+      "optional": true,
+      "description": "Official Netlify MCP server enabled when NETLIFY_MCP_ENABLED and NETLIFY_PERSONAL_ACCESS_TOKEN exist."
+    },
+    {
+      "name": "render",
+      "type": "url",
+      "startupTimeoutSec": 45,
+      "url": "https://mcp.render.com/mcp",
+      "headers": {
+        "Authorization": "Bearer {env:RENDER_API_KEY}"
+      },
+      "requiresEnv": [
+        "RENDER_API_KEY"
       ],
       "optional": true,
-      "description": "Netlify MCP server enabled only when NETLIFY_MCP_ENABLED exists."
+      "description": "Official Render MCP server for deployment management."
     },
     {
       "name": "doppler",
       "type": "command",
+      "startupTimeoutSec": 45,
       "description": "Official Doppler MCP server for secret management",
       "optional": true,
       "sourceUrl": "https://github.com/DopplerHQ/mcp-server",
@@ -121,6 +147,7 @@
     {
       "name": "bookmarks-local",
       "type": "command",
+      "startupTimeoutSec": 20,
       "command": {
         "default": "node"
       },

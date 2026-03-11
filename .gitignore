@@ -42,6 +42,12 @@ ngrok-v3-stable-linux-amd64.tgz
 
 # Codex runtime artifacts
 .codex/runtime/
+path_log.txt
+**/.tmp/
+
+# Local npm config
+.npmrc
+**/.npmrc
 
 # Claude local state
 .claude/settings.local.json
