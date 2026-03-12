@@ -1,6 +1,6 @@
-import { useState, useEffect, useLayoutEffect, useTransition } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useTransition } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Download, ListChecks, ShieldAlert, Upload, ChevronDown, BarChart3, ArrowUpDown, Database, Zap, Layers, Globe } from "lucide-react";
+import { Upload } from "lucide-react";
 import { Header } from "./components/layout/Header";
 import { TabNav } from "./components/layout/TabNav";
 import { Footer } from "./components/layout/Footer";
@@ -12,11 +12,14 @@ import { StockHealthChart } from "./components/dashboard/StockHealthChart";
 import { StockTable } from "./components/analysis/StockTable";
 import { TransferMatrix } from "./components/transfer/TransferMatrix";
 import { ForecastChart } from "./components/planning/ForecastChart";
-import { Button } from "./components/shared/Button";
-import { Card } from "./components/shared/Card";
 import { useFileUpload } from "./hooks/useFileUpload";
-import { exportAnalysisWorkbook } from "./utils/analysis";
 import type { AppTab, RecentUpload, UploadStage, UploadWorkflowResult } from "./types/stock";
+import {
+    getStudioTargetOrigin,
+    resolveStudioUrl,
+    saveLatestWorkflowResult,
+    STUDIO_SYNC_MESSAGE
+} from "./utils/studio";
 
 /* ── Typewriter rotating words ── */
 const ROTATING_WORDS = [
@@ -96,6 +99,7 @@ function App() {
     const [uploadProgress, setUploadProgress] = useState(0);
     const [uploadStage, setUploadStage] = useState<UploadStage>("idle");
     const [isSwitchPending, startTabTransition] = useTransition();
+    const studioWindowRef = useRef<Window | null>(null);
     const uploadMutation = useFileUpload({
         onProgressChange: setUploadProgress,
         onStageChange: setUploadStage
@@ -105,6 +109,44 @@ function App() {
     useLayoutEffect(() => {
         window.scrollTo({ top: 0, left: 0, behavior: "auto" });
     }, []);
+
+    useEffect(() => {
+        saveLatestWorkflowResult(result);
+    }, [result]);
+
+    useEffect(() => {
+        if (!result || !studioWindowRef.current || studioWindowRef.current.closed) {
+            return;
+        }
+
+        syncStudioWindow(studioWindowRef.current, result);
+    }, [result]);
+
+    function syncStudioWindow(studioWindow: Window, payload: UploadWorkflowResult) {
+        const studioUrl = resolveStudioUrl(window.location);
+        const targetOrigin = getStudioTargetOrigin(studioUrl);
+        const message = {
+            type: STUDIO_SYNC_MESSAGE,
+            payload
+        };
+
+        const sendPayload = () => {
+            studioWindow.postMessage(message, targetOrigin);
+        };
+
+        sendPayload();
+
+        let attempts = 0;
+        const timer = window.setInterval(() => {
+            if (studioWindow.closed || attempts >= 10) {
+                window.clearInterval(timer);
+                return;
+            }
+
+            sendPayload();
+            attempts += 1;
+        }, 600);
+    }
 
     function handleUpload(file: File) {
         setCurrentFile(file);
@@ -145,6 +187,36 @@ function App() {
         startTabTransition(() => setActiveTab(tab));
     }
 
+    function handleStudioLaunch() {
+        const studioUrl = resolveStudioUrl(window.location);
+        const existingStudioWindow = studioWindowRef.current;
+
+        if (existingStudioWindow && !existingStudioWindow.closed) {
+            existingStudioWindow.focus();
+            if (result) {
+                syncStudioWindow(existingStudioWindow, result);
+            }
+            return;
+        }
+
+        const nextStudioWindow = window.open(
+            studioUrl,
+            "stockpilot-studio",
+            "width=1680,height=1040,resizable=yes,scrollbars=yes"
+        );
+
+        if (!nextStudioWindow) {
+            return;
+        }
+
+        studioWindowRef.current = nextStudioWindow;
+        nextStudioWindow.focus();
+
+        if (result) {
+            syncStudioWindow(nextStudioWindow, result);
+        }
+    }
+
     const latestUpload = history[0] ?? null;
 
     return (
@@ -154,7 +226,12 @@ function App() {
             </div>
 
             <div className="relative z-10">
-            <Header dataSource={result?.source ?? null} />
+            <Header
+                dataSource={result?.source ?? null}
+                activeTab={activeTab}
+                onTabShortcut={handleTabChange}
+                onStudioLaunch={handleStudioLaunch}
+            />
 
             {/* HERO SECTION */}
             <section id="hero" className="flex min-h-screen flex-col items-center justify-start px-4 pt-[130px] pb-20 text-center sm:px-8 sm:pt-[130px] lg:pt-[130px]">

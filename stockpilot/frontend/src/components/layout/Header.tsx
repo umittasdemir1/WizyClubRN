@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { ShieldCheck, ArrowRight } from "lucide-react";
+import type { AppTab } from "../../types/stock";
 
 interface HeaderProps {
     dataSource: "api" | "local" | null;
+    activeTab: AppTab;
+    onTabShortcut: (tab: AppTab) => void;
+    onStudioLaunch: () => void;
 }
 
-export function Header({ dataSource }: HeaderProps) {
+export function Header({ dataSource, activeTab, onTabShortcut, onStudioLaunch }: HeaderProps) {
     const [isVisible, setIsVisible] = useState(true);
     const lastScrollYRef = useRef(0);
 
@@ -44,6 +48,11 @@ export function Header({ dataSource }: HeaderProps) {
                 behavior: "smooth"
             });
         }
+    };
+
+    const openWorkspaceTab = (tab: AppTab) => {
+        onTabShortcut(tab);
+        scrollToSection("workspace");
     };
 
     return (
@@ -91,10 +100,18 @@ export function Header({ dataSource }: HeaderProps) {
                         PLANNING
                     </button>
                     <button 
-                        onClick={() => scrollToSection("workspace")}
-                        className="text-sm font-medium tracking-wide text-ink hover:text-brand transition-colors"
+                        onClick={() => openWorkspaceTab("dashboard")}
+                        className={`text-sm font-medium tracking-wide transition-colors ${
+                            activeTab === "dashboard" ? "text-brand" : "text-ink hover:text-brand"
+                        }`}
                     >
                         DASHBOARD
+                    </button>
+                    <button 
+                        onClick={onStudioLaunch}
+                        className="text-sm font-medium tracking-wide text-ink transition-colors hover:text-brand"
+                    >
+                        STUDIO
                     </button>
                 </nav>
 
