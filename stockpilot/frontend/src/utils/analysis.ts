@@ -12,19 +12,25 @@ import type {
 } from "../types/stock";
 
 const HEADER_ALIASES = {
-    warehouseName: ["warehouse_name", "warehouse name"],
-    productCode: ["product_code", "product code", "sku", "stock code"],
-    productName: ["product_name", "product name"],
-    color: ["color"],
-    size: ["size"],
-    gender: ["gender"],
-    salesQty: ["sales_qty", "sales qty", "sales quantity"],
-    returnQty: ["return_qty", "return qty", "return quantity"],
-    inventory: ["inventory", "stock", "on hand"],
-    productionYear: ["production_year", "production year"],
-    lastSaleDate: ["last_sale_date", "last sale date"],
-    firstStockEntryDate: ["first_stock_entry_date", "first stock entry date"],
-    firstSaleDate: ["first_sale_date", "first sale date"]
+    warehouseName: ["warehouse_name", "warehouse name", "depo adı", "depo adi"],
+    productCode: ["product_code", "product code", "sku", "stock code", "ürün kodu", "urun kodu"],
+    productName: ["product_name", "product name", "ürün adı", "urun adi", "ürün adi"],
+    color: ["color", "renk açıklaması", "renk aciklamasi", "renk"],
+    size: ["size", "beden"],
+    gender: ["gender", "cinsiyet açıklama", "cinsiyet aciklama", "cinsiyet"],
+    salesQty: ["sales_qty", "sales qty", "sales quantity", "satis", "satış", "satış miktar"],
+    returnQty: ["return_qty", "return qty", "return quantity", "iade miktar", "iade miktari", "iade"],
+    inventory: ["inventory", "stock", "on hand", "envanter"],
+    productionYear: ["production_year", "production year", "yıl açıklama", "yil aciklama", "yıl", "yil"],
+    lastSaleDate: ["last_sale_date", "last sale date", "son satış tarihi", "son satis tarihi"],
+    firstStockEntryDate: [
+        "first_stock_entry_date",
+        "first stock entry date",
+        "ilk alış tarihi",
+        "ilk alis tarihi",
+        "first buy date"
+    ],
+    firstSaleDate: ["first_sale_date", "first sale date", "ilk satış tarihi", "ilk satis tarihi"]
 } satisfies Record<keyof InventoryRecord, string[]>;
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -33,6 +39,12 @@ function normalizeHeader(value: string): string {
     return value
         .trim()
         .toLowerCase()
+        .replace(/[ıİ]/g, "i")
+        .replace(/[ğĞ]/g, "g")
+        .replace(/[üÜ]/g, "u")
+        .replace(/[şŞ]/g, "s")
+        .replace(/[öÖ]/g, "o")
+        .replace(/[çÇ]/g, "c")
         .replace(/[_-]+/g, " ")
         .replace(/\s+/g, " ");
 }

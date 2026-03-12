@@ -2,25 +2,37 @@ import * as XLSX from "xlsx";
 import type { InventoryRecord, ParsedInventoryPayload } from "../types/index.js";
 
 const HEADER_ALIASES = {
-    warehouseName: ["warehouse_name", "warehouse name"],
-    productCode: ["product_code", "product code", "sku", "stock code"],
-    productName: ["product_name", "product name"],
-    color: ["color"],
-    size: ["size"],
-    gender: ["gender"],
-    salesQty: ["sales_qty", "sales qty", "sales quantity"],
-    returnQty: ["return_qty", "return qty", "return quantity"],
-    inventory: ["inventory", "stock", "on hand"],
-    productionYear: ["production_year", "production year"],
-    lastSaleDate: ["last_sale_date", "last sale date"],
-    firstStockEntryDate: ["first_stock_entry_date", "first stock entry date"],
-    firstSaleDate: ["first_sale_date", "first sale date"]
+    warehouseName: ["warehouse_name", "warehouse name", "depo adı", "depo adi"],
+    productCode: ["product_code", "product code", "sku", "stock code", "ürün kodu", "urun kodu"],
+    productName: ["product_name", "product name", "ürün adı", "urun adi", "ürün adi"],
+    color: ["color", "renk açıklaması", "renk aciklamasi", "renk"],
+    size: ["size", "beden"],
+    gender: ["gender", "cinsiyet açıklama", "cinsiyet aciklama", "cinsiyet"],
+    salesQty: ["sales_qty", "sales qty", "sales quantity", "satis", "satış", "satış miktar"],
+    returnQty: ["return_qty", "return qty", "return quantity", "iade miktar", "iade miktari", "iade"],
+    inventory: ["inventory", "stock", "on hand", "envanter"],
+    productionYear: ["production_year", "production year", "yıl açıklama", "yil aciklama", "yıl", "yil"],
+    lastSaleDate: ["last_sale_date", "last sale date", "son satış tarihi", "son satis tarihi"],
+    firstStockEntryDate: [
+        "first_stock_entry_date",
+        "first stock entry date",
+        "ilk alış tarihi",
+        "ilk alis tarihi",
+        "first buy date"
+    ],
+    firstSaleDate: ["first_sale_date", "first sale date", "ilk satış tarihi", "ilk satis tarihi"]
 } satisfies Record<keyof InventoryRecord, string[]>;
 
 function normalizeHeader(value: string): string {
     return value
         .trim()
         .toLowerCase()
+        .replace(/[ıİ]/g, "i")
+        .replace(/[ğĞ]/g, "g")
+        .replace(/[üÜ]/g, "u")
+        .replace(/[şŞ]/g, "s")
+        .replace(/[öÖ]/g, "o")
+        .replace(/[çÇ]/g, "c")
         .replace(/[_-]+/g, " ")
         .replace(/\s+/g, " ");
 }
@@ -141,6 +153,39 @@ function toYear(value: unknown): number | null {
     return Number(match[0]);
 }
 
+function parseConcatenatedQuotedCsv(text: string): Record<string, unknown>[] {
+    const lines = text
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+    if (lines.length === 0) {
+        return [];
+    }
+
+    const toCells = (line: string) => {
+        const trimmed = line.replace(/\r$/, "");
+        if (!trimmed.startsWith("\"") || !trimmed.endsWith("\"")) {
+            return [];
+        }
+
+        return trimmed.slice(1, -1).split("\"\"");
+    };
+
+    const headers = toCells(lines[0]);
+    if (headers.length <= 1) {
+        return [];
+    }
+
+    return lines.slice(1).map((line) => {
+        const values = toCells(line);
+        return headers.reduce<Record<string, unknown>>((row, header, index) => {
+            row[header] = values[index] ?? "";
+            return row;
+        }, {});
+    });
+}
+
 export function normalizeInventoryRows(
     rows: Record<string, unknown>[],
     fileName: string
@@ -179,6 +224,21 @@ export function normalizeInventoryRows(
 }
 
 export function parseInventoryBuffer(buffer: Buffer, fileName: string): ParsedInventoryPayload {
+    if (fileName.toLowerCase().endsWith(".csv")) {
+        const text = buffer.toString("utf8");
+        const firstLine = text.split(/\r?\n/, 1)[0]?.trim() ?? "";
+        const isConcatenatedQuotedCsv =
+            firstLine.startsWith("\"") &&
+            firstLine.includes("\"\"") &&
+            !firstLine.includes(",") &&
+            !firstLine.includes(";") &&
+            !firstLine.includes("\t");
+
+        if (isConcatenatedQuotedCsv) {
+            return normalizeInventoryRows(parseConcatenatedQuotedCsv(text), fileName);
+        }
+    }
+
     const workbook = XLSX.read(buffer, {
         type: "buffer",
         cellDates: false
