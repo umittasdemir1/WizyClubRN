@@ -791,6 +791,46 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
         setOpenFilterTableId(null);
     }
 
+    function deleteTable(tableId: string) {
+        const currentIndex = tables.findIndex((table) => table.id === tableId);
+        if (currentIndex === -1) {
+            return;
+        }
+
+        const remainingTables = tables.filter((table) => table.id !== tableId);
+
+        if (remainingTables.length === 0) {
+            const fallbackTable = createPivotTable(1);
+            setTables([fallbackTable]);
+            setActiveTableId(fallbackTable.id);
+            setLastActiveTableId(fallbackTable.id);
+            setOpenFilterTableId(null);
+            setOpenTableSettingsId(null);
+            cancelTableRename();
+            return;
+        }
+
+        const nextActiveTable = remainingTables[Math.min(currentIndex, remainingTables.length - 1)];
+
+        setTables(remainingTables);
+        setActiveTableId((currentActiveTableId) =>
+            currentActiveTableId === tableId || !remainingTables.some((table) => table.id === currentActiveTableId)
+                ? nextActiveTable.id
+                : currentActiveTableId
+        );
+        setLastActiveTableId(nextActiveTable.id);
+        setOpenFilterTableId((currentOpenFilterTableId) =>
+            currentOpenFilterTableId === tableId ? null : currentOpenFilterTableId
+        );
+        setOpenTableSettingsId((currentOpenTableSettingsId) =>
+            currentOpenTableSettingsId === tableId ? null : currentOpenTableSettingsId
+        );
+
+        if (editingTableId === tableId) {
+            cancelTableRename();
+        }
+    }
+
     function removeFieldFromZone(fieldId: PivotFieldId, zoneId: PivotZoneId) {
         updateActiveTable((table) => ({
             ...table,
@@ -1290,9 +1330,9 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                                         {activeTable ? (
                                             <button
                                             type="button"
-                                            onClick={clearTableSelection}
+                                            onClick={() => deleteTable(activeTable.id)}
                                             className="inline-flex shrink-0 items-center gap-2 rounded-[10px] pl-3 pr-1.5 py-1 text-white/80 transition hover:text-white"
-                                            aria-label={`Clear selection for ${activeTable.name}`}
+                                            aria-label={`Delete ${activeTable.name}`}
                                         >
                                             <X className="h-[18px] w-[18px] text-white" strokeWidth={1.75} />
                                             <span className="text-sm font-light tracking-tight text-white">Delete</span>
