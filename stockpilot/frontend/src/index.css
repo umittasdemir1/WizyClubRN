@@ -136,82 +136,61 @@ body {
 }
 
 /* ── Premium Gradient Card System ── */
-.premium-card-gradient {
+.premium-card-gradient,
+.premium-card-dark,
+.premium-square-card {
     position: relative;
-    background: rgba(255, 255, 255, 0.75);
+    -webkit-backdrop-filter: blur(12px);
     backdrop-filter: blur(12px);
-    border-radius: 48px;
-    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    transition:
+        transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+        box-shadow 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+        background-color 0.35s ease;
 }
 
-.premium-card-gradient::before {
-    content: "";
-    position: absolute;
-    inset: -1.5px;
-    border-radius: inherit;
-    padding: 1.5px;
-    background: linear-gradient(145deg, #FF416C, #FF9068, #FFD93D, #6BCF7F, #4D96FF);
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    pointer-events: none;
-    opacity: 0.2;
-    transition: opacity 0.4s ease;
+.premium-card-gradient {
+    border-radius: 48px;
+    background-color: rgba(255, 255, 255, 0.84);
+    box-shadow:
+        0 22px 54px -36px rgba(21, 33, 58, 0.32),
+        0 0 0 1px rgba(255, 255, 255, 0.34) inset;
 }
 
 .premium-card-gradient:hover {
     transform: translateY(-8px) scale(1.01);
-    background: rgba(255, 255, 255, 0.95);
-    box-shadow: 0 40px 80px -20px rgba(0,0,0,0.08);
-}
-
-.premium-card-gradient:hover::before {
-    opacity: 0.8;
+    background-color: rgba(255, 255, 255, 0.96);
+    box-shadow:
+        0 40px 80px -20px rgba(0, 0, 0, 0.08),
+        0 0 0 1px rgba(255, 255, 255, 0.52) inset;
 }
 
 /* ── Dark Premium Card (For EmptyState & Uploader) ── */
 .premium-card-dark {
-    position: relative;
-    background: radial-gradient(circle at top left, #1a1c24 0%, #080a0f 100%);
-    backdrop-filter: blur(20px);
     border-radius: 48px;
-    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    background-color: #0b0e14;
+    background-image: radial-gradient(circle at top left, #1a1c24 0%, #080a0f 100%);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+    box-shadow:
+        0 32px 90px -46px rgba(0, 0, 0, 0.86),
+        0 0 0 1px rgba(255, 255, 255, 0.06) inset;
     color: white;
-}
-
-.premium-card-dark::before {
-    content: "";
-    position: absolute;
-    inset: -1.5px;
-    border-radius: inherit;
-    padding: 1.5px;
-    background: linear-gradient(145deg, #FF416C, #FF9068, #FFD93D, #6BCF7F, #4D96FF);
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    pointer-events: none;
-    opacity: 0.4; /* More visible on dark */
-    transition: opacity 0.4s ease;
 }
 
 .premium-card-dark:hover {
     transform: translateY(-8px) scale(1.01);
-    box-shadow: 0 40px 100px -20px rgba(0,0,0,0.4);
-}
-
-.premium-card-dark:hover::before {
-    opacity: 1;
+    box-shadow:
+        0 40px 100px -20px rgba(0, 0, 0, 0.4),
+        0 0 0 1px rgba(255, 255, 255, 0.08) inset;
 }
 
 /* 4-Card Feature Style (Untouched Design) */
 .premium-square-card {
-    position: relative;
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(12px);
     border-radius: 40px;
-    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    background-color: rgba(255, 255, 255, 0.82);
+    box-shadow:
+        0 22px 58px -38px rgba(21, 33, 58, 0.28),
+        0 0 0 1px rgba(255, 255, 255, 0.34) inset;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -220,30 +199,12 @@ body {
     min-height: 320px; 
 }
 
-.premium-square-card::before {
-    content: "";
-    position: absolute;
-    inset: -1.5px;
-    border-radius: 41.5px;
-    padding: 1.5px;
-    background: linear-gradient(145deg, #FF416C, #FF9068, #FFD93D, #6BCF7F, #4D96FF);
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    pointer-events: none;
-    opacity: 0.15;
-    transition: opacity 0.4s ease;
-}
-
 .premium-square-card:hover {
     transform: translateY(-8px) scale(1.02);
-    background: rgba(255, 255, 255, 0.95);
-    box-shadow: 0 40px 80px -20px rgba(0,0,0,0.08);
-}
-
-.premium-square-card:hover::before {
-    opacity: 0.8;
+    background-color: rgba(255, 255, 255, 0.96);
+    box-shadow:
+        0 40px 80px -20px rgba(0, 0, 0, 0.08),
+        0 0 0 1px rgba(255, 255, 255, 0.5) inset;
 }
 
 /* ── UI Components ── */
