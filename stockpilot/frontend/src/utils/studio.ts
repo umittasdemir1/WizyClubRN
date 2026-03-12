@@ -3,12 +3,6 @@ import type { UploadWorkflowResult } from "../types/stock";
 export const STUDIO_SYNC_MESSAGE = "stockpilot:studio-sync";
 
 const LATEST_WORKFLOW_STORAGE_KEY = "stockpilot-latest-workflow";
-const LOCAL_HOSTNAMES = new Set(["localhost", "127.0.0.1", "0.0.0.0"]);
-const REWRITABLE_PREFIXES = new Set(["www", "app"]);
-
-function isIpAddress(hostname: string): boolean {
-    return /^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname);
-}
 
 export function isStudioHost(hostname: string): boolean {
     return hostname.toLowerCase() === "studio" || hostname.toLowerCase().startsWith("studio.");
@@ -22,23 +16,6 @@ export function resolveStudioUrl(location: Pick<Location, "origin" | "protocol" 
     const configuredUrl = import.meta.env.VITE_STOCKPILOT_STUDIO_URL?.trim();
     if (configuredUrl) {
         return configuredUrl;
-    }
-
-    if (
-        LOCAL_HOSTNAMES.has(location.hostname) ||
-        isIpAddress(location.hostname) ||
-        location.hostname.endsWith(".local") ||
-        location.hostname.endsWith(".netlify.app")
-    ) {
-        return `${location.origin}/studio`;
-    }
-
-    const hostnameParts = location.hostname.split(".").filter(Boolean);
-    if (hostnameParts.length >= 2) {
-        const baseParts = REWRITABLE_PREFIXES.has(hostnameParts[0])
-            ? hostnameParts.slice(1)
-            : hostnameParts;
-        return `${location.protocol}//studio.${baseParts.join(".")}`;
     }
 
     return `${location.origin}/studio`;

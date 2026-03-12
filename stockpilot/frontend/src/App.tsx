@@ -189,6 +189,7 @@ function App() {
 
     function handleStudioLaunch() {
         const studioUrl = resolveStudioUrl(window.location);
+        saveLatestWorkflowResult(result);
         const existingStudioWindow = studioWindowRef.current;
 
         if (existingStudioWindow && !existingStudioWindow.closed) {
@@ -206,6 +207,7 @@ function App() {
         );
 
         if (!nextStudioWindow) {
+            window.location.assign(studioUrl);
             return;
         }
 
