@@ -194,6 +194,17 @@ body {
         0 0 0 1px rgba(255, 255, 255, 0.08) inset;
 }
 
+.canvas-studio-header {
+    transition: none;
+}
+
+.canvas-studio-header:hover {
+    transform: none;
+    box-shadow:
+        0 32px 90px -46px rgba(0, 0, 0, 0.86),
+        0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+}
+
 /* 4-Card Feature Style (Untouched Design) */
 .premium-square-card {
     border-radius: 40px;

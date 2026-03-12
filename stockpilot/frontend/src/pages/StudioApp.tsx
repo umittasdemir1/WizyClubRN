@@ -39,7 +39,7 @@ function getSyncLabel(result: UploadWorkflowResult | null) {
 function StudioMetricCard({ card }: { card: SummaryCard }) {
     return (
         <article
-            className="premium-card-dark relative min-h-[220px] overflow-hidden px-6 py-6"
+            className="premium-card-dark relative aspect-square w-full overflow-hidden px-5 py-5 sm:px-6 sm:py-6"
             style={{ borderRadius: "12px" }}
         >
             <div
@@ -52,16 +52,18 @@ function StudioMetricCard({ card }: { card: SummaryCard }) {
                 <div className="story-grid-pattern" />
             </div>
 
-            <div className="relative z-10 flex h-full flex-col justify-between">
+            <div className="relative z-10 flex h-full flex-col">
                 <div>
-                    <p className="font-display text-[1.75rem] font-light leading-[1.08] tracking-tight text-white sm:text-[2rem]">
+                    <p className="text-[0.72rem] font-semibold uppercase tracking-[0.24em] text-slate-300/90">
                         {card.label}
                     </p>
-                    <p className="mt-4 font-display text-4xl font-semibold tracking-tight text-white">
+                </div>
+                <div className="flex flex-1 items-center">
+                    <p className="font-display text-[2.5rem] font-semibold leading-none tracking-tight text-white sm:text-[2.9rem]">
                         {card.value}
                     </p>
                 </div>
-                <p className="max-w-[22rem] text-lg font-normal leading-relaxed text-slate-200/90">
+                <p className="text-sm font-normal leading-relaxed text-slate-200/90 sm:text-[0.95rem]">
                     {card.note}
                 </p>
             </div>
@@ -73,11 +75,20 @@ export function StudioApp() {
     const [result, setResult] = useState<UploadWorkflowResult | null>(() => loadLatestWorkflowResult());
     const [isHeaderVisible, setIsHeaderVisible] = useState(true);
     const lastScrollYRef = useRef(0);
+    const canvasSectionRef = useRef<HTMLElement | null>(null);
     const uploadMutation = useFileUpload();
 
     useEffect(() => {
         const handleScroll = () => {
             const currentScrollY = window.scrollY;
+            const canvasRect = canvasSectionRef.current?.getBoundingClientRect();
+            const canvasProbeY = 140;
+
+            if (canvasRect && canvasRect.top <= canvasProbeY && canvasRect.bottom >= canvasProbeY) {
+                setIsHeaderVisible(false);
+                lastScrollYRef.current = currentScrollY;
+                return;
+            }
 
             if (currentScrollY < 120) {
                 setIsHeaderVisible(true);
@@ -94,6 +105,7 @@ export function StudioApp() {
             lastScrollYRef.current = currentScrollY;
         };
 
+        handleScroll();
         window.addEventListener("scroll", handleScroll, { passive: true });
         return () => window.removeEventListener("scroll", handleScroll);
     }, []);
@@ -236,7 +248,7 @@ export function StudioApp() {
 
                     <section
                         {...getRootProps()}
-                        className={`mt-10 grid gap-4 md:grid-cols-2 2xl:grid-cols-4 ${isDragActive ? "rounded-[28px] ring-2 ring-brand/30 ring-offset-2 ring-offset-transparent" : ""}`}
+                        className={`mx-auto mt-10 grid max-w-[280px] gap-4 sm:max-w-[560px] sm:grid-cols-2 xl:max-w-[1040px] xl:grid-cols-4 ${isDragActive ? "rounded-[28px] ring-2 ring-brand/30 ring-offset-2 ring-offset-transparent" : ""}`}
                     >
                         <input {...getInputProps()} />
                         {summaryCards.map((card) => (
@@ -244,7 +256,7 @@ export function StudioApp() {
                         ))}
                     </section>
 
-                    <section className="mt-6">
+                    <section ref={canvasSectionRef} className="mt-6">
                         <CanvasStudio analysis={result?.analysis ?? null} />
                     </section>
                 </div>
