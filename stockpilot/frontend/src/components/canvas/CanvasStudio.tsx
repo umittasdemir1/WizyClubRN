@@ -1,616 +1,1574 @@
-import { useEffect, useState, type DragEvent } from "react";
 import {
-    BellRing,
-    Boxes,
-    Database,
+    Fragment,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type DragEvent,
+    type PointerEvent as ReactPointerEvent
+} from "react";
+import { motion } from "framer-motion";
+import {
+    BetweenHorizontalStart,
+    BetweenVerticalStart,
+    ChevronDown,
+    Cog,
+    Diff,
     Grip,
-    LayoutTemplate,
-    RotateCcw,
-    Rows3,
-    ShieldCheck,
-    Trash2,
-    Warehouse
+    Plus,
+    SquarePen,
+    SlidersHorizontal,
+    TableProperties,
+    X
 } from "lucide-react";
-import type { AnalysisResult, TransferSuggestion } from "../../types/stock";
-import { formatNumber, formatPercent } from "../../utils/formatting";
+import type { AnalysisResult, AnalyzedInventoryRecord } from "../../types/stock";
+import { formatNullableDate, formatNumber, formatPercent } from "../../utils/formatting";
 
-type CanvasWidgetId =
-    | "inventory"
-    | "net-sales"
-    | "returns"
-    | "lifecycle"
-    | "warehouses"
-    | "planning"
-    | "alerts"
-    | "transfers";
+type PivotZoneId = "filters" | "columns" | "rows" | "values";
+type PivotFieldId = keyof AnalyzedInventoryRecord;
+
+interface PivotLayout {
+    filters: PivotFieldId[];
+    columns: PivotFieldId[];
+    rows: PivotFieldId[];
+    values: PivotFieldId[];
+}
+
+interface PivotFieldDefinition {
+    id: PivotFieldId;
+    label: string;
+    kind: "dimension" | "measure";
+    summary: "sum" | "avg" | "count";
+    format: "text" | "number" | "percent" | "date";
+}
 
 interface CanvasStudioProps {
     analysis: AnalysisResult | null;
-    transfers: TransferSuggestion[];
-    session: {
-        fileName: string | null;
-        rowCount: number;
-        source: "api" | "local" | null;
+}
+
+interface PivotCombo {
+    key: string;
+    labels: string[];
+}
+
+interface AggregationState {
+    sum: number;
+    count: number;
+}
+
+interface DragState {
+    fieldId: PivotFieldId;
+    sourceZone: PivotZoneId | "fields";
+}
+
+interface PivotResult {
+    valueFields: PivotFieldId[];
+    rowCombos: PivotCombo[];
+    columnCombos: PivotCombo[];
+    matrix: Map<string, Map<string, Record<string, AggregationState>>>;
+}
+
+interface PivotTableInstance {
+    id: string;
+    name: string;
+    layout: PivotLayout;
+    filterSelections: Record<string, string>;
+    position: {
+        x: number;
+        y: number;
+    };
+    size: {
+        width: number;
+        height: number;
     };
 }
 
-interface CanvasWidgetDefinition {
-    id: CanvasWidgetId;
-    label: string;
-    description: string;
-    spanClass: string;
+interface StudioCanvasState {
+    tables: PivotTableInstance[];
+    activeTableId: string | null;
 }
 
-const STORAGE_KEY = "stockpilot-canvas-layout";
+interface PivotTableView {
+    table: PivotTableInstance;
+    filterOptions: Record<string, string[]>;
+    filteredRecords: AnalyzedInventoryRecord[];
+    pivotResult: PivotResult;
+    hasColumnGroups: boolean;
+    hasMultipleValueFields: boolean;
+    showSecondaryHeaderRow: boolean;
+}
 
-const DEFAULT_WIDGETS: CanvasWidgetId[] = [
-    "inventory",
-    "net-sales",
-    "returns",
-    "lifecycle",
-    "warehouses",
-    "planning"
-];
+type TableResizeDirection =
+    | "n"
+    | "e"
+    | "s"
+    | "w"
+    | "ne"
+    | "nw"
+    | "se"
+    | "sw";
 
-const WIDGET_LIBRARY: CanvasWidgetDefinition[] = [
+interface ResizeState {
+    tableId: string;
+    direction: TableResizeDirection;
+    startPointerX: number;
+    startPointerY: number;
+    startX: number;
+    startY: number;
+    startWidth: number;
+    startHeight: number;
+}
+
+interface MoveState {
+    tableId: string;
+    startPointerX: number;
+    startPointerY: number;
+    startX: number;
+    startY: number;
+}
+
+const STORAGE_KEY = "stockpilot-pivot-studio-layout-v3";
+const ALL_FILTER_VALUE = "__all__";
+const MIN_TABLE_WIDTH = 220;
+const MIN_TABLE_HEIGHT = 220;
+const DEFAULT_TABLE_WIDTH = 560;
+const DEFAULT_TABLE_HEIGHT = 460;
+
+const DEFAULT_LAYOUT: PivotLayout = {
+    filters: [],
+    columns: [],
+    rows: [],
+    values: []
+};
+
+const PIVOT_ZONES: {
+    id: PivotZoneId;
+    label: string;
+}[] = [
     {
-        id: "inventory",
-        label: "Inventory Snapshot",
-        description: "Total inventory and product spread across the network.",
-        spanClass: "xl:col-span-1"
+        id: "filters",
+        label: "Filters"
     },
     {
-        id: "net-sales",
-        label: "Net Sales",
-        description: "Core sales movement after returns are deducted.",
-        spanClass: "xl:col-span-1"
+        id: "columns",
+        label: "Columns"
     },
     {
-        id: "returns",
-        label: "Returns Lens",
-        description: "Return count and blended return rate in one tile.",
-        spanClass: "xl:col-span-1"
+        id: "rows",
+        label: "Rows"
     },
     {
-        id: "lifecycle",
-        label: "Lifecycle Mix",
-        description: "Healthy, slow-moving, and stagnant distribution.",
-        spanClass: "xl:col-span-1"
-    },
-    {
-        id: "warehouses",
-        label: "Warehouse Mix",
-        description: "Top warehouses by inventory and net sales intensity.",
-        spanClass: "xl:col-span-2"
-    },
-    {
-        id: "planning",
-        label: "Planning Rail",
-        description: "Inventory and demand patterns by production year.",
-        spanClass: "xl:col-span-2"
-    },
-    {
-        id: "alerts",
-        label: "Attention Queue",
-        description: "Operational exceptions that need manual review.",
-        spanClass: "xl:col-span-2"
-    },
-    {
-        id: "transfers",
-        label: "Transfer Queue",
-        description: "Warehouse rebalancing suggestions from the latest run.",
-        spanClass: "xl:col-span-2"
+        id: "values",
+        label: "Values"
     }
 ];
 
-function isCanvasWidgetId(value: string): value is CanvasWidgetId {
-    return WIDGET_LIBRARY.some((widget) => widget.id === value);
+const TABLE_RESIZE_HANDLES: {
+    direction: TableResizeDirection;
+    className: string;
+}[] = [
+    { direction: "n", className: "left-3 right-3 top-0 h-4 cursor-ns-resize" },
+    { direction: "e", className: "bottom-3 right-0 top-3 w-4 cursor-ew-resize" },
+    { direction: "s", className: "bottom-0 left-3 right-3 h-4 cursor-ns-resize" },
+    { direction: "w", className: "bottom-3 left-0 top-3 w-4 cursor-ew-resize" },
+    { direction: "ne", className: "right-0 top-0 h-5 w-5 cursor-nesw-resize" },
+    { direction: "nw", className: "left-0 top-0 h-5 w-5 cursor-nwse-resize" },
+    { direction: "se", className: "bottom-0 right-0 h-5 w-5 cursor-nwse-resize" },
+    { direction: "sw", className: "bottom-0 left-0 h-5 w-5 cursor-nesw-resize" }
+];
+
+const PIVOT_FIELDS: PivotFieldDefinition[] = [
+    { id: "warehouseName", label: "Warehouse", kind: "dimension", summary: "count", format: "text" },
+    { id: "productCode", label: "Product Code", kind: "dimension", summary: "count", format: "text" },
+    { id: "productName", label: "Product Name", kind: "dimension", summary: "count", format: "text" },
+    { id: "color", label: "Color", kind: "dimension", summary: "count", format: "text" },
+    { id: "size", label: "Size", kind: "dimension", summary: "count", format: "text" },
+    { id: "gender", label: "Gender", kind: "dimension", summary: "count", format: "text" },
+    { id: "productionYear", label: "Production Year", kind: "dimension", summary: "count", format: "text" },
+    { id: "lastSaleDate", label: "Last Sale Date", kind: "dimension", summary: "count", format: "date" },
+    { id: "firstStockEntryDate", label: "First Stock Entry Date", kind: "dimension", summary: "count", format: "date" },
+    { id: "firstSaleDate", label: "First Sale Date", kind: "dimension", summary: "count", format: "date" },
+    { id: "salesQty", label: "Sales Qty", kind: "measure", summary: "sum", format: "number" },
+    { id: "returnQty", label: "Return Qty", kind: "measure", summary: "sum", format: "number" },
+    { id: "inventory", label: "Inventory", kind: "measure", summary: "sum", format: "number" },
+    { id: "netSalesQty", label: "Net Sales", kind: "measure", summary: "sum", format: "number" },
+    { id: "returnRate", label: "Return Rate", kind: "measure", summary: "avg", format: "percent" },
+    { id: "sellThroughRate", label: "Sell Through", kind: "measure", summary: "avg", format: "percent" },
+    { id: "daysSinceLastSale", label: "Days Since Last Sale", kind: "measure", summary: "avg", format: "number" },
+    { id: "stockAgeDays", label: "Stock Age Days", kind: "measure", summary: "avg", format: "number" },
+    { id: "daysToFirstSale", label: "Days to First Sale", kind: "measure", summary: "avg", format: "number" }
+];
+
+function getFieldDefinition(fieldId: PivotFieldId) {
+    return PIVOT_FIELDS.find((field) => field.id === fieldId)!;
 }
 
-function getWidgetDefinition(id: CanvasWidgetId) {
-    return WIDGET_LIBRARY.find((widget) => widget.id === id)!;
+function uniqueFieldIds(values: PivotFieldId[]) {
+    return Array.from(new Set(values.filter((value) => PIVOT_FIELDS.some((field) => field.id === value))));
 }
 
-export function CanvasStudio({ analysis, transfers, session }: CanvasStudioProps) {
-    const [widgets, setWidgets] = useState<CanvasWidgetId[]>(DEFAULT_WIDGETS);
-    const [isCanvasActive, setIsCanvasActive] = useState(false);
+function sanitizeLayout(value: unknown): PivotLayout {
+    if (!value || typeof value !== "object") {
+        return DEFAULT_LAYOUT;
+    }
+
+    const candidate = value as Partial<Record<PivotZoneId, PivotFieldId[]>>;
+
+    return {
+        filters: uniqueFieldIds(candidate.filters ?? DEFAULT_LAYOUT.filters),
+        columns: uniqueFieldIds(candidate.columns ?? DEFAULT_LAYOUT.columns),
+        rows: uniqueFieldIds(candidate.rows ?? DEFAULT_LAYOUT.rows),
+        values: uniqueFieldIds(candidate.values ?? DEFAULT_LAYOUT.values)
+    };
+}
+
+function getDimensionValue(record: AnalyzedInventoryRecord, fieldId: PivotFieldId) {
+    const field = getFieldDefinition(fieldId);
+    const rawValue = record[fieldId];
+
+    if (rawValue === null || rawValue === undefined || rawValue === "") {
+        return "(Blank)";
+    }
+
+    if (field.format === "date") {
+        return formatNullableDate(typeof rawValue === "string" ? rawValue : String(rawValue));
+    }
+
+    return String(rawValue);
+}
+
+function getMeasureInput(record: AnalyzedInventoryRecord, fieldId: PivotFieldId) {
+    const field = getFieldDefinition(fieldId);
+    const rawValue = record[fieldId];
+
+    if (field.kind === "dimension" || field.summary === "count") {
+        return {
+            sum: rawValue === null || rawValue === undefined || rawValue === "" ? 0 : 1,
+            count: rawValue === null || rawValue === undefined || rawValue === "" ? 0 : 1
+        };
+    }
+
+    if (typeof rawValue === "number" && Number.isFinite(rawValue)) {
+        return {
+            sum: rawValue,
+            count: 1
+        };
+    }
+
+    return {
+        sum: 0,
+        count: 0
+    };
+}
+
+function resolveAggregationValue(fieldId: PivotFieldId, state: AggregationState | undefined) {
+    if (!state) {
+        return 0;
+    }
+
+    const field = getFieldDefinition(fieldId);
+
+    if (field.summary === "count") {
+        return state.count;
+    }
+
+    if (field.summary === "avg") {
+        return state.count > 0 ? state.sum / state.count : 0;
+    }
+
+    return state.sum;
+}
+
+function formatAggregatedValue(fieldId: PivotFieldId, value: number) {
+    const field = getFieldDefinition(fieldId);
+
+    if (field.format === "percent") {
+        return formatPercent(value);
+    }
+
+    return formatNumber(value);
+}
+
+function buildComboKey(record: AnalyzedInventoryRecord, fieldIds: PivotFieldId[]) {
+    if (fieldIds.length === 0) {
+        return {
+            key: "__total__",
+            labels: ["Grand Total"]
+        };
+    }
+
+    const labels = fieldIds.map((fieldId) => getDimensionValue(record, fieldId));
+    return {
+        key: labels.join("|||"),
+        labels
+    };
+}
+
+function sortCombos(combos: PivotCombo[]) {
+    return [...combos].sort((left, right) =>
+        left.labels.join(" / ").localeCompare(right.labels.join(" / "), "en")
+    );
+}
+
+function createTableId() {
+    return `pivot-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function createPivotTable(index: number): PivotTableInstance {
+    const offset = (index - 1) * 36;
+    return {
+        id: createTableId(),
+        name: `Table ${index}`,
+        layout: DEFAULT_LAYOUT,
+        filterSelections: {},
+        position: {
+            x: offset,
+            y: offset
+        },
+        size: {
+            width: DEFAULT_TABLE_WIDTH,
+            height: DEFAULT_TABLE_HEIGHT
+        }
+    };
+}
+
+function sanitizeTable(value: unknown, index: number): PivotTableInstance {
+    const fallback = createPivotTable(index);
+    if (!value || typeof value !== "object") {
+        return fallback;
+    }
+
+    const candidate = value as Partial<PivotTableInstance>;
+    const nextPosition =
+        candidate.position &&
+        typeof candidate.position === "object" &&
+        typeof candidate.position.x === "number" &&
+        typeof candidate.position.y === "number"
+            ? {
+                  x: candidate.position.x,
+                  y: candidate.position.y
+              }
+            : fallback.position;
+    const nextSize =
+        candidate.size &&
+        typeof candidate.size === "object" &&
+        typeof candidate.size.width === "number" &&
+        typeof candidate.size.height === "number"
+            ? {
+                  width: Math.max(MIN_TABLE_WIDTH, candidate.size.width),
+                  height: Math.max(MIN_TABLE_HEIGHT, candidate.size.height)
+              }
+            : fallback.size;
+
+    const nextFilterSelections =
+        candidate.filterSelections && typeof candidate.filterSelections === "object"
+            ? Object.fromEntries(
+                  Object.entries(candidate.filterSelections).filter(
+                      ([, currentValue]) => typeof currentValue === "string"
+                  )
+              )
+            : {};
+
+    return {
+        id: typeof candidate.id === "string" && candidate.id ? candidate.id : fallback.id,
+        name: typeof candidate.name === "string" && candidate.name ? candidate.name : fallback.name,
+        layout: sanitizeLayout(candidate.layout),
+        filterSelections: nextFilterSelections,
+        position: nextPosition,
+        size: nextSize
+    };
+}
+
+function sanitizeStudioState(value: unknown): StudioCanvasState {
+    if (!value || typeof value !== "object") {
+        const initialTable = createPivotTable(1);
+        return {
+            tables: [initialTable],
+            activeTableId: initialTable.id
+        };
+    }
+
+    const candidate = value as Partial<StudioCanvasState>;
+    const nextTables =
+        Array.isArray(candidate.tables) && candidate.tables.length > 0
+            ? candidate.tables.map((table, index) => sanitizeTable(table, index + 1))
+            : [createPivotTable(1)];
+
+    const activeTableId =
+        typeof candidate.activeTableId === "string" &&
+        nextTables.some((table) => table.id === candidate.activeTableId)
+            ? candidate.activeTableId
+            : nextTables[0].id;
+
+    return {
+        tables: nextTables,
+        activeTableId
+    };
+}
+
+function buildFilterOptions(records: AnalyzedInventoryRecord[], filterFields: PivotFieldId[]) {
+    return filterFields.reduce<Record<string, string[]>>((accumulator, fieldId) => {
+        const values = sortCombos(
+            Array.from(
+                new Map(
+                    records.map((record) => {
+                        const label = getDimensionValue(record, fieldId);
+                        return [label, { key: label, labels: [label] }];
+                    })
+                ).values()
+            )
+        ).map((entry) => entry.labels[0]);
+
+        accumulator[fieldId] = values;
+        return accumulator;
+    }, {});
+}
+
+function applyFilters(
+    records: AnalyzedInventoryRecord[],
+    layout: PivotLayout,
+    filterSelections: Record<string, string>
+) {
+    return records.filter((record) =>
+        layout.filters.every((fieldId) => {
+            const selectedValue = filterSelections[fieldId] ?? ALL_FILTER_VALUE;
+            if (selectedValue === ALL_FILTER_VALUE) {
+                return true;
+            }
+
+            return getDimensionValue(record, fieldId) === selectedValue;
+        })
+    );
+}
+
+function buildPivotResult(filteredRecords: AnalyzedInventoryRecord[], layout: PivotLayout): PivotResult {
+    const valueFields = layout.values.length > 0 ? layout.values : [];
+
+    if (valueFields.length === 0) {
+        return {
+            valueFields,
+            rowCombos: [],
+            columnCombos: [],
+            matrix: new Map<string, Map<string, Record<string, AggregationState>>>()
+        };
+    }
+
+    const rowMap = new Map<string, PivotCombo>();
+    const columnMap = new Map<string, PivotCombo>();
+    const matrix = new Map<string, Map<string, Record<string, AggregationState>>>();
+
+    for (const record of filteredRecords) {
+        const rowCombo = buildComboKey(record, layout.rows);
+        const columnCombo = buildComboKey(record, layout.columns);
+
+        rowMap.set(rowCombo.key, rowCombo);
+        columnMap.set(columnCombo.key, columnCombo);
+
+        const rowBucket = matrix.get(rowCombo.key) ?? new Map<string, Record<string, AggregationState>>();
+        const cell =
+            rowBucket.get(columnCombo.key) ??
+            (Object.fromEntries(valueFields.map((fieldId) => [fieldId, { sum: 0, count: 0 }])) as Record<
+                string,
+                AggregationState
+            >);
+
+        for (const fieldId of valueFields) {
+            const input = getMeasureInput(record, fieldId);
+            cell[fieldId].sum += input.sum;
+            cell[fieldId].count += input.count;
+        }
+
+        rowBucket.set(columnCombo.key, cell);
+        matrix.set(rowCombo.key, rowBucket);
+    }
+
+    if (layout.rows.length === 0 && rowMap.size === 0) {
+        rowMap.set("__total__", { key: "__total__", labels: ["Grand Total"] });
+    }
+
+    if (layout.columns.length === 0 && columnMap.size === 0) {
+        columnMap.set("__total__", { key: "__total__", labels: ["Grand Total"] });
+    }
+
+    return {
+        valueFields,
+        rowCombos: sortCombos(Array.from(rowMap.values())),
+        columnCombos: sortCombos(Array.from(columnMap.values())),
+        matrix
+    };
+}
+
+export function CanvasStudio({ analysis }: CanvasStudioProps) {
+    const initialState = useMemo(() => sanitizeStudioState(null), []);
+    const [tables, setTables] = useState<PivotTableInstance[]>(initialState.tables);
+    const [activeTableId, setActiveTableId] = useState<string | null>(initialState.activeTableId);
+    const [dragZone, setDragZone] = useState<PivotZoneId | null>(null);
+    const [activeDrag, setActiveDrag] = useState<DragState | null>(null);
+    const [dropIndicator, setDropIndicator] = useState<{ zoneId: PivotZoneId; index: number } | null>(null);
+    const [openFilterTableId, setOpenFilterTableId] = useState<string | null>(null);
+    const [openTableSettingsId, setOpenTableSettingsId] = useState<string | null>(null);
+    const [editingTableId, setEditingTableId] = useState<string | null>(null);
+    const [tableNameDraft, setTableNameDraft] = useState("");
+    const [movingTableId, setMovingTableId] = useState<string | null>(null);
+    const [resizingTableId, setResizingTableId] = useState<string | null>(null);
+    const editingTableInputRef = useRef<HTMLInputElement | null>(null);
+    const tableCanvasRef = useRef<HTMLDivElement | null>(null);
+    const moveStateRef = useRef<MoveState | null>(null);
+    const resizeStateRef = useRef<ResizeState | null>(null);
 
     useEffect(() => {
         try {
             const raw = window.localStorage.getItem(STORAGE_KEY);
             if (!raw) {
-                setWidgets(DEFAULT_WIDGETS);
                 return;
             }
 
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) {
-                const nextWidgets = parsed.filter((value): value is CanvasWidgetId => isCanvasWidgetId(value));
-                setWidgets(nextWidgets.length > 0 ? nextWidgets : DEFAULT_WIDGETS);
-                return;
-            }
-
-            setWidgets(DEFAULT_WIDGETS);
+            const nextState = sanitizeStudioState(JSON.parse(raw));
+            setTables(nextState.tables);
+            setActiveTableId(nextState.activeTableId);
         } catch {
             window.localStorage.removeItem(STORAGE_KEY);
-            setWidgets(DEFAULT_WIDGETS);
         }
     }, []);
 
     useEffect(() => {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(widgets));
-    }, [widgets]);
+        window.localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify({
+                tables,
+                activeTableId
+            })
+        );
+    }, [activeTableId, tables]);
 
-    function addWidget(id: CanvasWidgetId) {
-        setWidgets((current) => (current.includes(id) ? current : [...current, id]));
-    }
-
-    function removeWidget(id: CanvasWidgetId) {
-        setWidgets((current) => current.filter((widgetId) => widgetId !== id));
-    }
-
-    function resetLayout() {
-        setWidgets(DEFAULT_WIDGETS);
-    }
-
-    function handleDrop(event: DragEvent<HTMLDivElement>) {
-        event.preventDefault();
-        const widgetId = event.dataTransfer.getData("text/stockpilot-widget");
-        if (isCanvasWidgetId(widgetId)) {
-            addWidget(widgetId);
+    useEffect(() => {
+        if (!editingTableId || !editingTableInputRef.current) {
+            return;
         }
-        setIsCanvasActive(false);
+
+        const input = editingTableInputRef.current;
+        input.focus();
+        const textLength = input.value.length;
+        input.setSelectionRange(textLength, textLength);
+    }, [editingTableId]);
+
+    useEffect(() => {
+        if (openTableSettingsId && activeTableId !== openTableSettingsId) {
+            setOpenTableSettingsId(null);
+        }
+    }, [activeTableId, openTableSettingsId]);
+
+    useEffect(() => {
+        function handlePointerMove(event: PointerEvent) {
+            const canvas = tableCanvasRef.current;
+            if (!canvas) {
+                return;
+            }
+
+            const canvasRect = canvas.getBoundingClientRect();
+            const moveState = moveStateRef.current;
+            if (moveState) {
+                const currentTable = tables.find((table) => table.id === moveState.tableId);
+                if (!currentTable) {
+                    return;
+                }
+
+                const deltaX = event.clientX - moveState.startPointerX;
+                const deltaY = event.clientY - moveState.startPointerY;
+                const nextX = Math.min(
+                    Math.max(0, moveState.startX + deltaX),
+                    Math.max(0, canvasRect.width - currentTable.size.width)
+                );
+                const nextY = Math.min(
+                    Math.max(0, moveState.startY + deltaY),
+                    Math.max(0, canvasRect.height - currentTable.size.height)
+                );
+
+                updateTable(moveState.tableId, (table) => ({
+                    ...table,
+                    position: {
+                        x: nextX,
+                        y: nextY
+                    }
+                }));
+                return;
+            }
+
+            const resizeState = resizeStateRef.current;
+            if (!resizeState) {
+                return;
+            }
+
+            const deltaX = event.clientX - resizeState.startPointerX;
+            const deltaY = event.clientY - resizeState.startPointerY;
+            const startLeft = resizeState.startX;
+            const startTop = resizeState.startY;
+            const startRight = resizeState.startX + resizeState.startWidth;
+            const startBottom = resizeState.startY + resizeState.startHeight;
+
+            let nextLeft = startLeft;
+            let nextTop = startTop;
+            let nextRight = startRight;
+            let nextBottom = startBottom;
+
+            if (resizeState.direction.includes("e")) {
+                nextRight = Math.min(
+                    canvasRect.width,
+                    Math.max(startLeft + MIN_TABLE_WIDTH, startRight + deltaX)
+                );
+            }
+
+            if (resizeState.direction.includes("s")) {
+                nextBottom = Math.min(
+                    canvasRect.height,
+                    Math.max(startTop + MIN_TABLE_HEIGHT, startBottom + deltaY)
+                );
+            }
+
+            if (resizeState.direction.includes("w")) {
+                nextLeft = Math.max(0, Math.min(startRight - MIN_TABLE_WIDTH, startLeft + deltaX));
+            }
+
+            if (resizeState.direction.includes("n")) {
+                nextTop = Math.max(0, Math.min(startBottom - MIN_TABLE_HEIGHT, startTop + deltaY));
+            }
+
+            updateTable(resizeState.tableId, (table) => ({
+                ...table,
+                position: {
+                    x: nextLeft,
+                    y: nextTop
+                },
+                size: {
+                    width: nextRight - nextLeft,
+                    height: nextBottom - nextTop
+                }
+            }));
+        }
+
+        function handlePointerUp() {
+            moveStateRef.current = null;
+            setMovingTableId(null);
+            resizeStateRef.current = null;
+            setResizingTableId(null);
+        }
+
+        window.addEventListener("pointermove", handlePointerMove);
+        window.addEventListener("pointerup", handlePointerUp);
+
+        return () => {
+            window.removeEventListener("pointermove", handlePointerMove);
+            window.removeEventListener("pointerup", handlePointerUp);
+        };
+    }, [tables]);
+
+    const records = analysis?.records ?? [];
+
+    const activeTable = useMemo(
+        () =>
+            activeTableId
+                ? tables.find((table) => table.id === activeTableId) ?? null
+                : null,
+        [activeTableId, tables]
+    );
+
+    useEffect(() => {
+        if (activeTableId && !tables.some((table) => table.id === activeTableId)) {
+            setActiveTableId(null);
+        }
+    }, [activeTableId, tables]);
+
+    const tableViews = useMemo<PivotTableView[]>(
+        () =>
+            tables.map((table) => {
+                const filterOptions = buildFilterOptions(records, table.layout.filters);
+                const filteredRecords = applyFilters(records, table.layout, table.filterSelections);
+                const pivotResult = buildPivotResult(filteredRecords, table.layout);
+                const hasColumnGroups = table.layout.columns.length > 0;
+                const hasMultipleValueFields = pivotResult.valueFields.length > 1;
+
+                return {
+                    table,
+                    filterOptions,
+                    filteredRecords,
+                    pivotResult,
+                    hasColumnGroups,
+                    hasMultipleValueFields,
+                    showSecondaryHeaderRow: hasColumnGroups && hasMultipleValueFields
+                };
+            }),
+        [records, tables]
+    );
+
+    const tableViewMap = useMemo(
+        () => new Map(tableViews.map((view) => [view.table.id, view])),
+        [tableViews]
+    );
+
+    const activeLayout = activeTable?.layout ?? DEFAULT_LAYOUT;
+    const visibleTableViews = tableViews.filter((view) => view.table.layout.values.length > 0);
+
+    function updateTable(tableId: string, updater: (table: PivotTableInstance) => PivotTableInstance) {
+        setTables((current) =>
+            current.map((table) => (table.id === tableId ? updater(table) : table))
+        );
+    }
+
+    function updateActiveTable(updater: (table: PivotTableInstance) => PivotTableInstance) {
+        if (!activeTable) {
+            return;
+        }
+
+        updateTable(activeTable.id, updater);
+    }
+
+    function addTable() {
+        const nextTable = createPivotTable(tables.length + 1);
+        setTables((current) => [...current, nextTable]);
+        setActiveTableId(nextTable.id);
+        setOpenFilterTableId(null);
+    }
+
+    function removeFieldFromZone(fieldId: PivotFieldId, zoneId: PivotZoneId) {
+        updateActiveTable((table) => ({
+            ...table,
+            layout: {
+                ...table.layout,
+                [zoneId]: table.layout[zoneId].filter((item) => item !== fieldId)
+            }
+        }));
+    }
+
+    function insertFieldIntoZone(fieldId: PivotFieldId, zoneId: PivotZoneId, targetIndex: number) {
+        updateActiveTable((table) => {
+            const nextLayout = {
+                filters: table.layout.filters.filter((item) => item !== fieldId),
+                columns: table.layout.columns.filter((item) => item !== fieldId),
+                rows: table.layout.rows.filter((item) => item !== fieldId),
+                values: table.layout.values.filter((item) => item !== fieldId)
+            };
+            const nextZoneFields = [...nextLayout[zoneId]];
+            const boundedIndex = Math.max(0, Math.min(targetIndex, nextZoneFields.length));
+            nextZoneFields.splice(boundedIndex, 0, fieldId);
+            nextLayout[zoneId] = nextZoneFields;
+
+            return {
+                ...table,
+                layout: nextLayout
+            };
+        });
+    }
+
+    function resetActiveTable() {
+        updateActiveTable((table) => ({
+            ...table,
+            layout: DEFAULT_LAYOUT,
+            filterSelections: {}
+        }));
+        setOpenFilterTableId(null);
+    }
+
+    function updateTableFilterSelection(tableId: string, fieldId: PivotFieldId, value: string) {
+        updateTable(tableId, (table) => ({
+            ...table,
+            filterSelections: {
+                ...table.filterSelections,
+                [fieldId]: value
+            }
+        }));
+    }
+
+    function startTableRename(tableId: string) {
+        const currentTable = tables.find((table) => table.id === tableId);
+        if (!currentTable) {
+            return;
+        }
+
+        setActiveTableId(tableId);
+        setOpenTableSettingsId(tableId);
+        setEditingTableId(tableId);
+        setTableNameDraft(currentTable.name);
+    }
+
+    function cancelTableRename() {
+        setEditingTableId(null);
+        setTableNameDraft("");
+    }
+
+    function commitTableRename() {
+        if (!editingTableId) {
+            return;
+        }
+
+        const nextName = tableNameDraft.trim();
+        if (nextName) {
+            updateTable(editingTableId, (table) => ({
+                ...table,
+                name: nextName
+            }));
+        }
+
+        cancelTableRename();
+    }
+
+    function clearTableSelection() {
+        setActiveTableId(null);
+        setOpenFilterTableId(null);
+        setOpenTableSettingsId(null);
+        cancelTableRename();
+    }
+
+    function toggleTableSettings(tableId: string) {
+        if (openTableSettingsId === tableId) {
+            cancelTableRename();
+            setOpenTableSettingsId(null);
+            return;
+        }
+
+        setOpenTableSettingsId(tableId);
+    }
+
+    function startTableMove(tableId: string, event: ReactPointerEvent<HTMLDivElement>) {
+        if (editingTableId || resizingTableId) {
+            return;
+        }
+
+        const currentTable = tables.find((table) => table.id === tableId);
+        if (!currentTable) {
+            return;
+        }
+
+        event.preventDefault();
+        setActiveTableId(tableId);
+        setMovingTableId(tableId);
+        moveStateRef.current = {
+            tableId,
+            startPointerX: event.clientX,
+            startPointerY: event.clientY,
+            startX: currentTable.position.x,
+            startY: currentTable.position.y
+        };
+    }
+
+    function handleTablePointerDown(tableId: string, event: ReactPointerEvent<HTMLDivElement>) {
+        const target = event.target as HTMLElement;
+        if (
+            target.closest("[data-no-table-drag='true']") ||
+            target.closest("[data-table-resize-handle='true']")
+        ) {
+            return;
+        }
+
+        if (activeTableId !== tableId) {
+            setActiveTableId(tableId);
+            return;
+        }
+
+        startTableMove(tableId, event);
+    }
+
+    function startTableResize(
+        tableId: string,
+        direction: TableResizeDirection,
+        event: ReactPointerEvent<HTMLButtonElement>
+    ) {
+        const currentTable = tables.find((table) => table.id === tableId);
+        if (!currentTable) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        moveStateRef.current = null;
+        setMovingTableId(null);
+        setActiveTableId(tableId);
+        setResizingTableId(tableId);
+        resizeStateRef.current = {
+            tableId,
+            direction,
+            startPointerX: event.clientX,
+            startPointerY: event.clientY,
+            startX: currentTable.position.x,
+            startY: currentTable.position.y,
+            startWidth: currentTable.size.width,
+            startHeight: currentTable.size.height
+        };
+    }
+
+    function clearDragState() {
+        setActiveDrag(null);
+        setDragZone(null);
+        setDropIndicator(null);
+    }
+
+    function handleZoneDrop(zoneId: PivotZoneId, event: DragEvent<HTMLDivElement>) {
+        event.preventDefault();
+        if (!activeTable) {
+            clearDragState();
+            return;
+        }
+
+        const fieldId = (activeDrag?.fieldId ??
+            event.dataTransfer.getData("text/stockpilot-field")) as PivotFieldId;
+
+        if (PIVOT_FIELDS.some((field) => field.id === fieldId)) {
+            const targetIndex =
+                dropIndicator?.zoneId === zoneId ? dropIndicator.index : activeLayout[zoneId].length;
+            insertFieldIntoZone(fieldId, zoneId, targetIndex);
+        }
+
+        clearDragState();
+    }
+
+    function renderCell(view: PivotTableView, rowKey: string, columnKey: string, fieldId: PivotFieldId) {
+        const rowBucket = view.pivotResult.matrix.get(rowKey);
+        const cell = rowBucket?.get(columnKey);
+        const state = cell?.[fieldId];
+        return formatAggregatedValue(fieldId, resolveAggregationValue(fieldId, state));
+    }
+
+    function renderRowTotal(view: PivotTableView, rowKey: string, fieldId: PivotFieldId) {
+        const rowBucket = view.pivotResult.matrix.get(rowKey);
+        if (!rowBucket) {
+            return formatAggregatedValue(fieldId, 0);
+        }
+
+        const mergedState = Array.from(rowBucket.values()).reduce<AggregationState>(
+            (accumulator, cell) => {
+                const state = cell[fieldId];
+                accumulator.sum += state?.sum ?? 0;
+                accumulator.count += state?.count ?? 0;
+                return accumulator;
+            },
+            { sum: 0, count: 0 }
+        );
+
+        return formatAggregatedValue(fieldId, resolveAggregationValue(fieldId, mergedState));
+    }
+
+    function renderColumnTotal(view: PivotTableView, columnKey: string, fieldId: PivotFieldId) {
+        const mergedState = view.pivotResult.rowCombos.reduce<AggregationState>(
+            (accumulator, rowCombo) => {
+                const state = view.pivotResult.matrix.get(rowCombo.key)?.get(columnKey)?.[fieldId];
+                accumulator.sum += state?.sum ?? 0;
+                accumulator.count += state?.count ?? 0;
+                return accumulator;
+            },
+            { sum: 0, count: 0 }
+        );
+
+        return formatAggregatedValue(fieldId, resolveAggregationValue(fieldId, mergedState));
+    }
+
+    function renderGrandTotal(view: PivotTableView, fieldId: PivotFieldId) {
+        const mergedState = view.pivotResult.rowCombos.reduce<AggregationState>(
+            (accumulator, rowCombo) => {
+                const rowBucket = view.pivotResult.matrix.get(rowCombo.key);
+                if (!rowBucket) {
+                    return accumulator;
+                }
+
+                for (const cell of rowBucket.values()) {
+                    const state = cell[fieldId];
+                    accumulator.sum += state?.sum ?? 0;
+                    accumulator.count += state?.count ?? 0;
+                }
+
+                return accumulator;
+            },
+            { sum: 0, count: 0 }
+        );
+
+        return formatAggregatedValue(fieldId, resolveAggregationValue(fieldId, mergedState));
     }
 
     return (
-        <div className="grid gap-6 2xl:grid-cols-[300px_minmax(0,1fr)_280px]">
-            <aside className="rounded-[34px] border border-white/70 bg-white/82 p-5 shadow-panel backdrop-blur-xl">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-400">
-                            Widget Library
+        <div className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
+            <aside className="flex h-[940px] max-h-[940px] flex-col overflow-hidden rounded-[12px] border border-slate-200/70 bg-white/80 p-6 shadow-[0_32px_90px_-46px_rgba(11,14,20,0.34)] backdrop-blur-xl">
+                <div className="flex min-h-0 flex-1 flex-col">
+                    <div className="px-1">
+                        <p className="pl-px text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                            Fields
                         </p>
-                        <h3 className="mt-3 font-display text-2xl font-semibold tracking-tight text-ink">
-                            Compose your board
+                        <h3 className="mt-1 font-display text-[2rem] font-light leading-[1.08] tracking-tight text-ink">
+                            Pivot field builder
                         </h3>
                     </div>
-                    <LayoutTemplate className="h-5 w-5 text-brand" />
-                </div>
 
-                <p className="mt-4 text-sm leading-relaxed text-slate-500">
-                    Drag modules into the board or tap to pin them. Layout changes are stored locally for this browser.
-                </p>
-
-                <div className="mt-6 space-y-3">
-                    {WIDGET_LIBRARY.map((widget) => {
-                        const isPinned = widgets.includes(widget.id);
-
-                        return (
-                            <button
-                                key={widget.id}
-                                type="button"
-                                draggable
-                                onClick={() => addWidget(widget.id)}
-                                onDragStart={(event) => {
-                                    event.dataTransfer.setData("text/stockpilot-widget", widget.id);
-                                    event.dataTransfer.effectAllowed = "copy";
-                                }}
-                                className={`flex w-full items-start gap-3 rounded-[26px] border px-4 py-4 text-left transition ${
-                                    isPinned
-                                        ? "border-brand/20 bg-brandSoft/60"
-                                        : "border-slate-100 bg-slate-50 hover:border-brand/20 hover:bg-white"
-                                }`}
-                            >
-                                <Grip className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <p className="font-semibold text-ink">{widget.label}</p>
-                                        {isPinned ? (
-                                            <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.18em] text-brand">
-                                                Pinned
-                                            </span>
-                                        ) : null}
-                                    </div>
-                                    <p className="mt-1 text-sm leading-relaxed text-slate-500">
-                                        {widget.description}
-                                    </p>
-                                </div>
-                            </button>
-                        );
-                    })}
-                </div>
-            </aside>
-
-            <section
-                onDragOver={(event) => {
-                    event.preventDefault();
-                    setIsCanvasActive(true);
-                }}
-                onDragLeave={() => setIsCanvasActive(false)}
-                onDrop={handleDrop}
-                className={`rounded-[36px] border p-5 shadow-panel backdrop-blur-xl transition ${
-                    isCanvasActive
-                        ? "border-brand bg-white/95"
-                        : "border-white/70 bg-white/78"
-                }`}
-            >
-                <div className="flex flex-col gap-4 rounded-[30px] border border-slate-100 bg-slate-50/90 px-5 py-5 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-400">
-                            Canvas Board
-                        </p>
-                        <h3 className="mt-3 font-display text-3xl font-semibold tracking-tight text-ink">
-                            Executive metric surface
-                        </h3>
-                        <p className="mt-2 text-sm text-slate-500">
-                            {widgets.length} widgets active. Drag more modules in, remove them, or restore the starter layout.
-                        </p>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-3">
-                        <button
-                            type="button"
-                            onClick={resetLayout}
-                            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:text-ink"
-                        >
-                            <Rows3 className="h-4 w-4" />
-                            Starter layout
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setWidgets([])}
-                            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:text-ink"
-                        >
-                            <Trash2 className="h-4 w-4" />
-                            Clear board
-                        </button>
-                    </div>
-                </div>
-
-                {widgets.length === 0 ? (
-                    <div className="flex min-h-[620px] items-center justify-center">
-                        <div className="max-w-xl rounded-[34px] border border-slate-100 bg-white px-10 py-14 text-center shadow-panel">
-                            <LayoutTemplate className="mx-auto h-12 w-12 text-brand" />
-                            <h4 className="mt-6 font-display text-3xl font-semibold tracking-tight text-ink">
-                                Board is empty
-                            </h4>
-                            <p className="mt-4 text-lg leading-relaxed text-slate-500">
-                                Pull modules from the library or restore the default layout to start shaping your presentation.
-                            </p>
-                            <button
-                                type="button"
-                                onClick={resetLayout}
-                                className="mt-8 inline-flex items-center gap-2 rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
-                            >
-                                <Rows3 className="h-4 w-4" />
-                                Restore starter layout
-                            </button>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="mt-5 grid gap-5 xl:grid-cols-2">
-                        {widgets.map((widgetId) => {
-                            const widget = getWidgetDefinition(widgetId);
-
-                            return (
-                                <div key={widgetId} className={widget.spanClass}>
-                                    <CanvasWidgetCard
-                                        analysis={analysis}
-                                        transfers={transfers}
-                                        widgetId={widgetId}
-                                        onRemove={() => removeWidget(widgetId)}
-                                    />
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </section>
-
-            <aside className="rounded-[34px] border border-white/70 bg-white/82 p-5 shadow-panel backdrop-blur-xl">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-400">
-                            Session Inspector
-                        </p>
-                        <h3 className="mt-3 font-display text-2xl font-semibold tracking-tight text-ink">
-                            Current context
-                        </h3>
-                    </div>
-                    <ShieldCheck className="h-5 w-5 text-success" />
-                </div>
-
-                <div className="mt-6 rounded-[28px] bg-slate-950 px-5 py-5 text-white">
-                    <div className="flex items-start justify-between gap-3">
-                        <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                                Dataset
-                            </p>
-                            <p className="mt-3 text-lg font-semibold">
-                                {session.fileName ?? "No file connected"}
-                            </p>
-                        </div>
-                        <Database className="h-5 w-5 text-brand" />
-                    </div>
-                    <div className="mt-5 grid gap-3 text-sm sm:grid-cols-2 2xl:grid-cols-1">
-                        <div className="rounded-[22px] bg-white/5 px-4 py-3">
-                            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Rows</p>
-                            <p className="mt-2 text-lg font-semibold">{formatNumber(session.rowCount)}</p>
-                        </div>
-                        <div className="rounded-[22px] bg-white/5 px-4 py-3">
-                            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Engine</p>
-                            <p className="mt-2 text-lg font-semibold">
-                                {session.source ? session.source.toUpperCase() : "SYNC"}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="mt-6 rounded-[28px] border border-slate-100 bg-slate-50 px-4 py-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                        Board stack
-                    </p>
-                    <div className="mt-4 space-y-2">
-                        {widgets.map((widgetId) => (
-                            <div
-                                key={widgetId}
-                                className="flex items-center justify-between rounded-[18px] bg-white px-3 py-3"
-                            >
-                                <span className="text-sm font-semibold text-ink">
-                                    {getWidgetDefinition(widgetId).label}
-                                </span>
+                    <div className="mt-4 min-h-0 flex-1">
+                        <div className="h-full overflow-y-auto pr-1">
+                            {PIVOT_FIELDS.map((field) => (
                                 <button
+                                    key={field.id}
                                     type="button"
-                                    onClick={() => removeWidget(widgetId)}
-                                    className="rounded-full border border-slate-200 p-2 text-slate-400 transition hover:border-slate-300 hover:text-ink"
-                                    aria-label={`Remove ${getWidgetDefinition(widgetId).label}`}
+                                    draggable
+                                    onDragStart={(event) => {
+                                        event.dataTransfer.setData("text/stockpilot-field", field.id);
+                                        event.dataTransfer.effectAllowed = "move";
+                                        setActiveDrag({
+                                            fieldId: field.id,
+                                            sourceZone: "fields"
+                                        });
+                                        setDropIndicator(null);
+                                    }}
+                                    onDragEnd={clearDragState}
+                                    className="flex w-full items-start gap-2 border-b border-slate-200/70 px-1 py-1.5 text-left transition hover:border-brand/30 last:border-b-0"
                                 >
-                                    <Trash2 className="h-3.5 w-3.5" />
+                                    <Grip className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-500" />
+                                    <div className="min-w-0 flex-1">
+                                        <p className="truncate font-display text-[0.96rem] font-light leading-[1.04] tracking-tight text-ink">
+                                            {field.label}
+                                        </p>
+                                    </div>
                                 </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="mt-5 flex items-end justify-between gap-4">
+                        <div className="px-1">
+                            <p className="pl-px text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                                Layout
+                            </p>
+                            <h3 className="mt-1 font-display text-[2rem] font-light leading-[1.08] tracking-tight text-ink">
+                                Drag and drop
+                            </h3>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={addTable}
+                                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/60 px-5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-700 shadow-sm backdrop-blur transition-colors hover:bg-white/75 hover:text-ink"
+                            >
+                                New table
+                                <Plus className="h-4 w-4 text-brand" />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={resetActiveTable}
+                                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/60 px-5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-700 shadow-sm backdrop-blur transition-colors hover:bg-white/75 hover:text-ink"
+                            >
+                                Reset
+                                <X className="h-4 w-4 text-red-500" />
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="mt-2 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        {activeTable ? `${activeTable.name} selected` : "Select a table"}
+                    </div>
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                        {PIVOT_ZONES.map((zone) => (
+                            <div key={zone.id} className="flex flex-col">
+                                <div className="mb-2 flex items-start gap-1.5 px-1">
+                                    <div className="shrink-0 pt-0.5 text-ink">
+                                        {zone.id === "filters" ? (
+                                            <SlidersHorizontal className="h-5 w-5" strokeWidth={1.7} />
+                                        ) : zone.id === "values" ? (
+                                            <Diff className="h-5 w-5" strokeWidth={1.7} />
+                                        ) : zone.id === "columns" ? (
+                                            <BetweenVerticalStart className="h-5 w-5" strokeWidth={1.7} />
+                                        ) : (
+                                            <BetweenHorizontalStart className="h-5 w-5" strokeWidth={1.7} />
+                                        )}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="font-display text-[1.12rem] font-light leading-[1.08] tracking-tight text-ink">
+                                            {zone.label}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div
+                                    onDragOver={(event) => {
+                                        event.preventDefault();
+                                        setDragZone(zone.id);
+                                        setDropIndicator((current) =>
+                                            current?.zoneId === zone.id
+                                                ? current
+                                                : {
+                                                      zoneId: zone.id,
+                                                      index: activeLayout[zone.id].length
+                                                  }
+                                        );
+                                    }}
+                                    onDrop={(event) => handleZoneDrop(zone.id, event)}
+                                    className={`flex aspect-[4/5] min-h-0 flex-col overflow-hidden rounded-[10px] border px-3 pb-3 pt-2.5 shadow-[0_18px_42px_-34px_rgba(11,14,20,0.38)] transition ${
+                                        dragZone === zone.id
+                                            ? "border-slate-300 bg-white/80 backdrop-blur-xl"
+                                            : "border-slate-200/70 bg-white/80 backdrop-blur-xl"
+                                    }`}
+                                >
+                                    <div className="min-h-0 flex-1 space-y-0 overflow-y-auto pr-1">
+                                        {activeLayout[zone.id].length === 0 ? (
+                                            dropIndicator?.zoneId === zone.id ? (
+                                                <motion.div
+                                                    layout
+                                                    className="my-1 h-7 rounded-[8px] border border-dashed border-slate-300 bg-slate-100/70"
+                                                />
+                                            ) : (
+                                                <div className="h-0" />
+                                            )
+                                        ) : (
+                                            activeLayout[zone.id].map((fieldId) => (
+                                                <Fragment key={`${zone.id}:${fieldId}`}>
+                                                    {dropIndicator?.zoneId === zone.id &&
+                                                    dropIndicator.index === activeLayout[zone.id].indexOf(fieldId) ? (
+                                                        <motion.div
+                                                            layout
+                                                            className="my-1 h-7 rounded-[8px] border border-dashed border-slate-300 bg-slate-100/70"
+                                                        />
+                                                    ) : null}
+
+                                                    <motion.div
+                                                        layout
+                                                        transition={{
+                                                            layout: {
+                                                                duration: 0.2,
+                                                                ease: [0.16, 1, 0.3, 1]
+                                                            }
+                                                        }}
+                                                        draggable
+                                                        onDragStart={(event) => {
+                                                            const dataTransfer = (
+                                                                event as unknown as DragEvent<HTMLDivElement>
+                                                            ).dataTransfer;
+
+                                                            if (!dataTransfer) {
+                                                                return;
+                                                            }
+                                                            dataTransfer.setData("text/stockpilot-field", fieldId);
+                                                            dataTransfer.effectAllowed = "move";
+                                                            setActiveDrag({
+                                                                fieldId,
+                                                                sourceZone: zone.id
+                                                            });
+                                                        }}
+                                                        onDragEnd={clearDragState}
+                                                        onDragOver={(event) => {
+                                                            event.preventDefault();
+                                                            event.stopPropagation();
+                                                            const bounds = event.currentTarget.getBoundingClientRect();
+                                                            const nextIndex =
+                                                                event.clientY < bounds.top + bounds.height / 2
+                                                                    ? activeLayout[zone.id].indexOf(fieldId)
+                                                                    : activeLayout[zone.id].indexOf(fieldId) + 1;
+                                                            setDragZone(zone.id);
+                                                            setDropIndicator((current) =>
+                                                                current?.zoneId === zone.id &&
+                                                                current.index === nextIndex
+                                                                    ? current
+                                                                    : {
+                                                                          zoneId: zone.id,
+                                                                          index: nextIndex
+                                                                      }
+                                                            );
+                                                        }}
+                                                        className={`flex items-center justify-between gap-3 border-b border-slate-200/70 py-1 text-sm text-slate-800 transition last:border-b-0 ${
+                                                            activeDrag?.fieldId === fieldId &&
+                                                            activeDrag.sourceZone === zone.id
+                                                                ? "opacity-45"
+                                                                : "opacity-100"
+                                                        }`}
+                                                    >
+                                                        <div className="flex min-w-0 items-start gap-1.5">
+                                                            <Grip className="mt-0.5 h-3 w-3 shrink-0 text-slate-500" />
+                                                            <span className="truncate font-display text-[0.92rem] font-light leading-[1.08] tracking-tight text-ink">
+                                                                {getFieldDefinition(fieldId).label}
+                                                            </span>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeFieldFromZone(fieldId, zone.id)}
+                                                            className="rounded-full p-0.5 text-slate-500 transition hover:text-ink"
+                                                            aria-label={`Remove ${getFieldDefinition(fieldId).label}`}
+                                                        >
+                                                            <X className="h-3.5 w-3.5" />
+                                                        </button>
+                                                    </motion.div>
+
+                                                    {dropIndicator?.zoneId === zone.id &&
+                                                    dropIndicator.index === activeLayout[zone.id].length &&
+                                                    fieldId === activeLayout[zone.id][activeLayout[zone.id].length - 1] ? (
+                                                        <motion.div
+                                                            layout
+                                                            className="my-1 h-7 rounded-[8px] border border-dashed border-slate-300 bg-slate-100/70"
+                                                        />
+                                                    ) : null}
+                                                </Fragment>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         ))}
                     </div>
                 </div>
-
-                <div className="mt-6 rounded-[28px] border border-slate-100 bg-white px-4 py-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                        Quick signals
-                    </p>
-                    <div className="mt-4 space-y-3 text-sm text-slate-500">
-                        <div className="flex items-center justify-between">
-                            <span>Transfers ready</span>
-                            <span className="font-semibold text-ink">{formatNumber(transfers.length)}</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <span>Alerts ready</span>
-                            <span className="font-semibold text-ink">
-                                {formatNumber(analysis?.alerts.length ?? 0)}
-                            </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <span>Slow + stagnant</span>
-                            <span className="font-semibold text-ink">
-                                {formatNumber(
-                                    (analysis?.overview.slowMovingItems ?? 0) +
-                                        (analysis?.overview.stagnantItems ?? 0)
-                                )}
-                            </span>
-                        </div>
-                    </div>
-                </div>
             </aside>
-        </div>
-    );
-}
 
-interface CanvasWidgetCardProps {
-    analysis: AnalysisResult | null;
-    transfers: TransferSuggestion[];
-    widgetId: CanvasWidgetId;
-    onRemove: () => void;
-}
-
-function CanvasWidgetCard({ analysis, transfers, widgetId, onRemove }: CanvasWidgetCardProps) {
-    const withFallback = (message: string) =>
-        analysis ? message : "Upload or sync a dataset to populate this widget.";
-
-    return (
-        <div className="rounded-[30px] border border-white/80 bg-white p-5 shadow-panel">
-            <div className="mb-5 flex items-start justify-between gap-4">
-                <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                        {getWidgetDefinition(widgetId).label}
-                    </p>
-                    <p className="mt-2 text-sm text-slate-500">
-                        {getWidgetDefinition(widgetId).description}
-                    </p>
-                </div>
-                <button
-                    type="button"
-                    onClick={onRemove}
-                    className="rounded-full border border-slate-200 p-2 text-slate-400 transition hover:border-slate-300 hover:text-ink"
-                    aria-label="Remove widget"
-                >
-                    <Trash2 className="h-4 w-4" />
-                </button>
-            </div>
-
-            {widgetId === "inventory" ? (
-                <div className="space-y-3">
-                    <div className="flex items-center gap-3 text-brand">
-                        <Boxes className="h-5 w-5" />
-                        <span className="text-sm font-semibold">Inventory and products</span>
+            <section className="flex h-[940px] max-h-[940px] flex-col overflow-hidden rounded-[12px] border border-slate-200/70 bg-white/80 p-[10px] shadow-[0_32px_90px_-46px_rgba(11,14,20,0.34)] backdrop-blur-xl">
+                {!analysis ? (
+                    <div className="flex min-h-[560px] items-center justify-center">
+                        <div className="max-w-xl rounded-[12px] border border-slate-300/70 bg-white/80 px-10 py-12 text-center shadow-[0_32px_90px_-46px_rgba(11,14,20,0.34)] backdrop-blur-xl">
+                            <TableProperties className="mx-auto h-12 w-12 text-brand" />
+                            <h4 className="mt-5 font-display text-[2rem] font-light leading-[1.08] tracking-tight text-ink sm:text-[2.35rem]">
+                                Pivot dataset required
+                            </h4>
+                            <p className="mt-4 text-lg font-normal leading-relaxed text-slate-600">
+                                Upload a file or sync from the main workspace. As soon as you place fields on the left, the pivot table appears here.
+                            </p>
+                        </div>
                     </div>
-                    <p className="font-display text-5xl font-semibold tracking-tight text-ink">
-                        {analysis ? formatNumber(analysis.overview.totalInventory) : "—"}
-                    </p>
-                    <p className="text-sm text-slate-500">
-                        {analysis
-                            ? `${formatNumber(analysis.overview.totalProducts)} products across ${formatNumber(analysis.overview.warehouses)} warehouses`
-                            : withFallback("")}
-                    </p>
-                </div>
-            ) : null}
-
-            {widgetId === "net-sales" ? (
-                <div className="space-y-3">
-                    <div className="flex items-center gap-3 text-success">
-                        <Warehouse className="h-5 w-5" />
-                        <span className="text-sm font-semibold">Net sales movement</span>
+                ) : visibleTableViews.length === 0 ? (
+                    <div className="relative flex min-h-0 flex-1 overflow-hidden rounded-none">
+                        <div className="canvas-grid-pattern" />
                     </div>
-                    <p className="font-display text-5xl font-semibold tracking-tight text-ink">
-                        {analysis ? formatNumber(analysis.overview.totalNetSales) : "—"}
-                    </p>
-                    <p className="text-sm text-slate-500">
-                        {withFallback("Sales minus returns from the connected dataset.")}
-                    </p>
-                </div>
-            ) : null}
-
-            {widgetId === "returns" ? (
-                <div className="space-y-3">
-                    <div className="flex items-center gap-3 text-warning">
-                        <RotateCcw className="h-5 w-5" />
-                        <span className="text-sm font-semibold">Return pressure</span>
-                    </div>
-                    <p className="font-display text-5xl font-semibold tracking-tight text-ink">
-                        {analysis ? formatNumber(analysis.overview.totalReturns) : "—"}
-                    </p>
-                    <p className="text-sm text-slate-500">
-                        {analysis
-                            ? `Average return rate ${formatPercent(analysis.overview.averageReturnRate)}`
-                            : withFallback("")}
-                    </p>
-                </div>
-            ) : null}
-
-            {widgetId === "lifecycle" ? (
-                <div className="space-y-4">
-                    {(analysis?.lifecycleBreakdown ?? []).length > 0 ? (
-                        (analysis?.lifecycleBreakdown ?? []).map((item) => (
-                            <div key={item.name}>
-                                <div className="mb-2 flex items-center justify-between text-sm">
-                                    <span className="font-semibold text-ink">{item.name}</span>
-                                    <span className="text-slate-500">{formatNumber(item.value)}</span>
-                                </div>
-                                <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                                    <div
-                                        className="h-full rounded-full"
-                                        style={{
-                                            width: `${Math.max(
-                                                8,
-                                                (item.value /
-                                                    Math.max(
-                                                        ...(analysis?.lifecycleBreakdown ?? []).map((entry) => entry.value),
-                                                        1
-                                                    )) *
-                                                    100
-                                            )}%`,
-                                            backgroundColor: item.tone
-                                        }}
-                                    />
-                                </div>
-                            </div>
-                        ))
-                    ) : (
-                        <p className="text-sm text-slate-500">{withFallback("Lifecycle signals will render here.")}</p>
-                    )}
-                </div>
-            ) : null}
-
-            {widgetId === "warehouses" ? (
-                <div className="space-y-3">
-                    {(analysis?.warehouseBreakdown ?? []).slice(0, 5).map((item) => (
+                ) : (
+                    <div className="relative flex min-h-0 flex-1 overflow-hidden rounded-none">
+                        <div className="canvas-grid-pattern" />
                         <div
-                            key={item.name}
-                            className="flex items-center justify-between rounded-[22px] bg-slate-50 px-4 py-3"
+                            ref={tableCanvasRef}
+                            className="relative min-h-0 flex-1 overflow-hidden rounded-none"
+                            onPointerDown={(event) => {
+                                if (event.target === event.currentTarget) {
+                                    clearTableSelection();
+                                }
+                            }}
                         >
-                            <div>
-                                <p className="font-semibold text-ink">{item.name}</p>
-                                <p className="text-xs text-slate-500">
-                                    {formatNumber(item.quantity)} net sales
-                                </p>
-                            </div>
-                            <span className="text-sm font-semibold text-slate-600">
-                                {formatNumber(item.value)} units
-                            </span>
-                        </div>
-                    ))}
-                    {!analysis ? <p className="text-sm text-slate-500">{withFallback("")}</p> : null}
-                </div>
-            ) : null}
+                            {visibleTableViews.map((view) => (
+                                <motion.div
+                                    key={view.table.id}
+                                    onPointerDown={(event) => handleTablePointerDown(view.table.id, event)}
+                                    style={{
+                                        left: view.table.position.x,
+                                        top: view.table.position.y,
+                                        width: view.table.size.width,
+                                        height: view.table.size.height
+                                    }}
+                                    className={`absolute left-0 top-0 flex max-h-full max-w-full flex-col overflow-visible rounded-none bg-white ${
+                                        movingTableId === view.table.id
+                                            ? "cursor-grabbing "
+                                            : activeTableId === view.table.id
+                                              ? "cursor-grab "
+                                              : ""
+                                    }${
+                                        activeTableId === view.table.id
+                                            ? "shadow-[0_32px_90px_-46px_rgba(11,14,20,0.34)]"
+                                            : "shadow-[0_18px_42px_-34px_rgba(11,14,20,0.24)]"
+                                    }`}
+                                >
+                                    {activeTableId === view.table.id ? (
+                                        <div
+                                            className="absolute -right-[2px] -top-[26px] z-30 flex items-center gap-2"
+                                            data-no-table-drag="true"
+                                            onPointerDown={(event) => event.stopPropagation()}
+                                        >
+                                            {openTableSettingsId === view.table.id ? (
+                                                <div className="absolute right-8 top-1/2 flex min-h-[36px] -translate-y-1/2 items-center gap-1.5 rounded-full border border-slate-200/80 bg-white/92 px-3 py-1.5 shadow-[0_18px_42px_-34px_rgba(11,14,20,0.32)] backdrop-blur-xl">
+                                                    {editingTableId === view.table.id ? (
+                                                        <input
+                                                            ref={editingTableInputRef}
+                                                            value={tableNameDraft}
+                                                            onChange={(event) => setTableNameDraft(event.target.value)}
+                                                            onBlur={commitTableRename}
+                                                            onPointerDown={(event) => event.stopPropagation()}
+                                                            onKeyDown={(event) => {
+                                                                if (event.key === "Enter") {
+                                                                    event.preventDefault();
+                                                                    commitTableRename();
+                                                                }
 
-            {widgetId === "planning" ? (
-                <div className="space-y-3">
-                    {(analysis?.planning ?? []).slice(0, 6).map((item) => (
-                        <div key={item.label} className="rounded-[22px] border border-slate-100 px-4 py-3">
-                            <div className="flex items-center justify-between gap-3">
-                                <p className="font-semibold text-ink">{item.label}</p>
-                                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
-                                    Production year
-                                </p>
-                            </div>
-                            <div className="mt-3 flex items-center justify-between text-sm text-slate-500">
-                                <span>Inventory {formatNumber(item.inventory)}</span>
-                                <span>Net sales {formatNumber(item.netSalesQty)}</span>
-                            </div>
-                        </div>
-                    ))}
-                    {!analysis ? <p className="text-sm text-slate-500">{withFallback("")}</p> : null}
-                </div>
-            ) : null}
+                                                                if (event.key === "Escape") {
+                                                                    event.preventDefault();
+                                                                    cancelTableRename();
+                                                                }
+                                                            }}
+                                                            className="min-w-[148px] border-b border-slate-300 bg-transparent px-0 py-0 font-display text-[0.92rem] font-medium tracking-tight text-ink outline-none"
+                                                        />
+                                                    ) : (
+                                                        <button
+                                                            type="button"
+                                                            onClick={(event) => {
+                                                                event.stopPropagation();
+                                                                startTableRename(view.table.id);
+                                                            }}
+                                                            onPointerDown={(event) => event.stopPropagation()}
+                                                            className="flex items-center justify-center p-0.5 text-slate-500 transition hover:text-ink"
+                                                            aria-label={`Rename ${view.table.name}`}
+                                                        >
+                                                            <SquarePen className="h-4 w-4" strokeWidth={1.7} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ) : null}
 
-            {widgetId === "alerts" ? (
-                <div className="space-y-3">
-                    {(analysis?.alerts ?? []).slice(0, 5).map((item) => (
-                        <div key={`${item.productCode}:${item.warehouseName}`} className="rounded-[22px] bg-slate-50 px-4 py-3">
-                            <div className="flex items-start gap-3">
-                                <BellRing className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
-                                <div>
-                                    <p className="font-semibold text-ink">{item.productName}</p>
-                                    <p className="text-xs text-slate-500">
-                                        {item.warehouseName} · {item.productCode}
-                                    </p>
-                                    <p className="mt-2 text-sm text-slate-600">
-                                        {item.issue} · {item.metric}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                    {!analysis ? <p className="text-sm text-slate-500">{withFallback("")}</p> : null}
-                </div>
-            ) : null}
+                                            {view.table.layout.filters.length > 0 ? (
+                                                <div className="relative">
+                                                    <button
+                                                        type="button"
+                                                        onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            setActiveTableId(view.table.id);
+                                                            setOpenFilterTableId((current) =>
+                                                                current === view.table.id ? null : view.table.id
+                                                            );
+                                                        }}
+                                                        onPointerDown={(event) => event.stopPropagation()}
+                                                        className={`flex items-center justify-center p-0 text-slate-500 transition ${
+                                                            openFilterTableId === view.table.id
+                                                                ? "text-[#080a0f]"
+                                                                : "hover:text-ink"
+                                                        }`}
+                                                        aria-label={`Filters for ${view.table.name}`}
+                                                    >
+                                                        <SlidersHorizontal className="h-4 w-4" strokeWidth={1.8} />
+                                                    </button>
 
-            {widgetId === "transfers" ? (
-                <div className="space-y-3">
-                    {transfers.slice(0, 5).map((item) => (
-                        <div
-                            key={`${item.productCode}:${item.fromWarehouseName}:${item.toWarehouseName}`}
-                            className="rounded-[22px] border border-slate-100 px-4 py-3"
-                        >
-                            <div className="flex items-center justify-between gap-3">
-                                <div>
-                                    <p className="font-semibold text-ink">{item.productCode}</p>
-                                    <p className="text-xs text-slate-500">
-                                        {item.fromWarehouseName} → {item.toWarehouseName}
-                                    </p>
-                                </div>
-                                <span className="rounded-full bg-brandSoft px-3 py-1 text-xs font-semibold text-brand">
-                                    {formatNumber(item.quantity)} units
-                                </span>
-                            </div>
+                                                    {openFilterTableId === view.table.id ? (
+                                                        <div
+                                                            className="absolute right-0 top-full z-20 mt-2 min-w-[240px] rounded-[12px] border border-slate-200 bg-white p-3 shadow-[0_18px_42px_-34px_rgba(11,14,20,0.32)]"
+                                                            onPointerDown={(event) => event.stopPropagation()}
+                                                        >
+                                                            {view.table.layout.filters.map((fieldId) => (
+                                                                <label key={`${view.table.id}:${fieldId}`} className="mb-3 block last:mb-0">
+                                                                    <span className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                                                        {getFieldDefinition(fieldId).label}
+                                                                    </span>
+                                                                    <span className="relative block">
+                                                                        <select
+                                                                            value={
+                                                                                view.table.filterSelections[fieldId] ??
+                                                                                ALL_FILTER_VALUE
+                                                                            }
+                                                                            onChange={(event) =>
+                                                                                updateTableFilterSelection(
+                                                                                    view.table.id,
+                                                                                    fieldId,
+                                                                                    event.target.value
+                                                                                )
+                                                                            }
+                                                                            className="w-full appearance-none border border-slate-200 bg-white px-3 py-2 pr-8 text-sm font-medium text-ink outline-none transition focus:border-brand"
+                                                                        >
+                                                                            <option value={ALL_FILTER_VALUE}>All values</option>
+                                                                            {(view.filterOptions[fieldId] ?? []).map((option) => (
+                                                                                <option
+                                                                                    key={`${view.table.id}:${fieldId}:${option}`}
+                                                                                    value={option}
+                                                                                >
+                                                                                    {option}
+                                                                                </option>
+                                                                            ))}
+                                                                        </select>
+                                                                        <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                                                                    </span>
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    ) : null}
+                                                </div>
+                                            ) : null}
+
+                                            <button
+                                                type="button"
+                                                onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    toggleTableSettings(view.table.id);
+                                                }}
+                                                onPointerDown={(event) => event.stopPropagation()}
+                                                className="flex items-center justify-center p-0 text-slate-500 transition hover:text-ink"
+                                                aria-label={`Table settings for ${view.table.name}`}
+                                            >
+                                                <Cog className="h-5 w-5" strokeWidth={1.5} />
+                                            </button>
+                                        </div>
+                                    ) : null}
+
+                                    {view.filteredRecords.length === 0 ? (
+                                        <div className="flex min-h-0 flex-1 items-center justify-center px-6 py-6 text-sm font-medium text-slate-500">
+                                            No matching records
+                                        </div>
+                                    ) : (
+                                        <div className="min-h-0 flex-1 overflow-hidden">
+                                            <div className="inline-block h-full max-w-full overflow-auto align-top">
+                                                <table className="pivot-table w-max min-w-max table-auto border-collapse text-[13px] leading-tight text-slate-800">
+                                                    <thead className="sticky top-0 z-10 bg-[#080a0f] text-white">
+                                                    <tr>
+                                                        {(view.table.layout.rows.length > 0
+                                                            ? view.table.layout.rows
+                                                            : (["warehouseName"] as PivotFieldId[])
+                                                        ).map((fieldId, index) => (
+                                                            <th
+                                                                key={`row-header:${view.table.id}:${fieldId}:${index}`}
+                                                                rowSpan={view.showSecondaryHeaderRow ? 2 : 1}
+                                                                className="whitespace-nowrap border border-slate-200 px-3 py-0.5 text-left font-display text-[0.94rem] font-medium tracking-tight text-white"
+                                                            >
+                                                                {view.table.layout.rows.length > 0
+                                                                    ? getFieldDefinition(fieldId).label
+                                                                    : "Rows"}
+                                                            </th>
+                                                        ))}
+
+                                                        {view.hasColumnGroups ? (
+                                                            view.pivotResult.columnCombos.map((combo) => (
+                                                                <th
+                                                                    key={`column-group:${view.table.id}:${combo.key}`}
+                                                                    colSpan={
+                                                                        view.hasMultipleValueFields
+                                                                            ? view.pivotResult.valueFields.length
+                                                                            : 1
+                                                                    }
+                                                                    className="whitespace-nowrap border border-slate-200 px-3 py-0.5 text-center font-display text-[0.94rem] font-medium tracking-tight text-white"
+                                                                >
+                                                                    {combo.labels.join(" / ")}
+                                                                </th>
+                                                            ))
+                                                        ) : (
+                                                            view.pivotResult.valueFields.map((fieldId) => (
+                                                                <th
+                                                                    key={`value-header-top:${view.table.id}:${fieldId}`}
+                                                                    className="whitespace-nowrap border border-slate-200 px-3 py-0.5 text-right font-display text-[0.9rem] font-medium tracking-tight text-white"
+                                                                >
+                                                                    {getFieldDefinition(fieldId).label}
+                                                                </th>
+                                                            ))
+                                                        )}
+
+                                                        {view.hasColumnGroups
+                                                            ? view.pivotResult.valueFields.map((fieldId) => (
+                                                                <th
+                                                                    key={`grand-header:${view.table.id}:${fieldId}`}
+                                                                    rowSpan={view.showSecondaryHeaderRow ? 2 : 1}
+                                                                    className="whitespace-nowrap border border-slate-200 px-3 py-0.5 text-right font-display text-[0.9rem] font-medium tracking-tight text-white"
+                                                                >
+                                                                    {getFieldDefinition(fieldId).label}
+                                                                </th>
+                                                            ))
+                                                            : null}
+                                                    </tr>
+
+                                                    {view.showSecondaryHeaderRow ? (
+                                                        <tr>
+                                                            {view.pivotResult.columnCombos.map((combo) =>
+                                                                view.pivotResult.valueFields.map((fieldId) => (
+                                                                    <th
+                                                                        key={`value-header:${view.table.id}:${combo.key}:${fieldId}`}
+                                                                        className="whitespace-nowrap border border-slate-200 px-3 py-0.5 text-right font-display text-[0.9rem] font-medium tracking-tight text-white"
+                                                                    >
+                                                                        {getFieldDefinition(fieldId).label}
+                                                                    </th>
+                                                                ))
+                                                            )}
+                                                        </tr>
+                                                    ) : null}
+                                                    </thead>
+                                                    <tbody>
+                                                    {view.pivotResult.rowCombos.map((rowCombo, rowIndex) => (
+                                                        <tr
+                                                            key={`row:${view.table.id}:${rowCombo.key}`}
+                                                            className={rowIndex % 2 === 0 ? "bg-white/96" : "bg-slate-50/55"}
+                                                        >
+                                                            {(view.table.layout.rows.length > 0
+                                                                ? rowCombo.labels
+                                                                : ["Grand Total"]
+                                                            ).map((label, index) => (
+                                                                <td
+                                                                    key={`row-label:${view.table.id}:${rowCombo.key}:${index}`}
+                                                                    className="whitespace-nowrap border border-slate-200 px-3 py-0.5 font-display text-[0.94rem] font-medium tracking-tight text-ink"
+                                                                >
+                                                                    {label}
+                                                                </td>
+                                                            ))}
+
+                                                            {(view.table.layout.columns.length > 0
+                                                                ? view.pivotResult.columnCombos
+                                                                : [{ key: "__total__", labels: ["Grand Total"] }]
+                                                            ).map((columnCombo) =>
+                                                                view.pivotResult.valueFields.map((fieldId) => (
+                                                                    <td
+                                                                        key={`cell:${view.table.id}:${rowCombo.key}:${columnCombo.key}:${fieldId}`}
+                                                                        className="whitespace-nowrap border border-slate-200 px-3 py-0.5 text-right tabular-nums text-[0.9rem] font-normal text-slate-700"
+                                                                    >
+                                                                        {renderCell(view, rowCombo.key, columnCombo.key, fieldId)}
+                                                                    </td>
+                                                                ))
+                                                            )}
+
+                                                            {view.table.layout.columns.length > 0
+                                                                ? view.pivotResult.valueFields.map((fieldId) => (
+                                                                    <td
+                                                                        key={`row-total:${view.table.id}:${rowCombo.key}:${fieldId}`}
+                                                                        className="whitespace-nowrap border border-slate-200 bg-brandSoft/45 px-3 py-0.5 text-right font-display text-[0.9rem] font-medium tracking-tight tabular-nums text-ink"
+                                                                    >
+                                                                        {renderRowTotal(view, rowCombo.key, fieldId)}
+                                                                    </td>
+                                                                ))
+                                                                : null}
+                                                        </tr>
+                                                    ))}
+                                                    </tbody>
+                                                    <tfoot className="bg-brandSoft/55">
+                                                    <tr>
+                                                        {Array.from({
+                                                            length: Math.max(view.table.layout.rows.length, 1)
+                                                        }).map((_, index) => (
+                                                            <td
+                                                                key={`footer-label:${view.table.id}:${index}`}
+                                                                className="whitespace-nowrap border border-slate-200 px-3 py-0.5 font-display text-[0.94rem] font-medium tracking-tight text-ink"
+                                                            >
+                                                                {index === 0 ? "Grand Total" : ""}
+                                                            </td>
+                                                        ))}
+
+                                                        {(view.table.layout.columns.length > 0
+                                                            ? view.pivotResult.columnCombos
+                                                            : [{ key: "__total__", labels: ["Grand Total"] }]
+                                                        ).map((columnCombo) =>
+                                                            view.pivotResult.valueFields.map((fieldId) => (
+                                                                <td
+                                                                    key={`column-total:${view.table.id}:${columnCombo.key}:${fieldId}`}
+                                                                    className="whitespace-nowrap border border-slate-200 px-3 py-0.5 text-right font-display text-[0.9rem] font-medium tracking-tight tabular-nums text-ink"
+                                                                >
+                                                                    {renderColumnTotal(view, columnCombo.key, fieldId)}
+                                                                </td>
+                                                            ))
+                                                        )}
+
+                                                        {view.table.layout.columns.length > 0
+                                                            ? view.pivotResult.valueFields.map((fieldId) => (
+                                                                <td
+                                                                    key={`grand-total:${view.table.id}:${fieldId}`}
+                                                                    className="whitespace-nowrap border border-slate-200 bg-brandSoft/70 px-3 py-0.5 text-right font-display text-[0.94rem] font-semibold tracking-tight tabular-nums text-ink"
+                                                                >
+                                                                    {renderGrandTotal(view, fieldId)}
+                                                                </td>
+                                                            ))
+                                                            : null}
+                                                    </tr>
+                                                    </tfoot>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {TABLE_RESIZE_HANDLES.map((handle) => (
+                                        <button
+                                            key={`${view.table.id}:${handle.direction}`}
+                                            type="button"
+                                            data-table-resize-handle="true"
+                                            aria-label={`Resize ${view.table.name} from ${handle.direction}`}
+                                            onPointerDown={(event) =>
+                                                startTableResize(view.table.id, handle.direction, event)
+                                            }
+                                            className={`absolute z-20 block touch-none bg-transparent p-0 ${handle.className}`}
+                                        />
+                                    ))}
+                                </motion.div>
+                            ))}
                         </div>
-                    ))}
-                    {transfers.length === 0 ? (
-                        <p className="text-sm text-slate-500">
-                            {analysis
-                                ? "No transfer suggestion exists for the current dataset."
-                                : "Upload or sync a dataset to generate transfer ideas."}
-                        </p>
-                    ) : null}
-                </div>
-            ) : null}
+                    </div>
+                )}
+            </section>
         </div>
     );
 }

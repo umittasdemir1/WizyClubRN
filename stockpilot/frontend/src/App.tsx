@@ -230,7 +230,6 @@ function App() {
             <div className="relative z-10">
             <Header
                 dataSource={result?.source ?? null}
-                activeTab={activeTab}
                 onTabShortcut={handleTabChange}
                 onStudioLaunch={handleStudioLaunch}
             />

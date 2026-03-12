@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
-import { ArrowUpRight, Boxes, Database, Layers3, RotateCcw, ShieldCheck, UploadCloud } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowUpRight, ShieldCheck, UploadCloud } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import { CanvasStudio } from "../components/canvas/CanvasStudio";
+import { BrandSignature } from "../components/layout/BrandSignature";
 import { useFileUpload } from "../hooks/useFileUpload";
-import type { UploadStage, UploadWorkflowResult } from "../types/stock";
+import type { UploadWorkflowResult } from "../types/stock";
 import { formatNumber, formatPercent } from "../utils/formatting";
 import {
     isStudioHost,
@@ -12,19 +13,10 @@ import {
     saveLatestWorkflowResult
 } from "../utils/studio";
 
-function getStageLabel(stage: UploadStage) {
-    switch (stage) {
-        case "uploading":
-            return "Uploading dataset";
-        case "analyzing":
-            return "Calculating metrics";
-        case "local-processing":
-            return "Falling back to local engine";
-        case "ready":
-            return "Studio synced";
-        default:
-            return "Waiting for a live dataset";
-    }
+interface SummaryCard {
+    label: string;
+    value: string;
+    note: string;
 }
 
 function resolveWorkspaceUrl(location: Pick<Location, "origin" | "protocol" | "hostname">) {
@@ -36,16 +28,75 @@ function resolveWorkspaceUrl(location: Pick<Location, "origin" | "protocol" | "h
     return `${location.origin}/`;
 }
 
-export function StudioApp() {
-    const [currentFile, setCurrentFile] = useState<File | null>(null);
-    const [result, setResult] = useState<UploadWorkflowResult | null>(() => loadLatestWorkflowResult());
-    const [uploadProgress, setUploadProgress] = useState(0);
-    const [uploadStage, setUploadStage] = useState<UploadStage>("idle");
+function getSyncLabel(result: UploadWorkflowResult | null) {
+    if (!result) {
+        return "AWAITING DATA";
+    }
 
-    const uploadMutation = useFileUpload({
-        onProgressChange: setUploadProgress,
-        onStageChange: setUploadStage
-    });
+    return result.source === "api" ? "SYNCED VIA API" : "SYNCED LOCAL";
+}
+
+function StudioMetricCard({ card }: { card: SummaryCard }) {
+    return (
+        <article
+            className="premium-card-dark relative min-h-[220px] overflow-hidden px-6 py-6"
+            style={{ borderRadius: "12px" }}
+        >
+            <div
+                className="absolute inset-y-0 right-0 w-[55%] overflow-hidden opacity-20 pointer-events-none"
+                style={{
+                    WebkitMaskImage: "linear-gradient(to left, black 10%, transparent 90%)",
+                    maskImage: "linear-gradient(to left, black 10%, transparent 90%)"
+                }}
+            >
+                <div className="story-grid-pattern" />
+            </div>
+
+            <div className="relative z-10 flex h-full flex-col justify-between">
+                <div>
+                    <p className="font-display text-[1.75rem] font-light leading-[1.08] tracking-tight text-white sm:text-[2rem]">
+                        {card.label}
+                    </p>
+                    <p className="mt-4 font-display text-4xl font-semibold tracking-tight text-white">
+                        {card.value}
+                    </p>
+                </div>
+                <p className="max-w-[22rem] text-lg font-normal leading-relaxed text-slate-200/90">
+                    {card.note}
+                </p>
+            </div>
+        </article>
+    );
+}
+
+export function StudioApp() {
+    const [result, setResult] = useState<UploadWorkflowResult | null>(() => loadLatestWorkflowResult());
+    const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+    const lastScrollYRef = useRef(0);
+    const uploadMutation = useFileUpload();
+
+    useEffect(() => {
+        const handleScroll = () => {
+            const currentScrollY = window.scrollY;
+
+            if (currentScrollY < 120) {
+                setIsHeaderVisible(true);
+                lastScrollYRef.current = currentScrollY;
+                return;
+            }
+
+            if (currentScrollY > lastScrollYRef.current) {
+                setIsHeaderVisible(false);
+            } else {
+                setIsHeaderVisible(true);
+            }
+
+            lastScrollYRef.current = currentScrollY;
+        };
+
+        window.addEventListener("scroll", handleScroll, { passive: true });
+        return () => window.removeEventListener("scroll", handleScroll);
+    }, []);
 
     useEffect(() => {
         saveLatestWorkflowResult(result);
@@ -58,9 +109,6 @@ export function StudioApp() {
             }
 
             setResult(event.data.payload);
-            setCurrentFile(null);
-            setUploadProgress(100);
-            setUploadStage("ready");
         }
 
         window.addEventListener("message", handleMessage);
@@ -83,18 +131,9 @@ export function StudioApp() {
                 return;
             }
 
-            setCurrentFile(file);
-            setUploadProgress(0);
-            setUploadStage("uploading");
             uploadMutation.mutate(file, {
                 onSuccess(nextResult) {
                     setResult(nextResult);
-                    setUploadProgress(100);
-                    setUploadStage("ready");
-                },
-                onError() {
-                    setUploadProgress(0);
-                    setUploadStage("idle");
                 }
             });
         }
@@ -105,178 +144,110 @@ export function StudioApp() {
         []
     );
 
-    const summaryCards = [
+    const summaryCards: SummaryCard[] = [
         {
             label: "Products",
             value: result ? formatNumber(result.analysis.overview.totalProducts) : "—",
-            note: result ? `${formatNumber(result.parsed.rowCount)} source rows` : "No dataset loaded"
+            note: result ? `${formatNumber(result.parsed.rowCount)} source rows loaded into the studio session.` : "No dataset loaded yet."
         },
         {
             label: "Inventory",
             value: result ? formatNumber(result.analysis.overview.totalInventory) : "—",
-            note: result ? `${formatNumber(result.analysis.overview.warehouses)} warehouses` : "Waiting for sync"
+            note: result ? `${formatNumber(result.analysis.overview.warehouses)} warehouses represented in the current file.` : "Inventory totals will appear after sync."
         },
         {
             label: "Net Sales",
             value: result ? formatNumber(result.analysis.overview.totalNetSales) : "—",
             note: result
-                ? `${formatPercent(result.analysis.overview.averageReturnRate)} avg return rate`
-                : "Sales less returns"
+                ? `${formatPercent(result.analysis.overview.averageReturnRate)} average return rate across visible records.`
+                : "Net sales are calculated as sales minus returns."
         },
         {
             label: "Returns",
             value: result ? formatNumber(result.analysis.overview.totalReturns) : "—",
             note: result
-                ? `${formatNumber(result.analysis.overview.stagnantItems)} stagnant items`
-                : "Return pressure lens"
+                ? `${formatNumber(result.analysis.records.length)} analyzed lines available for pivoting.`
+                : "Return pressure appears once the dataset is loaded."
         }
     ];
 
     return (
-        <div className="relative min-h-screen overflow-hidden bg-[#eef3fb] text-ink">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(36,107,253,0.14),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(255,144,104,0.15),transparent_28%),linear-gradient(180deg,#f8fbff_0%,#edf2f9_100%)]" />
-            <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(148,163,184,0.11)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.11)_1px,transparent_1px)] bg-[size:88px_88px] opacity-50" />
+        <div className="relative isolate min-h-screen text-ink selection:bg-brandSelection selection:text-white">
+            <div className="story-spectrum-bg">
+                <div className="bg-grid-pattern" />
+            </div>
 
-            <div className="relative z-10 px-4 py-4 sm:px-6 lg:px-8">
-                <header className="rounded-[32px] border border-white/70 bg-white/80 px-5 py-4 shadow-panel backdrop-blur-xl sm:px-6">
-                    <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                        <div className="flex items-center gap-4">
-                            <div className="flex h-14 w-14 items-center justify-center rounded-[22px] bg-ink text-white shadow-soft">
-                                <Layers3 className="h-7 w-7" />
-                            </div>
-                            <div>
-                                <p className="text-xs font-semibold uppercase tracking-[0.32em] text-brand">
-                                    StockPilot Studio
-                                </p>
-                                <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-ink">
-                                    Drag, compose, and present your metric canvas
-                                </h1>
-                            </div>
-                        </div>
+            <header
+                className={`fixed left-0 right-0 top-0 z-50 border-b border-white/20 bg-white/60 backdrop-blur-2xl transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                    isHeaderVisible ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0"
+                }`}
+            >
+                <div className="mx-auto flex max-w-[1680px] items-center justify-between px-8 py-5 sm:px-12">
+                    <BrandSignature onClick={() => window.location.assign(workspaceUrl)} />
 
-                        <div className="flex flex-wrap items-center gap-3">
-                            <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-500">
-                                <ShieldCheck className="h-4 w-4 text-success" />
-                                {result ? `Synced via ${result.source}` : "Awaiting workspace sync"}
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => window.open(workspaceUrl, "_blank", "noopener,noreferrer")}
-                                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:text-ink"
-                            >
-                                Main workspace
-                                <ArrowUpRight className="h-4 w-4" />
-                            </button>
-                            <button
-                                type="button"
-                                onClick={open}
-                                className="inline-flex items-center gap-2 rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
-                            >
-                                <UploadCloud className="h-4 w-4" />
-                                Upload dataset
-                            </button>
-                        </div>
-                    </div>
-                </header>
-
-                <section
-                    {...getRootProps()}
-                    className={`mt-6 rounded-[32px] border px-5 py-5 shadow-panel backdrop-blur-xl transition sm:px-6 ${isDragActive
-                        ? "border-brand bg-white/95"
-                        : "border-white/70 bg-white/72"
-                    }`}
-                >
-                    <input {...getInputProps()} />
-                    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-                        <div>
-                            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">
-                                Live canvas session
-                            </p>
-                            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-ink">
-                                Separate window, shared analysis session
-                            </h2>
-                            <p className="mt-4 max-w-3xl text-base leading-relaxed text-slate-500 sm:text-lg">
-                                The studio can receive the latest analysis from the main StockPilot window.
-                                It also accepts direct `.csv`, `.xls`, and `.xlsx` uploads when you want to work independently.
-                            </p>
-                            <div className="mt-5 flex flex-wrap gap-3 text-sm font-medium text-slate-500">
-                                <span className="rounded-full bg-slate-100 px-4 py-2">Canvas-first workspace</span>
-                                <span className="rounded-full bg-slate-100 px-4 py-2">Cross-window session sync</span>
-                                <span className="rounded-full bg-slate-100 px-4 py-2">Persistent layout memory</span>
-                            </div>
-                        </div>
-
-                        <div className="rounded-[28px] border border-slate-100 bg-slate-950 px-5 py-5 text-white">
-                            <div className="flex items-start justify-between gap-4">
-                                <div>
-                                    <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">
-                                        Data pulse
-                                    </p>
-                                    <p className="mt-3 text-2xl font-semibold">
-                                        {currentFile?.name ?? result?.parsed.fileName ?? "No dataset connected"}
-                                    </p>
-                                </div>
-                                <Database className="h-5 w-5 text-brand" />
-                            </div>
-
-                            <div className="mt-5 space-y-3">
-                                <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                                    <span>{getStageLabel(uploadStage)}</span>
-                                    <span>{uploadMutation.isPending ? `${uploadProgress}%` : result ? "LIVE" : "IDLE"}</span>
-                                </div>
-                                <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                                    <div
-                                        className="h-full rounded-full bg-[linear-gradient(90deg,#FF9068_0%,#FFD93D_36%,#6BCF7F_68%,#4D96FF_100%)] transition-all duration-300"
-                                        style={{ width: `${Math.max(result ? uploadProgress : uploadProgress, result ? 16 : 8)}%` }}
-                                    />
-                                </div>
-                                <div className="grid gap-3 text-sm text-slate-300 sm:grid-cols-2">
-                                    <div className="rounded-[22px] bg-white/5 px-4 py-3">
-                                        <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Rows</p>
-                                        <p className="mt-2 text-lg font-semibold text-white">
-                                            {result ? formatNumber(result.parsed.rowCount) : "—"}
-                                        </p>
-                                    </div>
-                                    <div className="rounded-[22px] bg-white/5 px-4 py-3">
-                                        <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Source</p>
-                                        <p className="mt-2 text-lg font-semibold text-white">
-                                            {result ? result.source.toUpperCase() : "SYNC"}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <section className="mt-6 grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
-                    {summaryCards.map((card) => (
-                        <article
-                            key={card.label}
-                            className="rounded-[28px] border border-white/70 bg-white/80 px-5 py-5 shadow-panel backdrop-blur-xl"
+                    <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-10 lg:flex">
+                        <button
+                            type="button"
+                            onClick={() => window.location.assign(workspaceUrl)}
+                            className="text-sm font-medium tracking-wide text-ink transition-colors hover:text-brand"
                         >
-                            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                                {card.label}
-                            </p>
-                            <p className="mt-3 font-display text-4xl font-semibold tracking-tight text-ink">
-                                {card.value}
-                            </p>
-                            <p className="mt-3 text-sm text-slate-500">{card.note}</p>
-                        </article>
-                    ))}
-                </section>
+                            WORKSPACE
+                        </button>
+                        <span className="text-sm font-medium tracking-wide text-brand">STUDIO</span>
+                    </nav>
 
-                <section className="mt-6">
-                    <CanvasStudio
-                        analysis={result?.analysis ?? null}
-                        transfers={result?.transferPlan ?? []}
-                        session={{
-                            fileName: result?.parsed.fileName ?? null,
-                            rowCount: result?.parsed.rowCount ?? 0,
-                            source: result?.source ?? null
-                        }}
-                    />
-                </section>
+                    <div className="ml-auto flex items-center gap-3">
+                        <div className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white/55 px-5 py-2 text-xs font-semibold text-slate-700 shadow-sm backdrop-blur sm:flex">
+                            <ShieldCheck className={`h-4 w-4 ${result ? "text-success" : "text-slate-300"}`} />
+                            {getSyncLabel(result)}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => window.location.assign(workspaceUrl)}
+                            className="flex items-center gap-2 rounded-full border border-slate-200 bg-white/55 px-5 py-2 text-xs font-semibold text-slate-700 shadow-sm backdrop-blur transition-colors hover:bg-white/70 hover:text-ink"
+                        >
+                            MAIN WORKSPACE
+                            <ArrowUpRight className="h-4 w-4 text-brand" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={open}
+                            className="flex items-center gap-2 rounded-full border border-slate-200 bg-white/55 px-5 py-2 text-xs font-semibold text-slate-700 shadow-sm backdrop-blur transition-colors hover:bg-white/70 hover:text-ink"
+                        >
+                            UPLOAD DATASET
+                            <UploadCloud className="h-4 w-4 text-brand" />
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <div className="relative z-10 px-4 pb-16 pt-[132px] sm:px-8 lg:px-10">
+                <div className="mx-auto max-w-[1680px]">
+                    <section className="text-center">
+                        <p className="section-tag">Pivot Studio</p>
+                        <h1 className="font-display text-4xl font-extralight leading-[1.08] tracking-tight text-ink sm:text-6xl lg:text-[5.5rem]">
+                            Build the table,
+                            <span className="block">read the data</span>
+                        </h1>
+                        <p className="section-desc !mb-0">
+                            Use the same StockPilot surface language, drag fields into pivot zones, and let the right side render a clean analytical table.
+                        </p>
+                    </section>
+
+                    <section
+                        {...getRootProps()}
+                        className={`mt-10 grid gap-4 md:grid-cols-2 2xl:grid-cols-4 ${isDragActive ? "rounded-[28px] ring-2 ring-brand/30 ring-offset-2 ring-offset-transparent" : ""}`}
+                    >
+                        <input {...getInputProps()} />
+                        {summaryCards.map((card) => (
+                            <StudioMetricCard key={card.label} card={card} />
+                        ))}
+                    </section>
+
+                    <section className="mt-6">
+                        <CanvasStudio analysis={result?.analysis ?? null} />
+                    </section>
+                </div>
             </div>
         </div>
     );

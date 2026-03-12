@@ -1,6 +1,6 @@
 # Root MCP ve Skill Master Rehberi
 
-Son güncelleme: 2026-03-11
+Son güncelleme: 2026-03-12
 
 Bu dosya, root altındaki MCP ve skill rehberlerinin kanonik özetidir. Amaç tek dosyada şu sorulara cevap vermektir:
 - Şu an son durumumuz ne?
@@ -19,17 +19,17 @@ Bu dosya özet ve operasyon odaklıdır. Teknik kaynaklar:
 ## 1. Son Durum
 
 - Repo artık MCP tarafında merkezi yönetiliyor; kullanıcı config'i manuel kopyalanmıyor.
-- Windows lokal makinede doğrulanan managed MCP seti:
+- 2026-03-12 doctor çıktısıyla doğrulanan managed MCP seti:
   `openaiDeveloperDocs`, `filesystem`, `r2-local`, `github`, `supabase-mcp-server`, `netlify`, `render`, `doppler`, `bookmarks-local`
-- Şu an pasif kalan tek optional MCP:
+- Bu workspace doğrulamasında pasif kalan tek optional MCP:
   `postgres` çünkü `POSTGRES_MCP_URL` yok.
 - `netlify` için startup timeout `90` saniyeye çıkarıldı.
 - `render` resmi hosted MCP olarak eklendi.
 - `netlify` resmi MCP olarak token bazlı açılıyor.
 - Firebase Studio / Linux için aynı managed akış destekleniyor; user-level `~/.codex/config.toml` kopyalamak yok.
-- StockPilot tarafında lokal build durumu iyi:
-  frontend build geçti, backend build geçti, backend smoke akışı geçti.
-- StockPilot için canlı deploy henüz yapılmadı; Render ve Netlify MCP erişimleri hazır, deploy adımı bekliyor.
+- 2026-03-12 local doctor doğrulaması temiz:
+  Codex config OK, `r2-mcp/.env` OK.
+- Build, smoke ve deploy gibi çalışma zamanı durumları bu master dosyada kalıcı gerçek olarak tutulmaz; gerektiğinde ilgili komut veya servis panelinden yeniden doğrulanır.
 
 ## 2. Kanonik Kural
 
@@ -234,16 +234,16 @@ Kontrol et:
 - `node scripts/doctor-codex-mcp.js` geçiyor mu?
 - Yeni eklenen MCP için restart gerekiyor mu?
 
-## 9. StockPilot Son Durumu
+## 9. 2026-03-12 Workspace Doğrulaması
 
-- StockPilot lokal frontend build: geçti.
-- StockPilot lokal backend build: geçti.
-- StockPilot backend smoke: geçti.
-- Render MCP: konfigüre edildi ve enabled.
-- Netlify MCP: konfigüre edildi ve enabled.
-- UI/UX şu an dondurulmuş kabul edilmeli; kullanıcı açıkça istemeden değiştirilmemeli.
-- Sonraki doğal adım canlı deploy akışıdır:
-  Render backend -> Netlify frontend
+- `node scripts/doctor-codex-mcp.js` geçti.
+- Codex config: OK (`/home/user/.codex/config.toml`)
+- R2 env: OK (`/home/user/WizyClubRN/r2-mcp/.env`)
+- Managed MCP servers:
+  `openaiDeveloperDocs`, `filesystem`, `r2-local`, `github`, `supabase-mcp-server`, `netlify`, `render`, `doppler`, `bookmarks-local`
+- Skipped optional MCP:
+  `postgres` (`POSTGRES_MCP_URL` eksik)
+- Bu bölüm yalnızca repo içinden doğrulanabilen MCP durumunu özetler; build, smoke, deploy ve UI freeze gibi akışlar ayrıca doğrulanmalıdır.
 
 ## 10. Arşiv İndeksi
 
@@ -251,13 +251,13 @@ Eski root rehberleri artık şu klasör altında tutulur:
 - `docs/archive/root-mcp-skills-guides/`
 
 Arşiv linkleri:
-- [MCP_SKILLS_INDEX.md](D:\WizyClub\docs\archive\root-mcp-skills-guides\MCP_SKILLS_INDEX.md)
-- [MCP_VE_SKILL_REHBERI_TR.md](D:\WizyClub\docs\archive\root-mcp-skills-guides\MCP_VE_SKILL_REHBERI_TR.md)
-- [MCP_AND_SKILLS_GUIDE_EN.md](D:\WizyClub\docs\archive\root-mcp-skills-guides\MCP_AND_SKILLS_GUIDE_EN.md)
-- [MCP_STANDARDIZATION_GUIDE.md](D:\WizyClub\docs\archive\root-mcp-skills-guides\MCP_STANDARDIZATION_GUIDE.md)
-- [CODEX_MCP_CROSS_PLATFORM_RUNBOOK.md](D:\WizyClub\docs\archive\root-mcp-skills-guides\CODEX_MCP_CROSS_PLATFORM_RUNBOOK.md)
-- [LOKAL_GECIS_VE_ENV_R2_REHBERI.md](D:\WizyClub\docs\archive\root-mcp-skills-guides\LOKAL_GECIS_VE_ENV_R2_REHBERI.md)
-- [BOOKMARKS_MCP_LOCAL_SETUP.md](D:\WizyClub\docs\archive\root-mcp-skills-guides\BOOKMARKS_MCP_LOCAL_SETUP.md)
+- [MCP_SKILLS_INDEX.md](docs/archive/root-mcp-skills-guides/MCP_SKILLS_INDEX.md)
+- [MCP_VE_SKILL_REHBERI_TR.md](docs/archive/root-mcp-skills-guides/MCP_VE_SKILL_REHBERI_TR.md)
+- [MCP_AND_SKILLS_GUIDE_EN.md](docs/archive/root-mcp-skills-guides/MCP_AND_SKILLS_GUIDE_EN.md)
+- [MCP_STANDARDIZATION_GUIDE.md](docs/archive/root-mcp-skills-guides/MCP_STANDARDIZATION_GUIDE.md)
+- [CODEX_MCP_CROSS_PLATFORM_RUNBOOK.md](docs/archive/root-mcp-skills-guides/CODEX_MCP_CROSS_PLATFORM_RUNBOOK.md)
+- [LOKAL_GECIS_VE_ENV_R2_REHBERI.md](docs/archive/root-mcp-skills-guides/LOKAL_GECIS_VE_ENV_R2_REHBERI.md)
+- [BOOKMARKS_MCP_LOCAL_SETUP.md](docs/archive/root-mcp-skills-guides/BOOKMARKS_MCP_LOCAL_SETUP.md)
 
 Kural:
 - Güncel operasyon kararı için önce bu master dosyaya bakılır.

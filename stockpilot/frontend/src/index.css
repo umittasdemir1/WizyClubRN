@@ -66,9 +66,19 @@ body {
     position: absolute;
     inset: 0;
     background-image: 
-        linear-gradient(to right, rgba(241, 245, 249, 0.82) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(241, 245, 249, 0.82) 1px, transparent 1px);
+        linear-gradient(to right, rgba(226, 232, 240, 0.9) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(226, 232, 240, 0.9) 1px, transparent 1px);
     background-size: 144px 144px;
+}
+
+.canvas-grid-pattern {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+        linear-gradient(to right, rgba(226, 232, 240, 0.3) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(226, 232, 240, 0.3) 1px, transparent 1px);
+    background-size: 10px 10px;
 }
 
 @keyframes float-bg {
@@ -282,4 +292,24 @@ body {
     margin-bottom: 4rem;
     /* Hero desc is 24px. Target is 18px (text-lg) */
     font-size: clamp(1.125rem, 2vw, 1.125rem); 
+}
+
+.pivot-table {
+    border: 0;
+}
+
+.pivot-table tr > :first-child {
+    border-left-width: 0;
+}
+
+.pivot-table tr > :last-child {
+    border-right-width: 0;
+}
+
+.pivot-table thead tr:first-child > * {
+    border-top-width: 0;
+}
+
+.pivot-table tfoot tr:last-child > * {
+    border-bottom-width: 0;
 }
