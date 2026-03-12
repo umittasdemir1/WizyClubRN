@@ -74,7 +74,7 @@ const FEATURES = [
     {
         imgSrc: "/images/feat_scoring.png",
         title: "Proprietary Scoring",
-        desc: "Beyond simple tracking. Execute complex ABC classification and stock health evaluations derived from longitudinal metrics.",
+        desc: "Beyond simple tracking. Compare inventory, sales, returns, and lifecycle signals in one normalized operational view.",
     },
     {
         imgSrc: "/images/feat_logistics.png",
@@ -84,7 +84,7 @@ const FEATURES = [
     {
         imgSrc: "/images/feat_planning.png",
         title: "Predictive Planning",
-        desc: "Strategic demand forecasting utilizing safety stock algorithms to eliminate out-of-stock events effectively.",
+        desc: "Read production year, first-entry timing, and last-sale recency together to spot stale stock before it hardens.",
     },
 ];
 
@@ -331,8 +331,8 @@ function App() {
                                         <div className="space-y-20">
                                             <MetricsGrid overview={result.analysis.overview} />
                                             <div className="grid gap-20 xl:grid-cols-2">
-                                                <CategoryDonutChart data={result.analysis.categoryBreakdown} />
-                                                <StockHealthChart data={result.analysis.stockHealth} />
+                                                <CategoryDonutChart data={result.analysis.warehouseBreakdown} />
+                                                <StockHealthChart data={result.analysis.lifecycleBreakdown} />
                                             </div>
                                         </div>
                                     )}
@@ -340,7 +340,7 @@ function App() {
                                     {activeTab === "transfers" && <TransferMatrix transfers={result.transferPlan} />}
                                     {activeTab === "planning" && (
                                         <ForecastChart
-                                            data={result.analysis.forecast}
+                                            data={result.analysis.planning}
                                             records={result.analysis.records}
                                         />
                                     )}

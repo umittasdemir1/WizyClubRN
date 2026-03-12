@@ -1,12 +1,20 @@
 import { useDeferredValue, useState } from "react";
 import { Search } from "lucide-react";
 import type { AnalyzedInventoryRecord } from "../../types/stock";
-import { formatCurrency } from "../../utils/formatting";
+import { formatNullableDate, formatNumber, formatPercent } from "../../utils/formatting";
 import { Card } from "../shared/Card";
 
 type SortKey = keyof Pick<
     AnalyzedInventoryRecord,
-    "sku" | "productName" | "store" | "category" | "onHand" | "stockValue" | "abcClass" | "stockStatus"
+    | "productCode"
+    | "productName"
+    | "warehouseName"
+    | "inventory"
+    | "salesQty"
+    | "returnQty"
+    | "netSalesQty"
+    | "sellThroughRate"
+    | "lifecycleStatus"
 >;
 
 interface StockTableProps {
@@ -32,7 +40,7 @@ function sortRecords(records: AnalyzedInventoryRecord[], sortKey: SortKey, direc
 
 export function StockTable({ records }: StockTableProps) {
     const [query, setQuery] = useState("");
-    const [sortKey, setSortKey] = useState<SortKey>("stockValue");
+    const [sortKey, setSortKey] = useState<SortKey>("inventory");
     const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
     const deferredQuery = useDeferredValue(query.trim().toLowerCase());
 
@@ -42,12 +50,13 @@ export function StockTable({ records }: StockTableProps) {
         }
 
         return [
-            record.sku,
+            record.productCode,
             record.productName,
-            record.store,
-            record.category,
-            record.abcClass,
-            record.stockStatus
+            record.warehouseName,
+            record.color,
+            record.size,
+            record.gender,
+            record.lifecycleStatus
         ]
             .join(" ")
             .toLowerCase()
@@ -63,7 +72,7 @@ export function StockTable({ records }: StockTableProps) {
         }
 
         setSortKey(nextKey);
-        setSortDirection(nextKey === "sku" ? "asc" : "desc");
+        setSortDirection(nextKey === "productCode" ? "asc" : "desc");
     }
 
     return (
@@ -71,10 +80,10 @@ export function StockTable({ records }: StockTableProps) {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                     <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">
-                        Stock Analysis
+                        Inventory Analysis
                     </p>
                     <h3 className="mt-2 font-display text-xl font-bold tracking-tight text-ink">
-                        Searchable and sortable inventory grid
+                        Searchable product and warehouse grid
                     </h3>
                 </div>
                 <label className="flex items-center gap-2 rounded-pill border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
@@ -83,7 +92,7 @@ export function StockTable({ records }: StockTableProps) {
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
                         className="w-full bg-transparent outline-none lg:w-72"
-                        placeholder="Search by SKU, product, store..."
+                        placeholder="Search by code, product, warehouse..."
                     />
                 </label>
             </div>
@@ -94,14 +103,15 @@ export function StockTable({ records }: StockTableProps) {
                         <thead className="sticky top-0 bg-slate-50/95 backdrop-blur">
                             <tr className="text-slate-500">
                                 {[
-                                    ["sku", "SKU"],
+                                    ["productCode", "Code"],
                                     ["productName", "Product"],
-                                    ["store", "Store"],
-                                    ["category", "Category"],
-                                    ["onHand", "On Hand"],
-                                    ["stockValue", "Value"],
-                                    ["abcClass", "ABC"],
-                                    ["stockStatus", "Status"]
+                                    ["warehouseName", "Warehouse"],
+                                    ["inventory", "Inventory"],
+                                    ["salesQty", "Sales"],
+                                    ["returnQty", "Returns"],
+                                    ["netSalesQty", "Net Sales"],
+                                    ["sellThroughRate", "Sell Through"],
+                                    ["lifecycleStatus", "Status"]
                                 ].map(([key, label]) => (
                                     <th key={key} className="px-4 py-3 font-semibold">
                                         <button type="button" onClick={() => handleSort(key as SortKey)}>
@@ -113,39 +123,45 @@ export function StockTable({ records }: StockTableProps) {
                         </thead>
                         <tbody className="divide-y divide-slate-100 bg-white">
                             {sorted.map((record) => (
-                                <tr key={`${record.store}:${record.sku}`} className="hover:bg-slate-50">
-                                    <td className="px-4 py-3 font-semibold text-ink">{record.sku}</td>
-                                    <td className="px-4 py-3 text-slate-700">{record.productName}</td>
-                                    <td className="px-4 py-3 text-slate-600">{record.store}</td>
-                                    <td className="px-4 py-3 text-slate-600">{record.category}</td>
-                                    <td className="px-4 py-3 text-slate-700">{record.onHand}</td>
+                                <tr
+                                    key={`${record.warehouseName}:${record.productCode}:${record.color}:${record.size}`}
+                                    className="hover:bg-slate-50"
+                                >
+                                    <td className="px-4 py-3 font-semibold text-ink">{record.productCode}</td>
                                     <td className="px-4 py-3 text-slate-700">
-                                        {formatCurrency(record.stockValue)}
+                                        <div>
+                                            <p>{record.productName}</p>
+                                            <p className="text-xs text-slate-500">
+                                                {record.color} · {record.size} · {record.gender}
+                                            </p>
+                                        </div>
                                     </td>
-                                    <td className="px-4 py-3">
-                                        <span
-                                            className={`rounded-pill px-3 py-1 text-xs font-semibold ${
-                                                record.abcClass === "A"
-                                                    ? "bg-emerald-50 text-success"
-                                                    : record.abcClass === "B"
-                                                      ? "bg-amber-50 text-warning"
-                                                      : "bg-rose-50 text-danger"
-                                            }`}
-                                        >
-                                            {record.abcClass}
-                                        </span>
+                                    <td className="px-4 py-3 text-slate-600">
+                                        <div>
+                                            <p>{record.warehouseName}</p>
+                                            <p className="text-xs text-slate-500">
+                                                Last sale {formatNullableDate(record.lastSaleDate)}
+                                            </p>
+                                        </div>
+                                    </td>
+                                    <td className="px-4 py-3 text-slate-700">{formatNumber(record.inventory)}</td>
+                                    <td className="px-4 py-3 text-slate-700">{formatNumber(record.salesQty)}</td>
+                                    <td className="px-4 py-3 text-slate-700">{formatNumber(record.returnQty)}</td>
+                                    <td className="px-4 py-3 text-slate-700">{formatNumber(record.netSalesQty)}</td>
+                                    <td className="px-4 py-3 text-slate-700">
+                                        {formatPercent(record.sellThroughRate)}
                                     </td>
                                     <td className="px-4 py-3">
                                         <span
                                             className={`rounded-pill px-3 py-1 text-xs font-semibold capitalize ${
-                                                record.stockStatus === "healthy"
+                                                record.lifecycleStatus === "healthy"
                                                     ? "bg-emerald-50 text-success"
-                                                    : record.stockStatus === "warning"
+                                                    : record.lifecycleStatus === "slow"
                                                       ? "bg-amber-50 text-warning"
                                                       : "bg-rose-50 text-danger"
                                             }`}
                                         >
-                                            {record.stockStatus}
+                                            {record.lifecycleStatus}
                                         </span>
                                     </td>
                                 </tr>

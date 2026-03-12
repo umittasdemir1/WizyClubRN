@@ -2,16 +2,19 @@ import * as XLSX from "xlsx";
 import type { InventoryRecord, ParsedInventoryPayload } from "../types/index.js";
 
 const HEADER_ALIASES = {
-    sku: ["sku", "stok kodu", "stock code", "product code", "item code"],
-    productName: ["product", "product name", "urun", "urun adi", "item"],
-    category: ["category", "kategori", "group", "department"],
-    store: ["store", "magaza", "branch", "location", "warehouse"],
-    onHand: ["on hand", "stock", "stok", "quantity", "qty", "mevcut stok"],
-    unitPrice: ["unit price", "price", "fiyat", "birim fiyat", "cost"],
-    dailySales: ["daily sales", "avg daily sales", "gunluk satis", "sales"],
-    leadTimeDays: ["lead time", "lead time days", "termin", "teslim suresi"],
-    safetyStock: ["safety stock", "guvenlik stogu", "buffer"],
-    reorderPoint: ["reorder point", "yeniden siparis noktasi", "min stock", "minimum stock"]
+    warehouseName: ["warehouse_name", "warehouse name"],
+    productCode: ["product_code", "product code", "sku", "stock code"],
+    productName: ["product_name", "product name"],
+    color: ["color"],
+    size: ["size"],
+    gender: ["gender"],
+    salesQty: ["sales_qty", "sales qty", "sales quantity"],
+    returnQty: ["return_qty", "return qty", "return quantity"],
+    inventory: ["inventory", "stock", "on hand"],
+    productionYear: ["production_year", "production year"],
+    lastSaleDate: ["last_sale_date", "last sale date"],
+    firstStockEntryDate: ["first_stock_entry_date", "first stock entry date"],
+    firstSaleDate: ["first_sale_date", "first sale date"]
 } satisfies Record<keyof InventoryRecord, string[]>;
 
 function normalizeHeader(value: string): string {
@@ -50,7 +53,7 @@ function toNumber(value: unknown, fallback = 0): number {
     return fallback;
 }
 
-function toText(value: unknown, fallback: string): string {
+function toText(value: unknown, fallback = ""): string {
     if (typeof value === "string" && value.trim()) {
         return value.trim();
     }
@@ -62,17 +65,80 @@ function toText(value: unknown, fallback: string): string {
     return fallback;
 }
 
-function computeReorderPoint(
-    dailySales: number,
-    leadTimeDays: number,
-    safetyStock: number,
-    explicitReorderPoint: number
-): number {
-    if (explicitReorderPoint > 0) {
-        return explicitReorderPoint;
+function buildIsoDate(year: number, month: number, day: number): string | null {
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (
+        date.getUTCFullYear() !== year ||
+        date.getUTCMonth() !== month - 1 ||
+        date.getUTCDate() !== day
+    ) {
+        return null;
     }
 
-    return Math.max(Math.round(dailySales * leadTimeDays + safetyStock), safetyStock);
+    return date.toISOString().slice(0, 10);
+}
+
+function toIsoDate(value: unknown): string | null {
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+        return value.toISOString().slice(0, 10);
+    }
+
+    if (typeof value === "number" && Number.isFinite(value)) {
+        const parsed = XLSX.SSF.parse_date_code(value);
+        if (parsed) {
+            return buildIsoDate(parsed.y, parsed.m, parsed.d);
+        }
+    }
+
+    if (typeof value !== "string") {
+        return null;
+    }
+
+    const text = value.trim();
+    if (!text) {
+        return null;
+    }
+
+    const isoMatch = text.match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})$/);
+    if (isoMatch) {
+        return buildIsoDate(Number(isoMatch[1]), Number(isoMatch[2]), Number(isoMatch[3]));
+    }
+
+    const localeMatch = text.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
+    if (localeMatch) {
+        const year = localeMatch[3].length === 2 ? Number(`20${localeMatch[3]}`) : Number(localeMatch[3]);
+        return buildIsoDate(year, Number(localeMatch[2]), Number(localeMatch[1]));
+    }
+
+    const timestamp = Date.parse(text);
+    if (Number.isFinite(timestamp)) {
+        return new Date(timestamp).toISOString().slice(0, 10);
+    }
+
+    return null;
+}
+
+function toYear(value: unknown): number | null {
+    if (typeof value === "number" && Number.isFinite(value)) {
+        const year = Math.trunc(value);
+        return year >= 1900 && year <= 2100 ? year : null;
+    }
+
+    if (typeof value !== "string") {
+        return null;
+    }
+
+    const text = value.trim();
+    if (!text) {
+        return null;
+    }
+
+    const match = text.match(/\b(19|20)\d{2}\b/);
+    if (!match) {
+        return null;
+    }
+
+    return Number(match[0]);
 }
 
 export function normalizeInventoryRows(
@@ -83,45 +149,26 @@ export function normalizeInventoryRows(
 
     const records = rows
         .map((row, index) => {
-            const sku = toText(findColumn(row, HEADER_ALIASES.sku), `SKU-${index + 1}`);
-            const productName = toText(findColumn(row, HEADER_ALIASES.productName), sku);
-            const category = toText(findColumn(row, HEADER_ALIASES.category), "Uncategorized");
-            const store = toText(findColumn(row, HEADER_ALIASES.store), "Main Store");
-            const onHand = toNumber(findColumn(row, HEADER_ALIASES.onHand));
-            const unitPrice = toNumber(findColumn(row, HEADER_ALIASES.unitPrice));
-            const dailySales = toNumber(findColumn(row, HEADER_ALIASES.dailySales), 1);
-            const leadTimeDays = Math.max(
-                toNumber(findColumn(row, HEADER_ALIASES.leadTimeDays), 7),
-                1
-            );
-            const safetyStock = Math.max(
-                toNumber(findColumn(row, HEADER_ALIASES.safetyStock), 2),
-                0
-            );
-            const explicitReorderPoint = Math.max(
-                toNumber(findColumn(row, HEADER_ALIASES.reorderPoint)),
-                0
-            );
+            const productCode = toText(findColumn(row, HEADER_ALIASES.productCode), `PRODUCT-${index + 1}`);
+            const productName = toText(findColumn(row, HEADER_ALIASES.productName), productCode);
 
             return {
-                sku,
+                warehouseName: toText(findColumn(row, HEADER_ALIASES.warehouseName), "Main Warehouse"),
+                productCode,
                 productName,
-                category,
-                store,
-                onHand,
-                unitPrice,
-                dailySales,
-                leadTimeDays,
-                safetyStock,
-                reorderPoint: computeReorderPoint(
-                    dailySales,
-                    leadTimeDays,
-                    safetyStock,
-                    explicitReorderPoint
-                )
+                color: toText(findColumn(row, HEADER_ALIASES.color), "Unknown"),
+                size: toText(findColumn(row, HEADER_ALIASES.size), "Unknown"),
+                gender: toText(findColumn(row, HEADER_ALIASES.gender), "Unspecified"),
+                salesQty: Math.max(toNumber(findColumn(row, HEADER_ALIASES.salesQty)), 0),
+                returnQty: Math.max(toNumber(findColumn(row, HEADER_ALIASES.returnQty)), 0),
+                inventory: Math.max(toNumber(findColumn(row, HEADER_ALIASES.inventory)), 0),
+                productionYear: toYear(findColumn(row, HEADER_ALIASES.productionYear)),
+                lastSaleDate: toIsoDate(findColumn(row, HEADER_ALIASES.lastSaleDate)),
+                firstStockEntryDate: toIsoDate(findColumn(row, HEADER_ALIASES.firstStockEntryDate)),
+                firstSaleDate: toIsoDate(findColumn(row, HEADER_ALIASES.firstSaleDate))
             } satisfies InventoryRecord;
         })
-        .filter((record) => record.productName || record.sku);
+        .filter((record) => record.productCode || record.productName);
 
     return {
         fileName,

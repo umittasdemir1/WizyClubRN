@@ -1,6 +1,6 @@
 # StockPilot
 
-StockPilot is a standalone stock analysis workspace under `D:\WizyClub\stockpilot`.
+StockPilot is a standalone stock analysis workspace under `stockpilot/` in this repo.
 
 ## Scope
 
@@ -31,20 +31,21 @@ Frontend expects the backend on `http://localhost:8787` through Vite proxy.
 
 ## Expected columns
 
-The parser accepts flexible header names, but these concepts are useful:
+The parser is now standardized around these fields:
 
-- `SKU`
-- `Product Name`
-- `Category`
-- `Store`
-- `Stock` or `On Hand`
-- `Unit Price`
-- `Daily Sales`
-- `Lead Time`
-- `Safety Stock`
-- `Reorder Point`
-
-Missing reorder points are inferred from daily sales, lead time, and safety stock.
+- `warehouse_name`
+- `product_code`
+- `product_name`
+- `color`
+- `size`
+- `gender`
+- `sales_qty`
+- `return_qty`
+- `inventory`
+- `production_year`
+- `last_sale_date`
+- `first_stock_entry_date`
+- `first_sale_date`
 
 ## Deployment notes
 

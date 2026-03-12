@@ -1,12 +1,12 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { Card } from "../shared/Card";
-import type { CategoryBreakdownPoint } from "../../types/stock";
-import { formatCurrency } from "../../utils/formatting";
+import type { WarehouseBreakdownPoint } from "../../types/stock";
+import { formatNumber } from "../../utils/formatting";
 
 const COLORS = ["#246BFD", "#1FA971", "#F2B13F", "#9B8AFB", "#E45858", "#0EA5E9"];
 
 interface CategoryDonutChartProps {
-    data: CategoryBreakdownPoint[];
+    data: WarehouseBreakdownPoint[];
 }
 
 export function CategoryDonutChart({ data }: CategoryDonutChartProps) {
@@ -14,10 +14,10 @@ export function CategoryDonutChart({ data }: CategoryDonutChartProps) {
         <Card>
             <div className="mb-4">
                 <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">
-                    Category Mix
+                    Warehouse Mix
                 </p>
                 <h3 className="mt-2 font-display text-xl font-bold tracking-tight text-ink">
-                    Value concentration by category
+                    Inventory concentration by warehouse
                 </h3>
             </div>
             <div className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
@@ -36,7 +36,7 @@ export function CategoryDonutChart({ data }: CategoryDonutChartProps) {
                                 ))}
                             </Pie>
                             <Tooltip
-                                formatter={(value: number) => formatCurrency(value)}
+                                formatter={(value: number) => `${formatNumber(value)} units`}
                                 contentStyle={{
                                     borderRadius: 16,
                                     border: "none",
@@ -60,12 +60,12 @@ export function CategoryDonutChart({ data }: CategoryDonutChartProps) {
                                 <div>
                                     <p className="font-semibold text-ink">{entry.name}</p>
                                     <p className="text-xs text-slate-500">
-                                        {entry.quantity.toLocaleString()} units
+                                        {formatNumber(entry.quantity)} net sales
                                     </p>
                                 </div>
                             </div>
                             <span className="text-sm font-semibold text-slate-600">
-                                {formatCurrency(entry.value)}
+                                {formatNumber(entry.value)} units
                             </span>
                         </div>
                     ))}

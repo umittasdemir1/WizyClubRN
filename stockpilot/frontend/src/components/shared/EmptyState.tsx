@@ -24,9 +24,9 @@ export function EmptyState() {
                         Drop an inventory export to unlock the workspace
                     </h2>
                     <p className="max-w-4xl text-lg leading-relaxed text-slate-400 sm:text-xl">
-                        S+ Label expects columns such as SKU, Product Name, Category, Store,
-                        Stock, Unit Price, Daily Sales, Lead Time, Safety Stock, or Reorder Point.
-                        Missing values are inferred so you can start with imperfect spreadsheets.
+                        StockPilot expects `warehouse_name`, `product_code`, `product_name`, `color`,
+                        `size`, `gender`, `sales_qty`, `return_qty`, `inventory`, `production_year`,
+                        `last_sale_date`, `first_stock_entry_date`, and `first_sale_date`.
                     </p>
                 </div>
             </div>

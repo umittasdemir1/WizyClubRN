@@ -2,16 +2,19 @@ export type AppTab = "dashboard" | "analysis" | "transfers" | "planning";
 export type UploadStage = "idle" | "uploading" | "analyzing" | "local-processing" | "ready";
 
 export interface InventoryRecord {
-    sku: string;
+    warehouseName: string;
+    productCode: string;
     productName: string;
-    category: string;
-    store: string;
-    onHand: number;
-    unitPrice: number;
-    dailySales: number;
-    leadTimeDays: number;
-    safetyStock: number;
-    reorderPoint: number;
+    color: string;
+    size: string;
+    gender: string;
+    salesQty: number;
+    returnQty: number;
+    inventory: number;
+    productionYear: number | null;
+    lastSaleDate: string | null;
+    firstStockEntryDate: string | null;
+    firstSaleDate: string | null;
 }
 
 export interface ParsedInventoryPayload {
@@ -22,65 +25,71 @@ export interface ParsedInventoryPayload {
 }
 
 export interface AnalyzedInventoryRecord extends InventoryRecord {
-    stockValue: number;
-    revenueScore: number;
-    coverageDays: number;
-    reorderQuantity: number;
-    suggestedPurchase: number;
-    abcClass: "A" | "B" | "C";
-    stockStatus: "healthy" | "warning" | "critical";
+    netSalesQty: number;
+    returnRate: number;
+    sellThroughRate: number;
+    daysSinceLastSale: number | null;
+    stockAgeDays: number | null;
+    daysToFirstSale: number | null;
+    lifecycleStatus: "healthy" | "slow" | "stagnant";
 }
 
-export interface CategoryBreakdownPoint {
+export interface WarehouseBreakdownPoint {
     name: string;
     value: number;
     quantity: number;
 }
 
-export interface StockHealthPoint {
-    name: "Healthy" | "Warning" | "Critical";
+export interface LifecyclePoint {
+    name: "Healthy" | "Slow Moving" | "Stagnant";
     value: number;
     tone: string;
 }
 
-export interface ForecastPoint {
+export interface PlanningPoint {
     label: string;
-    projectedDemand: number;
-    reorderTarget: number;
+    inventory: number;
+    netSalesQty: number;
 }
 
 export interface AlertItem {
-    sku: string;
+    productCode: string;
     productName: string;
-    store: string;
-    shortage: number;
+    warehouseName: string;
+    issue: string;
+    metric: string;
 }
 
 export interface OverviewMetrics {
-    totalSkus: number;
-    totalStockValue: number;
-    lowStockItems: number;
-    overstockItems: number;
-    stores: number;
+    totalProducts: number;
+    totalInventory: number;
+    totalNetSales: number;
+    totalReturns: number;
+    warehouses: number;
+    averageReturnRate: number;
+    slowMovingItems: number;
+    stagnantItems: number;
 }
 
 export interface AnalysisResult {
     overview: OverviewMetrics;
     records: AnalyzedInventoryRecord[];
-    categoryBreakdown: CategoryBreakdownPoint[];
-    stockHealth: StockHealthPoint[];
-    forecast: ForecastPoint[];
+    warehouseBreakdown: WarehouseBreakdownPoint[];
+    lifecycleBreakdown: LifecyclePoint[];
+    planning: PlanningPoint[];
     alerts: AlertItem[];
 }
 
 export interface TransferSuggestion {
-    sku: string;
+    productCode: string;
     productName: string;
-    fromStore: string;
-    toStore: string;
+    color: string;
+    size: string;
+    gender: string;
+    fromWarehouseName: string;
+    toWarehouseName: string;
     quantity: number;
-    unitPrice: number;
-    estimatedValue: number;
+    demandGap: number;
 }
 
 export interface UploadWorkflowResult {

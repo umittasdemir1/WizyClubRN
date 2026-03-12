@@ -1,9 +1,9 @@
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Card } from "../shared/Card";
-import type { StockHealthPoint } from "../../types/stock";
+import type { LifecyclePoint } from "../../types/stock";
 
 interface StockHealthChartProps {
-    data: StockHealthPoint[];
+    data: LifecyclePoint[];
 }
 
 export function StockHealthChart({ data }: StockHealthChartProps) {
@@ -11,10 +11,10 @@ export function StockHealthChart({ data }: StockHealthChartProps) {
         <Card>
             <div className="mb-4">
                 <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">
-                    Stock Health
+                    Lifecycle Snapshot
                 </p>
                 <h3 className="mt-2 font-display text-xl font-bold tracking-tight text-ink">
-                    Healthy vs warning vs critical lines
+                    Healthy vs slow-moving vs stagnant lines
                 </h3>
             </div>
             <div className="h-72">

@@ -18,7 +18,7 @@ function getStatusLabel(stage: UploadStage) {
         case "uploading":
             return "Uploading dataset";
         case "analyzing":
-            return "Running stock analysis";
+            return "Running product analysis";
         case "local-processing":
             return "Switching to local engine";
         case "ready":
@@ -90,20 +90,20 @@ export function FileUploader({
                         Drag a stock file here
                     </h3>
                     <p className="text-lg leading-relaxed text-slate-400 sm:text-xl max-w-2xl">
-                        `.xlsx`, `.xls`, and `.csv` are supported. The app normalizes messy headers
-                        and can still analyze data if the backend is offline.
+                        `.xlsx`, `.xls`, and `.csv` are supported. The app expects warehouse, product,
+                        sales, return, inventory, production year, and sales/stock dates.
                     </p>
                 </div>
 
                 <div className="flex flex-wrap gap-4 text-sm font-medium text-slate-300">
                     <span className="rounded-2xl bg-white/10 px-5 py-3 shadow-soft border border-white/5">
-                        Multi-store ready
+                        Warehouse ready
                     </span>
                     <span className="rounded-2xl bg-white/10 px-5 py-3 shadow-soft border border-white/5">
-                        ABC analysis
+                        Sales and return lens
                     </span>
                     <span className="rounded-2xl bg-white/10 px-5 py-3 shadow-soft border border-white/5">
-                        Transfer suggestions
+                        Rebalancing suggestions
                     </span>
                 </div>
 
@@ -145,7 +145,7 @@ export function FileUploader({
                                             />
                                         </div>
                                         <p className="text-sm text-slate-400">
-                                            Your inventory snapshot is being normalized and prepared for the workspace.
+                                            Your file is being normalized into the standard warehouse and product schema.
                                         </p>
                                     </div>
                                 ) : latestUpload ? (
