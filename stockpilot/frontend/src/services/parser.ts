@@ -35,9 +35,24 @@ function parseConcatenatedQuotedCsv(text: string): Record<string, unknown>[] {
     });
 }
 
+function decodeCsvText(arrayBuffer: ArrayBuffer): string {
+    const utf8 = new TextDecoder("utf-8").decode(arrayBuffer);
+    if (!utf8.includes("�")) {
+        return utf8;
+    }
+
+    try {
+        return new TextDecoder("windows-1254").decode(arrayBuffer);
+    } catch {
+        return utf8;
+    }
+}
+
 export async function parseInventoryFile(file: File): Promise<ParsedInventoryPayload> {
+    const arrayBuffer = await file.arrayBuffer();
+
     if (file.name.toLowerCase().endsWith(".csv")) {
-        const text = await file.text();
+        const text = decodeCsvText(arrayBuffer);
         const firstLine = text.split(/\r?\n/, 1)[0]?.trim() ?? "";
         const isConcatenatedQuotedCsv =
             firstLine.startsWith("\"") &&
@@ -51,7 +66,6 @@ export async function parseInventoryFile(file: File): Promise<ParsedInventoryPay
         }
     }
 
-    const arrayBuffer = await file.arrayBuffer();
     const workbook = XLSX.read(arrayBuffer, {
         type: "array",
         cellDates: false

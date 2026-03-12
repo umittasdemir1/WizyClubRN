@@ -186,6 +186,19 @@ function parseConcatenatedQuotedCsv(text: string): Record<string, unknown>[] {
     });
 }
 
+function decodeCsvText(buffer: Buffer): string {
+    const utf8 = buffer.toString("utf8");
+    if (!utf8.includes("�")) {
+        return utf8;
+    }
+
+    try {
+        return new TextDecoder("windows-1254").decode(buffer);
+    } catch {
+        return utf8;
+    }
+}
+
 export function normalizeInventoryRows(
     rows: Record<string, unknown>[],
     fileName: string
@@ -225,7 +238,7 @@ export function normalizeInventoryRows(
 
 export function parseInventoryBuffer(buffer: Buffer, fileName: string): ParsedInventoryPayload {
     if (fileName.toLowerCase().endsWith(".csv")) {
-        const text = buffer.toString("utf8");
+        const text = decodeCsvText(buffer);
         const firstLine = text.split(/\r?\n/, 1)[0]?.trim() ?? "";
         const isConcatenatedQuotedCsv =
             firstLine.startsWith("\"") &&
