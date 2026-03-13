@@ -1,6 +1,6 @@
 import { Router } from "express";
 import multer from "multer";
-import { parseInventoryBuffer } from "../services/parser.js";
+import { parseInventoryUpload } from "../usecases/parseInventoryUpload.js";
 
 const upload = multer({
     storage: multer.memoryStorage(),
@@ -20,7 +20,10 @@ uploadRouter.post("/", upload.single("file"), (req, res, next) => {
             return;
         }
 
-        const payload = parseInventoryBuffer(req.file.buffer, req.file.originalname);
+        const payload = parseInventoryUpload({
+            buffer: req.file.buffer,
+            fileName: req.file.originalname
+        });
         res.json(payload);
     } catch (error) {
         next(error);

@@ -96,6 +96,7 @@ function App() {
     const [currentFile, setCurrentFile] = useState<File | null>(null);
     const [result, setResult] = useState<UploadWorkflowResult | null>(null);
     const [history, setHistory] = useState<RecentUpload[]>([]);
+    const [uploadError, setUploadError] = useState<string | null>(null);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [uploadStage, setUploadStage] = useState<UploadStage>("idle");
     const [isSwitchPending, startTabTransition] = useTransition();
@@ -150,11 +151,13 @@ function App() {
 
     function handleUpload(file: File) {
         setCurrentFile(file);
+        setUploadError(null);
         setUploadProgress(0);
         setUploadStage("uploading");
 
         uploadMutation.mutate(file, {
             onSuccess(nextResult) {
+                setUploadError(null);
                 setResult(nextResult);
                 setHistory((current) =>
                     [{
@@ -167,7 +170,8 @@ function App() {
                 setUploadProgress(100);
                 setUploadStage("ready");
             },
-            onError() {
+            onError(error) {
+                setUploadError(error instanceof Error ? error.message : "Upload workflow failed.");
                 setUploadProgress(0);
                 setUploadStage("idle");
             },
@@ -178,6 +182,7 @@ function App() {
         setCurrentFile(null);
         setResult(null);
         setHistory([]);
+        setUploadError(null);
         setUploadProgress(0);
         setUploadStage("idle");
         uploadMutation.reset();
@@ -362,6 +367,7 @@ function App() {
                     >
                         <FileUploader
                             currentFile={currentFile}
+                            errorMessage={uploadError}
                             isLoading={uploadMutation.isPending}
                             latestUpload={latestUpload}
                             onSelect={handleUpload}

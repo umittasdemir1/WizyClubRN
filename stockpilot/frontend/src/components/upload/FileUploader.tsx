@@ -5,6 +5,7 @@ import type { RecentUpload, UploadStage } from "../../types/stock";
 
 interface FileUploaderProps {
     currentFile: File | null;
+    errorMessage: string | null;
     isLoading: boolean;
     onSelect: (file: File) => void;
     onClear: () => void;
@@ -30,6 +31,7 @@ function getStatusLabel(stage: UploadStage) {
 
 export function FileUploader({
     currentFile,
+    errorMessage,
     isLoading,
     onSelect,
     onClear,
@@ -106,6 +108,12 @@ export function FileUploader({
                         Rebalancing suggestions
                     </span>
                 </div>
+
+                {errorMessage ? (
+                    <div className="rounded-[28px] border border-rose-300/35 bg-rose-500/10 px-6 py-5 text-left text-sm text-rose-100 shadow-soft">
+                        {errorMessage}
+                    </div>
+                ) : null}
 
                 {visibleFileName ? (
                     <div className="relative mt-6 rounded-[32px] border border-white/10 bg-white/5 px-8 py-6 text-base text-slate-300 shadow-xl">

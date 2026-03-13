@@ -1,13 +1,11 @@
 import { Router } from "express";
-import { buildTransferPlan } from "../services/transfer.js";
-import { ensureInventoryRecords } from "../utils/validators.js";
+import { buildInventoryTransferPlan } from "../usecases/buildInventoryTransferPlan.js";
 
 export const transferRouter = Router();
 
 transferRouter.post("/", (req, res, next) => {
     try {
-        const records = ensureInventoryRecords(req.body.records);
-        res.json(buildTransferPlan(records));
+        res.json(buildInventoryTransferPlan({ records: req.body.records }));
     } catch (error) {
         next(error);
     }

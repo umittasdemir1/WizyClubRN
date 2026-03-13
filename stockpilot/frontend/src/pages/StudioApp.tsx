@@ -74,9 +74,14 @@ function StudioMetricCard({ card }: { card: SummaryCard }) {
 export function StudioApp() {
     const [result, setResult] = useState<UploadWorkflowResult | null>(() => loadLatestWorkflowResult());
     const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+    const [uploadError, setUploadError] = useState<string | null>(null);
     const lastScrollYRef = useRef(0);
     const canvasSectionRef = useRef<HTMLElement | null>(null);
     const uploadMutation = useFileUpload();
+    const workspaceUrl = useMemo(
+        () => resolveWorkspaceUrl(window.location),
+        []
+    );
 
     useEffect(() => {
         const handleScroll = () => {
@@ -116,6 +121,22 @@ export function StudioApp() {
 
     useEffect(() => {
         function handleMessage(event: MessageEvent) {
+            let allowedOrigin = window.location.origin;
+
+            try {
+                allowedOrigin = new URL(workspaceUrl, window.location.origin).origin;
+            } catch {
+                allowedOrigin = window.location.origin;
+            }
+
+            if (event.origin !== allowedOrigin) {
+                return;
+            }
+
+            if (window.opener && event.source !== window.opener) {
+                return;
+            }
+
             if (!isStudioSyncEnvelope(event.data)) {
                 return;
             }
@@ -125,7 +146,7 @@ export function StudioApp() {
 
         window.addEventListener("message", handleMessage);
         return () => window.removeEventListener("message", handleMessage);
-    }, []);
+    }, [workspaceUrl]);
 
     const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
         multiple: false,
@@ -143,18 +164,18 @@ export function StudioApp() {
                 return;
             }
 
+            setUploadError(null);
             uploadMutation.mutate(file, {
                 onSuccess(nextResult) {
+                    setUploadError(null);
                     setResult(nextResult);
+                },
+                onError(error) {
+                    setUploadError(error instanceof Error ? error.message : "Upload workflow failed.");
                 }
             });
         }
     });
-
-    const workspaceUrl = useMemo(
-        () => resolveWorkspaceUrl(window.location),
-        []
-    );
 
     const summaryCards: SummaryCard[] = [
         {
@@ -245,6 +266,12 @@ export function StudioApp() {
                             Use the same StockPilot surface language, drag fields into pivot zones, and let the right side render a clean analytical table.
                         </p>
                     </section>
+
+                    {uploadError ? (
+                        <div className="mx-auto mt-8 max-w-3xl rounded-[28px] border border-rose-200/60 bg-white/85 px-6 py-5 text-sm text-rose-700 shadow-soft backdrop-blur">
+                            {uploadError}
+                        </div>
+                    ) : null}
 
                     <section
                         {...getRootProps()}

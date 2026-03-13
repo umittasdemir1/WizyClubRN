@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { parseLocaleNumber, resolveProductIdentity, toText } from "../../../shared/normalization.js";
 import type {
     AlertItem,
     AnalysisResult,
@@ -59,34 +60,6 @@ function findColumn(row: Record<string, unknown>, aliases: string[]): unknown {
     }
 
     return undefined;
-}
-
-function toNumber(value: unknown, fallback = 0): number {
-    if (typeof value === "number" && Number.isFinite(value)) {
-        return value;
-    }
-
-    if (typeof value === "string") {
-        const cleaned = value.replace(/[^\d,.-]/g, "").replace(",", ".");
-        const parsed = Number(cleaned);
-        if (Number.isFinite(parsed)) {
-            return parsed;
-        }
-    }
-
-    return fallback;
-}
-
-function toText(value: unknown, fallback = ""): string {
-    if (typeof value === "string" && value.trim()) {
-        return value.trim();
-    }
-
-    if (typeof value === "number" && Number.isFinite(value)) {
-        return String(value);
-    }
-
-    return fallback;
 }
 
 function buildIsoDate(year: number, month: number, day: number): string | null {
@@ -233,27 +206,33 @@ export function normalizeInventoryRows(
     const columns = Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
 
     const records = rows
-        .map((row, index) => {
-            const productCode = toText(findColumn(row, HEADER_ALIASES.productCode), `PRODUCT-${index + 1}`);
-            const productName = toText(findColumn(row, HEADER_ALIASES.productName), productCode);
+        .map((row) => {
+            const productIdentity = resolveProductIdentity(
+                findColumn(row, HEADER_ALIASES.productCode),
+                findColumn(row, HEADER_ALIASES.productName)
+            );
+
+            if (!productIdentity) {
+                return null;
+            }
 
             return {
                 warehouseName: toText(findColumn(row, HEADER_ALIASES.warehouseName), "Main Warehouse"),
-                productCode,
-                productName,
+                productCode: productIdentity.productCode,
+                productName: productIdentity.productName,
                 color: toText(findColumn(row, HEADER_ALIASES.color), "Unknown"),
                 size: toText(findColumn(row, HEADER_ALIASES.size), "Unknown"),
                 gender: toText(findColumn(row, HEADER_ALIASES.gender), "Unspecified"),
-                salesQty: Math.max(toNumber(findColumn(row, HEADER_ALIASES.salesQty)), 0),
-                returnQty: Math.max(toNumber(findColumn(row, HEADER_ALIASES.returnQty)), 0),
-                inventory: Math.max(toNumber(findColumn(row, HEADER_ALIASES.inventory)), 0),
+                salesQty: Math.max(parseLocaleNumber(findColumn(row, HEADER_ALIASES.salesQty)), 0),
+                returnQty: Math.max(parseLocaleNumber(findColumn(row, HEADER_ALIASES.returnQty)), 0),
+                inventory: Math.max(parseLocaleNumber(findColumn(row, HEADER_ALIASES.inventory)), 0),
                 productionYear: toYear(findColumn(row, HEADER_ALIASES.productionYear)),
                 lastSaleDate: toIsoDate(findColumn(row, HEADER_ALIASES.lastSaleDate)),
                 firstStockEntryDate: toIsoDate(findColumn(row, HEADER_ALIASES.firstStockEntryDate)),
                 firstSaleDate: toIsoDate(findColumn(row, HEADER_ALIASES.firstSaleDate))
             } satisfies InventoryRecord;
         })
-        .filter((record) => record.productCode || record.productName);
+        .filter((record): record is InventoryRecord => record !== null);
 
     return {
         fileName,

@@ -1,24 +1,8 @@
+import { parseLocaleNumber, resolveProductIdentity, toText } from "../../../shared/normalization.js";
 import type { InventoryRecord } from "../types/index.js";
 
 function isRecordLike(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null;
-}
-
-function toText(value: unknown, fallback: string): string {
-    if (typeof value === "string" && value.trim()) {
-        return value.trim();
-    }
-
-    if (typeof value === "number" && Number.isFinite(value)) {
-        return String(value);
-    }
-
-    return fallback;
-}
-
-function toNumber(value: unknown, fallback = 0): number {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function toNullableYear(value: unknown): number | null {
@@ -49,16 +33,22 @@ export function ensureInventoryRecords(value: unknown): InventoryRecord[] {
             throw new Error(`Record at index ${index} must be an object.`);
         }
 
+        const productIdentity = resolveProductIdentity(item.productCode, item.productName);
+
+        if (!productIdentity) {
+            throw new Error(`Record at index ${index} must include productCode or productName.`);
+        }
+
         return {
             warehouseName: toText(item.warehouseName, "Main Warehouse"),
-            productCode: toText(item.productCode, ""),
-            productName: toText(item.productName, toText(item.productCode, "")),
+            productCode: productIdentity.productCode,
+            productName: productIdentity.productName,
             color: toText(item.color, "Unknown"),
             size: toText(item.size, "Unknown"),
             gender: toText(item.gender, "Unspecified"),
-            salesQty: Math.max(toNumber(item.salesQty), 0),
-            returnQty: Math.max(toNumber(item.returnQty), 0),
-            inventory: Math.max(toNumber(item.inventory), 0),
+            salesQty: Math.max(parseLocaleNumber(item.salesQty), 0),
+            returnQty: Math.max(parseLocaleNumber(item.returnQty), 0),
+            inventory: Math.max(parseLocaleNumber(item.inventory), 0),
             productionYear: toNullableYear(item.productionYear),
             lastSaleDate: toNullableDate(item.lastSaleDate),
             firstStockEntryDate: toNullableDate(item.firstStockEntryDate),

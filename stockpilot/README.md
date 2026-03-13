@@ -11,6 +11,13 @@ StockPilot is a standalone stock analysis workspace under `stockpilot/` in this 
 
 ## Local run
 
+From `stockpilot/` root:
+
+```bash
+npm run dev:frontend
+npm run dev:backend
+```
+
 ### Frontend
 
 ```bash
@@ -28,6 +35,13 @@ npm run dev
 ```
 
 Frontend expects the backend on `http://localhost:8787` through Vite proxy.
+
+## Local environment files
+
+- `stockpilot/frontend/.env.example`
+- `stockpilot/backend/.env.example`
+
+These files are local to StockPilot and should move with the project during repo extraction.
 
 ## Expected columns
 
