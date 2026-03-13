@@ -341,7 +341,7 @@ function App() {
             </section>
 
             {/* UPLOAD SECTION */}
-            <section id="upload" className="px-8 pt-20 pb-40 bg-slate-50/20">
+            <section id="upload" className="px-8 pt-20 pb-0 bg-slate-50/20">
                 <div className="mx-auto max-w-5xl">
                     <motion.div
                         initial={{ opacity: 0, y: 40 }}

@@ -85,7 +85,7 @@ export function Header({ dataSource, onTabShortcut, onStudioLaunch }: HeaderProp
                     </button>
                     <button
                         onClick={onStudioLaunch}
-                        className="text-sm font-medium tracking-wide text-ink transition-colors hover:text-brand"
+                        className="studio-animated-border px-4 py-1.5 text-sm font-medium tracking-wide text-ink transition-colors hover:text-brand"
                     >
                         STUDIO
                     </button>

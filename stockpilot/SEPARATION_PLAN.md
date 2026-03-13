@@ -33,21 +33,21 @@ Move `stockpilot/` into its own repository without breaking the existing `WizyCl
 - [X] Add StockPilot-local env examples for frontend and backend.
 - [X] Move separation notes under `stockpilot/`.
 - [X] Add StockPilot package-level build and check scripts.
-- [ ] Isolate env sync and secret-management workflow from root scripts.
-- [ ] Move remaining StockPilot-specific deployment and ops notes under `stockpilot/`.
+- [X] Isolate env sync and secret-management workflow from root scripts.
+- [X] Move remaining StockPilot-specific deployment and ops notes under `stockpilot/`.
 
 ### P2: Architecture Cleanup
 
 - [X] Move shared stock domain contracts and normalization rules into a StockPilot-only shared module.
 - [X] Start splitting `CanvasStudio.tsx` by extracting model, storage, header-filter, and typewriter helpers.
-- [ ] Extract pivot domain orchestration from `CanvasStudio.tsx`.
-- [ ] Extract persistence and pointer interaction hooks from `CanvasStudio.tsx`.
-- [ ] Extract presentation sections/components from `CanvasStudio.tsx`.
+- [X] Extract pivot domain orchestration from `CanvasStudio.tsx`.
+- [X] Extract persistence and pointer interaction hooks from `CanvasStudio.tsx`.
+- [X] Extract presentation sections/components from `CanvasStudio.tsx`.
 - [X] Introduce backend usecase layer for upload, analysis, and transfer flows.
-- [ ] Add explicit backend request contracts and DTO boundaries around usecases.
+- [X] Add explicit backend request contracts and DTO boundaries around usecases.
 - [X] Add parser and backend normalization regression tests.
 - [X] Add backend usecase regression tests.
-- [ ] Add dedicated analysis and transfer regression tests for business rules.
+- [X] Add dedicated analysis and transfer regression tests for business rules.
 
 ### P3: Final Extraction
 

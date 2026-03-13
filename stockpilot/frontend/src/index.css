@@ -324,3 +324,45 @@ body {
 .pivot-table tfoot tr:last-child > * {
     border-bottom-width: 0;
 }
+
+@property --border-angle {
+    syntax: "<angle>";
+    initial-value: 0turn;
+    inherits: false;
+}
+
+@keyframes spin-border {
+    to {
+        --border-angle: 1turn;
+    }
+}
+
+/* ── Studio Tab Animated Border ── */
+.studio-animated-border {
+    position: relative;
+    border-radius: 9999px;
+}
+
+.studio-animated-border::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1.6px;
+    background: conic-gradient(
+        from var(--border-angle),
+        transparent 0%,
+        transparent 15%,
+        #4D96FF 30%,
+        #6BCF7F 45%,
+        #FFD93D 60%,
+        #FF9068 80%,
+        #FF416C 100%
+    );
+    animation: spin-border 3s linear infinite;
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+}

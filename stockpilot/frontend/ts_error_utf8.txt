@@ -1,0 +1,3 @@
+﻿src/components/canvas/CanvasSidebar.tsx(18,10): error TS2724: '"./canvasModel"' has no exported member named 'PivotTableLayout'. Did you mean 'PivotLayout'?
+src/components/canvas/CanvasSidebar.tsx(165,68): error TS7006: Parameter 'fieldId' implicitly has an 'any' type.
+src/components/canvas/CanvasSidebar.tsx(221,57): error TS18047: 'activeDrag' is possibly 'null'.

@@ -1,11 +1,9 @@
 import { analyzeInventory } from "../services/analyzer.js";
-import type { AnalysisResult } from "../types/index.js";
+import type { AnalyzeInventoryRecordsRequest, AnalyzeInventoryRecordsResponse } from "../contracts/analysis.js";
 import { ensureInventoryRecords } from "../utils/validators.js";
 
-interface AnalyzeInventoryRecordsInput {
-    records: unknown;
-}
-
-export function analyzeInventoryRecords({ records }: AnalyzeInventoryRecordsInput): AnalysisResult {
+export function analyzeInventoryRecords({
+    records
+}: AnalyzeInventoryRecordsRequest): AnalyzeInventoryRecordsResponse {
     return analyzeInventory(ensureInventoryRecords(records));
 }

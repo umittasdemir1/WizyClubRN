@@ -1,11 +1,9 @@
 import { parseInventoryBuffer } from "../services/parser.js";
-import type { ParsedInventoryPayload } from "../types/index.js";
+import type { ParseInventoryUploadRequest, ParseInventoryUploadResponse } from "../contracts/upload.js";
 
-interface ParseInventoryUploadInput {
-    buffer: Buffer;
-    fileName: string;
-}
-
-export function parseInventoryUpload({ buffer, fileName }: ParseInventoryUploadInput): ParsedInventoryPayload {
+export function parseInventoryUpload({
+    buffer,
+    fileName
+}: ParseInventoryUploadRequest): ParseInventoryUploadResponse {
     return parseInventoryBuffer(buffer, fileName);
 }
