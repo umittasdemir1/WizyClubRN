@@ -1,8 +1,25 @@
 import type { AnalyzedInventoryRecord } from "../../types/stock";
 import { formatNullableDate, formatNumber, formatPercent } from "../../utils/formatting";
 
+type BasePivotFieldId = keyof AnalyzedInventoryRecord;
+
+export type CustomMetricId = `custom:${string}`;
+export type PivotFieldId = BasePivotFieldId | CustomMetricId;
 export type PivotZoneId = "filters" | "columns" | "rows" | "values";
-export type PivotFieldId = keyof AnalyzedInventoryRecord;
+export type PivotFieldFormat = "text" | "number" | "percent" | "date";
+export type CustomMetricOperator = "+" | "-" | "*" | "/";
+
+export interface CustomMetricFieldToken {
+    type: "field";
+    fieldId: PivotFieldId;
+}
+
+export interface CustomMetricOperatorToken {
+    type: "operator";
+    operator: CustomMetricOperator;
+}
+
+export type CustomMetricExpressionToken = CustomMetricFieldToken | CustomMetricOperatorToken;
 
 export interface PivotLayout {
     filters: PivotFieldId[];
@@ -15,8 +32,15 @@ export interface PivotFieldDefinition {
     id: PivotFieldId;
     label: string;
     kind: "dimension" | "measure";
-    summary: "sum" | "avg" | "count";
-    format: "text" | "number" | "percent" | "date";
+    summary: "sum" | "avg" | "count" | "formula";
+    format: PivotFieldFormat;
+}
+
+export interface CustomMetricDefinition {
+    id: CustomMetricId;
+    name: string;
+    tokens: CustomMetricExpressionToken[];
+    format: "number" | "percent";
 }
 
 export interface PivotCombo {
@@ -61,6 +85,7 @@ export interface PivotTableInstance {
 export interface StudioCanvasState {
     tables: PivotTableInstance[];
     activeTableId: string | null;
+    customMetrics: CustomMetricDefinition[];
 }
 
 export interface PivotTableView {
@@ -71,6 +96,7 @@ export interface PivotTableView {
     hasColumnGroups: boolean;
     hasMultipleValueFields: boolean;
     showSecondaryHeaderRow: boolean;
+    customMetrics: CustomMetricDefinition[];
 }
 
 export type HeaderFilterKind = "row-field" | "column-group" | "value-field" | "table-menu";
@@ -108,6 +134,11 @@ export interface ResizeState {
     startY: number;
     startWidth: number;
     startHeight: number;
+    currentX?: number;
+    currentY?: number;
+    currentWidth?: number;
+    currentHeight?: number;
+    hasMoved?: boolean;
 }
 
 export interface MoveState {
@@ -116,6 +147,9 @@ export interface MoveState {
     startPointerY: number;
     startX: number;
     startY: number;
+    currentX?: number;
+    currentY?: number;
+    hasMoved?: boolean;
 }
 
 export const STORAGE_KEY = "stockpilot-pivot-studio-layout-v3";
@@ -186,7 +220,7 @@ export const TABLE_RESIZE_HANDLES: {
     { direction: "sw", className: "bottom-[-2px] -left-[2px] h-[7px] w-[7px] cursor-nesw-resize" }
 ];
 
-export const PIVOT_FIELDS: PivotFieldDefinition[] = [
+const BASE_PIVOT_FIELDS: PivotFieldDefinition[] = [
     { id: "warehouseName", label: "Warehouse", kind: "dimension", summary: "count", format: "text" },
     { id: "productCode", label: "Product Code", kind: "dimension", summary: "count", format: "text" },
     { id: "productName", label: "Product Name", kind: "dimension", summary: "count", format: "text" },
@@ -208,8 +242,88 @@ export const PIVOT_FIELDS: PivotFieldDefinition[] = [
     { id: "daysToFirstSale", label: "Days to First Sale", kind: "measure", summary: "avg", format: "number" }
 ];
 
-export function getFieldDefinition(fieldId: PivotFieldId) {
-    return PIVOT_FIELDS.find((field) => field.id === fieldId)!;
+export const PIVOT_FIELDS = BASE_PIVOT_FIELDS;
+
+export function isCustomMetricFieldId(fieldId: PivotFieldId): fieldId is CustomMetricId {
+    return fieldId.startsWith("custom:");
+}
+
+function buildCustomMetricFieldDefinition(metric: CustomMetricDefinition): PivotFieldDefinition {
+    return {
+        id: metric.id,
+        label: metric.name,
+        kind: "measure",
+        summary: "formula",
+        format: metric.format
+    };
+}
+
+export function getAvailablePivotFields(customMetrics: CustomMetricDefinition[] = []) {
+    return [
+        ...BASE_PIVOT_FIELDS,
+        ...customMetrics.map((metric) => buildCustomMetricFieldDefinition(metric))
+    ];
+}
+
+export function getMeasureFieldDefinitions(customMetrics: CustomMetricDefinition[] = []) {
+    return getAvailablePivotFields(customMetrics).filter((field) => field.kind === "measure");
+}
+
+function getCustomMetricDefinition(
+    fieldId: PivotFieldId,
+    customMetrics: CustomMetricDefinition[] = []
+) {
+    return customMetrics.find((metric) => metric.id === fieldId) ?? null;
+}
+
+export function getFieldDefinition(
+    fieldId: PivotFieldId,
+    customMetrics: CustomMetricDefinition[] = []
+) {
+    return getAvailablePivotFields(customMetrics).find((field) => field.id === fieldId)!;
+}
+
+function slugifyCustomMetricName(value: string) {
+    return value
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+}
+
+export function createCustomMetricDefinition(
+    value: Omit<CustomMetricDefinition, "id">,
+    existingMetrics: CustomMetricDefinition[]
+): CustomMetricDefinition {
+    const normalizedName = value.name.trim();
+    const slugBase = slugifyCustomMetricName(normalizedName) || "metric";
+    let nextId = `custom:${slugBase}` as CustomMetricId;
+    let duplicateIndex = 2;
+
+    while (existingMetrics.some((metric) => metric.id === nextId)) {
+        nextId = `custom:${slugBase}-${duplicateIndex}` as CustomMetricId;
+        duplicateIndex += 1;
+    }
+
+    return {
+        ...value,
+        id: nextId,
+        name: normalizedName,
+        tokens: normalizeExpressionTokens(value.tokens)
+    };
+}
+
+export function describeCustomMetric(
+    metric: CustomMetricDefinition,
+    customMetrics: CustomMetricDefinition[] = []
+) {
+    return metric.tokens
+        .map((token) =>
+            token.type === "field"
+                ? getFieldDefinition(token.fieldId, customMetrics).label
+                : token.operator
+        )
+        .join(" ");
 }
 
 export function hexToRgba(hexColor: string, alpha: number) {
@@ -237,11 +351,23 @@ export function resolveTableHeaderColor(value: unknown) {
     return isHexColor(value) ? value : DEFAULT_TABLE_HEADER_COLOR;
 }
 
-function uniqueFieldIds(values: PivotFieldId[]) {
-    return Array.from(new Set(values.filter((value) => PIVOT_FIELDS.some((field) => field.id === value))));
+function isKnownFieldId(
+    value: unknown,
+    customMetrics: CustomMetricDefinition[] = []
+): value is PivotFieldId {
+    return (
+        typeof value === "string" &&
+        getAvailablePivotFields(customMetrics).some((field) => field.id === value)
+    );
 }
 
-function sanitizeLayout(value: unknown): PivotLayout {
+function uniqueFieldIds(values: PivotFieldId[], customMetrics: CustomMetricDefinition[] = []) {
+    return Array.from(
+        new Set(values.filter((value) => getAvailablePivotFields(customMetrics).some((field) => field.id === value)))
+    );
+}
+
+function sanitizeLayout(value: unknown, customMetrics: CustomMetricDefinition[] = []): PivotLayout {
     if (!value || typeof value !== "object") {
         return DEFAULT_LAYOUT;
     }
@@ -249,16 +375,112 @@ function sanitizeLayout(value: unknown): PivotLayout {
     const candidate = value as Partial<Record<PivotZoneId, PivotFieldId[]>>;
 
     return {
-        filters: uniqueFieldIds(candidate.filters ?? DEFAULT_LAYOUT.filters),
-        columns: uniqueFieldIds(candidate.columns ?? DEFAULT_LAYOUT.columns),
-        rows: uniqueFieldIds(candidate.rows ?? DEFAULT_LAYOUT.rows),
-        values: uniqueFieldIds(candidate.values ?? DEFAULT_LAYOUT.values)
+        filters: uniqueFieldIds(candidate.filters ?? DEFAULT_LAYOUT.filters, customMetrics),
+        columns: uniqueFieldIds(candidate.columns ?? DEFAULT_LAYOUT.columns, customMetrics),
+        rows: uniqueFieldIds(candidate.rows ?? DEFAULT_LAYOUT.rows, customMetrics),
+        values: uniqueFieldIds(candidate.values ?? DEFAULT_LAYOUT.values, customMetrics)
     };
 }
 
-function getDimensionValue(record: AnalyzedInventoryRecord, fieldId: PivotFieldId) {
-    const field = getFieldDefinition(fieldId);
-    const rawValue = record[fieldId];
+function applyMetricOperator(left: number, right: number, operator: CustomMetricOperator) {
+    if (operator === "+") {
+        return left + right;
+    }
+
+    if (operator === "-") {
+        return left - right;
+    }
+
+    if (operator === "*") {
+        return left * right;
+    }
+
+    return right === 0 ? 0 : left / right;
+}
+
+function toFiniteNumber(value: unknown) {
+    return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function normalizeExpressionTokens(tokens: CustomMetricExpressionToken[]) {
+    return tokens.filter((token, index) => {
+        if (token.type === "field") {
+            return index % 2 === 0;
+        }
+
+        return index % 2 === 1;
+    });
+}
+
+function evaluateCustomMetricTokens(
+    tokens: CustomMetricExpressionToken[],
+    resolveFieldValue: (fieldId: PivotFieldId, visited: Set<PivotFieldId>) => number,
+    visited: Set<PivotFieldId>
+) {
+    const normalizedTokens = normalizeExpressionTokens(tokens);
+    const firstToken = normalizedTokens[0];
+    if (!firstToken || firstToken.type !== "field") {
+        return 0;
+    }
+
+    let result = resolveFieldValue(firstToken.fieldId, visited);
+
+    for (let index = 1; index < normalizedTokens.length - 1; index += 2) {
+        const operatorToken = normalizedTokens[index];
+        const nextFieldToken = normalizedTokens[index + 1];
+
+        if (operatorToken?.type !== "operator" || nextFieldToken?.type !== "field") {
+            continue;
+        }
+
+        result = applyMetricOperator(
+            result,
+            resolveFieldValue(nextFieldToken.fieldId, visited),
+            operatorToken.operator
+        );
+    }
+
+    return result;
+}
+
+function getRecordFieldValue(
+    record: AnalyzedInventoryRecord,
+    fieldId: PivotFieldId,
+    customMetrics: CustomMetricDefinition[] = [],
+    visited = new Set<PivotFieldId>()
+): string | number | null {
+    if (!isCustomMetricFieldId(fieldId)) {
+        return record[fieldId as BasePivotFieldId];
+    }
+
+    if (visited.has(fieldId)) {
+        return 0;
+    }
+
+    const metric = getCustomMetricDefinition(fieldId, customMetrics);
+    if (!metric) {
+        return 0;
+    }
+
+    visited.add(fieldId);
+    const result = evaluateCustomMetricTokens(
+        metric.tokens,
+        (currentFieldId, currentVisited) =>
+            toFiniteNumber(getRecordFieldValue(record, currentFieldId, customMetrics, currentVisited)),
+        visited
+    );
+    visited.delete(fieldId);
+
+    return result;
+}
+
+function getDimensionValue(
+    record: AnalyzedInventoryRecord,
+    fieldId: PivotFieldId,
+    customMetrics: CustomMetricDefinition[] = []
+) {
+    const field = getFieldDefinition(fieldId, customMetrics);
+    const rawValue = getRecordFieldValue(record, fieldId, customMetrics);
 
     if (rawValue === null || rawValue === undefined || rawValue === "") {
         return "(Blank)";
@@ -268,12 +490,24 @@ function getDimensionValue(record: AnalyzedInventoryRecord, fieldId: PivotFieldI
         return formatNullableDate(typeof rawValue === "string" ? rawValue : String(rawValue));
     }
 
+    if (field.format === "percent") {
+        return formatPercent(toFiniteNumber(rawValue));
+    }
+
+    if (field.format === "number") {
+        return formatNumber(toFiniteNumber(rawValue));
+    }
+
     return String(rawValue);
 }
 
-function getMeasureInput(record: AnalyzedInventoryRecord, fieldId: PivotFieldId) {
-    const field = getFieldDefinition(fieldId);
-    const rawValue = record[fieldId];
+function getMeasureInput(
+    record: AnalyzedInventoryRecord,
+    fieldId: PivotFieldId,
+    customMetrics: CustomMetricDefinition[] = []
+) {
+    const field = getFieldDefinition(fieldId, customMetrics);
+    const rawValue = getRecordFieldValue(record, fieldId, customMetrics);
 
     if (field.kind === "dimension" || field.summary === "count") {
         return {
@@ -282,25 +516,24 @@ function getMeasureInput(record: AnalyzedInventoryRecord, fieldId: PivotFieldId)
         };
     }
 
-    if (typeof rawValue === "number" && Number.isFinite(rawValue)) {
-        return {
-            sum: rawValue,
-            count: 1
-        };
-    }
+    const numericValue = toFiniteNumber(rawValue);
 
     return {
-        sum: 0,
-        count: 0
+        sum: numericValue,
+        count: 1
     };
 }
 
-export function resolveAggregationValue(fieldId: PivotFieldId, state: AggregationState | undefined) {
+export function resolveAggregationValue(
+    fieldId: PivotFieldId,
+    state: AggregationState | undefined,
+    customMetrics: CustomMetricDefinition[] = []
+) {
     if (!state) {
         return 0;
     }
 
-    const field = getFieldDefinition(fieldId);
+    const field = getFieldDefinition(fieldId, customMetrics);
 
     if (field.summary === "count") {
         return state.count;
@@ -313,8 +546,43 @@ export function resolveAggregationValue(fieldId: PivotFieldId, state: Aggregatio
     return state.sum;
 }
 
-export function formatAggregatedValue(fieldId: PivotFieldId, value: number) {
-    const field = getFieldDefinition(fieldId);
+export function resolveFieldValueFromAggregationStates(
+    fieldId: PivotFieldId,
+    states: Record<string, AggregationState> | undefined,
+    customMetrics: CustomMetricDefinition[] = [],
+    visited = new Set<PivotFieldId>()
+): number {
+    if (visited.has(fieldId)) {
+        return 0;
+    }
+
+    if (!isCustomMetricFieldId(fieldId)) {
+        return resolveAggregationValue(fieldId, states?.[fieldId], customMetrics);
+    }
+
+    const metric = getCustomMetricDefinition(fieldId, customMetrics);
+    if (!metric) {
+        return 0;
+    }
+
+    visited.add(fieldId);
+    const result = evaluateCustomMetricTokens(
+        metric.tokens,
+        (currentFieldId, currentVisited) =>
+            resolveFieldValueFromAggregationStates(currentFieldId, states, customMetrics, currentVisited),
+        visited
+    );
+    visited.delete(fieldId);
+
+    return result;
+}
+
+export function formatAggregatedValue(
+    fieldId: PivotFieldId,
+    value: number,
+    customMetrics: CustomMetricDefinition[] = []
+) {
+    const field = getFieldDefinition(fieldId, customMetrics);
 
     if (field.format === "percent") {
         return formatPercent(value);
@@ -323,7 +591,11 @@ export function formatAggregatedValue(fieldId: PivotFieldId, value: number) {
     return formatNumber(value);
 }
 
-function buildComboKey(record: AnalyzedInventoryRecord, fieldIds: PivotFieldId[]) {
+function buildComboKey(
+    record: AnalyzedInventoryRecord,
+    fieldIds: PivotFieldId[],
+    customMetrics: CustomMetricDefinition[] = []
+) {
     if (fieldIds.length === 0) {
         return {
             key: "__total__",
@@ -331,7 +603,7 @@ function buildComboKey(record: AnalyzedInventoryRecord, fieldIds: PivotFieldId[]
         };
     }
 
-    const labels = fieldIds.map((fieldId) => getDimensionValue(record, fieldId));
+    const labels = fieldIds.map((fieldId) => getDimensionValue(record, fieldId, customMetrics));
     return {
         key: labels.join("|||"),
         labels
@@ -342,6 +614,37 @@ function sortCombos(combos: PivotCombo[]) {
     return [...combos].sort((left, right) =>
         left.labels.join(" / ").localeCompare(right.labels.join(" / "), "en")
     );
+}
+
+function collectAggregateFieldIds(
+    fieldId: PivotFieldId,
+    customMetrics: CustomMetricDefinition[] = [],
+    collected = new Set<PivotFieldId>(),
+    visited = new Set<PivotFieldId>()
+) {
+    if (visited.has(fieldId)) {
+        return collected;
+    }
+
+    if (!isCustomMetricFieldId(fieldId)) {
+        collected.add(fieldId);
+        return collected;
+    }
+
+    const metric = getCustomMetricDefinition(fieldId, customMetrics);
+    if (!metric) {
+        return collected;
+    }
+
+    visited.add(fieldId);
+    for (const token of metric.tokens) {
+        if (token.type === "field") {
+            collectAggregateFieldIds(token.fieldId, customMetrics, collected, visited);
+        }
+    }
+    visited.delete(fieldId);
+
+    return collected;
 }
 
 function createTableId() {
@@ -378,7 +681,103 @@ export function createPivotTable(index: number): PivotTableInstance {
     };
 }
 
-function sanitizeTable(value: unknown, index: number): PivotTableInstance {
+function sanitizeCustomMetric(
+    value: unknown,
+    index: number,
+    existingMetrics: CustomMetricDefinition[]
+): CustomMetricDefinition | null {
+    if (!value || typeof value !== "object") {
+        return null;
+    }
+
+    const candidate = value as Partial<CustomMetricDefinition>;
+    const fallbackName = `Metric ${index}`;
+    const nextName =
+        typeof candidate.name === "string" && candidate.name.trim()
+            ? candidate.name.trim()
+            : fallbackName;
+    const legacyCandidate = candidate as Partial<{
+        leftFieldId: PivotFieldId;
+        operator: CustomMetricOperator;
+        rightFieldId: PivotFieldId;
+    }>;
+    const rawTokens = Array.isArray(candidate.tokens)
+        ? candidate.tokens
+        : [
+              { type: "field", fieldId: legacyCandidate.leftFieldId ?? "netSalesQty" },
+              { type: "operator", operator: legacyCandidate.operator ?? "+" },
+              { type: "field", fieldId: legacyCandidate.rightFieldId ?? "inventory" }
+          ];
+    const tokens = rawTokens.reduce<CustomMetricExpressionToken[]>((accumulator, token, tokenIndex) => {
+        if (!token || typeof token !== "object") {
+            return accumulator;
+        }
+
+        if (tokenIndex % 2 === 0) {
+            const candidateToken = token as Partial<CustomMetricFieldToken>;
+            if (!isKnownFieldId(candidateToken.fieldId, existingMetrics)) {
+                return accumulator;
+            }
+
+            return [...accumulator, { type: "field", fieldId: candidateToken.fieldId }];
+        }
+
+        const candidateToken = token as Partial<CustomMetricOperatorToken>;
+        const operator: CustomMetricOperator =
+            candidateToken.operator === "-" ||
+            candidateToken.operator === "*" ||
+            candidateToken.operator === "/" ||
+            candidateToken.operator === "+"
+                ? candidateToken.operator
+                : "+";
+
+        return [...accumulator, { type: "operator", operator }];
+    }, []);
+    const format = candidate.format === "percent" ? "percent" : "number";
+    const id =
+        typeof candidate.id === "string" && candidate.id.startsWith("custom:")
+            ? (candidate.id as CustomMetricId)
+            : (`custom:metric-${index}` as CustomMetricId);
+
+    const uniqueId = existingMetrics.some((metric) => metric.id === id)
+        ? (`${id}-${existingMetrics.length + 1}` as CustomMetricId)
+        : id;
+
+    return {
+        id: uniqueId,
+        name: nextName,
+        tokens:
+            tokens.length >= 3 && tokens[0]?.type === "field" && tokens[tokens.length - 1]?.type === "field"
+                ? tokens
+                : [
+                      { type: "field", fieldId: "netSalesQty" },
+                      { type: "operator", operator: "+" },
+                      { type: "field", fieldId: "inventory" }
+                  ],
+        format
+    };
+}
+
+function sanitizeCustomMetrics(value: unknown) {
+    if (!Array.isArray(value)) {
+        return [] as CustomMetricDefinition[];
+    }
+
+    return value.reduce<CustomMetricDefinition[]>((accumulator, metric, index) => {
+        const nextMetric = sanitizeCustomMetric(metric, index + 1, accumulator);
+        if (!nextMetric) {
+            return accumulator;
+        }
+
+        return [...accumulator, nextMetric];
+    }, []);
+}
+
+function sanitizeTable(
+    value: unknown,
+    index: number,
+    customMetrics: CustomMetricDefinition[] = []
+): PivotTableInstance {
     const fallback = createPivotTable(index);
     if (!value || typeof value !== "object") {
         return fallback;
@@ -422,7 +821,7 @@ function sanitizeTable(value: unknown, index: number): PivotTableInstance {
     return {
         id: typeof candidate.id === "string" && candidate.id ? candidate.id : fallback.id,
         name: typeof candidate.name === "string" && candidate.name ? candidate.name : fallback.name,
-        layout: sanitizeLayout(candidate.layout),
+        layout: sanitizeLayout(candidate.layout, customMetrics),
         headerColor: resolveTableHeaderColor(candidate.headerColor),
         filterSelections: nextFilterSelections,
         position: nextPosition,
@@ -436,14 +835,16 @@ export function sanitizeStudioState(value: unknown): StudioCanvasState {
         const initialTable = createPivotTable(1);
         return {
             tables: [initialTable],
-            activeTableId: initialTable.id
+            activeTableId: initialTable.id,
+            customMetrics: []
         };
     }
 
     const candidate = value as Partial<StudioCanvasState>;
+    const customMetrics = sanitizeCustomMetrics(candidate.customMetrics);
     const nextTables =
         Array.isArray(candidate.tables) && candidate.tables.length > 0
-            ? candidate.tables.map((table, index) => sanitizeTable(table, index + 1))
+            ? candidate.tables.map((table, index) => sanitizeTable(table, index + 1, customMetrics))
             : [createPivotTable(1)];
 
     const activeTableId =
@@ -454,17 +855,22 @@ export function sanitizeStudioState(value: unknown): StudioCanvasState {
 
     return {
         tables: nextTables,
-        activeTableId
+        activeTableId,
+        customMetrics
     };
 }
 
-export function buildFilterOptions(records: AnalyzedInventoryRecord[], filterFields: PivotFieldId[]) {
+export function buildFilterOptions(
+    records: AnalyzedInventoryRecord[],
+    filterFields: PivotFieldId[],
+    customMetrics: CustomMetricDefinition[] = []
+) {
     return filterFields.reduce<Record<string, string[]>>((accumulator, fieldId) => {
         const values = sortCombos(
             Array.from(
                 new Map(
                     records.map((record) => {
-                        const label = getDimensionValue(record, fieldId);
+                        const label = getDimensionValue(record, fieldId, customMetrics);
                         return [label, { key: label, labels: [label] }];
                     })
                 ).values()
@@ -479,7 +885,8 @@ export function buildFilterOptions(records: AnalyzedInventoryRecord[], filterFie
 export function applyFilters(
     records: AnalyzedInventoryRecord[],
     layout: PivotLayout,
-    filterSelections: Record<string, string>
+    filterSelections: Record<string, string>,
+    customMetrics: CustomMetricDefinition[] = []
 ) {
     return records.filter((record) =>
         layout.filters.every((fieldId) => {
@@ -488,12 +895,16 @@ export function applyFilters(
                 return true;
             }
 
-            return getDimensionValue(record, fieldId) === selectedValue;
+            return getDimensionValue(record, fieldId, customMetrics) === selectedValue;
         })
     );
 }
 
-export function buildPivotResult(filteredRecords: AnalyzedInventoryRecord[], layout: PivotLayout): PivotResult {
+export function buildPivotResult(
+    filteredRecords: AnalyzedInventoryRecord[],
+    layout: PivotLayout,
+    customMetrics: CustomMetricDefinition[] = []
+): PivotResult {
     const valueFields = layout.values.length > 0 ? layout.values : [];
 
     if (valueFields.length === 0) {
@@ -505,13 +916,19 @@ export function buildPivotResult(filteredRecords: AnalyzedInventoryRecord[], lay
         };
     }
 
+    const aggregateFieldIds = Array.from(
+        valueFields.reduce<Set<PivotFieldId>>((accumulator, fieldId) => {
+            collectAggregateFieldIds(fieldId, customMetrics, accumulator);
+            return accumulator;
+        }, new Set<PivotFieldId>())
+    );
     const rowMap = new Map<string, PivotCombo>();
     const columnMap = new Map<string, PivotCombo>();
     const matrix = new Map<string, Map<string, Record<string, AggregationState>>>();
 
     for (const record of filteredRecords) {
-        const rowCombo = buildComboKey(record, layout.rows);
-        const columnCombo = buildComboKey(record, layout.columns);
+        const rowCombo = buildComboKey(record, layout.rows, customMetrics);
+        const columnCombo = buildComboKey(record, layout.columns, customMetrics);
 
         rowMap.set(rowCombo.key, rowCombo);
         columnMap.set(columnCombo.key, columnCombo);
@@ -519,13 +936,13 @@ export function buildPivotResult(filteredRecords: AnalyzedInventoryRecord[], lay
         const rowBucket = matrix.get(rowCombo.key) ?? new Map<string, Record<string, AggregationState>>();
         const cell =
             rowBucket.get(columnCombo.key) ??
-            (Object.fromEntries(valueFields.map((fieldId) => [fieldId, { sum: 0, count: 0 }])) as Record<
+            (Object.fromEntries(aggregateFieldIds.map((fieldId) => [fieldId, { sum: 0, count: 0 }])) as Record<
                 string,
                 AggregationState
             >);
 
-        for (const fieldId of valueFields) {
-            const input = getMeasureInput(record, fieldId);
+        for (const fieldId of aggregateFieldIds) {
+            const input = getMeasureInput(record, fieldId, customMetrics);
             cell[fieldId].sum += input.sum;
             cell[fieldId].count += input.count;
         }

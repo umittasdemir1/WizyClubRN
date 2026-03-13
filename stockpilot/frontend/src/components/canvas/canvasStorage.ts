@@ -1,8 +1,14 @@
-import { STORAGE_KEY, sanitizeStudioState, type PivotTableInstance } from "./canvasModel";
+import {
+    STORAGE_KEY,
+    sanitizeStudioState,
+    type CustomMetricDefinition,
+    type PivotTableInstance
+} from "./canvasModel";
 
 interface PersistedStudioState {
     tables: PivotTableInstance[];
     activeTableId: string | null;
+    customMetrics: CustomMetricDefinition[];
 }
 
 export function loadStudioState(): PersistedStudioState {
