@@ -10,11 +10,15 @@ import {
 } from "react";
 import { motion } from "framer-motion";
 import {
+    ArrowUpAZ,
+    ArrowUpZA,
     BetweenHorizontalStart,
     BetweenVerticalStart,
+    Check,
     ChevronDown,
     Diff,
     Grip,
+    Palette,
     Plus,
     SquarePen,
     SlidersHorizontal,
@@ -71,6 +75,7 @@ interface PivotTableInstance {
     id: string;
     name: string;
     layout: PivotLayout;
+    headerColor: string;
     filterSelections: Record<string, string>;
     hasCustomizedSize: boolean;
     position: {
@@ -96,6 +101,22 @@ interface PivotTableView {
     hasColumnGroups: boolean;
     hasMultipleValueFields: boolean;
     showSecondaryHeaderRow: boolean;
+}
+
+type HeaderFilterKind = "row-field" | "column-group" | "value-field" | "table-menu";
+type HeaderFilterSortDirection = "asc" | "desc";
+
+interface HeaderFilterOption {
+    label: string;
+    value: string;
+}
+
+interface HeaderFilterState {
+    tableId: string;
+    kind: HeaderFilterKind;
+    headerKey: string;
+    fieldId?: PivotFieldId;
+    rowIndex?: number;
 }
 
 type TableResizeDirection =
@@ -134,6 +155,23 @@ const MIN_TABLE_HEIGHT = 220;
 const DEFAULT_TABLE_WIDTH = 560;
 const DEFAULT_TABLE_HEIGHT = 460;
 const AUTO_FIT_SCROLLBAR_GUTTER = 16;
+const ACTION_BAR_ICON_CLASS = "h-[18px] w-[18px]";
+const ACTION_BAR_ICON_STROKE = 1.95;
+const PIVOT_FIELD_TEXT_TYPOGRAPHY = "font-display text-[0.96rem] font-light leading-[1.04] tracking-tight";
+const TABLE_HEADER_TEXT_TYPOGRAPHY = "font-display text-[1rem] font-light leading-[1.04] tracking-tight";
+const DEFAULT_TABLE_HEADER_COLOR = "#080a0f";
+const TABLE_HEADER_COLOR_OPTIONS = [
+    "#080a0f",
+    "#1d4ed8",
+    "#0f766e",
+    "#166534",
+    "#a16207",
+    "#c2410c",
+    "#be123c",
+    "#7c3aed",
+    "#1e293b",
+    "#475569"
+];
 
 const DEFAULT_LAYOUT: PivotLayout = {
     filters: [],
@@ -168,14 +206,14 @@ const TABLE_RESIZE_HANDLES: {
     direction: TableResizeDirection;
     className: string;
 }[] = [
-    { direction: "n", className: "left-3 right-3 top-0 h-4 cursor-ns-resize" },
-    { direction: "e", className: "bottom-3 right-0 top-3 w-4 cursor-ew-resize" },
-    { direction: "s", className: "bottom-0 left-3 right-3 h-4 cursor-ns-resize" },
-    { direction: "w", className: "bottom-3 left-0 top-3 w-4 cursor-ew-resize" },
-    { direction: "ne", className: "right-0 top-0 h-5 w-5 cursor-nesw-resize" },
-    { direction: "nw", className: "left-0 top-0 h-5 w-5 cursor-nwse-resize" },
-    { direction: "se", className: "bottom-0 right-0 h-5 w-5 cursor-nwse-resize" },
-    { direction: "sw", className: "bottom-0 left-0 h-5 w-5 cursor-nesw-resize" }
+    { direction: "n", className: "left-3 right-3 -top-[2px] h-[4px] cursor-ns-resize" },
+    { direction: "e", className: "bottom-3 -right-[2px] top-3 w-[4px] cursor-ew-resize" },
+    { direction: "s", className: "bottom-[-2px] left-3 right-3 h-[4px] cursor-ns-resize" },
+    { direction: "w", className: "bottom-3 -left-[2px] top-3 w-[4px] cursor-ew-resize" },
+    { direction: "ne", className: "-right-[2px] -top-[2px] h-[7px] w-[7px] cursor-nesw-resize" },
+    { direction: "nw", className: "-left-[2px] -top-[2px] h-[7px] w-[7px] cursor-nwse-resize" },
+    { direction: "se", className: "bottom-[-2px] -right-[2px] h-[7px] w-[7px] cursor-nwse-resize" },
+    { direction: "sw", className: "bottom-[-2px] -left-[2px] h-[7px] w-[7px] cursor-nesw-resize" }
 ];
 
 const PIVOT_FIELDS: PivotFieldDefinition[] = [
@@ -202,6 +240,31 @@ const PIVOT_FIELDS: PivotFieldDefinition[] = [
 
 function getFieldDefinition(fieldId: PivotFieldId) {
     return PIVOT_FIELDS.find((field) => field.id === fieldId)!;
+}
+
+function hexToRgba(hexColor: string, alpha: number) {
+    const normalizedHex = hexColor.replace("#", "");
+    const parsedHex =
+        normalizedHex.length === 3
+            ? normalizedHex
+                  .split("")
+                  .map((character) => `${character}${character}`)
+                  .join("")
+            : normalizedHex;
+
+    const red = Number.parseInt(parsedHex.slice(0, 2), 16);
+    const green = Number.parseInt(parsedHex.slice(2, 4), 16);
+    const blue = Number.parseInt(parsedHex.slice(4, 6), 16);
+
+    return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+}
+
+function isHexColor(value: unknown): value is string {
+    return typeof value === "string" && /^#(?:[0-9a-fA-F]{3}){1,2}$/.test(value);
+}
+
+function resolveTableHeaderColor(value: unknown) {
+    return isHexColor(value) ? value : DEFAULT_TABLE_HEADER_COLOR;
 }
 
 function uniqueFieldIds(values: PivotFieldId[]) {
@@ -367,6 +430,7 @@ function createPivotTable(index: number): PivotTableInstance {
         id: createTableId(),
         name: `Table ${index}`,
         layout: DEFAULT_LAYOUT,
+        headerColor: DEFAULT_TABLE_HEADER_COLOR,
         filterSelections: {},
         hasCustomizedSize: false,
         position: {
@@ -422,6 +486,7 @@ function sanitizeTable(value: unknown, index: number): PivotTableInstance {
         id: typeof candidate.id === "string" && candidate.id ? candidate.id : fallback.id,
         name: typeof candidate.name === "string" && candidate.name ? candidate.name : fallback.name,
         layout: sanitizeLayout(candidate.layout),
+        headerColor: resolveTableHeaderColor(candidate.headerColor),
         filterSelections: nextFilterSelections,
         position: nextPosition,
         size: nextSize,
@@ -556,8 +621,13 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
     const [dragZone, setDragZone] = useState<PivotZoneId | null>(null);
     const [activeDrag, setActiveDrag] = useState<DragState | null>(null);
     const [dropIndicator, setDropIndicator] = useState<{ zoneId: PivotZoneId; index: number } | null>(null);
-    const [openFilterTableId, setOpenFilterTableId] = useState<string | null>(null);
+    const [openHeaderFilter, setOpenHeaderFilter] = useState<HeaderFilterState | null>(null);
+    const [headerFilterSelections, setHeaderFilterSelections] = useState<Record<string, string[]>>({});
+    const [headerFilterSortDirections, setHeaderFilterSortDirections] = useState<
+        Record<string, HeaderFilterSortDirection>
+    >({});
     const [isTableListOpen, setIsTableListOpen] = useState(false);
+    const [openHeaderColorTableId, setOpenHeaderColorTableId] = useState<string | null>(null);
     const [editingTableId, setEditingTableId] = useState<string | null>(null);
     const [tableNameDraft, setTableNameDraft] = useState("");
     const [movingTableId, setMovingTableId] = useState<string | null>(null);
@@ -566,6 +636,9 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
     const tableCanvasRef = useRef<HTMLDivElement | null>(null);
     const tableListButtonRef = useRef<HTMLButtonElement | null>(null);
     const tableListPanelRef = useRef<HTMLDivElement | null>(null);
+    const headerFilterButtonRef = useRef<HTMLButtonElement | null>(null);
+    const headerFilterPanelRef = useRef<HTMLDivElement | null>(null);
+    const headerColorPaletteRef = useRef<HTMLDivElement | null>(null);
     const tableElementRefs = useRef<Record<string, HTMLTableElement | null>>({});
     const moveStateRef = useRef<MoveState | null>(null);
     const resizeStateRef = useRef<ResizeState | null>(null);
@@ -617,7 +690,21 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                 return;
             }
 
+            if (headerFilterButtonRef.current?.contains(event.target as Node)) {
+                return;
+            }
+
+            if (headerFilterPanelRef.current?.contains(event.target as Node)) {
+                return;
+            }
+
+            if (headerColorPaletteRef.current?.contains(event.target as Node)) {
+                return;
+            }
+
             setIsTableListOpen(false);
+            setOpenHeaderFilter(null);
+            setOpenHeaderColorTableId(null);
         }
 
         window.addEventListener("pointerdown", handlePointerDown);
@@ -635,6 +722,52 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
             setLastActiveTableId(tables[0]?.id ?? null);
         }
     }, [lastActiveTableId, tables]);
+
+    useEffect(() => {
+        if (openHeaderColorTableId && !tables.some((table) => table.id === openHeaderColorTableId)) {
+            setOpenHeaderColorTableId(null);
+        }
+    }, [openHeaderColorTableId, tables]);
+
+    useEffect(() => {
+        if (!openHeaderFilter) {
+            return;
+        }
+
+        const table = tables.find((currentTable) => currentTable.id === openHeaderFilter.tableId);
+        if (!table) {
+            setOpenHeaderFilter(null);
+            return;
+        }
+
+        if (
+            openHeaderFilter.kind === "row-field" &&
+            (!openHeaderFilter.fieldId ||
+                table.layout.rows[openHeaderFilter.rowIndex ?? -1] !== openHeaderFilter.fieldId)
+        ) {
+            setOpenHeaderFilter(null);
+            return;
+        }
+
+        if (openHeaderFilter.kind === "column-group" && table.layout.columns.length === 0) {
+            setOpenHeaderFilter(null);
+            return;
+        }
+
+        if (openHeaderFilter.kind === "table-menu" && table.layout.values.length === 0) {
+            setOpenHeaderFilter(null);
+            return;
+        }
+
+        if (
+            openHeaderFilter.kind === "value-field" &&
+            (!openHeaderFilter.fieldId ||
+                table.layout.columns.length > 0 ||
+                !table.layout.values.includes(openHeaderFilter.fieldId))
+        ) {
+            setOpenHeaderFilter(null);
+        }
+    }, [openHeaderFilter, tables]);
 
     useLayoutEffect(() => {
         const canvas = tableCanvasRef.current;
@@ -831,14 +964,12 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
         [records, tables]
     );
 
-    const tableViewMap = useMemo(
-        () => new Map(tableViews.map((view) => [view.table.id, view])),
-        [tableViews]
-    );
-
     const activeLayout = activeTable?.layout ?? DEFAULT_LAYOUT;
     const visibleTableViews = tableViews.filter((view) => view.table.layout.values.length > 0);
+    const activeTableView =
+        activeTableId ? tableViews.find((view) => view.table.id === activeTableId) ?? null : null;
     const headerTableName = activeTable?.layout.values.length ? activeTable.name : "";
+    const activeTableHeaderColor = resolveTableHeaderColor(activeTable?.headerColor);
     const actionBarNameWidth = getActionBarNameWidth(
         activeTable && editingTableId === activeTable.id ? tableNameDraft || headerTableName : headerTableName
     );
@@ -847,6 +978,13 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
         setTables((current) =>
             current.map((table) => (table.id === tableId ? updater(table) : table))
         );
+    }
+
+    function updateTableHeaderColor(tableId: string, headerColor: string) {
+        updateTable(tableId, (table) => ({
+            ...table,
+            headerColor
+        }));
     }
 
     function getDropTargetTable() {
@@ -876,7 +1014,8 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
         const nextTable = createPivotTable(tables.length + 1);
         setTables((current) => [...current, nextTable]);
         setActiveTableId(nextTable.id);
-        setOpenFilterTableId(null);
+        setOpenHeaderFilter(null);
+        setOpenHeaderColorTableId(null);
         setIsTableListOpen(false);
     }
 
@@ -893,7 +1032,18 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
             setTables([fallbackTable]);
             setActiveTableId(fallbackTable.id);
             setLastActiveTableId(fallbackTable.id);
-            setOpenFilterTableId(null);
+            setOpenHeaderFilter(null);
+            setOpenHeaderColorTableId(null);
+            setHeaderFilterSelections((current) =>
+                Object.fromEntries(
+                    Object.entries(current).filter(([key]) => !key.startsWith(`${tableId}:`))
+                )
+            );
+            setHeaderFilterSortDirections((current) =>
+                Object.fromEntries(
+                    Object.entries(current).filter(([key]) => !key.startsWith(`${tableId}:`))
+                )
+            );
             setIsTableListOpen(false);
             cancelTableRename();
             return;
@@ -908,8 +1058,17 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                 : currentActiveTableId
         );
         setLastActiveTableId(nextActiveTable.id);
-        setOpenFilterTableId((currentOpenFilterTableId) =>
-            currentOpenFilterTableId === tableId ? null : currentOpenFilterTableId
+        setOpenHeaderFilter((currentOpenHeaderFilter) =>
+            currentOpenHeaderFilter?.tableId === tableId ? null : currentOpenHeaderFilter
+        );
+        setOpenHeaderColorTableId((currentOpenHeaderColorTableId) =>
+            currentOpenHeaderColorTableId === tableId ? null : currentOpenHeaderColorTableId
+        );
+        setHeaderFilterSelections((current) =>
+            Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${tableId}:`)))
+        );
+        setHeaderFilterSortDirections((current) =>
+            Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${tableId}:`)))
         );
         setIsTableListOpen((currentOpenState) =>
             currentOpenState && remainingTables.some((table) => table.layout.values.length > 0) ? currentOpenState : false
@@ -960,12 +1119,27 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
     }
 
     function resetActiveTable() {
+        if (!activeTable) {
+            return;
+        }
+
         updateActiveTable((table) => ({
             ...table,
             layout: DEFAULT_LAYOUT,
             filterSelections: {}
         }));
-        setOpenFilterTableId(null);
+        setOpenHeaderFilter(null);
+        setHeaderFilterSelections((current) =>
+            Object.fromEntries(
+                Object.entries(current).filter(([key]) => !key.startsWith(`${activeTable.id}:`))
+            )
+        );
+        setHeaderFilterSortDirections((current) =>
+            Object.fromEntries(
+                Object.entries(current).filter(([key]) => !key.startsWith(`${activeTable.id}:`))
+            )
+        );
+        setOpenHeaderColorTableId(null);
     }
 
     function updateTableFilterSelection(tableId: string, fieldId: PivotFieldId, value: string) {
@@ -986,6 +1160,8 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
 
         setActiveTableId(tableId);
         setIsTableListOpen(false);
+        setOpenHeaderFilter(null);
+        setOpenHeaderColorTableId(null);
         setEditingTableId(tableId);
         setTableNameDraft(currentTable.name);
     }
@@ -1013,7 +1189,8 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
 
     function clearTableSelection() {
         setActiveTableId(null);
-        setOpenFilterTableId(null);
+        setOpenHeaderFilter(null);
+        setOpenHeaderColorTableId(null);
         setIsTableListOpen(false);
         cancelTableRename();
     }
@@ -1118,15 +1295,302 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
         return formatAggregatedValue(fieldId, resolveAggregationValue(fieldId, state));
     }
 
-    function renderRowTotal(view: PivotTableView, rowKey: string, fieldId: PivotFieldId) {
-        const rowBucket = view.pivotResult.matrix.get(rowKey);
-        if (!rowBucket) {
-            return formatAggregatedValue(fieldId, 0);
+    function getHeaderFilterStateKey(
+        tableId: string,
+        kind: HeaderFilterKind,
+        fieldId?: PivotFieldId,
+        rowIndex?: number
+    ) {
+        if (kind === "row-field") {
+            return `${tableId}:${kind}:${fieldId}:${rowIndex}`;
         }
 
-        const mergedState = Array.from(rowBucket.values()).reduce<AggregationState>(
-            (accumulator, cell) => {
-                const state = cell[fieldId];
+        if (kind === "value-field") {
+            return `${tableId}:${kind}:${fieldId}`;
+        }
+
+        return `${tableId}:${kind}`;
+    }
+
+    function parseSortableNumber(value: string) {
+        const normalizedValue = value.trim().replace(/,/g, "").replace(/%$/g, "");
+        if (!/^[+-]?\d+(\.\d+)?$/.test(normalizedValue)) {
+            return null;
+        }
+
+        const parsedValue = Number.parseFloat(normalizedValue);
+        return Number.isFinite(parsedValue) ? parsedValue : null;
+    }
+
+    function parseSortableDate(value: string) {
+        if (!/[/-]/.test(value)) {
+            return null;
+        }
+
+        const parsedValue = Date.parse(value);
+        return Number.isNaN(parsedValue) ? null : parsedValue;
+    }
+
+    function compareSortableValues(left: string, right: string) {
+        const leftNumber = parseSortableNumber(left);
+        const rightNumber = parseSortableNumber(right);
+
+        if (leftNumber !== null && rightNumber !== null) {
+            return leftNumber - rightNumber;
+        }
+
+        const leftDate = parseSortableDate(left);
+        const rightDate = parseSortableDate(right);
+
+        if (leftDate !== null && rightDate !== null) {
+            return leftDate - rightDate;
+        }
+
+        return left.localeCompare(right, undefined, {
+            numeric: true,
+            sensitivity: "base"
+        });
+    }
+
+    function sortByDirection(value: number, direction: HeaderFilterSortDirection) {
+        return direction === "asc" ? value : value * -1;
+    }
+
+    function getHeaderFilterSelectedValues(
+        tableId: string,
+        kind: HeaderFilterKind,
+        allValues: string[],
+        fieldId?: PivotFieldId,
+        rowIndex?: number
+    ) {
+        const selectionKey = getHeaderFilterStateKey(tableId, kind, fieldId, rowIndex);
+        const currentValues = headerFilterSelections[selectionKey];
+        if (!currentValues) {
+            return allValues;
+        }
+
+        const allowedValues = new Set(allValues);
+        return currentValues.filter((value) => allowedValues.has(value));
+    }
+
+    function updateHeaderFilterSelection(
+        tableId: string,
+        kind: HeaderFilterKind,
+        nextValues: string[],
+        allValues: string[],
+        fieldId?: PivotFieldId,
+        rowIndex?: number
+    ) {
+        const selectionKey = getHeaderFilterStateKey(tableId, kind, fieldId, rowIndex);
+        const allowedValues = new Set(allValues);
+        const normalizedValues = Array.from(new Set(nextValues)).filter((value) => allowedValues.has(value));
+
+        setHeaderFilterSelections((current) => {
+            if (normalizedValues.length === allValues.length) {
+                const nextSelections = { ...current };
+                delete nextSelections[selectionKey];
+                return nextSelections;
+            }
+
+            return {
+                ...current,
+                [selectionKey]: normalizedValues
+            };
+        });
+    }
+
+    function getHeaderFilterSortDirection(
+        tableId: string,
+        kind: HeaderFilterKind,
+        fieldId?: PivotFieldId,
+        rowIndex?: number
+    ) {
+        return (
+            headerFilterSortDirections[getHeaderFilterStateKey(tableId, kind, fieldId, rowIndex)] ?? "asc"
+        );
+    }
+
+    function toggleHeaderFilterSortDirection(
+        tableId: string,
+        kind: HeaderFilterKind,
+        fieldId?: PivotFieldId,
+        rowIndex?: number
+    ) {
+        const stateKey = getHeaderFilterStateKey(tableId, kind, fieldId, rowIndex);
+        setHeaderFilterSortDirections((current) => ({
+            ...current,
+            [stateKey]: current[stateKey] === "desc" ? "asc" : "desc"
+        }));
+    }
+
+    function sortHeaderFilterOptions(
+        options: HeaderFilterOption[],
+        direction: HeaderFilterSortDirection
+    ) {
+        return [...options].sort((left, right) =>
+            sortByDirection(compareSortableValues(left.label, right.label), direction)
+        );
+    }
+
+    function getRowFieldFilterOptions(
+        view: PivotTableView,
+        fieldId: PivotFieldId,
+        rowIndex: number
+    ) {
+        const options = Array.from(new Set(view.pivotResult.rowCombos.map((combo) => combo.labels[rowIndex]))).map(
+            (value) => ({
+                label: value,
+                value
+            })
+        );
+
+        return sortHeaderFilterOptions(
+            options,
+            getHeaderFilterSortDirection(view.table.id, "row-field", fieldId, rowIndex)
+        );
+    }
+
+    function getColumnGroupFilterOptions(view: PivotTableView) {
+        return sortHeaderFilterOptions(
+            view.pivotResult.columnCombos.map((combo) => ({
+                label: combo.labels.join(" / "),
+                value: combo.key
+            })),
+            getHeaderFilterSortDirection(view.table.id, "column-group")
+        );
+    }
+
+    function getValueFieldFilterOptions(view: PivotTableView, fieldId: PivotFieldId) {
+        const options = Array.from(
+            new Set(
+                view.pivotResult.rowCombos.map((rowCombo) => renderCell(view, rowCombo.key, "__total__", fieldId))
+            )
+        ).map((value) => ({
+            label: value,
+            value
+        }));
+
+        return sortHeaderFilterOptions(
+            options,
+            getHeaderFilterSortDirection(view.table.id, "value-field", fieldId)
+        );
+    }
+
+    function getVisibleColumnCombos(view: PivotTableView) {
+        if (!view.hasColumnGroups) {
+            return view.pivotResult.columnCombos;
+        }
+
+        const options = getColumnGroupFilterOptions(view);
+        const selectedValues = new Set(
+            getHeaderFilterSelectedValues(
+                view.table.id,
+                "column-group",
+                options.map((option) => option.value)
+            )
+        );
+        const sortDirection = getHeaderFilterSortDirection(view.table.id, "column-group");
+
+        return [...view.pivotResult.columnCombos]
+            .filter((combo) => selectedValues.has(combo.key))
+            .sort((left, right) =>
+                sortByDirection(
+                    compareSortableValues(left.labels.join(" / "), right.labels.join(" / ")),
+                    sortDirection
+                )
+            );
+    }
+
+    function getVisibleRowCombos(view: PivotTableView) {
+        const filteredRowCombos = view.pivotResult.rowCombos.filter((rowCombo) => {
+            const rowFieldSelectionPasses = view.table.layout.rows.every((fieldId, rowIndex) => {
+                const options = getRowFieldFilterOptions(view, fieldId, rowIndex);
+                const selectedValues = new Set(
+                    getHeaderFilterSelectedValues(
+                        view.table.id,
+                        "row-field",
+                        options.map((option) => option.value),
+                        fieldId,
+                        rowIndex
+                    )
+                );
+
+                return selectedValues.has(rowCombo.labels[rowIndex]);
+            });
+
+            if (!rowFieldSelectionPasses) {
+                return false;
+            }
+
+            if (view.hasColumnGroups) {
+                return true;
+            }
+
+            return view.pivotResult.valueFields.every((fieldId) => {
+                const options = getValueFieldFilterOptions(view, fieldId);
+                const selectedValues = new Set(
+                    getHeaderFilterSelectedValues(
+                        view.table.id,
+                        "value-field",
+                        options.map((option) => option.value),
+                        fieldId
+                    )
+                );
+
+                return selectedValues.has(renderCell(view, rowCombo.key, "__total__", fieldId));
+            });
+        });
+
+        const explicitValueSortFieldId =
+            !view.hasColumnGroups
+                ? view.pivotResult.valueFields.find((fieldId) =>
+                      Object.prototype.hasOwnProperty.call(
+                          headerFilterSortDirections,
+                          getHeaderFilterStateKey(view.table.id, "value-field", fieldId)
+                      )
+                  )
+                : undefined;
+
+        return [...filteredRowCombos].sort((left, right) => {
+            if (explicitValueSortFieldId) {
+                const sortDirection = getHeaderFilterSortDirection(
+                    view.table.id,
+                    "value-field",
+                    explicitValueSortFieldId
+                );
+                const comparison = compareSortableValues(
+                    renderCell(view, left.key, "__total__", explicitValueSortFieldId),
+                    renderCell(view, right.key, "__total__", explicitValueSortFieldId)
+                );
+
+                if (comparison !== 0) {
+                    return sortByDirection(comparison, sortDirection);
+                }
+            }
+
+            for (const [rowIndex, fieldId] of view.table.layout.rows.entries()) {
+                const comparison = compareSortableValues(left.labels[rowIndex], right.labels[rowIndex]);
+                if (comparison !== 0) {
+                    return sortByDirection(
+                        comparison,
+                        getHeaderFilterSortDirection(view.table.id, "row-field", fieldId, rowIndex)
+                    );
+                }
+            }
+
+            return 0;
+        });
+    }
+
+    function renderRowTotal(
+        view: PivotTableView,
+        rowKey: string,
+        fieldId: PivotFieldId,
+        columnCombos: PivotCombo[]
+    ) {
+        const mergedState = columnCombos.reduce<AggregationState>(
+            (accumulator, combo) => {
+                const state = view.pivotResult.matrix.get(rowKey)?.get(combo.key)?.[fieldId];
                 accumulator.sum += state?.sum ?? 0;
                 accumulator.count += state?.count ?? 0;
                 return accumulator;
@@ -1137,8 +1601,13 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
         return formatAggregatedValue(fieldId, resolveAggregationValue(fieldId, mergedState));
     }
 
-    function renderColumnTotal(view: PivotTableView, columnKey: string, fieldId: PivotFieldId) {
-        const mergedState = view.pivotResult.rowCombos.reduce<AggregationState>(
+    function renderColumnTotal(
+        view: PivotTableView,
+        columnKey: string,
+        fieldId: PivotFieldId,
+        rowCombos: PivotCombo[]
+    ) {
+        const mergedState = rowCombos.reduce<AggregationState>(
             (accumulator, rowCombo) => {
                 const state = view.pivotResult.matrix.get(rowCombo.key)?.get(columnKey)?.[fieldId];
                 accumulator.sum += state?.sum ?? 0;
@@ -1151,16 +1620,16 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
         return formatAggregatedValue(fieldId, resolveAggregationValue(fieldId, mergedState));
     }
 
-    function renderGrandTotal(view: PivotTableView, fieldId: PivotFieldId) {
-        const mergedState = view.pivotResult.rowCombos.reduce<AggregationState>(
+    function renderGrandTotal(
+        view: PivotTableView,
+        fieldId: PivotFieldId,
+        rowCombos: PivotCombo[],
+        columnCombos: PivotCombo[]
+    ) {
+        const mergedState = rowCombos.reduce<AggregationState>(
             (accumulator, rowCombo) => {
-                const rowBucket = view.pivotResult.matrix.get(rowCombo.key);
-                if (!rowBucket) {
-                    return accumulator;
-                }
-
-                for (const cell of rowBucket.values()) {
-                    const state = cell[fieldId];
+                for (const combo of columnCombos) {
+                    const state = view.pivotResult.matrix.get(rowCombo.key)?.get(combo.key)?.[fieldId];
                     accumulator.sum += state?.sum ?? 0;
                     accumulator.count += state?.count ?? 0;
                 }
@@ -1171,6 +1640,240 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
         );
 
         return formatAggregatedValue(fieldId, resolveAggregationValue(fieldId, mergedState));
+    }
+
+    function renderHeaderFilterMenu(view: PivotTableView) {
+        if (
+            !openHeaderFilter ||
+            openHeaderFilter.tableId !== view.table.id ||
+            openHeaderFilter.kind !== "table-menu"
+        ) {
+            return null;
+        }
+
+        const sections: Array<{
+            key: string;
+            title: string;
+            kind: Exclude<HeaderFilterKind, "table-menu">;
+            options: HeaderFilterOption[];
+            fieldId?: PivotFieldId;
+            rowIndex?: number;
+        }> = [
+            ...view.table.layout.rows.map((fieldId, rowIndex) => ({
+                key: `row-field:${fieldId}:${rowIndex}`,
+                title: getFieldDefinition(fieldId).label,
+                kind: "row-field" as const,
+                options: getRowFieldFilterOptions(view, fieldId, rowIndex),
+                fieldId,
+                rowIndex
+            })),
+            ...(view.hasColumnGroups
+                ? [
+                      {
+                          key: "column-group",
+                          title: view.table.layout.columns
+                              .map((fieldId) => getFieldDefinition(fieldId).label)
+                              .join(" / "),
+                          kind: "column-group" as const,
+                          options: getColumnGroupFilterOptions(view)
+                      }
+                  ]
+                : view.pivotResult.valueFields.map((fieldId) => ({
+                      key: `value-field:${fieldId}`,
+                      title: getFieldDefinition(fieldId).label,
+                      kind: "value-field" as const,
+                      options: getValueFieldFilterOptions(view, fieldId),
+                      fieldId
+                  })))
+        ].filter((section) => section.options.length > 0);
+
+        function renderCheckboxSection(
+            title: string,
+            kind: Exclude<HeaderFilterKind, "table-menu">,
+            options: HeaderFilterOption[],
+            fieldId?: PivotFieldId,
+            rowIndex?: number
+        ) {
+            const optionValues = options.map((option) => option.value);
+            const selectedValues = getHeaderFilterSelectedValues(
+                view.table.id,
+                kind,
+                optionValues,
+                fieldId,
+                rowIndex
+            );
+            const selectedValueSet = new Set(selectedValues);
+            const sortDirection = getHeaderFilterSortDirection(view.table.id, kind, fieldId, rowIndex);
+            const allSelected = selectedValues.length === optionValues.length;
+
+            return (
+                <div className="overflow-hidden rounded-[8px] border border-slate-200 bg-white">
+                    <div className="flex min-w-0 items-center gap-2 px-3 py-1">
+                        <span className="min-w-0 flex-1 truncate pl-px text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                            {title}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                toggleHeaderFilterSortDirection(view.table.id, kind, fieldId, rowIndex);
+                            }}
+                            className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-slate-500 transition hover:text-[#080a0f]"
+                            aria-label={`Sort ${title}`}
+                        >
+                            {sortDirection === "asc" ? (
+                                <ArrowUpAZ className="h-4 w-4" strokeWidth={1.8} />
+                            ) : (
+                                <ArrowUpZA className="h-4 w-4" strokeWidth={1.8} />
+                            )}
+                        </button>
+                    </div>
+
+                    <label className="flex cursor-pointer items-center gap-2 px-3 py-1 transition hover:bg-slate-50">
+                        <input
+                            type="checkbox"
+                            checked={allSelected}
+                            onChange={() =>
+                                updateHeaderFilterSelection(
+                                    view.table.id,
+                                    kind,
+                                    allSelected ? [] : optionValues,
+                                    optionValues,
+                                    fieldId,
+                                    rowIndex
+                                )
+                            }
+                            className="h-3.5 w-3.5 rounded border-slate-300 accent-[#080a0f] focus:ring-0"
+                        />
+                        <span className="truncate font-display text-[0.84rem] font-light leading-[1.08] tracking-tight text-ink">
+                            All
+                        </span>
+                    </label>
+
+                    <div className="max-h-[220px] overflow-y-auto">
+                        {options.map((option) => (
+                            <label
+                                key={`${view.table.id}:${kind}:${option.value}`}
+                                className="flex cursor-pointer items-center gap-2 px-3 py-1 transition hover:bg-slate-50"
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={selectedValueSet.has(option.value)}
+                                    onChange={(event) => {
+                                        const nextValues = new Set(selectedValues);
+                                        if (event.target.checked) {
+                                            nextValues.add(option.value);
+                                        } else {
+                                            nextValues.delete(option.value);
+                                        }
+
+                                        updateHeaderFilterSelection(
+                                            view.table.id,
+                                            kind,
+                                            Array.from(nextValues),
+                                            optionValues,
+                                            fieldId,
+                                            rowIndex
+                                        );
+                                    }}
+                                    className="h-3.5 w-3.5 rounded border-slate-300 accent-[#080a0f] focus:ring-0"
+                                />
+                                <span className="truncate font-display text-[0.84rem] font-light leading-[1.08] tracking-tight text-ink">
+                                    {option.label}
+                                </span>
+                            </label>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <div
+                ref={headerFilterPanelRef}
+                className="absolute left-0 top-full z-[140] mt-[14px] isolate w-[265px] max-w-[420px] overflow-hidden rounded-[12px] border border-slate-200 bg-white p-1.5 shadow-[0_22px_48px_-28px_rgba(11,14,20,0.24)]"
+                style={{ backgroundColor: "#ffffff", opacity: 1 }}
+                onPointerDown={(event) => event.stopPropagation()}
+            >
+                {sections.length > 0 ? (
+                    <div className="max-h-[440px] space-y-1 overflow-y-auto">
+                        {sections.map((section) => (
+                            <div key={`${view.table.id}:${section.key}`}>
+                                {renderCheckboxSection(
+                                    section.title,
+                                    section.kind,
+                                    section.options,
+                                    section.fieldId,
+                                    section.rowIndex
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="rounded-[8px] border border-slate-200 bg-white px-3 py-3 font-display text-[0.84rem] font-light leading-[1.08] tracking-tight text-slate-500">
+                        No filterable fields
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    function renderHeaderFilterTrigger(view: PivotTableView) {
+        const headerKey = `table-header-filter:${view.table.id}`;
+        const isOpen =
+            openHeaderFilter?.tableId === view.table.id &&
+            openHeaderFilter.headerKey === headerKey &&
+            openHeaderFilter.kind === "table-menu";
+        const activeFilterCount = Object.keys(headerFilterSelections).filter((key) =>
+            key.startsWith(`${view.table.id}:`)
+        );
+        const hasSelection = activeFilterCount.length > 0;
+        const hasCustomSort = Object.keys(headerFilterSortDirections).some((key) =>
+            key.startsWith(`${view.table.id}:`)
+        );
+        const filterCountLabel =
+            activeFilterCount.length > 9 ? "9+" : String(activeFilterCount.length);
+
+        return (
+            <button
+                ref={isOpen ? headerFilterButtonRef : null}
+                type="button"
+                onClick={(event) => {
+                    event.stopPropagation();
+                    setActiveTableId(view.table.id);
+                    setIsTableListOpen(false);
+                    setOpenHeaderColorTableId(null);
+                    setOpenHeaderFilter((current) =>
+                        current?.tableId === view.table.id &&
+                        current.headerKey === headerKey &&
+                        current.kind === "table-menu"
+                            ? null
+                            : {
+                                  tableId: view.table.id,
+                                  headerKey,
+                                  kind: "table-menu"
+                              }
+                    );
+                }}
+                onPointerDown={(event) => event.stopPropagation()}
+                className={`relative inline-flex shrink-0 items-center justify-center rounded-[10px] p-1 text-[#080a0f] transition ${
+                    isOpen || hasSelection || hasCustomSort
+                        ? "text-[#080a0f]"
+                        : "text-[#080a0f]"
+                }`}
+                aria-label={`Filter ${view.table.name}`}
+            >
+                <SlidersHorizontal
+                    className={`${ACTION_BAR_ICON_CLASS} text-[#080a0f]`}
+                    strokeWidth={ACTION_BAR_ICON_STROKE}
+                />
+                {activeFilterCount.length > 0 ? (
+                    <span className="absolute -right-1 -top-0.5 inline-flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-[#ef4444] px-[3px] text-center text-[8px] font-semibold leading-none text-white align-middle">
+                        {filterCountLabel}
+                    </span>
+                ) : null}
+            </button>
+        );
     }
 
     return (
@@ -1207,7 +1910,7 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                                 >
                                     <Grip className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-500" />
                                     <div className="min-w-0 flex-1">
-                                        <p className="truncate font-display text-[0.96rem] font-light leading-[1.04] tracking-tight text-ink">
+                                        <p className={`truncate ${PIVOT_FIELD_TEXT_TYPOGRAPHY} text-ink`}>
                                             {field.label}
                                         </p>
                                     </div>
@@ -1404,18 +2107,9 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                         }`}
                     >
                         {headerTableName ? (
-                            <div className="flex min-w-0 flex-1 items-center justify-end">
-                                <div className="relative z-[110] ml-auto flex shrink-0 items-center translate-x-[12.5px]">
-                                    <motion.div
-                                        layout
-                                        transition={{
-                                            layout: {
-                                                duration: 0.22,
-                                                ease: [0.16, 1, 0.3, 1]
-                                            }
-                                        }}
-                                        className="inline-flex min-w-0 shrink-0 items-center gap-0.5 rounded-[14px] bg-white px-1.5 py-1"
-                                    >
+                            <div className="flex min-w-0 flex-1 items-center justify-start">
+                                <div className="relative z-[110] flex shrink-0 -translate-x-[10px] items-center">
+                                    <div className="inline-flex min-w-0 shrink-0 items-center gap-0.5 rounded-[12px] bg-white px-1.5 py-[3px]">
                                         <div className="shrink-0" style={{ width: actionBarNameWidth }}>
                                             {activeTable && editingTableId === activeTable.id ? (
                                                 <input
@@ -1434,59 +2128,128 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                                                             cancelTableRename();
                                                         }
                                                     }}
-                                                    className="h-[30px] w-full rounded-[10px] bg-transparent px-3 py-1 font-display text-[1rem] font-medium tracking-tight text-[#080a0f] outline-none placeholder:text-slate-400"
+                                                    className={`h-[30px] w-full rounded-[10px] bg-transparent px-3 py-1 ${PIVOT_FIELD_TEXT_TYPOGRAPHY} text-[#080a0f] outline-none placeholder:text-slate-400`}
                                                 />
                                             ) : (
                                                 <button
                                                     ref={tableListButtonRef}
                                                     type="button"
-                                                    onClick={() => setIsTableListOpen((current) => !current)}
+                                                    onClick={() => {
+                                                        setOpenHeaderColorTableId(null);
+                                                        setOpenHeaderFilter(null);
+                                                        setIsTableListOpen((current) => !current);
+                                                    }}
                                                     className="inline-flex h-[30px] w-full min-w-0 items-center justify-between gap-2 rounded-[10px] px-3 py-1 text-left text-[#080a0f] transition hover:bg-slate-100"
                                                     aria-haspopup="menu"
                                                     aria-expanded={isTableListOpen}
                                                     aria-label="Open table list"
                                                 >
-                                                    <span className="truncate font-display text-[1rem] font-medium tracking-tight text-[#080a0f]">
+                                                    <span className={`truncate ${PIVOT_FIELD_TEXT_TYPOGRAPHY} text-[#080a0f]`}>
                                                         {headerTableName}
                                                     </span>
                                                     <ChevronDown
-                                                        className={`h-4 w-4 shrink-0 text-slate-500 transition ${
+                                                        className={`${ACTION_BAR_ICON_CLASS} shrink-0 text-slate-500 transition ${
                                                             isTableListOpen ? "rotate-180" : ""
                                                         }`}
-                                                        strokeWidth={1.8}
+                                                        strokeWidth={ACTION_BAR_ICON_STROKE}
                                                     />
                                                 </button>
                                             )}
                                         </div>
                                         {activeTable ? (
+                                            <div
+                                                ref={openHeaderColorTableId === activeTable.id ? headerColorPaletteRef : null}
+                                                className="inline-flex shrink-0 items-center gap-1"
+                                            >
+                                                <button
+                                                    type="button"
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        setActiveTableId(activeTable.id);
+                                                        setIsTableListOpen(false);
+                                                        setOpenHeaderFilter(null);
+                                                        setOpenHeaderColorTableId((current) =>
+                                                            current === activeTable.id ? null : activeTable.id
+                                                        );
+                                                    }}
+                                                    className="inline-flex shrink-0 items-center rounded-[10px] p-1 text-[#080a0f] transition"
+                                                    aria-label={`Change ${activeTable.name} header color`}
+                                                >
+                                                    <Palette
+                                                        className={`${ACTION_BAR_ICON_CLASS} text-[#080a0f]`}
+                                                        strokeWidth={ACTION_BAR_ICON_STROKE}
+                                                    />
+                                                </button>
+
+                                                {openHeaderColorTableId === activeTable.id ? (
+                                                    <div className="inline-flex shrink-0 items-center gap-1 pr-0.5">
+                                                        {TABLE_HEADER_COLOR_OPTIONS.map((color) => {
+                                                            const isSelected = activeTableHeaderColor === color;
+
+                                                            return (
+                                                                <button
+                                                                    key={`header-color:${activeTable.id}:${color}`}
+                                                                    type="button"
+                                                                    onClick={(event) => {
+                                                                        event.stopPropagation();
+                                                                        updateTableHeaderColor(activeTable.id, color);
+                                                                    }}
+                                                                    className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full transition"
+                                                                    style={{ backgroundColor: color }}
+                                                                    aria-label={`Set ${activeTable.name} header color to ${color}`}
+                                                                >
+                                                                    {isSelected ? (
+                                                                        <Check
+                                                                            className="h-[10px] w-[10px] text-white"
+                                                                            strokeWidth={2.6}
+                                                                        />
+                                                                    ) : null}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                ) : null}
+                                            </div>
+                                        ) : null}
+                                        {activeTableView ? renderHeaderFilterTrigger(activeTableView) : null}
+                                        {activeTable ? (
                                             <button
                                             type="button"
                                             onClick={() => deleteTable(activeTable.id)}
-                                            className="inline-flex shrink-0 items-center rounded-[10px] p-1 text-[#080a0f] transition hover:bg-slate-100"
+                                            className="inline-flex shrink-0 items-center rounded-[10px] p-1 text-[#080a0f] transition"
                                             aria-label={`Delete ${activeTable.name}`}
                                         >
-                                            <X className="h-[18px] w-[18px] text-[#080a0f]" strokeWidth={1.95} />
+                                            <X
+                                                className={`${ACTION_BAR_ICON_CLASS} text-[#080a0f]`}
+                                                strokeWidth={ACTION_BAR_ICON_STROKE}
+                                            />
                                         </button>
                                     ) : null}
                                         <button
                                             type="button"
                                             onClick={addTable}
-                                            className="inline-flex shrink-0 items-center rounded-[10px] p-1 text-[#080a0f] transition hover:bg-slate-100"
+                                            className="inline-flex shrink-0 items-center rounded-[10px] p-1 text-[#080a0f] transition"
                                             aria-label="Create new table"
                                         >
-                                        <Plus className="h-[18px] w-[18px] text-[#080a0f]" strokeWidth={1.95} />
+                                        <Plus
+                                            className={`${ACTION_BAR_ICON_CLASS} text-[#080a0f]`}
+                                            strokeWidth={ACTION_BAR_ICON_STROKE}
+                                        />
                                     </button>
                                         {activeTable ? (
                                             <button
                                                 type="button"
                                                 onClick={() => startTableRename(activeTable.id)}
-                                                className="inline-flex shrink-0 items-center justify-center rounded-[10px] p-1 text-[#080a0f] transition hover:bg-slate-100"
+                                                className="inline-flex shrink-0 items-center justify-center rounded-[10px] p-1 text-[#080a0f] transition"
                                                 aria-label={`Rename ${activeTable.name}`}
                                             >
-                                                <SquarePen className="h-[18px] w-[18px] text-[#080a0f]" strokeWidth={1.65} />
+                                                <SquarePen
+                                                    className={`${ACTION_BAR_ICON_CLASS} text-[#080a0f]`}
+                                                    strokeWidth={ACTION_BAR_ICON_STROKE}
+                                                />
                                             </button>
                                         ) : null}
-                                    </motion.div>
+                                    </div>
 
                                     {headerTableName && isTableListOpen ? (
                                         <div
@@ -1507,11 +2270,12 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                                                         onClick={() => {
                                                             setActiveTableId(view.table.id);
                                                             setLastActiveTableId(view.table.id);
+                                                            setOpenHeaderColorTableId(null);
                                                             setIsTableListOpen(false);
                                                         }}
                                                         className="flex h-[30px] min-w-0 flex-1 items-center rounded-[10px] px-3 py-1 text-left text-[#080a0f] transition hover:bg-slate-100"
                                                     >
-                                                        <span className="truncate font-display text-[1rem] font-medium tracking-tight">
+                                                        <span className={`truncate ${PIVOT_FIELD_TEXT_TYPOGRAPHY}`}>
                                                             {view.table.name}
                                                         </span>
                                                     </button>
@@ -1530,6 +2294,11 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                                             ))}
                                         </div>
                                     ) : null}
+                                    {activeTableView &&
+                                    openHeaderFilter?.tableId === activeTableView.table.id &&
+                                    openHeaderFilter.kind === "table-menu"
+                                        ? renderHeaderFilterMenu(activeTableView)
+                                        : null}
                                 </div>
                             </div>
                         ) : (
@@ -1573,6 +2342,17 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                                         : activeTableId === view.table.id
                                           ? visibleTableViews.length + 1
                                           : viewIndex + 1;
+                                const tableHeaderColor = resolveTableHeaderColor(view.table.headerColor);
+                                const tableHeaderStyle = { backgroundColor: tableHeaderColor };
+                                const tableGridBorderStyle = {
+                                    borderColor: hexToRgba(tableHeaderColor, 0.18)
+                                };
+                                const visibleRowCombos = getVisibleRowCombos(view);
+                                const visibleColumnCombos = getVisibleColumnCombos(view);
+                                const renderedColumnCombos =
+                                    view.table.layout.columns.length > 0
+                                        ? visibleColumnCombos
+                                        : [{ key: "__total__", labels: ["Grand Total"] }];
 
                                 return (
                                 <motion.div
@@ -1597,81 +2377,6 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                                             : "shadow-[0_18px_42px_-34px_rgba(11,14,20,0.24)]"
                                     }`}
                                 >
-                                    {activeTableId === view.table.id ? (
-                                        <div
-                                            className="absolute -right-[2px] -top-[26px] z-30 flex items-center gap-2"
-                                            data-no-table-drag="true"
-                                            onPointerDown={(event) => event.stopPropagation()}
-                                        >
-                                            {view.table.layout.filters.length > 0 ? (
-                                                <div className="relative">
-                                                    <button
-                                                        type="button"
-                                                        onClick={(event) => {
-                                                            event.stopPropagation();
-                                                            setActiveTableId(view.table.id);
-                                                            setOpenFilterTableId((current) =>
-                                                                current === view.table.id ? null : view.table.id
-                                                            );
-                                                        }}
-                                                        onPointerDown={(event) => event.stopPropagation()}
-                                                        className={`flex items-center justify-center p-0 text-slate-500 transition ${
-                                                            openFilterTableId === view.table.id
-                                                                ? "text-[#080a0f]"
-                                                                : "hover:text-ink"
-                                                        }`}
-                                                        aria-label={`Filters for ${view.table.name}`}
-                                                    >
-                                                        <SlidersHorizontal className="h-4 w-4" strokeWidth={1.8} />
-                                                    </button>
-
-                                                    {openFilterTableId === view.table.id ? (
-                                                        <div
-                                                            className="absolute right-0 top-full z-20 mt-2 min-w-[240px] rounded-[12px] border border-slate-200 bg-white p-3 shadow-[0_18px_42px_-34px_rgba(11,14,20,0.32)]"
-                                                            onPointerDown={(event) => event.stopPropagation()}
-                                                        >
-                                                            {view.table.layout.filters.map((fieldId) => (
-                                                                <label key={`${view.table.id}:${fieldId}`} className="mb-3 block last:mb-0">
-                                                                    <span className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                                                        {getFieldDefinition(fieldId).label}
-                                                                    </span>
-                                                                    <span className="relative block">
-                                                                        <select
-                                                                            value={
-                                                                                view.table.filterSelections[fieldId] ??
-                                                                                ALL_FILTER_VALUE
-                                                                            }
-                                                                            onChange={(event) =>
-                                                                                updateTableFilterSelection(
-                                                                                    view.table.id,
-                                                                                    fieldId,
-                                                                                    event.target.value
-                                                                                )
-                                                                            }
-                                                                            className="w-full appearance-none border border-slate-200 bg-white px-3 py-2 pr-8 text-sm font-medium text-ink outline-none transition focus:border-brand"
-                                                                        >
-                                                                            <option value={ALL_FILTER_VALUE}>All values</option>
-                                                                            {(view.filterOptions[fieldId] ?? []).map((option) => (
-                                                                                <option
-                                                                                    key={`${view.table.id}:${fieldId}:${option}`}
-                                                                                    value={option}
-                                                                                >
-                                                                                    {option}
-                                                                                </option>
-                                                                            ))}
-                                                                        </select>
-                                                                        <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                                                                    </span>
-                                                                </label>
-                                                            ))}
-                                                        </div>
-                                                    ) : null}
-                                                </div>
-                                            ) : null}
-
-                                        </div>
-                                    ) : null}
-
                                     {view.filteredRecords.length === 0 ? (
                                         <div className="min-h-0 flex-1" />
                                     ) : (
@@ -1690,7 +2395,7 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                                                     }}
                                                     className="pivot-table w-max min-w-max table-auto border-collapse text-[13px] leading-tight text-slate-800"
                                                 >
-                                                    <thead className="sticky top-0 z-10 bg-[#080a0f] text-white">
+                                                    <thead className="sticky top-0 z-10 text-white" style={tableHeaderStyle}>
                                                     <tr>
                                                         {(view.table.layout.rows.length > 0
                                                             ? view.table.layout.rows
@@ -1699,7 +2404,8 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                                                             <th
                                                                 key={`row-header:${view.table.id}:${fieldId}:${index}`}
                                                                 rowSpan={view.showSecondaryHeaderRow ? 2 : 1}
-                                                                className="whitespace-nowrap border border-slate-200 px-3 py-0.5 text-left font-display text-[0.94rem] font-medium tracking-tight text-white"
+                                                                className={`whitespace-nowrap border px-3 py-0.5 text-left ${TABLE_HEADER_TEXT_TYPOGRAPHY} text-white`}
+                                                                style={tableGridBorderStyle}
                                                             >
                                                                 {view.table.layout.rows.length > 0
                                                                     ? getFieldDefinition(fieldId).label
@@ -1708,7 +2414,7 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                                                         ))}
 
                                                         {view.hasColumnGroups ? (
-                                                            view.pivotResult.columnCombos.map((combo) => (
+                                                            visibleColumnCombos.map((combo) => (
                                                                 <th
                                                                     key={`column-group:${view.table.id}:${combo.key}`}
                                                                     colSpan={
@@ -1716,7 +2422,8 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                                                                             ? view.pivotResult.valueFields.length
                                                                             : 1
                                                                     }
-                                                                    className="whitespace-nowrap border border-slate-200 px-3 py-0.5 text-center font-display text-[0.94rem] font-medium tracking-tight text-white"
+                                                                    className={`whitespace-nowrap border px-3 py-0.5 text-center ${TABLE_HEADER_TEXT_TYPOGRAPHY} text-white`}
+                                                                    style={tableGridBorderStyle}
                                                                 >
                                                                     {combo.labels.join(" / ")}
                                                                 </th>
@@ -1724,20 +2431,22 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                                                         ) : (
                                                             view.pivotResult.valueFields.map((fieldId) => (
                                                                 <th
-                                                                    key={`value-header-top:${view.table.id}:${fieldId}`}
-                                                                    className="whitespace-nowrap border border-slate-200 px-3 py-0.5 text-right font-display text-[0.9rem] font-medium tracking-tight text-white"
-                                                                >
-                                                                    {getFieldDefinition(fieldId).label}
-                                                                </th>
-                                                            ))
-                                                        )}
+                                                                key={`value-header-top:${view.table.id}:${fieldId}`}
+                                                                className={`whitespace-nowrap border px-3 py-0.5 text-right ${TABLE_HEADER_TEXT_TYPOGRAPHY} text-white`}
+                                                                style={tableGridBorderStyle}
+                                                            >
+                                                                {getFieldDefinition(fieldId).label}
+                                                            </th>
+                                                        ))
+                                                    )}
 
                                                         {view.hasColumnGroups
                                                             ? view.pivotResult.valueFields.map((fieldId) => (
                                                                 <th
                                                                     key={`grand-header:${view.table.id}:${fieldId}`}
                                                                     rowSpan={view.showSecondaryHeaderRow ? 2 : 1}
-                                                                    className="whitespace-nowrap border border-slate-200 px-3 py-0.5 text-right font-display text-[0.9rem] font-medium tracking-tight text-white"
+                                                                    className={`whitespace-nowrap border px-3 py-0.5 text-right ${TABLE_HEADER_TEXT_TYPOGRAPHY} text-white`}
+                                                                    style={tableGridBorderStyle}
                                                                 >
                                                                     {getFieldDefinition(fieldId).label}
                                                                 </th>
@@ -1747,11 +2456,12 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
 
                                                     {view.showSecondaryHeaderRow ? (
                                                         <tr>
-                                                            {view.pivotResult.columnCombos.map((combo) =>
+                                                            {visibleColumnCombos.map((combo) =>
                                                                 view.pivotResult.valueFields.map((fieldId) => (
                                                                     <th
                                                                         key={`value-header:${view.table.id}:${combo.key}:${fieldId}`}
-                                                                        className="whitespace-nowrap border border-slate-200 px-3 py-0.5 text-right font-display text-[0.9rem] font-medium tracking-tight text-white"
+                                                                        className={`whitespace-nowrap border px-3 py-0.5 text-right ${TABLE_HEADER_TEXT_TYPOGRAPHY} text-white`}
+                                                                        style={tableGridBorderStyle}
                                                                     >
                                                                         {getFieldDefinition(fieldId).label}
                                                                     </th>
@@ -1761,7 +2471,7 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                                                     ) : null}
                                                     </thead>
                                                     <tbody>
-                                                    {view.pivotResult.rowCombos.map((rowCombo, rowIndex) => (
+                                                    {visibleRowCombos.map((rowCombo, rowIndex) => (
                                                         <tr
                                                             key={`row:${view.table.id}:${rowCombo.key}`}
                                                             className={rowIndex % 2 === 0 ? "bg-white/96" : "bg-slate-50/55"}
@@ -1772,20 +2482,19 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                                                             ).map((label, index) => (
                                                                 <td
                                                                     key={`row-label:${view.table.id}:${rowCombo.key}:${index}`}
-                                                                    className="whitespace-nowrap border border-slate-200 px-3 py-0.5 font-display text-[0.94rem] font-medium tracking-tight text-ink"
+                                                                    className={`whitespace-nowrap border px-3 py-0.5 ${PIVOT_FIELD_TEXT_TYPOGRAPHY} text-ink`}
+                                                                    style={tableGridBorderStyle}
                                                                 >
                                                                     {label}
                                                                 </td>
                                                             ))}
 
-                                                            {(view.table.layout.columns.length > 0
-                                                                ? view.pivotResult.columnCombos
-                                                                : [{ key: "__total__", labels: ["Grand Total"] }]
-                                                            ).map((columnCombo) =>
+                                                            {renderedColumnCombos.map((columnCombo) =>
                                                                 view.pivotResult.valueFields.map((fieldId) => (
                                                                     <td
                                                                         key={`cell:${view.table.id}:${rowCombo.key}:${columnCombo.key}:${fieldId}`}
-                                                                        className="whitespace-nowrap border border-slate-200 px-3 py-0.5 text-right tabular-nums text-[0.9rem] font-normal text-slate-700"
+                                                                        className={`whitespace-nowrap border px-3 py-0.5 text-right tabular-nums ${PIVOT_FIELD_TEXT_TYPOGRAPHY} text-slate-700`}
+                                                                        style={tableGridBorderStyle}
                                                                     >
                                                                         {renderCell(view, rowCombo.key, columnCombo.key, fieldId)}
                                                                     </td>
@@ -1796,38 +2505,48 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                                                                 ? view.pivotResult.valueFields.map((fieldId) => (
                                                                     <td
                                                                         key={`row-total:${view.table.id}:${rowCombo.key}:${fieldId}`}
-                                                                        className="whitespace-nowrap border border-slate-200 bg-brandSoft/45 px-3 py-0.5 text-right font-display text-[0.9rem] font-medium tracking-tight tabular-nums text-ink"
+                                                                        className={`whitespace-nowrap border bg-brandSoft/45 px-3 py-0.5 text-right tabular-nums ${PIVOT_FIELD_TEXT_TYPOGRAPHY} text-ink`}
+                                                                        style={tableGridBorderStyle}
                                                                     >
-                                                                        {renderRowTotal(view, rowCombo.key, fieldId)}
+                                                                        {renderRowTotal(
+                                                                            view,
+                                                                            rowCombo.key,
+                                                                            fieldId,
+                                                                            visibleColumnCombos
+                                                                        )}
                                                                     </td>
                                                                 ))
                                                                 : null}
                                                         </tr>
                                                     ))}
                                                     </tbody>
-                                                    <tfoot className="bg-brandSoft/55">
+                                                    <tfoot>
                                                     <tr>
                                                         {Array.from({
                                                             length: Math.max(view.table.layout.rows.length, 1)
                                                         }).map((_, index) => (
                                                             <td
                                                                 key={`footer-label:${view.table.id}:${index}`}
-                                                                className="whitespace-nowrap border border-slate-200 px-3 py-0.5 font-display text-[0.94rem] font-medium tracking-tight text-ink"
+                                                                className={`whitespace-nowrap border px-3 py-0.5 font-semibold ${PIVOT_FIELD_TEXT_TYPOGRAPHY} text-ink`}
+                                                                style={tableGridBorderStyle}
                                                             >
                                                                 {index === 0 ? "Grand Total" : ""}
                                                             </td>
                                                         ))}
 
-                                                        {(view.table.layout.columns.length > 0
-                                                            ? view.pivotResult.columnCombos
-                                                            : [{ key: "__total__", labels: ["Grand Total"] }]
-                                                        ).map((columnCombo) =>
+                                                        {renderedColumnCombos.map((columnCombo) =>
                                                             view.pivotResult.valueFields.map((fieldId) => (
                                                                 <td
                                                                     key={`column-total:${view.table.id}:${columnCombo.key}:${fieldId}`}
-                                                                    className="whitespace-nowrap border border-slate-200 px-3 py-0.5 text-right font-display text-[0.9rem] font-medium tracking-tight tabular-nums text-ink"
+                                                                    className={`whitespace-nowrap border px-3 py-0.5 text-right font-semibold tabular-nums ${PIVOT_FIELD_TEXT_TYPOGRAPHY} text-ink`}
+                                                                    style={tableGridBorderStyle}
                                                                 >
-                                                                    {renderColumnTotal(view, columnCombo.key, fieldId)}
+                                                                    {renderColumnTotal(
+                                                                        view,
+                                                                        columnCombo.key,
+                                                                        fieldId,
+                                                                        visibleRowCombos
+                                                                    )}
                                                                 </td>
                                                             ))
                                                         )}
@@ -1836,9 +2555,15 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                                                             ? view.pivotResult.valueFields.map((fieldId) => (
                                                                 <td
                                                                     key={`grand-total:${view.table.id}:${fieldId}`}
-                                                                    className="whitespace-nowrap border border-slate-200 bg-brandSoft/70 px-3 py-0.5 text-right font-display text-[0.94rem] font-semibold tracking-tight tabular-nums text-ink"
+                                                                    className={`whitespace-nowrap border px-3 py-0.5 text-right font-semibold tabular-nums ${PIVOT_FIELD_TEXT_TYPOGRAPHY} text-ink`}
+                                                                    style={tableGridBorderStyle}
                                                                 >
-                                                                    {renderGrandTotal(view, fieldId)}
+                                                                    {renderGrandTotal(
+                                                                        view,
+                                                                        fieldId,
+                                                                        visibleRowCombos,
+                                                                        visibleColumnCombos
+                                                                    )}
                                                                 </td>
                                                             ))
                                                             : null}
