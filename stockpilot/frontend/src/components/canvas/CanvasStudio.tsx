@@ -1,6 +1,7 @@
 import {
     Fragment,
     useEffect,
+    useLayoutEffect,
     useMemo,
     useRef,
     useState,
@@ -12,7 +13,6 @@ import {
     BetweenHorizontalStart,
     BetweenVerticalStart,
     ChevronDown,
-    Cog,
     Diff,
     Grip,
     Plus,
@@ -72,6 +72,7 @@ interface PivotTableInstance {
     name: string;
     layout: PivotLayout;
     filterSelections: Record<string, string>;
+    hasCustomizedSize: boolean;
     position: {
         x: number;
         y: number;
@@ -132,6 +133,7 @@ const MIN_TABLE_WIDTH = 220;
 const MIN_TABLE_HEIGHT = 220;
 const DEFAULT_TABLE_WIDTH = 560;
 const DEFAULT_TABLE_HEIGHT = 460;
+const AUTO_FIT_SCROLLBAR_GUTTER = 16;
 
 const DEFAULT_LAYOUT: PivotLayout = {
     filters: [],
@@ -313,6 +315,19 @@ function createTableId() {
     return `pivot-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function getActionBarNameWidth(label: string) {
+    const normalizedLabel = label.trim();
+    const estimatedWidth = Math.ceil(normalizedLabel.length * 9 + 48);
+    return Math.min(240, Math.max(116, estimatedWidth));
+}
+
+function getDefaultTableSize() {
+    return {
+        width: DEFAULT_TABLE_WIDTH,
+        height: DEFAULT_TABLE_HEIGHT
+    };
+}
+
 function useTypewriter(words: string[], typingSpeed = 160, pauseMs = 2200, deletingSpeed = 80) {
     const [displayText, setDisplayText] = useState("");
     const [wordIndex, setWordIndex] = useState(0);
@@ -353,14 +368,12 @@ function createPivotTable(index: number): PivotTableInstance {
         name: `Table ${index}`,
         layout: DEFAULT_LAYOUT,
         filterSelections: {},
+        hasCustomizedSize: false,
         position: {
             x: offset,
             y: offset
         },
-        size: {
-            width: DEFAULT_TABLE_WIDTH,
-            height: DEFAULT_TABLE_HEIGHT
-        }
+        size: getDefaultTableSize()
     };
 }
 
@@ -400,6 +413,10 @@ function sanitizeTable(value: unknown, index: number): PivotTableInstance {
                   )
               )
             : {};
+    const hasCustomizedSize =
+        typeof candidate.hasCustomizedSize === "boolean"
+            ? candidate.hasCustomizedSize
+            : nextSize.width !== fallback.size.width || nextSize.height !== fallback.size.height;
 
     return {
         id: typeof candidate.id === "string" && candidate.id ? candidate.id : fallback.id,
@@ -407,7 +424,8 @@ function sanitizeTable(value: unknown, index: number): PivotTableInstance {
         layout: sanitizeLayout(candidate.layout),
         filterSelections: nextFilterSelections,
         position: nextPosition,
-        size: nextSize
+        size: nextSize,
+        hasCustomizedSize
     };
 }
 
@@ -539,13 +557,16 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
     const [activeDrag, setActiveDrag] = useState<DragState | null>(null);
     const [dropIndicator, setDropIndicator] = useState<{ zoneId: PivotZoneId; index: number } | null>(null);
     const [openFilterTableId, setOpenFilterTableId] = useState<string | null>(null);
-    const [openTableSettingsId, setOpenTableSettingsId] = useState<string | null>(null);
+    const [isTableListOpen, setIsTableListOpen] = useState(false);
     const [editingTableId, setEditingTableId] = useState<string | null>(null);
     const [tableNameDraft, setTableNameDraft] = useState("");
     const [movingTableId, setMovingTableId] = useState<string | null>(null);
     const [resizingTableId, setResizingTableId] = useState<string | null>(null);
     const editingTableInputRef = useRef<HTMLInputElement | null>(null);
     const tableCanvasRef = useRef<HTMLDivElement | null>(null);
+    const tableListButtonRef = useRef<HTMLButtonElement | null>(null);
+    const tableListPanelRef = useRef<HTMLDivElement | null>(null);
+    const tableElementRefs = useRef<Record<string, HTMLTableElement | null>>({});
     const moveStateRef = useRef<MoveState | null>(null);
     const resizeStateRef = useRef<ResizeState | null>(null);
     const emptyHeaderText = useTypewriter(["Table Editor"]);
@@ -587,10 +608,21 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
     }, [editingTableId]);
 
     useEffect(() => {
-        if (openTableSettingsId && activeTableId !== openTableSettingsId) {
-            setOpenTableSettingsId(null);
+        function handlePointerDown(event: PointerEvent) {
+            if (tableListButtonRef.current?.contains(event.target as Node)) {
+                return;
+            }
+
+            if (tableListPanelRef.current?.contains(event.target as Node)) {
+                return;
+            }
+
+            setIsTableListOpen(false);
         }
-    }, [activeTableId, openTableSettingsId]);
+
+        window.addEventListener("pointerdown", handlePointerDown);
+        return () => window.removeEventListener("pointerdown", handlePointerDown);
+    }, []);
 
     useEffect(() => {
         if (activeTableId) {
@@ -603,6 +635,58 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
             setLastActiveTableId(tables[0]?.id ?? null);
         }
     }, [lastActiveTableId, tables]);
+
+    useLayoutEffect(() => {
+        const canvas = tableCanvasRef.current;
+        if (!canvas) {
+            return;
+        }
+
+        setTables((current) => {
+            let hasChanges = false;
+
+            const nextTables = current.map((table) => {
+                if (table.hasCustomizedSize || table.layout.values.length === 0) {
+                    return table;
+                }
+
+                const tableElement = tableElementRefs.current[table.id];
+                if (!tableElement) {
+                    return table;
+                }
+
+                const availableWidth = Math.max(0, canvas.clientWidth - table.position.x);
+                const availableHeight = Math.max(0, canvas.clientHeight - table.position.y);
+                const contentHeight = Math.ceil(tableElement.getBoundingClientRect().height);
+                const nextHeight = Math.min(contentHeight, DEFAULT_TABLE_HEIGHT, availableHeight);
+                const needsVerticalScrollbar = contentHeight > nextHeight;
+                const contentWidth = Math.ceil(tableElement.getBoundingClientRect().width);
+                const nextWidth = Math.min(
+                    contentWidth + (needsVerticalScrollbar ? AUTO_FIT_SCROLLBAR_GUTTER : 0),
+                    availableWidth
+                );
+
+                if (nextWidth <= 0 || nextHeight <= 0) {
+                    return table;
+                }
+
+                if (table.size.width === nextWidth && table.size.height === nextHeight) {
+                    return table;
+                }
+
+                hasChanges = true;
+                return {
+                    ...table,
+                    size: {
+                        width: nextWidth,
+                        height: nextHeight
+                    }
+                };
+            });
+
+            return hasChanges ? nextTables : current;
+        });
+    }, [analysis, tables]);
 
     useEffect(() => {
         function handlePointerMove(event: PointerEvent) {
@@ -681,6 +765,7 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
 
             updateTable(resizeState.tableId, (table) => ({
                 ...table,
+                hasCustomizedSize: true,
                 position: {
                     x: nextLeft,
                     y: nextTop
@@ -754,6 +839,9 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
     const activeLayout = activeTable?.layout ?? DEFAULT_LAYOUT;
     const visibleTableViews = tableViews.filter((view) => view.table.layout.values.length > 0);
     const headerTableName = activeTable?.layout.values.length ? activeTable.name : "";
+    const actionBarNameWidth = getActionBarNameWidth(
+        activeTable && editingTableId === activeTable.id ? tableNameDraft || headerTableName : headerTableName
+    );
 
     function updateTable(tableId: string, updater: (table: PivotTableInstance) => PivotTableInstance) {
         setTables((current) =>
@@ -789,6 +877,7 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
         setTables((current) => [...current, nextTable]);
         setActiveTableId(nextTable.id);
         setOpenFilterTableId(null);
+        setIsTableListOpen(false);
     }
 
     function deleteTable(tableId: string) {
@@ -805,7 +894,7 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
             setActiveTableId(fallbackTable.id);
             setLastActiveTableId(fallbackTable.id);
             setOpenFilterTableId(null);
-            setOpenTableSettingsId(null);
+            setIsTableListOpen(false);
             cancelTableRename();
             return;
         }
@@ -822,8 +911,8 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
         setOpenFilterTableId((currentOpenFilterTableId) =>
             currentOpenFilterTableId === tableId ? null : currentOpenFilterTableId
         );
-        setOpenTableSettingsId((currentOpenTableSettingsId) =>
-            currentOpenTableSettingsId === tableId ? null : currentOpenTableSettingsId
+        setIsTableListOpen((currentOpenState) =>
+            currentOpenState && remainingTables.some((table) => table.layout.values.length > 0) ? currentOpenState : false
         );
 
         if (editingTableId === tableId) {
@@ -896,7 +985,7 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
         }
 
         setActiveTableId(tableId);
-        setOpenTableSettingsId(tableId);
+        setIsTableListOpen(false);
         setEditingTableId(tableId);
         setTableNameDraft(currentTable.name);
     }
@@ -925,18 +1014,8 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
     function clearTableSelection() {
         setActiveTableId(null);
         setOpenFilterTableId(null);
-        setOpenTableSettingsId(null);
+        setIsTableListOpen(false);
         cancelTableRename();
-    }
-
-    function toggleTableSettings(tableId: string) {
-        if (openTableSettingsId === tableId) {
-            cancelTableRename();
-            setOpenTableSettingsId(null);
-            return;
-        }
-
-        setOpenTableSettingsId(tableId);
     }
 
     function startTableMove(tableId: string, event: ReactPointerEvent<HTMLDivElement>) {
@@ -1308,7 +1387,7 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
             </aside>
 
             <section className="relative flex h-[940px] max-h-[940px] flex-col overflow-hidden rounded-[12px] border border-slate-200/70 bg-white/80 p-[10px] shadow-[0_32px_90px_-46px_rgba(11,14,20,0.34)] backdrop-blur-xl">
-                <div className="canvas-studio-header premium-card-dark relative h-11 overflow-hidden" style={{ borderRadius: "10px" }}>
+                <div className="canvas-studio-header premium-card-dark relative z-[90] h-11 overflow-visible" style={{ borderRadius: "14px" }}>
                     <div
                         className="absolute inset-y-0 right-0 w-[55%] overflow-hidden opacity-20 pointer-events-none"
                         style={{
@@ -1319,37 +1398,14 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                         <div className="story-grid-pattern" />
                     </div>
 
-                    <div className="relative z-10 flex h-full min-w-0 items-center justify-between gap-4 px-4">
+                    <div
+                        className={`relative z-10 flex h-full min-w-0 items-center gap-4 px-4 ${
+                            headerTableName ? "justify-between" : "justify-start"
+                        }`}
+                    >
                         {headerTableName ? (
-                            <div className="flex min-w-0 items-center gap-12">
-                                <span className="truncate font-display text-[1rem] font-medium tracking-tight text-white">
-                                    {headerTableName}
-                                </span>
-                                <div className="flex shrink-0 items-center gap-3">
-                                    <div className="inline-flex shrink-0 items-center rounded-[10px] bg-white/10 px-2 py-1 backdrop-blur-sm">
-                                        {activeTable ? (
-                                            <button
-                                            type="button"
-                                            onClick={() => deleteTable(activeTable.id)}
-                                            className="inline-flex shrink-0 items-center gap-2 rounded-[10px] pl-3 pr-1.5 py-1 text-white/80 transition hover:text-white"
-                                            aria-label={`Delete ${activeTable.name}`}
-                                        >
-                                            <X className="h-[18px] w-[18px] text-white" strokeWidth={1.75} />
-                                            <span className="text-sm font-light tracking-tight text-white">Delete</span>
-                                        </button>
-                                    ) : null}
-                                        {activeTable ? <span className="mx-0 h-4 w-px bg-white/12" aria-hidden="true" /> : null}
-                                        <button
-                                            type="button"
-                                            onClick={addTable}
-                                            className="inline-flex shrink-0 items-center gap-2 rounded-[10px] pl-1.5 pr-3 py-1 text-white/80 transition hover:text-white"
-                                            aria-label="Create new table"
-                                        >
-                                        <Plus className="h-[18px] w-[18px] text-white" strokeWidth={1.75} />
-                                        <span className="text-sm font-light tracking-tight text-white">New Table</span>
-                                    </button>
-                                    </div>
-
+                            <div className="flex min-w-0 flex-1 items-center justify-end">
+                                <div className="relative z-[110] ml-auto flex shrink-0 items-center translate-x-[12.5px]">
                                     <motion.div
                                         layout
                                         transition={{
@@ -1358,65 +1414,135 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                                                 ease: [0.16, 1, 0.3, 1]
                                             }
                                         }}
-                                        className="inline-flex shrink-0 items-center rounded-[10px] bg-white/10 px-2 py-1 backdrop-blur-sm"
+                                        className="inline-flex min-w-0 shrink-0 items-center gap-0.5 rounded-[14px] bg-white px-1.5 py-1"
                                     >
+                                        <div className="shrink-0" style={{ width: actionBarNameWidth }}>
+                                            {activeTable && editingTableId === activeTable.id ? (
+                                                <input
+                                                    ref={editingTableInputRef}
+                                                    value={tableNameDraft}
+                                                    onChange={(event) => setTableNameDraft(event.target.value)}
+                                                    onBlur={commitTableRename}
+                                                    onKeyDown={(event) => {
+                                                        if (event.key === "Enter") {
+                                                            event.preventDefault();
+                                                            commitTableRename();
+                                                        }
+
+                                                        if (event.key === "Escape") {
+                                                            event.preventDefault();
+                                                            cancelTableRename();
+                                                        }
+                                                    }}
+                                                    className="h-[30px] w-full rounded-[10px] bg-transparent px-3 py-1 font-display text-[1rem] font-medium tracking-tight text-[#080a0f] outline-none placeholder:text-slate-400"
+                                                />
+                                            ) : (
+                                                <button
+                                                    ref={tableListButtonRef}
+                                                    type="button"
+                                                    onClick={() => setIsTableListOpen((current) => !current)}
+                                                    className="inline-flex h-[30px] w-full min-w-0 items-center justify-between gap-2 rounded-[10px] px-3 py-1 text-left text-[#080a0f] transition hover:bg-slate-100"
+                                                    aria-haspopup="menu"
+                                                    aria-expanded={isTableListOpen}
+                                                    aria-label="Open table list"
+                                                >
+                                                    <span className="truncate font-display text-[1rem] font-medium tracking-tight text-[#080a0f]">
+                                                        {headerTableName}
+                                                    </span>
+                                                    <ChevronDown
+                                                        className={`h-4 w-4 shrink-0 text-slate-500 transition ${
+                                                            isTableListOpen ? "rotate-180" : ""
+                                                        }`}
+                                                        strokeWidth={1.8}
+                                                    />
+                                                </button>
+                                            )}
+                                        </div>
+                                        {activeTable ? (
+                                            <button
+                                            type="button"
+                                            onClick={() => deleteTable(activeTable.id)}
+                                            className="inline-flex shrink-0 items-center rounded-[10px] p-1 text-[#080a0f] transition hover:bg-slate-100"
+                                            aria-label={`Delete ${activeTable.name}`}
+                                        >
+                                            <X className="h-[18px] w-[18px] text-[#080a0f]" strokeWidth={1.95} />
+                                        </button>
+                                    ) : null}
                                         <button
                                             type="button"
-                                            onClick={() => {
-                                                if (activeTable) {
-                                                    toggleTableSettings(activeTable.id);
-                                                }
-                                            }}
-                                            className="inline-flex shrink-0 items-center gap-2 rounded-[10px] px-3 py-1 text-white/80 transition hover:text-white"
-                                            aria-label={activeTable ? `Table settings for ${activeTable.name}` : "Table settings"}
+                                            onClick={addTable}
+                                            className="inline-flex shrink-0 items-center rounded-[10px] p-1 text-[#080a0f] transition hover:bg-slate-100"
+                                            aria-label="Create new table"
                                         >
-                                            <Cog
-                                                className="h-[18px] w-[18px] text-white"
-                                                strokeWidth={1.4}
-                                            />
-                                            <span className="text-sm font-light tracking-tight text-white">Editor</span>
-                                        </button>
-
-                                        {activeTable && openTableSettingsId === activeTable.id ? (
-                                            <>
-                                                <span className="mx-1 h-4 w-px bg-white/12" aria-hidden="true" />
-                                                {editingTableId === activeTable.id ? (
-                                                    <input
-                                                        ref={editingTableInputRef}
-                                                        value={tableNameDraft}
-                                                        onChange={(event) => setTableNameDraft(event.target.value)}
-                                                        onBlur={commitTableRename}
-                                                        onKeyDown={(event) => {
-                                                            if (event.key === "Enter") {
-                                                                event.preventDefault();
-                                                                commitTableRename();
-                                                            }
-
-                                                            if (event.key === "Escape") {
-                                                                event.preventDefault();
-                                                                cancelTableRename();
-                                                            }
-                                                        }}
-                                                        className="min-w-[148px] border-b border-white/25 bg-transparent px-2 py-0 text-sm font-medium tracking-tight text-white outline-none placeholder:text-white/45"
-                                                    />
-                                                ) : (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => startTableRename(activeTable.id)}
-                                                        className="inline-flex shrink-0 items-center justify-center rounded-[10px] px-3 py-1 text-white/80 transition hover:text-white"
-                                                        aria-label={`Rename ${activeTable.name}`}
-                                                    >
-                                                        <SquarePen className="h-[18px] w-[18px] text-white" strokeWidth={1.45} />
-                                                    </button>
-                                                )}
-                                            </>
+                                        <Plus className="h-[18px] w-[18px] text-[#080a0f]" strokeWidth={1.95} />
+                                    </button>
+                                        {activeTable ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => startTableRename(activeTable.id)}
+                                                className="inline-flex shrink-0 items-center justify-center rounded-[10px] p-1 text-[#080a0f] transition hover:bg-slate-100"
+                                                aria-label={`Rename ${activeTable.name}`}
+                                            >
+                                                <SquarePen className="h-[18px] w-[18px] text-[#080a0f]" strokeWidth={1.65} />
+                                            </button>
                                         ) : null}
                                     </motion.div>
+
+                                    {headerTableName && isTableListOpen ? (
+                                        <div
+                                            ref={tableListPanelRef}
+                                            className="absolute left-0 right-0 top-full z-[140] mt-1 isolate overflow-hidden rounded-[14px] border border-slate-200 bg-white p-1.5 shadow-[0_22px_48px_-28px_rgba(11,14,20,0.24)]"
+                                            style={{ backgroundColor: "#ffffff", opacity: 1 }}
+                                            onPointerDown={(event) => event.stopPropagation()}
+                                        >
+                                            {visibleTableViews.map((view) => (
+                                                <div
+                                                    key={`header-table-option:${view.table.id}`}
+                                                    className={`mb-0.5 flex items-center gap-1 rounded-[10px] last:mb-0 ${
+                                                        view.table.id === activeTableId ? "bg-slate-100" : "bg-transparent"
+                                                    }`}
+                                                >
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setActiveTableId(view.table.id);
+                                                            setLastActiveTableId(view.table.id);
+                                                            setIsTableListOpen(false);
+                                                        }}
+                                                        className="flex h-[30px] min-w-0 flex-1 items-center rounded-[10px] px-3 py-1 text-left text-[#080a0f] transition hover:bg-slate-100"
+                                                    >
+                                                        <span className="truncate font-display text-[1rem] font-medium tracking-tight">
+                                                            {view.table.name}
+                                                        </span>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            deleteTable(view.table.id);
+                                                        }}
+                                                        className="inline-flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[10px] text-[#080a0f] transition hover:bg-slate-100"
+                                                        aria-label={`Delete ${view.table.name}`}
+                                                    >
+                                                        <X className="h-4 w-4" strokeWidth={1.95} />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : null}
                                 </div>
                             </div>
                         ) : (
-                            <span className="text-gradient inline-block w-max max-w-none whitespace-nowrap font-display text-[1rem] font-semibold leading-none tracking-[-0.04em]">
-                                <span className="inline-block whitespace-nowrap">{emptyHeaderText}</span>
+                            <span
+                                className="inline-flex h-full max-w-full items-center"
+                                style={{ paddingBottom: 0 }}
+                            >
+                                <span
+                                    className="text-gradient truncate font-display text-[1.16rem] font-bold leading-none tracking-tight"
+                                    style={{ paddingBottom: 0 }}
+                                >
+                                    {emptyHeaderText}
+                                </span>
                             </span>
                         )}
                     </div>
@@ -1440,7 +1566,15 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                                 }
                             }}
                         >
-                            {visibleTableViews.map((view) => (
+                            {visibleTableViews.map((view, viewIndex) => {
+                                const tableLayer =
+                                    movingTableId === view.table.id || resizingTableId === view.table.id
+                                        ? visibleTableViews.length + 2
+                                        : activeTableId === view.table.id
+                                          ? visibleTableViews.length + 1
+                                          : viewIndex + 1;
+
+                                return (
                                 <motion.div
                                     key={view.table.id}
                                     onPointerDown={(event) => handleTablePointerDown(view.table.id, event)}
@@ -1448,9 +1582,10 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                                         left: view.table.position.x,
                                         top: view.table.position.y,
                                         width: view.table.size.width,
-                                        height: view.table.size.height
+                                        height: view.table.size.height,
+                                        zIndex: tableLayer
                                     }}
-                                    className={`absolute left-0 top-0 flex max-h-full max-w-full flex-col overflow-visible rounded-none bg-white ${
+                                    className={`absolute left-0 top-0 isolate flex max-h-full max-w-full flex-col overflow-visible rounded-none bg-white ${
                                         movingTableId === view.table.id
                                             ? "cursor-grabbing "
                                             : activeTableId === view.table.id
@@ -1541,8 +1676,20 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                                         <div className="min-h-0 flex-1" />
                                     ) : (
                                         <div className="min-h-0 flex-1 overflow-hidden">
-                                            <div className="inline-block h-full max-w-full overflow-auto align-top">
-                                                <table className="pivot-table w-max min-w-max table-auto border-collapse text-[13px] leading-tight text-slate-800">
+                                            <div
+                                                className="h-full w-full overflow-auto"
+                                            >
+                                                <table
+                                                    ref={(node) => {
+                                                        if (node) {
+                                                            tableElementRefs.current[view.table.id] = node;
+                                                            return;
+                                                        }
+
+                                                        delete tableElementRefs.current[view.table.id];
+                                                    }}
+                                                    className="pivot-table w-max min-w-max table-auto border-collapse text-[13px] leading-tight text-slate-800"
+                                                >
                                                     <thead className="sticky top-0 z-10 bg-[#080a0f] text-white">
                                                     <tr>
                                                         {(view.table.layout.rows.length > 0
@@ -1715,7 +1862,8 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                                         />
                                     ))}
                                 </motion.div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                 )}
