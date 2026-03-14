@@ -2,7 +2,7 @@ import axios, { type AxiosProgressEvent } from "axios";
 import type {
     AnalysisResult,
     InventoryRecord,
-    ParsedInventoryPayload,
+    UploadWorkflowResult,
     TransferSuggestion
 } from "../types/stock";
 
@@ -14,10 +14,10 @@ const api = axios.create({
 export async function uploadInventoryFile(
     file: File,
     onProgress?: (progress: number) => void
-): Promise<ParsedInventoryPayload> {
+): Promise<UploadWorkflowResult> {
     const formData = new FormData();
     formData.append("file", file);
-    const response = await api.post<ParsedInventoryPayload>("/upload", formData, {
+    const response = await api.post<UploadWorkflowResult>("/upload", formData, {
         headers: {
             "Content-Type": "multipart/form-data"
         },

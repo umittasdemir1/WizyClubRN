@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { analyzeInventoryRecords } from "../dist/backend/src/usecases/analyzeInventoryRecords.js";
 import { buildInventoryTransferPlan } from "../dist/backend/src/usecases/buildInventoryTransferPlan.js";
 import { parseInventoryUpload } from "../dist/backend/src/usecases/parseInventoryUpload.js";
+import { processInventoryUpload } from "../dist/backend/src/usecases/processInventoryUpload.js";
 
 test("analyzeInventoryRecords validates raw payloads before analysis", () => {
     const result = analyzeInventoryRecords({
@@ -75,4 +76,37 @@ test("parseInventoryUpload parses uploaded csv buffers through the upload usecas
     assert.equal(payload.records[0].warehouseName, "Istanbul");
     assert.equal(payload.records[0].productCode, "SKU-33");
     assert.equal(payload.records[0].inventory, 18);
+});
+
+test("processInventoryUpload returns the full workflow in one response", () => {
+    const result = processInventoryUpload({
+        fileName: "inventory.csv",
+        buffer: Buffer.from(
+            [
+                "\"warehouse name\"\"sku\"\"product name\"\"sales qty\"\"return qty\"\"inventory\"",
+                "\"Ankara\"\"SKU-44\"\"Jacket\"\"20\"\"2\"\"48\"",
+                "\"Izmir\"\"SKU-44\"\"Jacket\"\"18\"\"0\"\"3\""
+            ].join("\n"),
+            "utf8"
+        )
+    });
+
+    assert.equal(result.source, "api");
+    assert.deepEqual(result.parsed, {
+        fileName: "inventory.csv",
+        columns: [
+            "warehouse name",
+            "sku",
+            "product name",
+            "sales qty",
+            "return qty",
+            "inventory"
+        ],
+        rowCount: 2
+    });
+    assert.equal(result.analysis.overview.totalProducts, 1);
+    assert.equal(result.analysis.records.length, 2);
+    assert.equal(result.transferPlan.length, 1);
+    assert.equal(result.transferPlan[0].fromWarehouseName, "Ankara");
+    assert.equal(result.transferPlan[0].toWarehouseName, "Izmir");
 });

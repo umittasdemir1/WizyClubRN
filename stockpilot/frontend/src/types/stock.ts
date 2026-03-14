@@ -1,8 +1,4 @@
-import type {
-    AnalysisResult,
-    ParsedInventoryPayload,
-    TransferSuggestion
-} from "../../../shared/stockTypes.js";
+import type { UploadWorkflowSource } from "../../../shared/stockTypes.js";
 
 export type AppTab = "dashboard" | "analysis" | "transfers" | "planning";
 export type UploadStage = "idle" | "uploading" | "analyzing" | "local-processing" | "ready";
@@ -14,21 +10,17 @@ export type {
     LifecyclePoint,
     OverviewMetrics,
     ParsedInventoryPayload,
+    ParsedInventorySummary,
     PlanningPoint,
     TransferSuggestion,
+    UploadWorkflowResult,
+    UploadWorkflowSource,
     WarehouseBreakdownPoint
 } from "../../../shared/stockTypes.js";
-
-export interface UploadWorkflowResult {
-    parsed: ParsedInventoryPayload;
-    analysis: AnalysisResult;
-    transferPlan: TransferSuggestion[];
-    source: "api" | "local";
-}
 
 export interface RecentUpload {
     fileName: string;
     processedAt: string;
     rowCount: number;
-    source: "api" | "local";
+    source: UploadWorkflowSource;
 }

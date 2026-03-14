@@ -14,10 +14,13 @@ export interface InventoryRecord {
     firstSaleDate: string | null;
 }
 
-export interface ParsedInventoryPayload {
+export interface ParsedInventorySummary {
     fileName: string;
     columns: string[];
     rowCount: number;
+}
+
+export interface ParsedInventoryPayload extends ParsedInventorySummary {
     records: InventoryRecord[];
 }
 
@@ -87,4 +90,13 @@ export interface TransferSuggestion {
     toWarehouseName: string;
     quantity: number;
     demandGap: number;
+}
+
+export type UploadWorkflowSource = "api" | "local";
+
+export interface UploadWorkflowResult {
+    parsed: ParsedInventorySummary;
+    analysis: AnalysisResult;
+    transferPlan: TransferSuggestion[];
+    source: UploadWorkflowSource;
 }
