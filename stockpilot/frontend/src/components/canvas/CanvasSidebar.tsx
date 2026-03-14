@@ -222,6 +222,53 @@ export function CanvasSidebar({
     const [formulaTokens, setFormulaTokens] = useState<CustomMetricExpressionToken[]>([]);
     const [isFormulaDropActive, setIsFormulaDropActive] = useState(false);
     const [builderError, setBuilderError] = useState<string | null>(null);
+
+    // --- Typewriter Placeholder logic ---
+    const [placeholderText, setPlaceholderText] = useState("");
+    const placeholders = ["Total Revenue", "Gross Margin", "Net Profit %", "YoY Growth", "Customer LTV", "Retention Rate"];
+    const [isNameInputFocused, setIsNameInputFocused] = useState(false);
+    
+    useEffect(() => {
+        if (isNameInputFocused) return;
+        let isCancelled = false;
+        let pIndex = 0;
+        let charIndex = 0;
+        let isDeleting = false;
+        let timeout: NodeJS.Timeout;
+
+        const tick = () => {
+            if (isCancelled) return;
+            const fullText = placeholders[pIndex];
+            
+            if (isDeleting) {
+                setPlaceholderText(fullText.substring(0, charIndex - 1));
+                charIndex--;
+            } else {
+                setPlaceholderText(fullText.substring(0, charIndex + 1));
+                charIndex++;
+            }
+
+            let delta = isDeleting ? 60 : 120; // Silme hızı vs yazma hızı
+
+            if (!isDeleting && charIndex === fullText.length) {
+                isDeleting = true;
+                delta = 2000; // Tamamlandığında 2sn bekle
+            } else if (isDeleting && charIndex === 0) {
+                isDeleting = false;
+                pIndex = (pIndex + 1) % placeholders.length;
+                delta = 500;
+            }
+
+            timeout = setTimeout(tick, delta);
+        };
+
+        timeout = setTimeout(tick, 500);
+        return () => {
+            isCancelled = true;
+            clearTimeout(timeout);
+        };
+    }, [isNameInputFocused]);
+    // ------------------------------------
     const [manualInputValue, setManualInputValue] = useState("");
     const [isInputFocused, setIsInputFocused] = useState(false);
 
@@ -806,33 +853,21 @@ export function CanvasSidebar({
                         <div className="overflow-y-auto pr-1">
                             <div className="rounded-[14px] border border-slate-200/70 bg-white/85 p-4 shadow-[0_18px_42px_-34px_rgba(11,14,20,0.24)]">
                                 <div className="flex min-h-full flex-col gap-3">
-                                    <div
-                                        onDragOver={(event) => {
-                                            event.preventDefault();
-                                            setIsFormulaDropActive(true);
-                                        }}
-                                        onDragLeave={() => setIsFormulaDropActive(false)}
-                                        onDrop={handleFormulaDrop}
-                                        onClick={() => manualInputRef.current?.focus()}
-                                        className={`min-h-[200px] -mx-1 -mt-2 pb-2 transition cursor-text ${
-                                            isFormulaDropActive ? "bg-slate-50/70" : ""
-                                        }`}
-                                    >
-                                        <div className="flex items-start justify-between gap-3 px-0.5" onClick={(e) => e.stopPropagation()}>
-                                            <div className="min-w-0 flex-1 px-1 py-1">
-                                                <div
-                                                    className="rounded-[10px] border border-slate-200/70 bg-white/80 px-3 py-2"
-                                                    style={{ transform: "translate(-10px, -5px)" }}
-                                                >
+                                    <div className="flex flex-col gap-4 -mx-[10px]">
+                                        <div className="flex items-center justify-between gap-3 px-0 -mt-[10px]" onClick={(e) => e.stopPropagation()}>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="rounded-[10px] border border-slate-200/70 bg-white/80 h-[36px] flex items-center shadow-sm">
                                                     <input
                                                         value={calculationName}
                                                         onChange={(event) => setCalculationName(event.target.value)}
-                                                        placeholder=""
-                                                        className={`block w-full appearance-none bg-transparent p-0 leading-none outline-none border-none ring-0 focus:ring-0 ${PIVOT_FIELD_TEXT_TYPOGRAPHY} text-ink`}
+                                                        onFocus={() => setIsNameInputFocused(true)}
+                                                        onBlur={() => setIsNameInputFocused(false)}
+                                                        placeholder={placeholderText}
+                                                        className={`w-full appearance-none bg-transparent px-4 outline-none border-none ring-0 focus:ring-0 ${PIVOT_FIELD_TEXT_TYPOGRAPHY} text-ink !leading-none -translate-y-[2px] placeholder:text-slate-400`}
                                                     />
                                                 </div>
                                             </div>
-                                            <div className="mt-1 flex shrink-0 items-center gap-1.5">
+                                            <div className="flex shrink-0 items-center gap-1.5">
                                                 <MetricFormatSelect
                                                     value={calculationFormat}
                                                     onChange={setCalculationFormat}
@@ -846,50 +881,92 @@ export function CanvasSidebar({
                                             </div>
                                         </div>
                                         <div
-                                            className="h-px w-full bg-slate-100"
-                                            style={{ marginTop: "0" }}
-                                            aria-hidden="true"
-                                        />
-                                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-3">
-                                            {formulaTokens.map((token, tokenIndex) => (
-                                                <FormulaTokenChip
-                                                    key={`formula-token:${tokenIndex}`}
-                                                    token={token}
-                                                    customMetrics={customMetrics}
-                                                />
-                                            ))}
-                                            <div className="relative inline-flex min-w-[4px] items-baseline">
-                                                <input
-                                                    ref={manualInputRef}
-                                                    value={manualInputValue}
-                                                    onChange={(e) => setManualInputValue(e.target.value.replace(/[^0-9.]/g, ""))}
-                                                    onKeyDown={handleManualInputKeyDown}
-                                                    onFocus={() => setIsInputFocused(true)}
-                                                    onBlur={() => setIsInputFocused(false)}
-                                                    className="absolute inset-0 w-full bg-transparent opacity-0 cursor-text outline-none p-0 border-none ring-0 focus:ring-0"
-                                                    style={{ width: Math.max(manualInputValue.length * 8, 12) }}
-                                                />
-                                                <span className={`${PIVOT_FIELD_TEXT_TYPOGRAPHY} text-ink leading-none whitespace-pre`}>
-                                                    {manualInputValue}
-                                                </span>
-                                                {isInputFocused && (
-                                                    <motion.span
-                                                        initial={{ opacity: 0 }}
-                                                        animate={{ opacity: 1 }}
-                                                        transition={{ repeat: Infinity, duration: 0.8, ease: "easeInOut" }}
-                                                        className="ml-px w-px self-center bg-ink"
-                                                        style={{ height: "0.96em" }}
+                                            onDragOver={(event) => {
+                                                event.preventDefault();
+                                                setIsFormulaDropActive(true);
+                                            }}
+                                            onDragLeave={() => setIsFormulaDropActive(false)}
+                                            onDrop={handleFormulaDrop}
+                                            onClick={() => manualInputRef.current?.focus()}
+                                            className={`relative min-h-[170px] rounded-[12px] border p-3 pb-12 transition cursor-text overflow-y-auto -mt-[10px] ${
+                                                isFormulaDropActive 
+                                                    ? "border-brand/40 bg-brand/5" 
+                                                    : "border-slate-200/60 bg-slate-50/30"
+                                            }`}
+                                        >
+                                            <div className="flex flex-wrap items-center gap-x-2 gap-y-3">
+                                                {formulaTokens.map((token, tokenIndex) => (
+                                                    <FormulaTokenChip
+                                                        key={`formula-token:${tokenIndex}`}
+                                                        token={token}
+                                                        customMetrics={customMetrics}
                                                     />
-                                                )}
+                                                ))}
+                                                <div className="relative inline-flex min-w-[4px] items-baseline">
+                                                    <input
+                                                        ref={manualInputRef}
+                                                        value={manualInputValue}
+                                                        onChange={(e) => setManualInputValue(e.target.value.replace(/[^0-9.]/g, ""))}
+                                                        onKeyDown={handleManualInputKeyDown}
+                                                        onFocus={() => setIsInputFocused(true)}
+                                                        onBlur={() => setIsInputFocused(false)}
+                                                        className="absolute inset-0 w-full bg-transparent opacity-0 cursor-text outline-none p-0 border-none ring-0 focus:ring-0"
+                                                        style={{ width: Math.max(manualInputValue.length * 8, 12) }}
+                                                    />
+                                                    <span className={`${PIVOT_FIELD_TEXT_TYPOGRAPHY} text-ink leading-none whitespace-pre`}>
+                                                        {manualInputValue}
+                                                    </span>
+                                                    {isInputFocused && (
+                                                        <motion.span
+                                                            initial={{ opacity: 0 }}
+                                                            animate={{ opacity: 1 }}
+                                                            transition={{ repeat: Infinity, duration: 0.8, ease: "easeInOut" }}
+                                                            className="ml-px w-px self-center bg-ink"
+                                                            style={{ height: "0.96em" }}
+                                                        />
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Action Buttons (Delete & Save) */}
+                                            <div 
+                                                className="absolute bottom-[7px] right-[7px] flex items-center gap-1.5"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <button
+                                                    type="button"
+                                                    onMouseDown={(e) => e.preventDefault()}
+                                                    onClick={handleDeleteLastToken}
+                                                    className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-[8px] bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-ink"
+                                                    aria-label="Delete last item"
+                                                >
+                                                    <Delete className="h-3.5 w-3.5" />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onMouseDown={(e) => e.preventDefault()}
+                                                    onClick={handleSaveMetric}
+                                                    disabled={!calculationName.trim() || !isValidCustomMetricExpression(
+                                                        (() => {
+                                                            const n = Number.parseFloat(manualInputValue);
+                                                            return !Number.isNaN(n) && canAppendValueToken(formulaTokens)
+                                                                ? [...formulaTokens, { type: "constant" as const, value: n }]
+                                                                : formulaTokens;
+                                                        })()
+                                                    )}
+                                                    className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-[8px] bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-slate-100 disabled:hover:text-slate-500"
+                                                    aria-label="Save formula"
+                                                >
+                                                    <Check className="h-4 w-4" />
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div className="mt-auto px-1 py-1 space-y-2">
+                                    <div className="mt-auto space-y-2">
                                         {/* Operators */}
                                         <div
-                                            className="flex flex-wrap items-center gap-1.5"
-                                            style={{ transform: "translate(-10px, 0)" }}
+                                            className="flex flex-wrap items-center justify-center gap-[3px]"
                                         >
                                             {CUSTOM_METRIC_OPERATOR_BUTTONS.map((button) => (
                                                 <button
@@ -924,36 +1001,7 @@ export function CanvasSidebar({
                                             >
                                                 ,
                                             </button>
-                                            <div className="ml-auto flex items-center gap-1">
-                                                <button
-                                                    type="button"
-                                                    onMouseDown={(e) => e.preventDefault()}
-                                                    onClick={handleDeleteLastToken}
-                                                    className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-[8px] bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-ink"
-                                                    aria-label="Delete last item"
-                                                >
-                                                    <Delete className="h-3.5 w-3.5" />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onMouseDown={(e) => e.preventDefault()}
-                                                    onClick={handleSaveMetric}
-                                                    disabled={!calculationName.trim() || !isValidCustomMetricExpression(
-                                                        (() => {
-                                                            const n = Number.parseFloat(manualInputValue);
-                                                            return !Number.isNaN(n) && canAppendValueToken(formulaTokens)
-                                                                ? [...formulaTokens, { type: "constant" as const, value: n }]
-                                                                : formulaTokens;
-                                                        })()
-                                                    )}
-                                                    className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-[8px] bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-slate-100 disabled:hover:text-slate-500"
-                                                    aria-label="Save formula"
-                                                >
-                                                    <Check className="h-3.5 w-3.5" />
-                                                </button>
-                                            </div>
                                         </div>
-
                                     </div>
 
                                     {builderError ? (
