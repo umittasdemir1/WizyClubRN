@@ -10,6 +10,7 @@ import {
     getAvailablePivotFields,
     sanitizeStudioState,
     type CustomMetricDefinition,
+    type CustomMetricId,
     type DragState,
     type HeaderFilterKind,
     type HeaderFilterSortDirection,
@@ -205,7 +206,10 @@ export function usePivotOrchestration(analysis: AnalysisResult | null) {
 
     const activeLayout = activeTable?.layout ?? DEFAULT_LAYOUT;
     const visibleTableViews = useMemo(
-        () => tableViews.filter((view) => view.table.layout.values.length > 0),
+        () => tableViews.filter((view) => {
+            const { values, rows, columns, filters } = view.table.layout;
+            return values.length > 0 || rows.length > 0 || columns.length > 0 || filters.length > 0;
+        }),
         [tableViews]
     );
     const activeTableView = useMemo(
@@ -231,6 +235,21 @@ export function usePivotOrchestration(analysis: AnalysisResult | null) {
         const nextMetric = createCustomMetricDefinition(value, customMetrics);
         setCustomMetrics((current) => [...current, nextMetric]);
         return nextMetric;
+    }
+
+    function deleteCustomMetric(id: CustomMetricId) {
+        setCustomMetrics((current) => current.filter((m) => m.id !== id));
+        setTables((current) =>
+            current.map((table) => ({
+                ...table,
+                layout: {
+                    filters: table.layout.filters.filter((f) => f !== id),
+                    columns: table.layout.columns.filter((f) => f !== id),
+                    rows: table.layout.rows.filter((f) => f !== id),
+                    values: table.layout.values.filter((f) => f !== id)
+                }
+            }))
+        );
     }
 
     function getDropTargetTable() {
@@ -533,6 +552,7 @@ export function usePivotOrchestration(analysis: AnalysisResult | null) {
         updateTable,
         updateActiveTable,
         addCustomMetric,
+        deleteCustomMetric,
         addTable,
         deleteTable,
         removeFieldFromZone,

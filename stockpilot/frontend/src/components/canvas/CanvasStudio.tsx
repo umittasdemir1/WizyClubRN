@@ -80,7 +80,12 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
         orchestration.setOpenHeaderFilter
     ]);
 
-    const headerTableName = orchestration.activeTable?.layout.values.length ? orchestration.activeTable.name : "";
+    const headerTableName = (() => {
+        const layout = orchestration.activeTable?.layout;
+        if (!layout) return "";
+        const hasAny = layout.values.length > 0 || layout.rows.length > 0 || layout.columns.length > 0 || layout.filters.length > 0;
+        return hasAny ? orchestration.activeTable!.name : "";
+    })();
     const activeTableHeaderColor = resolveTableHeaderColor(orchestration.activeTable?.headerColor);
     const actionBarNameWidth = getActionBarNameWidth(
         orchestration.activeTable && orchestration.editingTableId === orchestration.activeTable.id 
@@ -352,6 +357,7 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                 }}
                 removeFieldFromZone={orchestration.removeFieldFromZone}
                 addCustomMetric={orchestration.addCustomMetric}
+                deleteCustomMetric={orchestration.deleteCustomMetric}
             />
 
             <section className="relative flex h-[940px] max-h-[940px] flex-col overflow-hidden rounded-[12px] border border-slate-200/70 bg-white/80 p-[10px] shadow-[0_32px_90px_-46px_rgba(11,14,20,0.34)] backdrop-blur-xl">

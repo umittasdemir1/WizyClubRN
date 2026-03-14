@@ -76,7 +76,7 @@ export function useCanvasPointer({
             let hasChanges = false;
 
             const nextTables = current.map((table) => {
-                if (table.hasCustomizedSize || table.layout.values.length === 0) {
+                if (table.hasCustomizedSize) {
                     return table;
                 }
 
@@ -171,25 +171,19 @@ export function useCanvasPointer({
                 let nextBottom = startBottom;
 
                 if (resizeState.direction.includes("e")) {
-                    nextRight = Math.min(
-                        canvasRect.width,
-                        Math.max(startLeft + MIN_TABLE_WIDTH, startRight + deltaX)
-                    );
+                    nextRight = startRight + deltaX;
                 }
 
                 if (resizeState.direction.includes("s")) {
-                    nextBottom = Math.min(
-                        canvasRect.height,
-                        Math.max(startTop + MIN_TABLE_HEIGHT, startBottom + deltaY)
-                    );
+                    nextBottom = startBottom + deltaY;
                 }
 
                 if (resizeState.direction.includes("w")) {
-                    nextLeft = Math.max(0, Math.min(startRight - MIN_TABLE_WIDTH, startLeft + deltaX));
+                    nextLeft = startLeft + deltaX;
                 }
 
                 if (resizeState.direction.includes("n")) {
-                    nextTop = Math.max(0, Math.min(startBottom - MIN_TABLE_HEIGHT, startTop + deltaY));
+                    nextTop = startTop + deltaY;
                 }
 
                 resizeState.currentX = nextLeft;

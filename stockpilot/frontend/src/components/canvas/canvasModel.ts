@@ -10,6 +10,27 @@ export type PivotFieldFormat = "text" | "number" | "percent" | "date";
 export type CustomMetricBinaryOperator = "+" | "-" | "*" | "/" | "=" | ">" | "<";
 export type CustomMetricOperator = CustomMetricBinaryOperator | "%";
 export type CustomMetricParenthesis = "(" | ")";
+export type CustomMetricFormat = "integer" | "decimal" | "percent" | "currency" | "multiplier" | "datetime";
+
+export type DateConstantFn = "TODAY" | "DAY_OF_MONTH" | "DAYS_IN_MONTH" | "DAYS_ELAPSED" | "DAYS_REMAINING" | "YEAR";
+export type MetricFunctionName = "ROUND" | "ABS" | "MIN" | "MAX" | "IF";
+
+export const DATE_CONSTANT_LABELS: Record<DateConstantFn, string> = {
+    TODAY: "TODAY()",
+    DAY_OF_MONTH: "DAY()",
+    DAYS_IN_MONTH: "MONTH_DAYS()",
+    DAYS_ELAPSED: "ELAPSED()",
+    DAYS_REMAINING: "REMAINING()",
+    YEAR: "YEAR()"
+};
+
+export const METRIC_FUNCTION_ARITY: Record<MetricFunctionName, number> = {
+    ROUND: 2,
+    ABS: 1,
+    MIN: 2,
+    MAX: 2,
+    IF: 3
+};
 
 export interface CustomMetricFieldToken {
     type: "field";
@@ -31,11 +52,28 @@ export interface CustomMetricParenthesisToken {
     value: CustomMetricParenthesis;
 }
 
+export interface CustomMetricDateConstantToken {
+    type: "date-constant";
+    fn: DateConstantFn;
+}
+
+export interface CustomMetricFunctionToken {
+    type: "function";
+    fn: MetricFunctionName;
+}
+
+export interface CustomMetricCommaToken {
+    type: "comma";
+}
+
 export type CustomMetricExpressionToken =
     | CustomMetricFieldToken
     | CustomMetricOperatorToken
     | CustomMetricConstantToken
-    | CustomMetricParenthesisToken;
+    | CustomMetricParenthesisToken
+    | CustomMetricDateConstantToken
+    | CustomMetricFunctionToken
+    | CustomMetricCommaToken;
 
 export interface PivotLayout {
     filters: PivotFieldId[];
@@ -56,7 +94,7 @@ export interface CustomMetricDefinition {
     id: CustomMetricId;
     name: string;
     tokens: CustomMetricExpressionToken[];
-    format: "number" | "percent";
+    format: CustomMetricFormat;
 }
 
 export interface PivotCombo {
@@ -264,13 +302,17 @@ export function isCustomMetricFieldId(fieldId: PivotFieldId): fieldId is CustomM
     return fieldId.startsWith("custom:");
 }
 
+function mapCustomMetricFormatToPivotFormat(format: CustomMetricFormat): PivotFieldFormat {
+    return format === "percent" ? "percent" : "number";
+}
+
 function buildCustomMetricFieldDefinition(metric: CustomMetricDefinition): PivotFieldDefinition {
     return {
         id: metric.id,
         label: metric.name,
         kind: "measure",
         summary: "formula",
-        format: metric.format
+        format: mapCustomMetricFormatToPivotFormat(metric.format)
     };
 }
 
@@ -351,15 +393,14 @@ export function describeCustomMetric(
 ) {
     return metric.tokens
         .map((token) => {
-            if (token.type === "field") {
-                return getFieldDefinition(token.fieldId, customMetrics).label;
-            }
-
-            if (token.type === "operator") {
-                return formatCustomMetricOperatorLabel(token.operator);
-            }
-
-            return String(token.value);
+            if (token.type === "field") return getFieldDefinition(token.fieldId, customMetrics).label;
+            if (token.type === "operator") return formatCustomMetricOperatorLabel(token.operator);
+            if (token.type === "constant") return String(token.value);
+            if (token.type === "parenthesis") return token.value;
+            if (token.type === "date-constant") return DATE_CONSTANT_LABELS[token.fn];
+            if (token.type === "function") return token.fn + "(";
+            if (token.type === "comma") return ",";
+            return "";
         })
         .join(" ");
 }
@@ -452,21 +493,19 @@ function toFiniteNumber(value: unknown) {
     return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
+const METRIC_FUNCTION_NAMES: MetricFunctionName[] = ["ROUND", "ABS", "MIN", "MAX", "IF"];
+const DATE_CONSTANT_FNS: DateConstantFn[] = ["TODAY", "DAY_OF_MONTH", "DAYS_IN_MONTH", "DAYS_ELAPSED", "DAYS_REMAINING", "YEAR"];
+
 function normalizeExpressionTokens(tokens: CustomMetricExpressionToken[]) {
     return tokens.filter((token) => {
-        if (token.type === "field") {
-            return true;
-        }
-
-        if (token.type === "constant") {
-            return Number.isFinite(token.value);
-        }
-
-        if (token.type === "operator") {
-            return isCustomMetricOperator(token.operator);
-        }
-
-        return isCustomMetricParenthesis(token.value);
+        if (token.type === "field") return true;
+        if (token.type === "constant") return Number.isFinite(token.value);
+        if (token.type === "operator") return isCustomMetricOperator(token.operator);
+        if (token.type === "parenthesis") return isCustomMetricParenthesis(token.value);
+        if (token.type === "date-constant") return DATE_CONSTANT_FNS.includes(token.fn);
+        if (token.type === "function") return METRIC_FUNCTION_NAMES.includes(token.fn);
+        if (token.type === "comma") return true;
+        return false;
     });
 }
 
@@ -486,80 +525,93 @@ function getCustomMetricOperatorPrecedence(operator: CustomMetricOperator) {
     return 1;
 }
 
+type RPNOutputToken =
+    | CustomMetricFieldToken
+    | CustomMetricConstantToken
+    | CustomMetricOperatorToken
+    | CustomMetricDateConstantToken
+    | CustomMetricFunctionToken;
+
+type OperatorStackToken =
+    | CustomMetricOperatorToken
+    | CustomMetricParenthesisToken
+    | CustomMetricFunctionToken;
+
 function toReversePolishExpression(tokens: CustomMetricExpressionToken[]) {
     const normalizedTokens = normalizeExpressionTokens(tokens);
-    if (normalizedTokens.length === 0) {
-        return null;
-    }
+    if (normalizedTokens.length === 0) return null;
 
-    const output: Array<CustomMetricFieldToken | CustomMetricConstantToken | CustomMetricOperatorToken> = [];
-    const operatorStack: Array<CustomMetricOperatorToken | CustomMetricParenthesisToken> = [];
+    const output: RPNOutputToken[] = [];
+    const operatorStack: OperatorStackToken[] = [];
     let expectsValue = true;
 
     for (const token of normalizedTokens) {
-        if (token.type === "field" || token.type === "constant") {
-            if (!expectsValue) {
-                return null;
-            }
-
+        // Values
+        if (token.type === "field" || token.type === "constant" || token.type === "date-constant") {
+            if (!expectsValue) return null;
             output.push(token);
             expectsValue = false;
             continue;
         }
 
+        // Function: push to operator stack, next token must be (
+        if (token.type === "function") {
+            if (!expectsValue) return null;
+            operatorStack.push(token);
+            continue;
+        }
+
+        // Parentheses
         if (token.type === "parenthesis") {
             if (token.value === "(") {
-                if (!expectsValue) {
-                    return null;
-                }
-
+                if (!expectsValue) return null;
                 operatorStack.push(token);
                 continue;
             }
 
-            if (expectsValue) {
-                return null;
-            }
+            if (expectsValue) return null;
 
-            let foundOpeningParenthesis = false;
+            let foundOpen = false;
             while (operatorStack.length > 0) {
-                const stackToken = operatorStack.pop()!;
-                if (stackToken.type === "parenthesis" && stackToken.value === "(") {
-                    foundOpeningParenthesis = true;
+                const top = operatorStack.pop()!;
+                if (top.type === "parenthesis" && top.value === "(") {
+                    foundOpen = true;
                     break;
                 }
-
-                if (stackToken.type === "operator") {
-                    output.push(stackToken);
-                }
+                if (top.type === "operator") output.push(top);
             }
 
-            if (!foundOpeningParenthesis) {
-                return null;
+            if (!foundOpen) return null;
+
+            // If top is a function, pop it to output
+            if (operatorStack.length > 0 && operatorStack[operatorStack.length - 1].type === "function") {
+                output.push(operatorStack.pop() as CustomMetricFunctionToken);
             }
 
             expectsValue = false;
             continue;
         }
 
-        if (token.operator === "%") {
-            if (expectsValue) {
-                return null;
+        // Comma: argument separator
+        if (token.type === "comma") {
+            if (expectsValue) return null;
+            while (operatorStack.length > 0) {
+                const top = operatorStack[operatorStack.length - 1];
+                if (top.type === "parenthesis") break;
+                output.push(operatorStack.pop() as CustomMetricOperatorToken);
             }
+            expectsValue = true;
+            continue;
+        }
+
+        // % unary postfix
+        if (token.operator === "%") {
+            if (expectsValue) return null;
 
             while (operatorStack.length > 0) {
-                const stackToken = operatorStack[operatorStack.length - 1];
-                if (stackToken.type !== "operator") {
-                    break;
-                }
-
-                if (
-                    getCustomMetricOperatorPrecedence(stackToken.operator) <
-                    getCustomMetricOperatorPrecedence(token.operator)
-                ) {
-                    break;
-                }
-
+                const top = operatorStack[operatorStack.length - 1];
+                if (top.type !== "operator") break;
+                if (getCustomMetricOperatorPrecedence(top.operator) < getCustomMetricOperatorPrecedence(token.operator)) break;
                 output.push(operatorStack.pop() as CustomMetricOperatorToken);
             }
 
@@ -568,23 +620,13 @@ function toReversePolishExpression(tokens: CustomMetricExpressionToken[]) {
             continue;
         }
 
-        if (expectsValue || !isBinaryCustomMetricOperator(token.operator)) {
-            return null;
-        }
+        // Binary operators
+        if (expectsValue || !isBinaryCustomMetricOperator(token.operator)) return null;
 
         while (operatorStack.length > 0) {
-            const stackToken = operatorStack[operatorStack.length - 1];
-            if (stackToken.type !== "operator") {
-                break;
-            }
-
-            if (
-                getCustomMetricOperatorPrecedence(stackToken.operator) <
-                getCustomMetricOperatorPrecedence(token.operator)
-            ) {
-                break;
-            }
-
+            const top = operatorStack[operatorStack.length - 1];
+            if (top.type !== "operator") break;
+            if (getCustomMetricOperatorPrecedence(top.operator) < getCustomMetricOperatorPrecedence(token.operator)) break;
             output.push(operatorStack.pop() as CustomMetricOperatorToken);
         }
 
@@ -592,17 +634,12 @@ function toReversePolishExpression(tokens: CustomMetricExpressionToken[]) {
         expectsValue = true;
     }
 
-    if (expectsValue) {
-        return null;
-    }
+    if (expectsValue) return null;
 
     while (operatorStack.length > 0) {
-        const stackToken = operatorStack.pop()!;
-        if (stackToken.type === "parenthesis") {
-            return null;
-        }
-
-        output.push(stackToken);
+        const top = operatorStack.pop()!;
+        if (top.type === "parenthesis") return null;
+        output.push(top as RPNOutputToken);
     }
 
     return output;
@@ -612,15 +649,38 @@ export function isValidCustomMetricExpression(tokens: CustomMetricExpressionToke
     return toReversePolishExpression(tokens) !== null;
 }
 
+function evaluateDateConstant(fn: DateConstantFn): number {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const day = now.getDate();
+    if (fn === "TODAY") return Math.floor(Date.now() / (1000 * 60 * 60 * 24));
+    if (fn === "DAY_OF_MONTH" || fn === "DAYS_ELAPSED") return day;
+    if (fn === "DAYS_IN_MONTH") return new Date(year, month + 1, 0).getDate();
+    if (fn === "DAYS_REMAINING") return new Date(year, month + 1, 0).getDate() - day;
+    if (fn === "YEAR") return year;
+    return 0;
+}
+
+function applyMetricFunction(fn: MetricFunctionName, args: number[]): number {
+    const a = args[0] ?? 0;
+    const b = args[1] ?? 0;
+    const c = args[2] ?? 0;
+    if (fn === "ABS") return Math.abs(a);
+    if (fn === "ROUND") return Math.round(a * Math.pow(10, b)) / Math.pow(10, b);
+    if (fn === "MIN") return Math.min(a, b);
+    if (fn === "MAX") return Math.max(a, b);
+    if (fn === "IF") return a !== 0 ? b : c;
+    return 0;
+}
+
 function evaluateCustomMetricTokens(
     tokens: CustomMetricExpressionToken[],
     resolveFieldValue: (fieldId: PivotFieldId, visited: Set<PivotFieldId>) => number,
     visited: Set<PivotFieldId>
 ) {
     const reversePolishTokens = toReversePolishExpression(tokens);
-    if (!reversePolishTokens) {
-        return 0;
-    }
+    if (!reversePolishTokens) return 0;
 
     const stack: number[] = [];
 
@@ -635,23 +695,33 @@ function evaluateCustomMetricTokens(
             continue;
         }
 
+        if (token.type === "date-constant") {
+            stack.push(evaluateDateConstant(token.fn));
+            continue;
+        }
+
+        if (token.type === "function") {
+            const arity = METRIC_FUNCTION_ARITY[token.fn];
+            const args: number[] = [];
+            for (let i = 0; i < arity; i++) {
+                const val = stack.pop();
+                if (val === undefined) return 0;
+                args.unshift(val);
+            }
+            stack.push(applyMetricFunction(token.fn, args));
+            continue;
+        }
+
         if (token.operator === "%") {
             const value = stack.pop();
-            if (value === undefined) {
-                return 0;
-            }
-
+            if (value === undefined) return 0;
             stack.push(value / 100);
             continue;
         }
 
         const right = stack.pop();
         const left = stack.pop();
-
-        if (left === undefined || right === undefined) {
-            return 0;
-        }
-
+        if (left === undefined || right === undefined) return 0;
         stack.push(applyMetricOperator(left, right, token.operator));
     }
 
@@ -699,6 +769,11 @@ function getDimensionValue(
 
     if (rawValue === null || rawValue === undefined || rawValue === "") {
         return "(Blank)";
+    }
+
+    if (isCustomMetricFieldId(fieldId)) {
+        const metric = customMetrics.find((m) => m.id === fieldId);
+        if (metric) return formatWithCustomMetricFormat(toFiniteNumber(rawValue), metric.format);
     }
 
     if (field.format === "date") {
@@ -792,17 +867,31 @@ export function resolveFieldValueFromAggregationStates(
     return result;
 }
 
+function formatWithCustomMetricFormat(value: number, format: CustomMetricFormat): string {
+    if (format === "percent") return formatPercent(value);
+    if (format === "integer") return Math.round(value).toLocaleString("tr-TR");
+    if (format === "decimal") return value.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (format === "currency") return "₺" + value.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (format === "multiplier") return value.toFixed(2) + "x";
+    if (format === "datetime") {
+        const date = new Date(value * 1000 * 60 * 60 * 24);
+        return date.toLocaleDateString("tr-TR");
+    }
+    return formatNumber(value);
+}
+
 export function formatAggregatedValue(
     fieldId: PivotFieldId,
     value: number,
     customMetrics: CustomMetricDefinition[] = []
 ) {
-    const field = getFieldDefinition(fieldId, customMetrics);
-
-    if (field.format === "percent") {
-        return formatPercent(value);
+    if (isCustomMetricFieldId(fieldId)) {
+        const metric = customMetrics.find((m) => m.id === fieldId);
+        if (metric) return formatWithCustomMetricFormat(value, metric.format);
     }
 
+    const field = getFieldDefinition(fieldId, customMetrics);
+    if (field.format === "percent") return formatPercent(value);
     return formatNumber(value);
 }
 
@@ -959,9 +1048,34 @@ function sanitizeCustomMetric(
             return [...accumulator, { type: "parenthesis", value: candidateParenthesisToken.value }];
         }
 
+        const candidateDateConstantToken = token as Partial<CustomMetricDateConstantToken>;
+        if (
+            candidateDateConstantToken.type === "date-constant" &&
+            DATE_CONSTANT_FNS.includes(candidateDateConstantToken.fn as DateConstantFn)
+        ) {
+            return [...accumulator, { type: "date-constant", fn: candidateDateConstantToken.fn as DateConstantFn }];
+        }
+
+        const candidateFunctionToken = token as Partial<CustomMetricFunctionToken>;
+        if (
+            candidateFunctionToken.type === "function" &&
+            METRIC_FUNCTION_NAMES.includes(candidateFunctionToken.fn as MetricFunctionName)
+        ) {
+            return [...accumulator, { type: "function", fn: candidateFunctionToken.fn as MetricFunctionName }];
+        }
+
+        const candidateCommaToken = token as Partial<CustomMetricCommaToken>;
+        if (candidateCommaToken.type === "comma") {
+            return [...accumulator, { type: "comma" }];
+        }
+
         return accumulator;
     }, []);
-    const format = candidate.format === "percent" ? "percent" : "number";
+    const knownFormats: CustomMetricFormat[] = ["integer", "decimal", "percent", "currency", "multiplier", "datetime"];
+    const rawFormat = String(candidate.format ?? "");
+    const format: CustomMetricFormat = knownFormats.includes(rawFormat as CustomMetricFormat)
+        ? (rawFormat as CustomMetricFormat)
+        : rawFormat === "percent" ? "percent" : "integer";
     const id =
         typeof candidate.id === "string" && candidate.id.startsWith("custom:")
             ? (candidate.id as CustomMetricId)
@@ -1027,8 +1141,8 @@ function sanitizeTable(
         typeof candidate.size.width === "number" &&
         typeof candidate.size.height === "number"
             ? {
-                  width: Math.max(MIN_TABLE_WIDTH, candidate.size.width),
-                  height: Math.max(MIN_TABLE_HEIGHT, candidate.size.height)
+                  width: candidate.size.width,
+                  height: candidate.size.height
               }
             : fallback.size;
 
@@ -1132,13 +1246,23 @@ export function buildPivotResult(
     layout: PivotLayout,
     customMetrics: CustomMetricDefinition[] = []
 ): PivotResult {
-    const valueFields = layout.values.length > 0 ? layout.values : [];
+    const valueFields: PivotFieldId[] = layout.values.length > 0 ? layout.values : [];
 
     if (valueFields.length === 0) {
+        const rowMap = new Map<string, PivotCombo>();
+        const columnMap = new Map<string, PivotCombo>();
+        for (const record of filteredRecords) {
+            const rowCombo = buildComboKey(record, layout.rows, customMetrics);
+            const columnCombo = buildComboKey(record, layout.columns, customMetrics);
+            rowMap.set(rowCombo.key, rowCombo);
+            columnMap.set(columnCombo.key, columnCombo);
+        }
+        if (layout.rows.length === 0 && rowMap.size === 0) rowMap.set("__total__", { key: "__total__", labels: ["Grand Total"] });
+        if (layout.columns.length === 0 && columnMap.size === 0) columnMap.set("__total__", { key: "__total__", labels: ["Grand Total"] });
         return {
             valueFields,
-            rowCombos: [],
-            columnCombos: [],
+            rowCombos: sortCombos(Array.from(rowMap.values())),
+            columnCombos: sortCombos(Array.from(columnMap.values())),
             matrix: new Map<string, Map<string, Record<string, AggregationState>>>()
         };
     }

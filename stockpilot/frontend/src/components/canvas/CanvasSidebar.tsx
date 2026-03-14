@@ -7,15 +7,20 @@ import {
     ChevronUp,
     Delete,
     Diff,
+    EyeClosed,
     Grip,
+    Pin,
+    Sigma,
     SlidersHorizontal,
+    SquarePen,
     X
 } from "lucide-react";
 import { Fragment, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import {
+    DATE_CONSTANT_LABELS,
+    METRIC_FUNCTION_ARITY,
     PIVOT_FIELD_TEXT_TYPOGRAPHY,
     PIVOT_ZONES,
-    describeCustomMetric,
     formatCustomMetricOperatorLabel,
     getAvailablePivotFields,
     getFieldDefinition,
@@ -23,14 +28,19 @@ import {
     isCustomMetricFieldId,
     type CustomMetricBinaryOperator,
     type CustomMetricDefinition,
+    type CustomMetricFormat,
+    type CustomMetricId,
     type CustomMetricExpressionToken,
     type CustomMetricParenthesis,
+    type DateConstantFn,
     type DragState,
+    type MetricFunctionName,
     type PivotFieldDefinition,
     type PivotFieldId,
     type PivotLayout,
     type PivotZoneId
 } from "./canvasModel";
+import { MetricDateDropdown, MetricFormatSelect, MetricFunctionDropdown } from "./MetricFormatSelect";
 
 type SidebarPanel = "calculations" | "layout" | null;
 
@@ -65,60 +75,98 @@ interface CanvasSidebarProps {
     handleZoneDrop: (zoneId: PivotZoneId, event: DragEvent<HTMLDivElement>) => void;
     removeFieldFromZone: (fieldId: PivotFieldId, zoneId: PivotZoneId) => void;
     addCustomMetric: (value: Omit<CustomMetricDefinition, "id">) => CustomMetricDefinition;
+    deleteCustomMetric: (id: CustomMetricId) => void;
 }
 
 function FieldListItem({
     field,
-    customMetrics,
+    isHidden,
+    isPinned,
     setActiveDrag,
     setDropIndicator,
-    clearDragState
+    clearDragState,
+    onEdit,
+    onDelete,
+    onToggleHide,
+    onTogglePin
 }: {
     field: PivotFieldDefinition;
-    customMetrics: CustomMetricDefinition[];
+    isHidden?: boolean;
+    isPinned?: boolean;
     setActiveDrag: (state: DragState | null) => void;
     setDropIndicator: React.Dispatch<React.SetStateAction<{ zoneId: PivotZoneId; index: number } | null>>;
     clearDragState: () => void;
+    onEdit?: () => void;
+    onDelete?: () => void;
+    onToggleHide?: () => void;
+    onTogglePin?: () => void;
 }) {
     const isFormula = isCustomMetricFieldId(field.id);
-    const metric = isFormula ? customMetrics.find((currentMetric) => currentMetric.id === field.id) ?? null : null;
-    const fieldDescription = metric ? describeCustomMetric(metric, customMetrics) : null;
 
     return (
-        <button
-            type="button"
-            draggable
-            onDragStart={(event) => {
-                event.dataTransfer.setData("text/stockpilot-field", field.id);
-                event.dataTransfer.effectAllowed = "move";
-                setActiveDrag({
-                    fieldId: field.id,
-                    sourceZone: "fields"
-                });
-                setDropIndicator(null);
-            }}
-            onDragEnd={clearDragState}
-            className="flex w-full items-start gap-2 border-b border-slate-200/70 px-1 py-1.5 text-left transition hover:border-brand/30 last:border-b-0"
-        >
-            <Grip className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-500" />
-            <div className="min-w-0 flex-1">
-                <div className="flex min-w-0 items-center gap-2">
-                    <p className={`truncate ${PIVOT_FIELD_TEXT_TYPOGRAPHY} text-ink`}>
-                        {field.label}
-                    </p>
-                    {isFormula ? (
-                        <span className="inline-flex shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.56rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                            Saved
-                        </span>
-                    ) : null}
-                </div>
-                {fieldDescription ? (
-                    <p className="mt-0.5 truncate text-[0.72rem] font-medium uppercase tracking-[0.16em] text-slate-400">
-                        {fieldDescription}
-                    </p>
+        <div className={`flex w-full items-center gap-2 border-b border-slate-200/70 px-1 py-1.5 last:border-b-0 ${isHidden ? "opacity-40" : ""}`}>
+            <button
+                type="button"
+                draggable
+                onDragStart={(event) => {
+                    event.dataTransfer.setData("text/stockpilot-field", field.id);
+                    event.dataTransfer.effectAllowed = "move";
+                    setActiveDrag({
+                        fieldId: field.id,
+                        sourceZone: "fields"
+                    });
+                    setDropIndicator(null);
+                }}
+                onDragEnd={clearDragState}
+                className="flex min-w-0 flex-1 items-center gap-2 text-left transition hover:opacity-70"
+            >
+                {isFormula
+                    ? <Sigma className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                    : <Grip className="h-3.5 w-3.5 shrink-0 text-slate-500" />
+                }
+                <p className={`truncate ${PIVOT_FIELD_TEXT_TYPOGRAPHY} text-ink`}>
+                    {field.label}
+                </p>
+            </button>
+            <div className="flex shrink-0 items-center gap-1">
+                {isFormula ? (
+                    <>
+                        <button
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={onEdit}
+                            className="rounded p-0.5 text-slate-400 transition hover:text-ink"
+                        >
+                            <SquarePen className="h-3.5 w-3.5" strokeWidth={1.5} />
+                        </button>
+                        <button
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={onDelete}
+                            className="rounded p-0.5 text-slate-400 transition hover:text-red-500"
+                        >
+                            <X className="h-3.5 w-3.5" strokeWidth={1.5} />
+                        </button>
+                    </>
                 ) : null}
+                <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={onTogglePin}
+                    className={`rounded p-0.5 transition ${isPinned ? "text-brand" : "text-slate-400 hover:text-ink"}`}
+                >
+                    <Pin className="h-3.5 w-3.5" strokeWidth={1.5} />
+                </button>
+                <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={onToggleHide}
+                    className={`rounded p-0.5 transition ${isHidden ? "text-slate-500" : "text-slate-400 hover:text-ink"}`}
+                >
+                    <EyeClosed className="h-3.5 w-3.5" strokeWidth={1.5} />
+                </button>
             </div>
-        </button>
+        </div>
     );
 }
 
@@ -129,16 +177,17 @@ function FormulaTokenChip({
     token: CustomMetricExpressionToken;
     customMetrics: CustomMetricDefinition[];
 }) {
-    const label =
-        token.type === "field"
-            ? getFieldDefinition(token.fieldId, customMetrics).label
-            : token.type === "operator"
-              ? formatCustomMetricOperatorLabel(token.operator)
-              : token.type === "parenthesis"
-                ? token.value
-              : String(token.value);
+    let label: string;
+    if (token.type === "field") label = getFieldDefinition(token.fieldId, customMetrics).label;
+    else if (token.type === "operator") label = formatCustomMetricOperatorLabel(token.operator);
+    else if (token.type === "constant") label = String(token.value);
+    else if (token.type === "parenthesis") label = token.value;
+    else if (token.type === "date-constant") label = DATE_CONSTANT_LABELS[token.fn];
+    else if (token.type === "function") label = token.fn + "(";
+    else if (token.type === "comma") label = ",";
+    else label = "";
 
-    const isSymbol = token.type === "operator" || token.type === "parenthesis";
+    const isSymbol = token.type === "operator" || token.type === "parenthesis" || token.type === "comma";
 
     return (
         <span
@@ -163,22 +212,35 @@ export function CanvasSidebar({
     clearDragState,
     handleZoneDrop,
     removeFieldFromZone,
-    addCustomMetric
+    addCustomMetric,
+    deleteCustomMetric
 }: CanvasSidebarProps) {
     const [activePanel, setActivePanel] = useState<SidebarPanel>("layout");
     const [isFieldsOpen, setIsFieldsOpen] = useState(true);
     const [calculationName, setCalculationName] = useState("");
-    const [calculationFormat, setCalculationFormat] = useState<"number" | "percent">("number");
+    const [calculationFormat, setCalculationFormat] = useState<CustomMetricFormat>("integer");
     const [formulaTokens, setFormulaTokens] = useState<CustomMetricExpressionToken[]>([]);
     const [isFormulaDropActive, setIsFormulaDropActive] = useState(false);
     const [builderError, setBuilderError] = useState<string | null>(null);
     const [manualInputValue, setManualInputValue] = useState("");
     const [isInputFocused, setIsInputFocused] = useState(false);
 
+    const [pinnedFieldIds, setPinnedFieldIds] = useState<Set<PivotFieldId>>(() => new Set());
+    const [hiddenFieldIds, setHiddenFieldIds] = useState<Set<PivotFieldId>>(() => new Set());
+
     const manualInputRef = useRef<HTMLInputElement>(null);
-    const allFields = useMemo(() => getAvailablePivotFields(customMetrics), [customMetrics]);
-    const savedMetricFields = allFields.filter((field) => isCustomMetricFieldId(field.id));
-    const standardFields = allFields.filter((field) => !isCustomMetricFieldId(field.id));
+    const allFields = useMemo(() => {
+        const fields = getAvailablePivotFields(customMetrics);
+        return [...fields].sort((a, b) => {
+            const aPinned = pinnedFieldIds.has(a.id);
+            const bPinned = pinnedFieldIds.has(b.id);
+            const aHidden = hiddenFieldIds.has(a.id);
+            const bHidden = hiddenFieldIds.has(b.id);
+            if (aPinned !== bPinned) return aPinned ? -1 : 1;
+            if (aHidden !== bHidden) return aHidden ? 1 : -1;
+            return 0;
+        });
+    }, [customMetrics, pinnedFieldIds, hiddenFieldIds]);
 
     useEffect(() => {
         if (activePanel === "calculations") {
@@ -188,6 +250,15 @@ export function CanvasSidebar({
 
     function toggleCalculationsPanel() {
         setActivePanel((current) => (current === "calculations" ? null : "calculations"));
+    }
+
+    function loadMetricForEdit(metric: CustomMetricDefinition) {
+        setCalculationName(metric.name);
+        setCalculationFormat(metric.format);
+        setFormulaTokens(metric.tokens);
+        setBuilderError(null);
+        deleteCustomMetric(metric.id);
+        setActivePanel("calculations");
     }
 
     function toggleLayoutPanel() {
@@ -212,6 +283,7 @@ export function CanvasSidebar({
         return (
             token?.type === "field" ||
             token?.type === "constant" ||
+            token?.type === "date-constant" ||
             (token?.type === "parenthesis" && token.value === ")") ||
             (token?.type === "operator" && token.operator === "%")
         );
@@ -222,7 +294,8 @@ export function CanvasSidebar({
         return (
             !lastToken ||
             (lastToken.type === "operator" && lastToken.operator !== "%") ||
-            (lastToken.type === "parenthesis" && lastToken.value === "(")
+            (lastToken.type === "parenthesis" && lastToken.value === "(") ||
+            lastToken.type === "comma"
         );
     }
 
@@ -279,6 +352,40 @@ export function CanvasSidebar({
         }
 
         appendFieldToFormula(fieldId);
+    }
+
+    function appendDateConstantToFormula(fn: DateConstantFn) {
+        if (!canAppendValueToken()) {
+            setBuilderError("Add an operator before this constant.");
+            return;
+        }
+        setFormulaTokens((current) => [...current, { type: "date-constant", fn }]);
+        setBuilderError(null);
+        manualInputRef.current?.focus();
+    }
+
+    function appendFunctionToFormula(fn: MetricFunctionName) {
+        if (!canAppendValueToken()) {
+            setBuilderError("Add an operator before this function.");
+            return;
+        }
+        setFormulaTokens((current) => [
+            ...current,
+            { type: "function", fn },
+            { type: "parenthesis", value: "(" }
+        ]);
+        setBuilderError(null);
+        manualInputRef.current?.focus();
+    }
+
+    function appendCommaToFormula() {
+        if (!isResolvedFormulaValueToken(getLastFormulaToken())) {
+            setBuilderError("Complete the current argument before adding a comma.");
+            return;
+        }
+        setFormulaTokens((current) => [...current, { type: "comma" }]);
+        setBuilderError(null);
+        manualInputRef.current?.focus();
     }
 
     function appendBinaryOperatorToFormula(operator: CustomMetricBinaryOperator) {
@@ -439,8 +546,6 @@ export function CanvasSidebar({
         const nextName = calculationName.trim();
 
         if (!nextName || !isValidCustomMetricExpression(finalTokens)) {
-            setBuilderError("Name the metric and build a valid formula first.");
-            manualInputRef.current?.focus();
             return;
         }
 
@@ -451,7 +556,7 @@ export function CanvasSidebar({
         });
 
         setCalculationName("");
-        setCalculationFormat("number");
+        setCalculationFormat("integer");
         setFormulaTokens([]);
         setManualInputValue("");
         setBuilderError(null);
@@ -631,43 +736,41 @@ export function CanvasSidebar({
                 {isFieldsOpen ? (
                     <div className="mt-4 h-[184px] shrink-0 overflow-hidden">
                         <div className="h-full overflow-y-auto pr-1">
-                            <div className="rounded-[10px] border border-slate-200/70 bg-white/80 px-3 py-2">
+                            <div className="rounded-[10px] border border-slate-200/70 bg-white/80 px-3 pb-0 pt-2">
                                 <p className="text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-slate-400">
                                     Core fields
                                 </p>
                                 <div className="mt-2">
-                                    {standardFields.map((field) => (
-                                        <FieldListItem
-                                            key={field.id}
-                                            field={field}
-                                            customMetrics={customMetrics}
-                                            setActiveDrag={setActiveDrag}
-                                            setDropIndicator={setDropIndicator}
-                                            clearDragState={clearDragState}
-                                        />
-                                    ))}
-                                </div>
-                            </div>
-
-                            {savedMetricFields.length > 0 ? (
-                                <div className="mt-3 rounded-[10px] border border-slate-200/70 bg-white/80 px-3 py-2">
-                                    <p className="text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                                        Saved metrics
-                                    </p>
-                                    <div className="mt-2">
-                                        {savedMetricFields.map((field) => (
+                                    {allFields.map((field) => {
+                                        const metric = isCustomMetricFieldId(field.id)
+                                            ? customMetrics.find((m) => m.id === field.id) ?? null
+                                            : null;
+                                        return (
                                             <FieldListItem
                                                 key={field.id}
                                                 field={field}
-                                                customMetrics={customMetrics}
+                                                isHidden={hiddenFieldIds.has(field.id)}
+                                                isPinned={pinnedFieldIds.has(field.id)}
                                                 setActiveDrag={setActiveDrag}
                                                 setDropIndicator={setDropIndicator}
                                                 clearDragState={clearDragState}
+                                                onEdit={metric ? () => loadMetricForEdit(metric) : undefined}
+                                                onDelete={metric ? () => deleteCustomMetric(metric.id) : undefined}
+                                                onTogglePin={() => setPinnedFieldIds((prev) => {
+                                                    const next = new Set(prev);
+                                                    next.has(field.id) ? next.delete(field.id) : next.add(field.id);
+                                                    return next;
+                                                })}
+                                                onToggleHide={() => setHiddenFieldIds((prev) => {
+                                                    const next = new Set(prev);
+                                                    next.has(field.id) ? next.delete(field.id) : next.add(field.id);
+                                                    return next;
+                                                })}
                                             />
-                                        ))}
-                                    </div>
+                                        );
+                                    })}
                                 </div>
-                            ) : null}
+                            </div>
                         </div>
                     </div>
                 ) : null}
@@ -711,7 +814,7 @@ export function CanvasSidebar({
                                         onDragLeave={() => setIsFormulaDropActive(false)}
                                         onDrop={handleFormulaDrop}
                                         onClick={() => manualInputRef.current?.focus()}
-                                        className={`min-h-[148px] -mx-1 -mt-2 pb-2 transition cursor-text ${
+                                        className={`min-h-[200px] -mx-1 -mt-2 pb-2 transition cursor-text ${
                                             isFormulaDropActive ? "bg-slate-50/70" : ""
                                         }`}
                                     >
@@ -730,52 +833,16 @@ export function CanvasSidebar({
                                                 </div>
                                             </div>
                                             <div className="mt-1 flex shrink-0 items-center gap-1.5">
-                                                <button
-                                                    type="button"
-                                                    onMouseDown={(e) => e.preventDefault()}
-                                                    onClick={() => setCalculationFormat("number")}
-                                                    className={`inline-flex h-7 w-7 items-center justify-center rounded-[8px] text-[0.68rem] font-semibold transition ${
-                                                        calculationFormat === "number"
-                                                            ? "bg-slate-900 text-white"
-                                                            : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                                                    }`}
-                                                    aria-pressed={calculationFormat === "number"}
-                                                    aria-label="Use number format"
-                                                >
-                                                    123
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onMouseDown={(e) => e.preventDefault()}
-                                                    onClick={() => setCalculationFormat("percent")}
-                                                    className={`inline-flex h-7 w-7 items-center justify-center rounded-[8px] text-[0.9rem] font-semibold leading-none transition ${
-                                                        calculationFormat === "percent"
-                                                            ? "bg-slate-900 text-white"
-                                                            : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                                                    }`}
-                                                    aria-pressed={calculationFormat === "percent"}
-                                                    aria-label="Use percent format"
-                                                >
-                                                    %
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onMouseDown={(e) => e.preventDefault()}
-                                                    onClick={handleDeleteLastToken}
-                                                    className="inline-flex h-7 w-7 items-center justify-center rounded-[8px] bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-ink"
-                                                    aria-label="Delete last item"
-                                                >
-                                                    <Delete className="h-4 w-4" />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onMouseDown={(e) => e.preventDefault()}
-                                                    onClick={handleSaveMetric}
-                                                    className="inline-flex h-7 w-7 items-center justify-center rounded-[8px] bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-ink"
-                                                    aria-label="Save formula"
-                                                >
-                                                    <Check className="h-4 w-4" />
-                                                </button>
+                                                <MetricFormatSelect
+                                                    value={calculationFormat}
+                                                    onChange={setCalculationFormat}
+                                                />
+                                                <MetricDateDropdown
+                                                    onSelect={(fn) => { commitManualInput(); appendDateConstantToFormula(fn); }}
+                                                />
+                                                <MetricFunctionDropdown
+                                                    onSelect={(fn) => { commitManualInput(); appendFunctionToFormula(fn); }}
+                                                />
                                             </div>
                                         </div>
                                         <div
@@ -818,10 +885,11 @@ export function CanvasSidebar({
                                         </div>
                                     </div>
 
-                                    <div className="mt-auto px-1 py-1">
+                                    <div className="mt-auto px-1 py-1 space-y-2">
+                                        {/* Operators */}
                                         <div
                                             className="flex flex-wrap items-center gap-1.5"
-                                            style={{ transform: "translate(-10px, 14px)" }}
+                                            style={{ transform: "translate(-10px, 0)" }}
                                         >
                                             {CUSTOM_METRIC_OPERATOR_BUTTONS.map((button) => (
                                                 <button
@@ -834,22 +902,58 @@ export function CanvasSidebar({
                                                             appendBinaryOperatorToFormula(button.value);
                                                             return;
                                                         }
-
                                                         if (button.type === "operator") {
                                                             appendPercentToFormula();
                                                             return;
                                                         }
-
                                                         appendParenthesisToFormula(button.value);
                                                     }}
-                                                    className="inline-flex h-7 w-7 items-center justify-center rounded-[8px] bg-slate-100 text-[0.9rem] font-semibold leading-none text-slate-500 transition hover:bg-slate-200 hover:text-ink"
+                                                    className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-[8px] bg-slate-100 text-[0.9rem] font-semibold leading-none text-slate-500 transition hover:bg-slate-200 hover:text-ink"
                                                 >
                                                     {button.type === "binary"
                                                         ? formatCustomMetricOperatorLabel(button.value)
                                                         : button.value}
                                                 </button>
                                             ))}
+                                            {/* Comma */}
+                                            <button
+                                                type="button"
+                                                onMouseDown={(e) => e.preventDefault()}
+                                                onClick={() => { commitManualInput(); appendCommaToFormula(); }}
+                                                className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-[8px] bg-slate-100 text-[0.9rem] font-semibold leading-none text-slate-500 transition hover:bg-slate-200 hover:text-ink"
+                                            >
+                                                ,
+                                            </button>
+                                            <div className="ml-auto flex items-center gap-1">
+                                                <button
+                                                    type="button"
+                                                    onMouseDown={(e) => e.preventDefault()}
+                                                    onClick={handleDeleteLastToken}
+                                                    className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-[8px] bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-ink"
+                                                    aria-label="Delete last item"
+                                                >
+                                                    <Delete className="h-3.5 w-3.5" />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onMouseDown={(e) => e.preventDefault()}
+                                                    onClick={handleSaveMetric}
+                                                    disabled={!calculationName.trim() || !isValidCustomMetricExpression(
+                                                        (() => {
+                                                            const n = Number.parseFloat(manualInputValue);
+                                                            return !Number.isNaN(n) && canAppendValueToken(formulaTokens)
+                                                                ? [...formulaTokens, { type: "constant" as const, value: n }]
+                                                                : formulaTokens;
+                                                        })()
+                                                    )}
+                                                    className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-[8px] bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-slate-100 disabled:hover:text-slate-500"
+                                                    aria-label="Save formula"
+                                                >
+                                                    <Check className="h-3.5 w-3.5" />
+                                                </button>
+                                            </div>
                                         </div>
+
                                     </div>
 
                                     {builderError ? (
