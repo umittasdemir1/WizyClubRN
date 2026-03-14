@@ -7,7 +7,9 @@ export type CustomMetricId = `custom:${string}`;
 export type PivotFieldId = BasePivotFieldId | CustomMetricId;
 export type PivotZoneId = "filters" | "columns" | "rows" | "values";
 export type PivotFieldFormat = "text" | "number" | "percent" | "date";
-export type CustomMetricOperator = "+" | "-" | "*" | "/";
+export type CustomMetricBinaryOperator = "+" | "-" | "*" | "/" | "=" | ">" | "<";
+export type CustomMetricOperator = CustomMetricBinaryOperator | "%";
+export type CustomMetricParenthesis = "(" | ")";
 
 export interface CustomMetricFieldToken {
     type: "field";
@@ -19,7 +21,21 @@ export interface CustomMetricOperatorToken {
     operator: CustomMetricOperator;
 }
 
-export type CustomMetricExpressionToken = CustomMetricFieldToken | CustomMetricOperatorToken;
+export interface CustomMetricConstantToken {
+    type: "constant";
+    value: number;
+}
+
+export interface CustomMetricParenthesisToken {
+    type: "parenthesis";
+    value: CustomMetricParenthesis;
+}
+
+export type CustomMetricExpressionToken =
+    | CustomMetricFieldToken
+    | CustomMetricOperatorToken
+    | CustomMetricConstantToken
+    | CustomMetricParenthesisToken;
 
 export interface PivotLayout {
     filters: PivotFieldId[];
@@ -313,16 +329,38 @@ export function createCustomMetricDefinition(
     };
 }
 
+export function formatCustomMetricOperatorLabel(operator: CustomMetricOperator) {
+    return operator === "*" ? "x" : operator;
+}
+
+function isCustomMetricOperator(value: unknown): value is CustomMetricOperator {
+    return value === "+" || value === "-" || value === "*" || value === "/" || value === "=" || value === ">" || value === "<" || value === "%";
+}
+
+function isCustomMetricParenthesis(value: unknown): value is CustomMetricParenthesis {
+    return value === "(" || value === ")";
+}
+
+function isBinaryCustomMetricOperator(operator: CustomMetricOperator): operator is CustomMetricBinaryOperator {
+    return operator !== "%";
+}
+
 export function describeCustomMetric(
     metric: CustomMetricDefinition,
     customMetrics: CustomMetricDefinition[] = []
 ) {
     return metric.tokens
-        .map((token) =>
-            token.type === "field"
-                ? getFieldDefinition(token.fieldId, customMetrics).label
-                : token.operator
-        )
+        .map((token) => {
+            if (token.type === "field") {
+                return getFieldDefinition(token.fieldId, customMetrics).label;
+            }
+
+            if (token.type === "operator") {
+                return formatCustomMetricOperatorLabel(token.operator);
+            }
+
+            return String(token.value);
+        })
         .join(" ");
 }
 
@@ -382,7 +420,7 @@ function sanitizeLayout(value: unknown, customMetrics: CustomMetricDefinition[] 
     };
 }
 
-function applyMetricOperator(left: number, right: number, operator: CustomMetricOperator) {
+function applyMetricOperator(left: number, right: number, operator: CustomMetricBinaryOperator) {
     if (operator === "+") {
         return left + right;
     }
@@ -395,6 +433,18 @@ function applyMetricOperator(left: number, right: number, operator: CustomMetric
         return left * right;
     }
 
+    if (operator === "=") {
+        return Math.abs(left - right) < 1e-9 ? 1 : 0;
+    }
+
+    if (operator === ">") {
+        return left > right ? 1 : 0;
+    }
+
+    if (operator === "<") {
+        return left < right ? 1 : 0;
+    }
+
     return right === 0 ? 0 : left / right;
 }
 
@@ -403,13 +453,163 @@ function toFiniteNumber(value: unknown) {
 }
 
 function normalizeExpressionTokens(tokens: CustomMetricExpressionToken[]) {
-    return tokens.filter((token, index) => {
+    return tokens.filter((token) => {
         if (token.type === "field") {
-            return index % 2 === 0;
+            return true;
         }
 
-        return index % 2 === 1;
+        if (token.type === "constant") {
+            return Number.isFinite(token.value);
+        }
+
+        if (token.type === "operator") {
+            return isCustomMetricOperator(token.operator);
+        }
+
+        return isCustomMetricParenthesis(token.value);
     });
+}
+
+function getCustomMetricOperatorPrecedence(operator: CustomMetricOperator) {
+    if (operator === "%") {
+        return 4;
+    }
+
+    if (operator === "*" || operator === "/") {
+        return 3;
+    }
+
+    if (operator === "+" || operator === "-") {
+        return 2;
+    }
+
+    return 1;
+}
+
+function toReversePolishExpression(tokens: CustomMetricExpressionToken[]) {
+    const normalizedTokens = normalizeExpressionTokens(tokens);
+    if (normalizedTokens.length === 0) {
+        return null;
+    }
+
+    const output: Array<CustomMetricFieldToken | CustomMetricConstantToken | CustomMetricOperatorToken> = [];
+    const operatorStack: Array<CustomMetricOperatorToken | CustomMetricParenthesisToken> = [];
+    let expectsValue = true;
+
+    for (const token of normalizedTokens) {
+        if (token.type === "field" || token.type === "constant") {
+            if (!expectsValue) {
+                return null;
+            }
+
+            output.push(token);
+            expectsValue = false;
+            continue;
+        }
+
+        if (token.type === "parenthesis") {
+            if (token.value === "(") {
+                if (!expectsValue) {
+                    return null;
+                }
+
+                operatorStack.push(token);
+                continue;
+            }
+
+            if (expectsValue) {
+                return null;
+            }
+
+            let foundOpeningParenthesis = false;
+            while (operatorStack.length > 0) {
+                const stackToken = operatorStack.pop()!;
+                if (stackToken.type === "parenthesis" && stackToken.value === "(") {
+                    foundOpeningParenthesis = true;
+                    break;
+                }
+
+                if (stackToken.type === "operator") {
+                    output.push(stackToken);
+                }
+            }
+
+            if (!foundOpeningParenthesis) {
+                return null;
+            }
+
+            expectsValue = false;
+            continue;
+        }
+
+        if (token.operator === "%") {
+            if (expectsValue) {
+                return null;
+            }
+
+            while (operatorStack.length > 0) {
+                const stackToken = operatorStack[operatorStack.length - 1];
+                if (stackToken.type !== "operator") {
+                    break;
+                }
+
+                if (
+                    getCustomMetricOperatorPrecedence(stackToken.operator) <
+                    getCustomMetricOperatorPrecedence(token.operator)
+                ) {
+                    break;
+                }
+
+                output.push(operatorStack.pop() as CustomMetricOperatorToken);
+            }
+
+            operatorStack.push(token);
+            expectsValue = false;
+            continue;
+        }
+
+        if (expectsValue || !isBinaryCustomMetricOperator(token.operator)) {
+            return null;
+        }
+
+        while (operatorStack.length > 0) {
+            const stackToken = operatorStack[operatorStack.length - 1];
+            if (stackToken.type !== "operator") {
+                break;
+            }
+
+            if (
+                getCustomMetricOperatorPrecedence(stackToken.operator) <
+                getCustomMetricOperatorPrecedence(token.operator)
+            ) {
+                break;
+            }
+
+            output.push(operatorStack.pop() as CustomMetricOperatorToken);
+        }
+
+        operatorStack.push(token);
+        expectsValue = true;
+    }
+
+    if (expectsValue) {
+        return null;
+    }
+
+    while (operatorStack.length > 0) {
+        const stackToken = operatorStack.pop()!;
+        if (stackToken.type === "parenthesis") {
+            return null;
+        }
+
+        output.push(stackToken);
+    }
+
+    return output;
+}
+
+export function isValidCustomMetricExpression(tokens: CustomMetricExpressionToken[]) {
+    return toReversePolishExpression(tokens) !== null;
 }
 
 function evaluateCustomMetricTokens(
@@ -417,30 +617,45 @@ function evaluateCustomMetricTokens(
     resolveFieldValue: (fieldId: PivotFieldId, visited: Set<PivotFieldId>) => number,
     visited: Set<PivotFieldId>
 ) {
-    const normalizedTokens = normalizeExpressionTokens(tokens);
-    const firstToken = normalizedTokens[0];
-    if (!firstToken || firstToken.type !== "field") {
+    const reversePolishTokens = toReversePolishExpression(tokens);
+    if (!reversePolishTokens) {
         return 0;
     }
 
-    let result = resolveFieldValue(firstToken.fieldId, visited);
+    const stack: number[] = [];
 
-    for (let index = 1; index < normalizedTokens.length - 1; index += 2) {
-        const operatorToken = normalizedTokens[index];
-        const nextFieldToken = normalizedTokens[index + 1];
-
-        if (operatorToken?.type !== "operator" || nextFieldToken?.type !== "field") {
+    for (const token of reversePolishTokens) {
+        if (token.type === "field") {
+            stack.push(resolveFieldValue(token.fieldId, visited));
             continue;
         }
 
-        result = applyMetricOperator(
-            result,
-            resolveFieldValue(nextFieldToken.fieldId, visited),
-            operatorToken.operator
-        );
+        if (token.type === "constant") {
+            stack.push(token.value);
+            continue;
+        }
+
+        if (token.operator === "%") {
+            const value = stack.pop();
+            if (value === undefined) {
+                return 0;
+            }
+
+            stack.push(value / 100);
+            continue;
+        }
+
+        const right = stack.pop();
+        const left = stack.pop();
+
+        if (left === undefined || right === undefined) {
+            return 0;
+        }
+
+        stack.push(applyMetricOperator(left, right, token.operator));
     }
 
-    return result;
+    return stack.length === 1 ? toFiniteNumber(stack[0]) : 0;
 }
 
 function getRecordFieldValue(
@@ -708,30 +923,43 @@ function sanitizeCustomMetric(
               { type: "operator", operator: legacyCandidate.operator ?? "+" },
               { type: "field", fieldId: legacyCandidate.rightFieldId ?? "inventory" }
           ];
-    const tokens = rawTokens.reduce<CustomMetricExpressionToken[]>((accumulator, token, tokenIndex) => {
+    const tokens = rawTokens.reduce<CustomMetricExpressionToken[]>((accumulator, token) => {
         if (!token || typeof token !== "object") {
             return accumulator;
         }
 
-        if (tokenIndex % 2 === 0) {
-            const candidateToken = token as Partial<CustomMetricFieldToken>;
-            if (!isKnownFieldId(candidateToken.fieldId, existingMetrics)) {
+        const candidateFieldToken = token as Partial<CustomMetricFieldToken>;
+        if (candidateFieldToken.type === "field") {
+            if (!isKnownFieldId(candidateFieldToken.fieldId, existingMetrics)) {
                 return accumulator;
             }
 
-            return [...accumulator, { type: "field", fieldId: candidateToken.fieldId }];
+            return [...accumulator, { type: "field", fieldId: candidateFieldToken.fieldId }];
         }
 
-        const candidateToken = token as Partial<CustomMetricOperatorToken>;
-        const operator: CustomMetricOperator =
-            candidateToken.operator === "-" ||
-            candidateToken.operator === "*" ||
-            candidateToken.operator === "/" ||
-            candidateToken.operator === "+"
-                ? candidateToken.operator
-                : "+";
+        const candidateConstantToken = token as Partial<CustomMetricConstantToken>;
+        if (
+            candidateConstantToken.type === "constant" &&
+            typeof candidateConstantToken.value === "number" &&
+            Number.isFinite(candidateConstantToken.value)
+        ) {
+            return [...accumulator, { type: "constant", value: candidateConstantToken.value }];
+        }
 
-        return [...accumulator, { type: "operator", operator }];
+        const candidateOperatorToken = token as Partial<CustomMetricOperatorToken>;
+        if (candidateOperatorToken.type === "operator" && isCustomMetricOperator(candidateOperatorToken.operator)) {
+            return [...accumulator, { type: "operator", operator: candidateOperatorToken.operator }];
+        }
+
+        const candidateParenthesisToken = token as Partial<CustomMetricParenthesisToken>;
+        if (
+            candidateParenthesisToken.type === "parenthesis" &&
+            isCustomMetricParenthesis(candidateParenthesisToken.value)
+        ) {
+            return [...accumulator, { type: "parenthesis", value: candidateParenthesisToken.value }];
+        }
+
+        return accumulator;
     }, []);
     const format = candidate.format === "percent" ? "percent" : "number";
     const id =
@@ -746,14 +974,13 @@ function sanitizeCustomMetric(
     return {
         id: uniqueId,
         name: nextName,
-        tokens:
-            tokens.length >= 3 && tokens[0]?.type === "field" && tokens[tokens.length - 1]?.type === "field"
-                ? tokens
-                : [
-                      { type: "field", fieldId: "netSalesQty" },
-                      { type: "operator", operator: "+" },
-                      { type: "field", fieldId: "inventory" }
-                  ],
+        tokens: isValidCustomMetricExpression(tokens)
+            ? normalizeExpressionTokens(tokens)
+            : [
+                  { type: "field", fieldId: "netSalesQty" },
+                  { type: "operator", operator: "+" },
+                  { type: "field", fieldId: "inventory" }
+              ],
         format
     };
 }

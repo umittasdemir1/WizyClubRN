@@ -5,22 +5,26 @@ import {
     Check,
     ChevronDown,
     ChevronUp,
+    Delete,
     Diff,
     Grip,
     SlidersHorizontal,
     X
 } from "lucide-react";
-import { Fragment, useMemo, useState, type DragEvent } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import {
     PIVOT_FIELD_TEXT_TYPOGRAPHY,
     PIVOT_ZONES,
     describeCustomMetric,
+    formatCustomMetricOperatorLabel,
     getAvailablePivotFields,
     getFieldDefinition,
+    isValidCustomMetricExpression,
     isCustomMetricFieldId,
+    type CustomMetricBinaryOperator,
     type CustomMetricDefinition,
     type CustomMetricExpressionToken,
-    type CustomMetricOperator,
+    type CustomMetricParenthesis,
     type DragState,
     type PivotFieldDefinition,
     type PivotFieldId,
@@ -30,7 +34,23 @@ import {
 
 type SidebarPanel = "calculations" | "layout" | null;
 
-const CUSTOM_METRIC_OPERATORS: CustomMetricOperator[] = ["+", "-", "*", "/"];
+const CUSTOM_METRIC_BINARY_OPERATORS: CustomMetricBinaryOperator[] = ["+", "-", "*", "/", "=", ">", "<"];
+const CUSTOM_METRIC_OPERATOR_BUTTONS: Array<
+    | { type: "binary"; value: CustomMetricBinaryOperator }
+    | { type: "operator"; value: "%" }
+    | { type: "parenthesis"; value: CustomMetricParenthesis }
+> = [
+    { type: "binary", value: "+" },
+    { type: "binary", value: "-" },
+    { type: "binary", value: "*" },
+    { type: "binary", value: "/" },
+    { type: "operator", value: "%" },
+    { type: "binary", value: "=" },
+    { type: "parenthesis", value: "(" },
+    { type: "parenthesis", value: ")" },
+    { type: "binary", value: ">" },
+    { type: "binary", value: "<" }
+];
 
 interface CanvasSidebarProps {
     activeLayout: PivotLayout;
@@ -104,35 +124,29 @@ function FieldListItem({
 
 function FormulaTokenChip({
     token,
-    customMetrics,
-    onRemove
+    customMetrics
 }: {
     token: CustomMetricExpressionToken;
     customMetrics: CustomMetricDefinition[];
-    onRemove: () => void;
 }) {
     const label =
-        token.type === "field" ? getFieldDefinition(token.fieldId, customMetrics).label : token.operator;
+        token.type === "field"
+            ? getFieldDefinition(token.fieldId, customMetrics).label
+            : token.type === "operator"
+              ? formatCustomMetricOperatorLabel(token.operator)
+              : token.type === "parenthesis"
+                ? token.value
+              : String(token.value);
+
+    const isSymbol = token.type === "operator" || token.type === "parenthesis";
 
     return (
         <span
-            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm ${
-                token.type === "field"
-                    ? "border-slate-200 bg-white text-ink"
-                    : "border-slate-900 bg-slate-900 text-white"
+            className={`${PIVOT_FIELD_TEXT_TYPOGRAPHY} leading-none ${
+                isSymbol ? "text-slate-400 font-bold" : "text-ink"
             }`}
         >
-            <span className="font-medium">{label}</span>
-            <button
-                type="button"
-                onClick={onRemove}
-                className={`rounded-full p-0.5 transition ${
-                    token.type === "field" ? "text-slate-400 hover:text-ink" : "text-white/70 hover:text-white"
-                }`}
-                aria-label={`Remove ${label}`}
-            >
-                <X className="h-3.5 w-3.5" />
-            </button>
+            {label}
         </span>
     );
 }
@@ -158,10 +172,19 @@ export function CanvasSidebar({
     const [formulaTokens, setFormulaTokens] = useState<CustomMetricExpressionToken[]>([]);
     const [isFormulaDropActive, setIsFormulaDropActive] = useState(false);
     const [builderError, setBuilderError] = useState<string | null>(null);
+    const [manualInputValue, setManualInputValue] = useState("");
+    const [isInputFocused, setIsInputFocused] = useState(false);
 
+    const manualInputRef = useRef<HTMLInputElement>(null);
     const allFields = useMemo(() => getAvailablePivotFields(customMetrics), [customMetrics]);
     const savedMetricFields = allFields.filter((field) => isCustomMetricFieldId(field.id));
     const standardFields = allFields.filter((field) => !isCustomMetricFieldId(field.id));
+
+    useEffect(() => {
+        if (activePanel === "calculations") {
+            setTimeout(() => manualInputRef.current?.focus(), 100);
+        }
+    }, [activePanel]);
 
     function toggleCalculationsPanel() {
         setActivePanel((current) => (current === "calculations" ? null : "calculations"));
@@ -171,6 +194,54 @@ export function CanvasSidebar({
         setActivePanel((current) => (current === "layout" ? null : "layout"));
     }
 
+    function getLastFormulaToken(tokens: CustomMetricExpressionToken[] = formulaTokens) {
+        return tokens[tokens.length - 1];
+    }
+
+    function getOpenParenthesisCount(tokens: CustomMetricExpressionToken[] = formulaTokens) {
+        return tokens.reduce((count, token) => {
+            if (token.type !== "parenthesis") {
+                return count;
+            }
+
+            return token.value === "(" ? count + 1 : Math.max(0, count - 1);
+        }, 0);
+    }
+
+    function isResolvedFormulaValueToken(token: CustomMetricExpressionToken | undefined) {
+        return (
+            token?.type === "field" ||
+            token?.type === "constant" ||
+            (token?.type === "parenthesis" && token.value === ")") ||
+            (token?.type === "operator" && token.operator === "%")
+        );
+    }
+
+    function canAppendValueToken(tokens: CustomMetricExpressionToken[] = formulaTokens) {
+        const lastToken = getLastFormulaToken(tokens);
+        return (
+            !lastToken ||
+            (lastToken.type === "operator" && lastToken.operator !== "%") ||
+            (lastToken.type === "parenthesis" && lastToken.value === "(")
+        );
+    }
+
+    function canAppendBinaryOperator(tokens: CustomMetricExpressionToken[] = formulaTokens) {
+        return isResolvedFormulaValueToken(getLastFormulaToken(tokens));
+    }
+
+    function canAppendParenthesis(value: CustomMetricParenthesis, tokens: CustomMetricExpressionToken[] = formulaTokens) {
+        if (value === "(") {
+            return canAppendValueToken(tokens);
+        }
+
+        return getOpenParenthesisCount(tokens) > 0 && isResolvedFormulaValueToken(getLastFormulaToken(tokens));
+    }
+
+    function canAppendPercentOperator(tokens: CustomMetricExpressionToken[] = formulaTokens) {
+        return isResolvedFormulaValueToken(getLastFormulaToken(tokens));
+    }
+
     function appendFieldToFormula(fieldId: PivotFieldId) {
         const field = getFieldDefinition(fieldId, customMetrics);
         if (field.kind !== "measure") {
@@ -178,10 +249,15 @@ export function CanvasSidebar({
             return;
         }
 
+        if (manualInputValue !== "") {
+            setBuilderError("Add an operator after the current number first.");
+            manualInputRef.current?.focus();
+            return;
+        }
+
         let nextError: string | null = null;
         setFormulaTokens((current) => {
-            const lastToken = current[current.length - 1];
-            if (lastToken?.type === "field") {
+            if (!canAppendValueToken(current)) {
                 nextError = "Select an operator before dropping the next metric.";
                 return current;
             }
@@ -190,6 +266,7 @@ export function CanvasSidebar({
             return [...current, { type: "field", fieldId }];
         });
         setBuilderError(nextError);
+        manualInputRef.current?.focus();
     }
 
     function handleFormulaDrop(event: DragEvent<HTMLDivElement>) {
@@ -204,71 +281,179 @@ export function CanvasSidebar({
         appendFieldToFormula(fieldId);
     }
 
-    function appendOperatorToFormula(operator: CustomMetricOperator) {
+    function appendBinaryOperatorToFormula(operator: CustomMetricBinaryOperator) {
         let nextError: string | null = null;
         setFormulaTokens((current) => {
             if (current.length === 0) {
-                nextError = "Drop a metric first.";
+                nextError = "Drop a metric or enter a number first.";
                 return current;
             }
 
             const lastToken = current[current.length - 1];
-            if (lastToken?.type === "operator") {
+            if (lastToken?.type === "operator" && lastToken.operator !== "%") {
                 nextError = null;
                 return [...current.slice(0, -1), { type: "operator", operator }];
+            }
+
+            if (!canAppendBinaryOperator(current)) {
+                nextError = "Add a metric, number, or closing bracket first.";
+                return current;
             }
 
             nextError = null;
             return [...current, { type: "operator", operator }];
         });
         setBuilderError(nextError);
+        manualInputRef.current?.focus();
     }
 
-    function removeFormulaToken(tokenIndex: number) {
+    function appendPercentToFormula() {
+        let nextError: string | null = null;
         setFormulaTokens((current) => {
-            const nextTokens = current.filter((_, index) => index !== tokenIndex);
-
-            if (nextTokens[0]?.type === "operator") {
-                nextTokens.shift();
+            if (!canAppendPercentOperator(current)) {
+                nextError = "Add a metric, number, or closing bracket before %.";
+                return current;
             }
 
-            if (nextTokens[nextTokens.length - 1]?.type === "operator") {
-                nextTokens.pop();
+            nextError = null;
+            return [...current, { type: "operator", operator: "%" }];
+        });
+        setBuilderError(nextError);
+        manualInputRef.current?.focus();
+    }
+
+    function appendParenthesisToFormula(value: CustomMetricParenthesis) {
+        let nextError: string | null = null;
+        setFormulaTokens((current) => {
+            if (!canAppendParenthesis(value, current)) {
+                nextError =
+                    value === "("
+                        ? "Add an operator before opening another group."
+                        : "Close the expression after a metric or number.";
+                return current;
             }
 
-            return nextTokens.filter((token, index) => {
-                if (token.type === "field") {
-                    return index % 2 === 0;
+            nextError = null;
+            return [...current, { type: "parenthesis", value }];
+        });
+        setBuilderError(nextError);
+        manualInputRef.current?.focus();
+    }
+
+    function handleDeleteLastToken() {
+        if (manualInputValue !== "") {
+            setManualInputValue("");
+            setBuilderError(null);
+            manualInputRef.current?.focus();
+            return;
+        }
+
+        setFormulaTokens((current) => (current.length > 0 ? current.slice(0, -1) : current));
+        setBuilderError(null);
+        manualInputRef.current?.focus();
+    }
+
+    function commitManualInput() {
+        const numericValue = Number.parseFloat(manualInputValue);
+        if (!Number.isNaN(numericValue)) {
+            let wasCommitted = false;
+            setFormulaTokens((current) => {
+                if (!canAppendValueToken(current)) {
+                    return current;
                 }
 
-                return index % 2 === 1;
+                wasCommitted = true;
+                return [...current, { type: "constant", value: numericValue }];
             });
-        });
-        setBuilderError(null);
+            if (wasCommitted) {
+                setManualInputValue("");
+                setBuilderError(null);
+            } else {
+                setBuilderError("Add an operator before entering another number.");
+            }
+
+            return wasCommitted;
+        }
+        return false;
+    }
+
+    function handleManualInputKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+        if (event.key === "Backspace" && manualInputValue === "") {
+            event.preventDefault();
+            handleDeleteLastToken();
+            return;
+        }
+
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            commitManualInput();
+            return;
+        }
+
+        if (
+            CUSTOM_METRIC_BINARY_OPERATORS.includes(event.key as CustomMetricBinaryOperator) ||
+            event.key === "x" ||
+            event.key === "X"
+        ) {
+            event.preventDefault();
+            commitManualInput();
+            appendBinaryOperatorToFormula(
+                event.key === "x" || event.key === "X" ? "*" : (event.key as CustomMetricBinaryOperator)
+            );
+            return;
+        }
+
+        if (event.key === "%") {
+            event.preventDefault();
+            commitManualInput();
+            appendPercentToFormula();
+            return;
+        }
+
+        if (event.key === "(") {
+            event.preventDefault();
+            appendParenthesisToFormula("(");
+            return;
+        }
+
+        if (event.key === ")") {
+            event.preventDefault();
+            commitManualInput();
+            appendParenthesisToFormula(")");
+        }
     }
 
     function handleSaveMetric() {
+        let finalTokens = [...formulaTokens];
+        const numericValue = Number.parseFloat(manualInputValue);
+        if (!Number.isNaN(numericValue)) {
+            if (!canAppendValueToken(finalTokens)) {
+                setBuilderError("Add an operator before entering another number.");
+                manualInputRef.current?.focus();
+                return;
+            }
+
+            finalTokens.push({ type: "constant", value: numericValue });
+        }
+
         const nextName = calculationName.trim();
 
-        if (
-            !nextName ||
-            formulaTokens.length < 3 ||
-            formulaTokens[0]?.type !== "field" ||
-            formulaTokens[formulaTokens.length - 1]?.type !== "field"
-        ) {
+        if (!nextName || !isValidCustomMetricExpression(finalTokens)) {
             setBuilderError("Name the metric and build a valid formula first.");
+            manualInputRef.current?.focus();
             return;
         }
 
         addCustomMetric({
             name: nextName,
-            tokens: formulaTokens,
+            tokens: finalTokens,
             format: calculationFormat
         });
 
         setCalculationName("");
         setCalculationFormat("number");
         setFormulaTokens([]);
+        setManualInputValue("");
         setBuilderError(null);
         setIsFormulaDropActive(false);
         setActivePanel("layout");
@@ -517,7 +702,7 @@ export function CanvasSidebar({
                     <div className="mt-3 shrink-0 overflow-hidden">
                         <div className="overflow-y-auto pr-1">
                             <div className="rounded-[14px] border border-slate-200/70 bg-white/85 p-4 shadow-[0_18px_42px_-34px_rgba(11,14,20,0.24)]">
-                                <div className="space-y-3">
+                                <div className="flex min-h-full flex-col gap-3">
                                     <div
                                         onDragOver={(event) => {
                                             event.preventDefault();
@@ -525,27 +710,29 @@ export function CanvasSidebar({
                                         }}
                                         onDragLeave={() => setIsFormulaDropActive(false)}
                                         onDrop={handleFormulaDrop}
-                                        className={`min-h-[132px] -mx-1 -mt-2 pb-2 transition ${
+                                        onClick={() => manualInputRef.current?.focus()}
+                                        className={`min-h-[148px] -mx-1 -mt-2 pb-2 transition cursor-text ${
                                             isFormulaDropActive ? "bg-slate-50/70" : ""
                                         }`}
                                     >
-                                        <div className="flex items-center gap-2">
-                                            <p className="shrink-0 text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                                                Formula
-                                            </p>
-                                            <span className="h-4 w-px shrink-0 bg-slate-200" aria-hidden="true" />
-                                            <p className="shrink-0 text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                                                Save
-                                            </p>
-                                            <input
-                                                value={calculationName}
-                                                onChange={(event) => setCalculationName(event.target.value)}
-                                                placeholder="......................"
-                                                className="h-8 min-w-0 flex-1 bg-transparent px-0 font-medium text-ink outline-none transition placeholder:text-slate-300"
-                                            />
-                                            <div className="flex shrink-0 items-center gap-1.5">
+                                        <div className="flex items-start justify-between gap-3 px-0.5" onClick={(e) => e.stopPropagation()}>
+                                            <div className="min-w-0 flex-1 px-1 py-1">
+                                                <div
+                                                    className="rounded-[10px] border border-slate-200/70 bg-white/80 px-3 py-2"
+                                                    style={{ transform: "translate(-10px, -5px)" }}
+                                                >
+                                                    <input
+                                                        value={calculationName}
+                                                        onChange={(event) => setCalculationName(event.target.value)}
+                                                        placeholder=""
+                                                        className={`block w-full appearance-none bg-transparent p-0 leading-none outline-none border-none ring-0 focus:ring-0 ${PIVOT_FIELD_TEXT_TYPOGRAPHY} text-ink`}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="mt-1 flex shrink-0 items-center gap-1.5">
                                                 <button
                                                     type="button"
+                                                    onMouseDown={(e) => e.preventDefault()}
                                                     onClick={() => setCalculationFormat("number")}
                                                     className={`inline-flex h-7 w-7 items-center justify-center rounded-[8px] text-[0.68rem] font-semibold transition ${
                                                         calculationFormat === "number"
@@ -559,6 +746,7 @@ export function CanvasSidebar({
                                                 </button>
                                                 <button
                                                     type="button"
+                                                    onMouseDown={(e) => e.preventDefault()}
                                                     onClick={() => setCalculationFormat("percent")}
                                                     className={`inline-flex h-7 w-7 items-center justify-center rounded-[8px] text-[0.9rem] font-semibold leading-none transition ${
                                                         calculationFormat === "percent"
@@ -572,6 +760,16 @@ export function CanvasSidebar({
                                                 </button>
                                                 <button
                                                     type="button"
+                                                    onMouseDown={(e) => e.preventDefault()}
+                                                    onClick={handleDeleteLastToken}
+                                                    className="inline-flex h-7 w-7 items-center justify-center rounded-[8px] bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-ink"
+                                                    aria-label="Delete last item"
+                                                >
+                                                    <Delete className="h-4 w-4" />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onMouseDown={(e) => e.preventDefault()}
                                                     onClick={handleSaveMetric}
                                                     className="inline-flex h-7 w-7 items-center justify-center rounded-[8px] bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-ink"
                                                     aria-label="Save formula"
@@ -580,34 +778,75 @@ export function CanvasSidebar({
                                                 </button>
                                             </div>
                                         </div>
-                                        <div className="mt-2 h-px w-full bg-slate-100" aria-hidden="true" />
-                                        <div className="mt-3 flex flex-wrap gap-2">
-                                            {formulaTokens.length > 0 ? (
-                                                formulaTokens.map((token, tokenIndex) => (
-                                                    <FormulaTokenChip
-                                                        key={`formula-token:${tokenIndex}`}
-                                                        token={token}
-                                                        customMetrics={customMetrics}
-                                                        onRemove={() => removeFormulaToken(tokenIndex)}
+                                        <div
+                                            className="h-px w-full bg-slate-100"
+                                            style={{ marginTop: "0" }}
+                                            aria-hidden="true"
+                                        />
+                                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-3">
+                                            {formulaTokens.map((token, tokenIndex) => (
+                                                <FormulaTokenChip
+                                                    key={`formula-token:${tokenIndex}`}
+                                                    token={token}
+                                                    customMetrics={customMetrics}
+                                                />
+                                            ))}
+                                            <div className="relative inline-flex min-w-[4px] items-baseline">
+                                                <input
+                                                    ref={manualInputRef}
+                                                    value={manualInputValue}
+                                                    onChange={(e) => setManualInputValue(e.target.value.replace(/[^0-9.]/g, ""))}
+                                                    onKeyDown={handleManualInputKeyDown}
+                                                    onFocus={() => setIsInputFocused(true)}
+                                                    onBlur={() => setIsInputFocused(false)}
+                                                    className="absolute inset-0 w-full bg-transparent opacity-0 cursor-text outline-none p-0 border-none ring-0 focus:ring-0"
+                                                    style={{ width: Math.max(manualInputValue.length * 8, 12) }}
+                                                />
+                                                <span className={`${PIVOT_FIELD_TEXT_TYPOGRAPHY} text-ink leading-none whitespace-pre`}>
+                                                    {manualInputValue}
+                                                </span>
+                                                {isInputFocused && (
+                                                    <motion.span
+                                                        initial={{ opacity: 0 }}
+                                                        animate={{ opacity: 1 }}
+                                                        transition={{ repeat: Infinity, duration: 0.8, ease: "easeInOut" }}
+                                                        className="ml-px w-px self-center bg-ink"
+                                                        style={{ height: "0.96em" }}
                                                     />
-                                                ))
-                                            ) : null}
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <div className="px-1 py-1">
-                                        <p className="text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                                            Operator
-                                        </p>
-                                        <div className="mt-2 flex flex-wrap items-center gap-4">
-                                            {CUSTOM_METRIC_OPERATORS.map((operator) => (
+                                    <div className="mt-auto px-1 py-1">
+                                        <div
+                                            className="flex flex-wrap items-center gap-1.5"
+                                            style={{ transform: "translate(-10px, 14px)" }}
+                                        >
+                                            {CUSTOM_METRIC_OPERATOR_BUTTONS.map((button) => (
                                                 <button
-                                                    key={operator}
+                                                    key={`${button.type}:${button.value}`}
                                                     type="button"
-                                                    onClick={() => appendOperatorToFormula(operator)}
-                                                    className="text-[1.35rem] font-semibold leading-none text-ink transition hover:text-slate-500"
+                                                    onMouseDown={(e) => e.preventDefault()}
+                                                    onClick={() => {
+                                                        commitManualInput();
+                                                        if (button.type === "binary") {
+                                                            appendBinaryOperatorToFormula(button.value);
+                                                            return;
+                                                        }
+
+                                                        if (button.type === "operator") {
+                                                            appendPercentToFormula();
+                                                            return;
+                                                        }
+
+                                                        appendParenthesisToFormula(button.value);
+                                                    }}
+                                                    className="inline-flex h-7 w-7 items-center justify-center rounded-[8px] bg-slate-100 text-[0.9rem] font-semibold leading-none text-slate-500 transition hover:bg-slate-200 hover:text-ink"
                                                 >
-                                                    {operator}
+                                                    {button.type === "binary"
+                                                        ? formatCustomMetricOperatorLabel(button.value)
+                                                        : button.value}
                                                 </button>
                                             ))}
                                         </div>
