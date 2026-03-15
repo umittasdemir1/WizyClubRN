@@ -4,7 +4,7 @@ import { BrandSignature } from "../components/layout/BrandSignature";
 import { StudioNav, type StudioModuleId } from "../studio/StudioNav";
 import { LabsModule } from "../studio/modules/labs/LabsModule";
 import { AtelierModule } from "../studio/modules/atelier/AtelierModule";
-import { PlusModule } from "../studio/modules/plus/PlusModule";
+import { SenatoModule } from "../studio/modules/plus/SenatoModule";
 import { LoyalModule } from "../studio/modules/loyal/LoyalModule";
 import { isStudioHost } from "../utils/studio";
 
@@ -48,7 +48,7 @@ export function StudioApp() {
             <main className="relative z-10 pt-[65px]">
                 {activeModule === "labs"    && <LabsModule workspaceUrl={workspaceUrl} />}
                 {activeModule === "atelier" && <AtelierModule />}
-                {activeModule === "plus"    && <PlusModule />}
+                {activeModule === "senato"  && <SenatoModule />}
                 {activeModule === "loyal"   && <LoyalModule />}
             </main>
         </div>

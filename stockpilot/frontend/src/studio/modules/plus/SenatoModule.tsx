@@ -1,6 +1,6 @@
 import { ShoppingBag } from "lucide-react";
 
-export function PlusModule() {
+export function SenatoModule() {
     return (
         <div className="flex min-h-[600px] items-center justify-center px-4 py-16">
             <div className="premium-card-dark w-full max-w-2xl overflow-hidden p-14 text-center">
@@ -22,7 +22,7 @@ export function PlusModule() {
                         Coming Soon
                     </p>
                     <h2 className="font-display text-4xl font-light tracking-tight text-white">
-                        S++
+                        S+Senato
                     </h2>
                     <p className="mt-4 text-lg font-light leading-relaxed text-slate-400">
                         Sales & retail operations. Real-time sell-through analysis, return pressure tracking, and store-level performance dashboards.
