@@ -1103,10 +1103,11 @@ export function CanvasSidebar({
             >
                 <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
                 <div
-                    className="relative z-10 flex max-h-[80vh] w-full max-w-lg flex-col overflow-hidden rounded-[16px] border border-slate-200/70 bg-white shadow-[0_32px_90px_-20px_rgba(11,14,20,0.38)]"
+                    className="relative z-10 flex max-h-[82vh] w-full max-w-3xl flex-col overflow-hidden rounded-[16px] border border-slate-200/70 bg-white shadow-[0_32px_90px_-20px_rgba(11,14,20,0.38)]"
                     onMouseDown={(e) => e.stopPropagation()}
                 >
-                    <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+                    {/* Header */}
+                    <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
                         <div>
                             <p className="text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-slate-400">Fields</p>
                             <h2 className="mt-0.5 font-display text-[1.5rem] font-light leading-[1.08] tracking-tight text-ink">
@@ -1121,52 +1122,96 @@ export function CanvasSidebar({
                             <X className="h-4 w-4" strokeWidth={1.5} />
                         </button>
                     </div>
-                    <div className="flex-1 overflow-y-auto p-4">
-                        <div className="flex flex-col gap-2">
-                            {columns.map((col) => {
-                                const override = columnOverrides[col.key];
-                                return (
-                                    <div key={col.key} className="flex items-center gap-2 rounded-[10px] border border-slate-200/60 bg-slate-50/60 px-3 py-2.5">
-                                        <div className="min-w-0 flex-1">
-                                            <input
-                                                className={`w-full appearance-none bg-transparent outline-none border-none ring-0 focus:ring-0 ${PIVOT_FIELD_TEXT_TYPOGRAPHY} text-ink placeholder:text-slate-400`}
-                                                value={override?.label ?? col.label}
-                                                placeholder={col.label}
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    updateColumnOverride(col.key, {
-                                                        label: val || col.label,
-                                                        format: override?.format ?? "integer"
-                                                    });
-                                                }}
-                                            />
-                                        </div>
-                                        {col.type === "numeric" && (
-                                            <div className="shrink-0">
-                                                <MetricFormatSelect
-                                                    value={override?.format ?? "integer"}
-                                                    onChange={(fmt) => updateColumnOverride(col.key, {
-                                                        label: override?.label ?? col.label,
-                                                        format: fmt
-                                                    })}
+
+                    {/* Table */}
+                    <div className="flex-1 overflow-auto">
+                        <table className="w-full border-collapse text-[13px]">
+                            <thead className="sticky top-0 z-10 bg-slate-50">
+                                <tr>
+                                    <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-slate-400">Original</th>
+                                    <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-slate-400">Display name</th>
+                                    <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-slate-400">Type</th>
+                                    <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-slate-400">Format</th>
+                                    <th className="w-8 border-b border-slate-200" />
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {columns.map((col, i) => {
+                                    const override = columnOverrides[col.key];
+                                    const isModified = !!override;
+                                    return (
+                                        <tr
+                                            key={col.key}
+                                            className={`${i % 2 === 0 ? "bg-white" : "bg-slate-50/40"} ${isModified ? "ring-1 ring-inset ring-brand/20" : ""}`}
+                                        >
+                                            {/* Original */}
+                                            <td className="px-4 py-2.5 align-middle">
+                                                <span className="font-mono text-[0.78rem] text-slate-400">{col.key}</span>
+                                            </td>
+
+                                            {/* Display name */}
+                                            <td className="px-4 py-2.5 align-middle">
+                                                <input
+                                                    className={`w-full min-w-[120px] appearance-none rounded-[7px] border bg-white px-2.5 py-1 outline-none ring-0 transition focus:border-brand/40 focus:ring-1 focus:ring-brand/20 ${PIVOT_FIELD_TEXT_TYPOGRAPHY} text-ink placeholder:text-slate-300 ${isModified ? "border-brand/30" : "border-slate-200"}`}
+                                                    value={override?.label ?? col.label}
+                                                    placeholder={col.label}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        updateColumnOverride(col.key, {
+                                                            label: val || col.label,
+                                                            format: override?.format ?? "integer"
+                                                        });
+                                                    }}
                                                 />
-                                            </div>
-                                        )}
-                                        {override && (
-                                            <button
-                                                type="button"
-                                                onMouseDown={(e) => e.preventDefault()}
-                                                onClick={() => updateColumnOverride(col.key, null)}
-                                                className="shrink-0 rounded p-0.5 text-slate-400 transition hover:text-red-500"
-                                                aria-label="Reset to default"
-                                            >
-                                                <X className="h-3.5 w-3.5" strokeWidth={1.5} />
-                                            </button>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
+                                            </td>
+
+                                            {/* Type badge */}
+                                            <td className="px-4 py-2.5 align-middle">
+                                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[0.68rem] font-medium ${
+                                                    col.type === "numeric"
+                                                        ? "bg-brand/10 text-brand"
+                                                        : col.type === "date"
+                                                        ? "bg-violet-50 text-violet-500"
+                                                        : "bg-slate-100 text-slate-500"
+                                                }`}>
+                                                    {col.type === "numeric" ? "Number" : col.type === "date" ? "Date" : "Text"}
+                                                </span>
+                                            </td>
+
+                                            {/* Format */}
+                                            <td className="px-4 py-2.5 align-middle">
+                                                {col.type === "numeric" ? (
+                                                    <MetricFormatSelect
+                                                        value={override?.format ?? "integer"}
+                                                        onChange={(fmt) => updateColumnOverride(col.key, {
+                                                            label: override?.label ?? col.label,
+                                                            format: fmt
+                                                        })}
+                                                    />
+                                                ) : (
+                                                    <span className="text-slate-300">—</span>
+                                                )}
+                                            </td>
+
+                                            {/* Reset */}
+                                            <td className="px-2 py-2.5 align-middle">
+                                                {isModified && (
+                                                    <button
+                                                        type="button"
+                                                        onMouseDown={(e) => e.preventDefault()}
+                                                        onClick={() => updateColumnOverride(col.key, null)}
+                                                        className="rounded p-1 text-slate-300 transition hover:text-red-400"
+                                                        aria-label="Reset"
+                                                    >
+                                                        <X className="h-3.5 w-3.5" strokeWidth={1.5} />
+                                                    </button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>,
