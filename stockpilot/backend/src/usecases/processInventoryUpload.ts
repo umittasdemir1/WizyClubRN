@@ -1,23 +1,20 @@
-import { analyzeInventory } from "../services/analyzer.js";
-import { parseInventoryBuffer } from "../services/parser.js";
-import { buildTransferPlan } from "../services/transfer.js";
-import type { ProcessInventoryUploadRequest, ProcessInventoryUploadResponse } from "../contracts/upload.js";
+import { parseFileBuffer } from "../services/parser.js";
+import type { UploadWorkflowResult } from "../types/index.js";
+
+export interface ProcessInventoryUploadRequest {
+    buffer: Buffer;
+    fileName: string;
+}
 
 export function processInventoryUpload({
     buffer,
     fileName
-}: ProcessInventoryUploadRequest): ProcessInventoryUploadResponse {
-    const parsed = parseInventoryBuffer(buffer, fileName);
-    const records = parsed.records;
+}: ProcessInventoryUploadRequest): UploadWorkflowResult {
+    const { columns, rows, rowCount } = parseFileBuffer(buffer, fileName);
 
     return {
-        parsed: {
-            fileName: parsed.fileName,
-            columns: parsed.columns,
-            rowCount: parsed.rowCount
-        },
-        analysis: analyzeInventory(records),
-        transferPlan: buildTransferPlan(records),
+        parsed: { fileName, rowCount, columns },
+        analysis: { fileName, columns, rows, rowCount },
         source: "api"
     };
 }

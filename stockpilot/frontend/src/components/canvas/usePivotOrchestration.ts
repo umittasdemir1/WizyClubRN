@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { AnalysisResult } from "../../types/stock";
+import type { AnalysisResult, ColumnMeta } from "../../types/stock";
 import {
     DEFAULT_LAYOUT,
     applyFilters,
@@ -138,20 +138,21 @@ export function usePivotOrchestration(analysis: AnalysisResult | null) {
         }
     }, [activeTableId, tables]);
 
-    const records = analysis?.records ?? [];
-    const fieldDefinitions = useMemo(() => getAvailablePivotFields(customMetrics), [customMetrics]);
+    const rows = analysis?.rows ?? [];
+    const columns: ColumnMeta[] = analysis?.columns ?? [];
+    const fieldDefinitions = useMemo(() => getAvailablePivotFields(columns, customMetrics), [columns, customMetrics]);
 
     const pivotCache = useRef<Map<string, { cacheKey: string; tableRef: PivotTableInstance; view: PivotTableView }>>(
         new Map()
     );
-    const prevRecordsRef = useRef(records);
+    const prevRowsRef = useRef(rows);
     const prevCustomMetricsKeyRef = useRef(JSON.stringify(customMetrics));
 
     const customMetricsKey = JSON.stringify(customMetrics);
 
-    if (prevRecordsRef.current !== records || prevCustomMetricsKeyRef.current !== customMetricsKey) {
+    if (prevRowsRef.current !== rows || prevCustomMetricsKeyRef.current !== customMetricsKey) {
         pivotCache.current.clear();
-        prevRecordsRef.current = records;
+        prevRowsRef.current = rows;
         prevCustomMetricsKeyRef.current = customMetricsKey;
     }
 
@@ -162,51 +163,50 @@ export function usePivotOrchestration(analysis: AnalysisResult | null) {
                 const filtersKey = JSON.stringify(table.filterSelections);
                 const cacheKey = `${layoutKey}|${filtersKey}|${customMetricsKey}`;
 
-                let entry = pivotCache.current.get(table.id);
-                if (!entry || entry.cacheKey !== cacheKey) {
-                    const filterOptions = buildFilterOptions(records, table.layout.filters, customMetrics);
-                    const filteredRecords = applyFilters(records, table.layout, table.filterSelections, customMetrics);
-                    const pivotResult = buildPivotResult(filteredRecords, table.layout, customMetrics);
-                    const hasColumnGroups = table.layout.columns.length > 0;
-                    const hasMultipleValueFields = pivotResult.valueFields.length > 1;
-
-                    entry = {
-                        cacheKey,
+                const cached = pivotCache.current.get(table.id);
+                if (cached && cached.cacheKey === cacheKey) {
+                    if (cached.tableRef === table) return cached.view;
+                    const updated = {
+                        ...cached,
                         tableRef: table,
-                        view: {
-                            table,
-                            filterOptions,
-                            filteredRecords,
-                            pivotResult,
-                            hasColumnGroups,
-                            hasMultipleValueFields,
-                            showSecondaryHeaderRow: hasColumnGroups && hasMultipleValueFields,
-                            customMetrics
-                        }
+                        view: { ...cached.view, table }
                     };
-                    pivotCache.current.set(table.id, entry);
-                } else if (entry.tableRef !== table) {
-                    entry = {
-                        ...entry,
-                        tableRef: table,
-                        view: {
-                            ...entry.view,
-                            table
-                        }
-                    };
-                    pivotCache.current.set(table.id, entry);
+                    pivotCache.current.set(table.id, updated);
+                    return updated.view;
                 }
 
+                const filterOptions = buildFilterOptions(rows, table.layout.filters, columns, customMetrics);
+                const filteredRecords = applyFilters(rows, table.layout, table.filterSelections, columns, customMetrics);
+                const pivotResult = buildPivotResult(filteredRecords, table.layout, columns, customMetrics);
+                const hasColumnGroups = table.layout.columns.length > 0;
+                const hasMultipleValueFields = pivotResult.valueFields.length > 1;
+
+                const entry = {
+                    cacheKey,
+                    tableRef: table,
+                    view: {
+                        table,
+                        columns,
+                        filterOptions,
+                        filteredRecords,
+                        pivotResult,
+                        hasColumnGroups,
+                        hasMultipleValueFields,
+                        showSecondaryHeaderRow: hasColumnGroups && hasMultipleValueFields,
+                        customMetrics
+                    }
+                };
+                pivotCache.current.set(table.id, entry);
                 return entry.view;
             }),
-        [customMetrics, customMetricsKey, records, tables]
+        [columns, customMetrics, customMetricsKey, rows, tables]
     );
 
     const activeLayout = activeTable?.layout ?? DEFAULT_LAYOUT;
     const visibleTableViews = useMemo(
         () => tableViews.filter((view) => {
-            const { values, rows, columns, filters } = view.table.layout;
-            return values.length > 0 || rows.length > 0 || columns.length > 0 || filters.length > 0;
+            const layout = view.table.layout;
+            return layout.values.length > 0 || layout.rows.length > 0 || layout.columns.length > 0 || layout.filters.length > 0;
         }),
         [tableViews]
     );
@@ -505,6 +505,7 @@ export function usePivotOrchestration(analysis: AnalysisResult | null) {
     return {
         tables,
         setTables,
+        columns,
         customMetrics,
         pinnedFieldIds,
         setPinnedFieldIds,

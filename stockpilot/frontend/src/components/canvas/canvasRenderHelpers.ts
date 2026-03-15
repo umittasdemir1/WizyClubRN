@@ -100,7 +100,8 @@ function formatResolvedValue(
 ) {
     return formatAggregatedValue(
         fieldId,
-        resolveFieldValueFromAggregationStates(fieldId, states, view.customMetrics),
+        resolveFieldValueFromAggregationStates(fieldId, states, view.columns, view.customMetrics),
+        view.columns,
         view.customMetrics
     );
 }

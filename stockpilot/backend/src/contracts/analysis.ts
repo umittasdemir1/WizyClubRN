@@ -1,7 +1,7 @@
-import type { AnalysisResult } from "../types/index.js";
+import type { LegacyAnalysisResult } from "../types/index.js";
 
 export interface AnalyzeInventoryRecordsRequest {
     records: unknown;
 }
 
-export type AnalyzeInventoryRecordsResponse = AnalysisResult;
+export type AnalyzeInventoryRecordsResponse = LegacyAnalysisResult;

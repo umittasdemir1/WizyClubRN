@@ -183,7 +183,7 @@ function PivotCanvasTableComponent({
                                             style={tableGridBorderStyle}
                                         >
                                             {view.table.layout.rows.length > 0
-                                                ? getFieldDefinition(fieldId, view.customMetrics).label
+                                                ? getFieldDefinition(fieldId, view.columns, view.customMetrics).label
                                                 : "Rows"}
                                         </th>
                                     ))}
@@ -206,7 +206,7 @@ function PivotCanvasTableComponent({
                                                 className={`whitespace-nowrap border px-3 py-0.5 text-right ${TABLE_HEADER_TEXT_TYPOGRAPHY} text-white`}
                                                 style={tableGridBorderStyle}
                                             >
-                                                {getFieldDefinition(fieldId, view.customMetrics).label}
+                                                {getFieldDefinition(fieldId, view.columns, view.customMetrics).label}
                                             </th>
                                         ))
                                     )}
@@ -219,7 +219,7 @@ function PivotCanvasTableComponent({
                                                   className={`whitespace-nowrap border px-3 py-0.5 text-right ${TABLE_HEADER_TEXT_TYPOGRAPHY} text-white`}
                                                   style={tableGridBorderStyle}
                                               >
-                                                  {getFieldDefinition(fieldId, view.customMetrics).label}
+                                                  {getFieldDefinition(fieldId, view.columns, view.customMetrics).label}
                                               </th>
                                           ))
                                         : null}
@@ -234,7 +234,7 @@ function PivotCanvasTableComponent({
                                                     className={`whitespace-nowrap border px-3 py-0.5 text-right ${TABLE_HEADER_TEXT_TYPOGRAPHY} text-white`}
                                                     style={tableGridBorderStyle}
                                                 >
-                                                    {getFieldDefinition(fieldId, view.customMetrics).label}
+                                                    {getFieldDefinition(fieldId, view.columns, view.customMetrics).label}
                                                 </th>
                                             ))
                                         )}

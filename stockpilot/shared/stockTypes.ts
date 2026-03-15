@@ -1,102 +1,28 @@
-export interface InventoryRecord {
-    warehouseName: string;
-    productCode: string;
-    productName: string;
-    color: string;
-    size: string;
-    gender: string;
-    salesQty: number;
-    returnQty: number;
-    inventory: number;
-    productionYear: number | null;
-    lastSaleDate: string | null;
-    firstStockEntryDate: string | null;
-    firstSaleDate: string | null;
-}
+export type ColumnType = "numeric" | "text" | "date";
 
-export interface ParsedInventorySummary {
-    fileName: string;
-    columns: string[];
-    rowCount: number;
-}
-
-export interface ParsedInventoryPayload extends ParsedInventorySummary {
-    records: InventoryRecord[];
-}
-
-export interface AnalyzedInventoryRecord extends InventoryRecord {
-    netSalesQty: number;
-    returnRate: number;
-    sellThroughRate: number;
-    daysSinceLastSale: number | null;
-    stockAgeDays: number | null;
-    daysToFirstSale: number | null;
-    lifecycleStatus: "healthy" | "slow" | "stagnant";
-}
-
-export interface WarehouseBreakdownPoint {
-    name: string;
-    value: number;
-    quantity: number;
-}
-
-export interface LifecyclePoint {
-    name: "Healthy" | "Slow Moving" | "Stagnant";
-    value: number;
-    tone: string;
-}
-
-export interface PlanningPoint {
+export interface ColumnMeta {
+    key: string;
     label: string;
-    inventory: number;
-    netSalesQty: number;
+    type: ColumnType;
 }
 
-export interface AlertItem {
-    productCode: string;
-    productName: string;
-    warehouseName: string;
-    issue: string;
-    metric: string;
-}
-
-export interface OverviewMetrics {
-    totalProducts: number;
-    totalInventory: number;
-    totalNetSales: number;
-    totalReturns: number;
-    warehouses: number;
-    averageReturnRate: number;
-    slowMovingItems: number;
-    stagnantItems: number;
-}
+export type GenericRow = Record<string, string | number | null>;
 
 export interface AnalysisResult {
-    overview: OverviewMetrics;
-    records: AnalyzedInventoryRecord[];
-    warehouseBreakdown: WarehouseBreakdownPoint[];
-    lifecycleBreakdown: LifecyclePoint[];
-    planning: PlanningPoint[];
-    alerts: AlertItem[];
-}
-
-export interface TransferSuggestion {
-    productCode: string;
-    productName: string;
-    color: string;
-    size: string;
-    gender: string;
-    fromWarehouseName: string;
-    toWarehouseName: string;
-    quantity: number;
-    demandGap: number;
+    columns: ColumnMeta[];
+    rows: GenericRow[];
+    rowCount: number;
+    fileName: string;
 }
 
 export type UploadWorkflowSource = "api" | "local";
 
 export interface UploadWorkflowResult {
-    parsed: ParsedInventorySummary;
+    parsed: {
+        fileName: string;
+        rowCount: number;
+        columns: ColumnMeta[];
+    };
     analysis: AnalysisResult;
-    transferPlan: TransferSuggestion[];
     source: UploadWorkflowSource;
 }

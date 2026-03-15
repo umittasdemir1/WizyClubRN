@@ -1,11 +1,4 @@
-import type { ParsedInventoryPayload, UploadWorkflowResult } from "../types/index.js";
-
-export interface ParseInventoryUploadRequest {
-    buffer: Buffer;
-    fileName: string;
-}
-
-export type ParseInventoryUploadResponse = ParsedInventoryPayload;
+import type { UploadWorkflowResult } from "../types/index.js";
 
 export interface ProcessInventoryUploadRequest {
     buffer: Buffer;

@@ -1,54 +1,14 @@
 import * as XLSX from "xlsx";
-import { parseLocaleNumber, resolveProductIdentity, toText } from "../../../shared/normalization.js";
-import type { InventoryRecord, ParsedInventoryPayload } from "../types/index.js";
+import type { ColumnMeta, ColumnType, GenericRow } from "../types/index.js";
 
-const HEADER_ALIASES = {
-    warehouseName: ["warehouse_name", "warehouse name", "depo adı", "depo adi"],
-    productCode: ["product_code", "product code", "sku", "stock code", "ürün kodu", "urun kodu"],
-    productName: ["product_name", "product name", "ürün adı", "urun adi", "ürün adi"],
-    color: ["color", "renk açıklaması", "renk aciklamasi", "renk"],
-    size: ["size", "beden"],
-    gender: ["gender", "cinsiyet açıklama", "cinsiyet aciklama", "cinsiyet"],
-    salesQty: ["sales_qty", "sales qty", "sales quantity", "satis", "satış", "satış miktar"],
-    returnQty: ["return_qty", "return qty", "return quantity", "iade miktar", "iade miktari", "iade"],
-    inventory: ["inventory", "stock", "on hand", "envanter"],
-    productionYear: ["production_year", "production year", "yıl açıklama", "yil aciklama", "yıl", "yil"],
-    lastSaleDate: ["last_sale_date", "last sale date", "son satış tarihi", "son satis tarihi"],
-    firstStockEntryDate: [
-        "first_stock_entry_date",
-        "first stock entry date",
-        "ilk alış tarihi",
-        "ilk alis tarihi",
-        "first buy date"
-    ],
-    firstSaleDate: ["first_sale_date", "first sale date", "ilk satış tarihi", "ilk satis tarihi"]
-} satisfies Record<keyof InventoryRecord, string[]>;
-
-function normalizeHeader(value: string): string {
-    return value
-        .trim()
-        .toLowerCase()
-        .replace(/[ıİ]/g, "i")
-        .replace(/[ğĞ]/g, "g")
-        .replace(/[üÜ]/g, "u")
-        .replace(/[şŞ]/g, "s")
-        .replace(/[öÖ]/g, "o")
-        .replace(/[çÇ]/g, "c")
-        .replace(/[_-]+/g, " ")
-        .replace(/\s+/g, " ");
+export interface ParsedFilePayload {
+    fileName: string;
+    rowCount: number;
+    columns: ColumnMeta[];
+    rows: GenericRow[];
 }
 
-function findColumn(row: Record<string, unknown>, aliases: string[]): unknown {
-    const keys = Object.keys(row);
-    for (const key of keys) {
-        const normalized = normalizeHeader(key);
-        if (aliases.some((alias) => normalizeHeader(alias) === normalized)) {
-            return row[key];
-        }
-    }
-
-    return undefined;
-}
+// ── Date helpers ──────────────────────────────────────────────────────────────
 
 function buildIsoDate(year: number, month: number, day: number): string | null {
     const date = new Date(Date.UTC(year, month - 1, day));
@@ -59,7 +19,6 @@ function buildIsoDate(year: number, month: number, day: number): string | null {
     ) {
         return null;
     }
-
     return date.toISOString().slice(0, 10);
 }
 
@@ -70,24 +29,16 @@ function toIsoDate(value: unknown): string | null {
 
     if (typeof value === "number" && Number.isFinite(value)) {
         const parsed = XLSX.SSF.parse_date_code(value);
-        if (parsed) {
-            return buildIsoDate(parsed.y, parsed.m, parsed.d);
-        }
+        if (parsed) return buildIsoDate(parsed.y, parsed.m, parsed.d);
     }
 
-    if (typeof value !== "string") {
-        return null;
-    }
+    if (typeof value !== "string") return null;
 
     const text = value.trim();
-    if (!text) {
-        return null;
-    }
+    if (!text) return null;
 
     const isoMatch = text.match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})$/);
-    if (isoMatch) {
-        return buildIsoDate(Number(isoMatch[1]), Number(isoMatch[2]), Number(isoMatch[3]));
-    }
+    if (isoMatch) return buildIsoDate(Number(isoMatch[1]), Number(isoMatch[2]), Number(isoMatch[3]));
 
     const localeMatch = text.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
     if (localeMatch) {
@@ -95,36 +46,104 @@ function toIsoDate(value: unknown): string | null {
         return buildIsoDate(year, Number(localeMatch[2]), Number(localeMatch[1]));
     }
 
-    const timestamp = Date.parse(text);
-    if (Number.isFinite(timestamp)) {
-        return new Date(timestamp).toISOString().slice(0, 10);
-    }
+    const ts = Date.parse(text);
+    if (Number.isFinite(ts)) return new Date(ts).toISOString().slice(0, 10);
 
     return null;
 }
 
-function toYear(value: unknown): number | null {
-    if (typeof value === "number" && Number.isFinite(value)) {
-        const year = Math.trunc(value);
-        return year >= 1900 && year <= 2100 ? year : null;
+function toFiniteNumber(value: unknown): number | null {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim()) {
+        const cleaned = value.replace(/[^\d,.-]/g, "").trim();
+        const normalized =
+            cleaned.includes(",") && cleaned.includes(".")
+                ? cleaned.lastIndexOf(",") > cleaned.lastIndexOf(".")
+                    ? cleaned.replace(/\./g, "").replace(",", ".")
+                    : cleaned.replace(/,/g, "")
+                : cleaned.replace(",", ".");
+        const n = Number(normalized);
+        if (Number.isFinite(n)) return n;
     }
-
-    if (typeof value !== "string") {
-        return null;
-    }
-
-    const text = value.trim();
-    if (!text) {
-        return null;
-    }
-
-    const match = text.match(/\b(19|20)\d{2}\b/);
-    if (!match) {
-        return null;
-    }
-
-    return Number(match[0]);
+    return null;
 }
+
+// ── Column type detection ─────────────────────────────────────────────────────
+
+function detectColumnType(values: unknown[]): ColumnType {
+    const nonEmpty = values.filter((v) => v !== null && v !== undefined && v !== "");
+    if (nonEmpty.length === 0) return "text";
+
+    const numericCount = nonEmpty.filter((v) => toFiniteNumber(v) !== null).length;
+    if (numericCount / nonEmpty.length >= 0.8) return "numeric";
+
+    const dateCount = nonEmpty.filter((v) => toIsoDate(v) !== null).length;
+    if (dateCount / nonEmpty.length >= 0.8) return "date";
+
+    return "text";
+}
+
+// ── Cell normalization ────────────────────────────────────────────────────────
+
+function normalizeCell(value: unknown, type: ColumnType): string | number | null {
+    if (value === null || value === undefined || value === "") return null;
+
+    if (type === "numeric") {
+        const n = toFiniteNumber(value);
+        return n !== null ? n : null;
+    }
+
+    if (type === "date") {
+        return toIsoDate(value);
+    }
+
+    // text
+    if (typeof value === "string") return value.trim() || null;
+    if (typeof value === "number") return String(value);
+    return String(value);
+}
+
+// ── Label helper ──────────────────────────────────────────────────────────────
+
+function toLabel(key: string): string {
+    return key
+        .replace(/[_-]+/g, " ")
+        .replace(/([a-z])([A-Z])/g, "$1 $2")
+        .trim();
+}
+
+// ── Core normalizer ───────────────────────────────────────────────────────────
+
+export function normalizeGenericRows(
+    rawRows: Record<string, unknown>[],
+    fileName: string
+): ParsedFilePayload {
+    if (rawRows.length === 0) {
+        return { fileName, rowCount: 0, columns: [], rows: [] };
+    }
+
+    const keys = Array.from(new Set(rawRows.flatMap((row) => Object.keys(row))));
+
+    const columns: ColumnMeta[] = keys.map((key) => {
+        const colValues = rawRows.map((row) => row[key]);
+        const type = detectColumnType(colValues);
+        return { key, label: toLabel(key), type };
+    });
+
+    const columnTypeMap = new Map(columns.map((col) => [col.key, col.type]));
+
+    const rows: GenericRow[] = rawRows.map((raw) => {
+        const row: GenericRow = {};
+        for (const col of columns) {
+            row[col.key] = normalizeCell(raw[col.key], columnTypeMap.get(col.key)!);
+        }
+        return row;
+    });
+
+    return { fileName, rowCount: rows.length, columns, rows };
+}
+
+// ── CSV helpers ───────────────────────────────────────────────────────────────
 
 function parseConcatenatedQuotedCsv(text: string): Record<string, unknown>[] {
     const lines = text
@@ -132,23 +151,16 @@ function parseConcatenatedQuotedCsv(text: string): Record<string, unknown>[] {
         .map((line) => line.trim())
         .filter(Boolean);
 
-    if (lines.length === 0) {
-        return [];
-    }
+    if (lines.length === 0) return [];
 
     const toCells = (line: string) => {
         const trimmed = line.replace(/\r$/, "");
-        if (!trimmed.startsWith("\"") || !trimmed.endsWith("\"")) {
-            return [];
-        }
-
+        if (!trimmed.startsWith("\"") || !trimmed.endsWith("\"")) return [];
         return trimmed.slice(1, -1).split("\"\"");
     };
 
     const headers = toCells(lines[0]);
-    if (headers.length <= 1) {
-        return [];
-    }
+    if (headers.length <= 1) return [];
 
     return lines.slice(1).map((line) => {
         const values = toCells(line);
@@ -161,9 +173,7 @@ function parseConcatenatedQuotedCsv(text: string): Record<string, unknown>[] {
 
 function decodeCsvText(buffer: Buffer): string {
     const utf8 = buffer.toString("utf8");
-    if (!utf8.includes("�")) {
-        return utf8;
-    }
+    if (!utf8.includes("")) return utf8;
 
     try {
         return new TextDecoder("windows-1254").decode(buffer);
@@ -172,50 +182,9 @@ function decodeCsvText(buffer: Buffer): string {
     }
 }
 
-export function normalizeInventoryRows(
-    rows: Record<string, unknown>[],
-    fileName: string
-): ParsedInventoryPayload {
-    const columns = Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
+// ── Public entry point ────────────────────────────────────────────────────────
 
-    const records = rows
-        .map((row) => {
-            const productIdentity = resolveProductIdentity(
-                findColumn(row, HEADER_ALIASES.productCode),
-                findColumn(row, HEADER_ALIASES.productName)
-            );
-
-            if (!productIdentity) {
-                return null;
-            }
-
-            return {
-                warehouseName: toText(findColumn(row, HEADER_ALIASES.warehouseName), "Main Warehouse"),
-                productCode: productIdentity.productCode,
-                productName: productIdentity.productName,
-                color: toText(findColumn(row, HEADER_ALIASES.color), "Unknown"),
-                size: toText(findColumn(row, HEADER_ALIASES.size), "Unknown"),
-                gender: toText(findColumn(row, HEADER_ALIASES.gender), "Unspecified"),
-                salesQty: Math.max(parseLocaleNumber(findColumn(row, HEADER_ALIASES.salesQty)), 0),
-                returnQty: Math.max(parseLocaleNumber(findColumn(row, HEADER_ALIASES.returnQty)), 0),
-                inventory: Math.max(parseLocaleNumber(findColumn(row, HEADER_ALIASES.inventory)), 0),
-                productionYear: toYear(findColumn(row, HEADER_ALIASES.productionYear)),
-                lastSaleDate: toIsoDate(findColumn(row, HEADER_ALIASES.lastSaleDate)),
-                firstStockEntryDate: toIsoDate(findColumn(row, HEADER_ALIASES.firstStockEntryDate)),
-                firstSaleDate: toIsoDate(findColumn(row, HEADER_ALIASES.firstSaleDate))
-            } satisfies InventoryRecord;
-        })
-        .filter((record): record is InventoryRecord => record !== null);
-
-    return {
-        fileName,
-        columns,
-        rowCount: records.length,
-        records
-    };
-}
-
-export function parseInventoryBuffer(buffer: Buffer, fileName: string): ParsedInventoryPayload {
+export function parseFileBuffer(buffer: Buffer, fileName: string): ParsedFilePayload {
     if (fileName.toLowerCase().endsWith(".csv")) {
         const text = decodeCsvText(buffer);
         const firstLine = text.split(/\r?\n/, 1)[0]?.trim() ?? "";
@@ -227,19 +196,14 @@ export function parseInventoryBuffer(buffer: Buffer, fileName: string): ParsedIn
             !firstLine.includes("\t");
 
         if (isConcatenatedQuotedCsv) {
-            return normalizeInventoryRows(parseConcatenatedQuotedCsv(text), fileName);
+            return normalizeGenericRows(parseConcatenatedQuotedCsv(text), fileName);
         }
     }
 
-    const workbook = XLSX.read(buffer, {
-        type: "buffer",
-        cellDates: false
-    });
+    const workbook = XLSX.read(buffer, { type: "buffer", cellDates: false });
     const firstSheet = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[firstSheet];
-    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
-        defval: ""
-    });
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: "" });
 
-    return normalizeInventoryRows(rows, fileName);
+    return normalizeGenericRows(rows, fileName);
 }

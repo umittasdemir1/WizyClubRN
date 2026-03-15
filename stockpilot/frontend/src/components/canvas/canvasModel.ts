@@ -1,7 +1,7 @@
-import type { AnalyzedInventoryRecord } from "../../types/stock";
+import type { ColumnMeta, GenericRow } from "../../types/stock";
 import { formatNullableDate, formatNumber, formatPercent } from "../../utils/formatting";
 
-type BasePivotFieldId = keyof AnalyzedInventoryRecord;
+type BasePivotFieldId = string;
 
 export type CustomMetricId = `custom:${string}`;
 export type PivotFieldId = BasePivotFieldId | CustomMetricId;
@@ -145,8 +145,9 @@ export interface StudioCanvasState {
 
 export interface PivotTableView {
     table: PivotTableInstance;
+    columns: ColumnMeta[];
     filterOptions: Record<string, string[]>;
-    filteredRecords: AnalyzedInventoryRecord[];
+    filteredRecords: GenericRow[];
     pivotResult: PivotResult;
     hasColumnGroups: boolean;
     hasMultipleValueFields: boolean;
@@ -275,30 +276,6 @@ export const TABLE_RESIZE_HANDLES: {
     { direction: "sw", className: "bottom-[-2px] -left-[2px] h-[7px] w-[7px] cursor-nesw-resize" }
 ];
 
-const BASE_PIVOT_FIELDS: PivotFieldDefinition[] = [
-    { id: "warehouseName", label: "Warehouse", kind: "dimension", summary: "count", format: "text" },
-    { id: "productCode", label: "Product Code", kind: "dimension", summary: "count", format: "text" },
-    { id: "productName", label: "Product Name", kind: "dimension", summary: "count", format: "text" },
-    { id: "color", label: "Color", kind: "dimension", summary: "count", format: "text" },
-    { id: "size", label: "Size", kind: "dimension", summary: "count", format: "text" },
-    { id: "gender", label: "Gender", kind: "dimension", summary: "count", format: "text" },
-    { id: "productionYear", label: "Production Year", kind: "dimension", summary: "count", format: "text" },
-    { id: "lastSaleDate", label: "Last Sale Date", kind: "dimension", summary: "count", format: "date" },
-    { id: "firstStockEntryDate", label: "First Stock Entry Date", kind: "dimension", summary: "count", format: "date" },
-    { id: "firstSaleDate", label: "First Sale Date", kind: "dimension", summary: "count", format: "date" },
-    { id: "salesQty", label: "Sales Qty", kind: "measure", summary: "sum", format: "number" },
-    { id: "returnQty", label: "Return Qty", kind: "measure", summary: "sum", format: "number" },
-    { id: "inventory", label: "Inventory", kind: "measure", summary: "sum", format: "number" },
-    { id: "netSalesQty", label: "Net Sales", kind: "measure", summary: "sum", format: "number" },
-    { id: "returnRate", label: "Return Rate", kind: "measure", summary: "avg", format: "percent" },
-    { id: "sellThroughRate", label: "Sell Through", kind: "measure", summary: "avg", format: "percent" },
-    { id: "daysSinceLastSale", label: "Days Since Last Sale", kind: "measure", summary: "avg", format: "number" },
-    { id: "stockAgeDays", label: "Stock Age Days", kind: "measure", summary: "avg", format: "number" },
-    { id: "daysToFirstSale", label: "Days to First Sale", kind: "measure", summary: "avg", format: "number" }
-];
-
-export const PIVOT_FIELDS = BASE_PIVOT_FIELDS;
-
 export function isCustomMetricFieldId(fieldId: PivotFieldId): fieldId is CustomMetricId {
     return fieldId.startsWith("custom:");
 }
@@ -317,15 +294,39 @@ function buildCustomMetricFieldDefinition(metric: CustomMetricDefinition): Pivot
     };
 }
 
-export function getAvailablePivotFields(customMetrics: CustomMetricDefinition[] = []) {
+function columnMetaToFieldDefinition(col: ColumnMeta): PivotFieldDefinition {
+    return {
+        id: col.key,
+        label: col.label,
+        kind: col.type === "numeric" ? "measure" : "dimension",
+        summary: col.type === "numeric" ? "sum" : "count",
+        format: col.type === "numeric" ? "number" : col.type === "date" ? "date" : "text"
+    };
+}
+
+const FALLBACK_FIELD_DEF = (fieldId: PivotFieldId): PivotFieldDefinition => ({
+    id: fieldId,
+    label: fieldId,
+    kind: "dimension",
+    summary: "count",
+    format: "text"
+});
+
+export function getAvailablePivotFields(
+    columns: ColumnMeta[] = [],
+    customMetrics: CustomMetricDefinition[] = []
+) {
     return [
-        ...BASE_PIVOT_FIELDS,
-        ...customMetrics.map((metric) => buildCustomMetricFieldDefinition(metric))
+        ...columns.map(columnMetaToFieldDefinition),
+        ...customMetrics.map(buildCustomMetricFieldDefinition)
     ];
 }
 
-export function getMeasureFieldDefinitions(customMetrics: CustomMetricDefinition[] = []) {
-    return getAvailablePivotFields(customMetrics).filter((field) => field.kind === "measure");
+export function getMeasureFieldDefinitions(
+    columns: ColumnMeta[] = [],
+    customMetrics: CustomMetricDefinition[] = []
+) {
+    return getAvailablePivotFields(columns, customMetrics).filter((field) => field.kind === "measure");
 }
 
 function getCustomMetricDefinition(
@@ -337,9 +338,13 @@ function getCustomMetricDefinition(
 
 export function getFieldDefinition(
     fieldId: PivotFieldId,
+    columns: ColumnMeta[] = [],
     customMetrics: CustomMetricDefinition[] = []
 ) {
-    return getAvailablePivotFields(customMetrics).find((field) => field.id === fieldId)!;
+    return (
+        getAvailablePivotFields(columns, customMetrics).find((field) => field.id === fieldId) ??
+        FALLBACK_FIELD_DEF(fieldId)
+    );
 }
 
 function slugifyCustomMetricName(value: string) {
@@ -390,11 +395,12 @@ function isBinaryCustomMetricOperator(operator: CustomMetricOperator): operator 
 
 export function describeCustomMetric(
     metric: CustomMetricDefinition,
+    columns: ColumnMeta[] = [],
     customMetrics: CustomMetricDefinition[] = []
 ) {
     return metric.tokens
         .map((token) => {
-            if (token.type === "field") return getFieldDefinition(token.fieldId, customMetrics).label;
+            if (token.type === "field") return getFieldDefinition(token.fieldId, columns, customMetrics).label;
             if (token.type === "operator") return formatCustomMetricOperatorLabel(token.operator);
             if (token.type === "constant") return String(token.value);
             if (token.type === "parenthesis") return token.value;
@@ -435,15 +441,14 @@ function isKnownFieldId(
     value: unknown,
     customMetrics: CustomMetricDefinition[] = []
 ): value is PivotFieldId {
-    return (
-        typeof value === "string" &&
-        getAvailablePivotFields(customMetrics).some((field) => field.id === value)
-    );
+    if (typeof value !== "string" || !value) return false;
+    if (value.startsWith("custom:")) return customMetrics.some((m) => m.id === value);
+    return true; // accept any non-empty string — columns are dynamic
 }
 
-function uniqueFieldIds(values: PivotFieldId[], customMetrics: CustomMetricDefinition[] = []) {
+function uniqueFieldIds(values: unknown[], customMetrics: CustomMetricDefinition[] = []) {
     return Array.from(
-        new Set(values.filter((value) => getAvailablePivotFields(customMetrics).some((field) => field.id === value)))
+        new Set(values.filter((value): value is PivotFieldId => isKnownFieldId(value, customMetrics)))
     );
 }
 
@@ -730,13 +735,13 @@ function evaluateCustomMetricTokens(
 }
 
 function getRecordFieldValue(
-    record: AnalyzedInventoryRecord,
+    record: GenericRow,
     fieldId: PivotFieldId,
     customMetrics: CustomMetricDefinition[] = [],
     visited = new Set<PivotFieldId>()
 ): string | number | null {
     if (!isCustomMetricFieldId(fieldId)) {
-        return record[fieldId as BasePivotFieldId];
+        return record[fieldId] ?? null;
     }
 
     if (visited.has(fieldId)) {
@@ -761,11 +766,12 @@ function getRecordFieldValue(
 }
 
 function getDimensionValue(
-    record: AnalyzedInventoryRecord,
+    record: GenericRow,
     fieldId: PivotFieldId,
+    columns: ColumnMeta[] = [],
     customMetrics: CustomMetricDefinition[] = []
 ) {
-    const field = getFieldDefinition(fieldId, customMetrics);
+    const field = getFieldDefinition(fieldId, columns, customMetrics);
     const rawValue = getRecordFieldValue(record, fieldId, customMetrics);
 
     if (rawValue === null || rawValue === undefined || rawValue === "") {
@@ -793,11 +799,12 @@ function getDimensionValue(
 }
 
 function getMeasureInput(
-    record: AnalyzedInventoryRecord,
+    record: GenericRow,
     fieldId: PivotFieldId,
+    columns: ColumnMeta[] = [],
     customMetrics: CustomMetricDefinition[] = []
 ) {
-    const field = getFieldDefinition(fieldId, customMetrics);
+    const field = getFieldDefinition(fieldId, columns, customMetrics);
     const rawValue = getRecordFieldValue(record, fieldId, customMetrics);
 
     if (field.kind === "dimension" || field.summary === "count") {
@@ -818,13 +825,14 @@ function getMeasureInput(
 export function resolveAggregationValue(
     fieldId: PivotFieldId,
     state: AggregationState | undefined,
+    columns: ColumnMeta[] = [],
     customMetrics: CustomMetricDefinition[] = []
 ) {
     if (!state) {
         return 0;
     }
 
-    const field = getFieldDefinition(fieldId, customMetrics);
+    const field = getFieldDefinition(fieldId, columns, customMetrics);
 
     if (field.summary === "count") {
         return state.count;
@@ -840,6 +848,7 @@ export function resolveAggregationValue(
 export function resolveFieldValueFromAggregationStates(
     fieldId: PivotFieldId,
     states: Record<string, AggregationState> | undefined,
+    columns: ColumnMeta[] = [],
     customMetrics: CustomMetricDefinition[] = [],
     visited = new Set<PivotFieldId>()
 ): number {
@@ -848,7 +857,7 @@ export function resolveFieldValueFromAggregationStates(
     }
 
     if (!isCustomMetricFieldId(fieldId)) {
-        return resolveAggregationValue(fieldId, states?.[fieldId], customMetrics);
+        return resolveAggregationValue(fieldId, states?.[fieldId], columns, customMetrics);
     }
 
     const metric = getCustomMetricDefinition(fieldId, customMetrics);
@@ -860,7 +869,7 @@ export function resolveFieldValueFromAggregationStates(
     const result = evaluateCustomMetricTokens(
         metric.tokens,
         (currentFieldId, currentVisited) =>
-            resolveFieldValueFromAggregationStates(currentFieldId, states, customMetrics, currentVisited),
+            resolveFieldValueFromAggregationStates(currentFieldId, states, columns, customMetrics, currentVisited),
         visited
     );
     visited.delete(fieldId);
@@ -884,6 +893,7 @@ function formatWithCustomMetricFormat(value: number, format: CustomMetricFormat)
 export function formatAggregatedValue(
     fieldId: PivotFieldId,
     value: number,
+    columns: ColumnMeta[] = [],
     customMetrics: CustomMetricDefinition[] = []
 ) {
     if (isCustomMetricFieldId(fieldId)) {
@@ -891,14 +901,15 @@ export function formatAggregatedValue(
         if (metric) return formatWithCustomMetricFormat(value, metric.format);
     }
 
-    const field = getFieldDefinition(fieldId, customMetrics);
+    const field = getFieldDefinition(fieldId, columns, customMetrics);
     if (field.format === "percent") return formatPercent(value);
     return formatNumber(value);
 }
 
 function buildComboKey(
-    record: AnalyzedInventoryRecord,
+    record: GenericRow,
     fieldIds: PivotFieldId[],
+    columns: ColumnMeta[] = [],
     customMetrics: CustomMetricDefinition[] = []
 ) {
     if (fieldIds.length === 0) {
@@ -908,7 +919,7 @@ function buildComboKey(
         };
     }
 
-    const labels = fieldIds.map((fieldId) => getDimensionValue(record, fieldId, customMetrics));
+    const labels = fieldIds.map((fieldId) => getDimensionValue(record, fieldId, columns, customMetrics));
     return {
         key: labels.join("|||"),
         labels
@@ -1209,8 +1220,9 @@ export function sanitizeStudioState(value: unknown): StudioCanvasState {
 }
 
 export function buildFilterOptions(
-    records: AnalyzedInventoryRecord[],
+    records: GenericRow[],
     filterFields: PivotFieldId[],
+    columns: ColumnMeta[] = [],
     customMetrics: CustomMetricDefinition[] = []
 ) {
     return filterFields.reduce<Record<string, string[]>>((accumulator, fieldId) => {
@@ -1218,7 +1230,7 @@ export function buildFilterOptions(
             Array.from(
                 new Map(
                     records.map((record) => {
-                        const label = getDimensionValue(record, fieldId, customMetrics);
+                        const label = getDimensionValue(record, fieldId, columns, customMetrics);
                         return [label, { key: label, labels: [label] }];
                     })
                 ).values()
@@ -1231,9 +1243,10 @@ export function buildFilterOptions(
 }
 
 export function applyFilters(
-    records: AnalyzedInventoryRecord[],
+    records: GenericRow[],
     layout: PivotLayout,
     filterSelections: Record<string, string>,
+    columns: ColumnMeta[] = [],
     customMetrics: CustomMetricDefinition[] = []
 ) {
     return records.filter((record) =>
@@ -1243,14 +1256,15 @@ export function applyFilters(
                 return true;
             }
 
-            return getDimensionValue(record, fieldId, customMetrics) === selectedValue;
+            return getDimensionValue(record, fieldId, columns, customMetrics) === selectedValue;
         })
     );
 }
 
 export function buildPivotResult(
-    filteredRecords: AnalyzedInventoryRecord[],
+    filteredRecords: GenericRow[],
     layout: PivotLayout,
+    columns: ColumnMeta[] = [],
     customMetrics: CustomMetricDefinition[] = []
 ): PivotResult {
     const valueFields: PivotFieldId[] = layout.values.length > 0 ? layout.values : [];
@@ -1259,8 +1273,8 @@ export function buildPivotResult(
         const rowMap = new Map<string, PivotCombo>();
         const columnMap = new Map<string, PivotCombo>();
         for (const record of filteredRecords) {
-            const rowCombo = buildComboKey(record, layout.rows, customMetrics);
-            const columnCombo = buildComboKey(record, layout.columns, customMetrics);
+            const rowCombo = buildComboKey(record, layout.rows, columns, customMetrics);
+            const columnCombo = buildComboKey(record, layout.columns, columns, customMetrics);
             rowMap.set(rowCombo.key, rowCombo);
             columnMap.set(columnCombo.key, columnCombo);
         }
@@ -1285,8 +1299,8 @@ export function buildPivotResult(
     const matrix = new Map<string, Map<string, Record<string, AggregationState>>>();
 
     for (const record of filteredRecords) {
-        const rowCombo = buildComboKey(record, layout.rows, customMetrics);
-        const columnCombo = buildComboKey(record, layout.columns, customMetrics);
+        const rowCombo = buildComboKey(record, layout.rows, columns, customMetrics);
+        const columnCombo = buildComboKey(record, layout.columns, columns, customMetrics);
 
         rowMap.set(rowCombo.key, rowCombo);
         columnMap.set(columnCombo.key, columnCombo);
@@ -1300,7 +1314,7 @@ export function buildPivotResult(
             >);
 
         for (const fieldId of aggregateFieldIds) {
-            const input = getMeasureInput(record, fieldId, customMetrics);
+            const input = getMeasureInput(record, fieldId, columns, customMetrics);
             cell[fieldId].sum += input.sum;
             cell[fieldId].count += input.count;
         }

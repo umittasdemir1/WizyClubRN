@@ -18,45 +18,25 @@ function getUploadErrorMessage(error: unknown, fallbackMessage = "Upload workflo
                 ? error.response.data.message
                 : null;
 
-        if (responseMessage) {
-            return responseMessage;
-        }
-
-        if (error.code === "ECONNABORTED") {
-            return "The API request timed out before StockPilot could finish processing the file.";
-        }
-
-        if (error.response?.status === 504) {
-            return "The StockPilot API timed out while processing the file.";
-        }
-
-        if (error.response?.status === 502 || error.response?.status === 503) {
-            return "The StockPilot API is temporarily unavailable.";
-        }
-
-        if (error.code === "ERR_NETWORK" || !error.response) {
-            return "StockPilot could not reach the API and local processing also failed.";
-        }
-
+        if (responseMessage) return responseMessage;
+        if (error.code === "ECONNABORTED") return "The API request timed out before StockPilot could finish processing the file.";
+        if (error.response?.status === 504) return "The StockPilot API timed out while processing the file.";
+        if (error.response?.status === 502 || error.response?.status === 503) return "The StockPilot API is temporarily unavailable.";
+        if (error.code === "ERR_NETWORK" || !error.response) return "StockPilot could not reach the API and local processing also failed.";
         return error.message || fallbackMessage;
     }
 
-    if (error instanceof Error && error.message) {
-        return error.message;
-    }
-
+    if (error instanceof Error && error.message) return error.message;
     return fallbackMessage;
 }
 
 function shouldUseLocalFallback(error: unknown) {
     return (
         isAxiosError(error) &&
-        (
-            error.code === "ERR_NETWORK" ||
+        (error.code === "ERR_NETWORK" ||
             error.code === "ECONNABORTED" ||
             !error.response ||
-            error.response.status >= 500
-        )
+            error.response.status >= 500)
     );
 }
 
@@ -86,14 +66,8 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
                 reportProgress(28);
 
                 try {
-                    const [{ parseInventoryFile }, localAnalysisModule] = await Promise.all([
-                        import("../services/parser"),
-                        import("../utils/analysis")
-                    ]);
+                    const { parseInventoryFile } = await import("../services/parser");
                     const parsed = await parseInventoryFile(file);
-                    reportProgress(72);
-                    const analysis = localAnalysisModule.analyzeInventory(parsed.records);
-                    const transferPlan = localAnalysisModule.buildTransferPlan(parsed.records);
                     reportProgress(100);
                     options.onStageChange?.("ready");
 
@@ -103,8 +77,12 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
                             columns: parsed.columns,
                             rowCount: parsed.rowCount
                         },
-                        analysis,
-                        transferPlan,
+                        analysis: {
+                            fileName: parsed.fileName,
+                            columns: parsed.columns,
+                            rows: parsed.rows,
+                            rowCount: parsed.rowCount
+                        },
                         source: "local"
                     };
                 } catch (fallbackError) {

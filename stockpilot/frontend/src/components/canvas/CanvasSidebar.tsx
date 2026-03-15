@@ -66,6 +66,7 @@ const CUSTOM_METRIC_OPERATOR_BUTTONS: Array<
 
 interface CanvasSidebarProps {
     activeLayout: PivotLayout;
+    columns: import("../../types/stock").ColumnMeta[];
     customMetrics: CustomMetricDefinition[];
     dragZone: PivotZoneId | null;
     activeDrag: DragState | null;
@@ -176,13 +177,15 @@ function FieldListItem({
 
 function FormulaTokenChip({
     token,
+    columns,
     customMetrics
 }: {
     token: CustomMetricExpressionToken;
+    columns: import("../../types/stock").ColumnMeta[];
     customMetrics: CustomMetricDefinition[];
 }) {
     let label: string;
-    if (token.type === "field") label = getFieldDefinition(token.fieldId, customMetrics).label;
+    if (token.type === "field") label = getFieldDefinition(token.fieldId, columns, customMetrics).label;
     else if (token.type === "operator") label = formatCustomMetricOperatorLabel(token.operator);
     else if (token.type === "constant") label = String(token.value);
     else if (token.type === "parenthesis") label = token.value;
@@ -206,6 +209,7 @@ function FormulaTokenChip({
 
 export function CanvasSidebar({
     activeLayout,
+    columns,
     customMetrics,
     dragZone,
     activeDrag,
@@ -283,7 +287,7 @@ export function CanvasSidebar({
 
     const manualInputRef = useRef<HTMLInputElement>(null);
     const allFields = useMemo(() => {
-        const fields = getAvailablePivotFields(customMetrics);
+        const fields = getAvailablePivotFields(columns, customMetrics);
         const pinnedSet = new Set(pinnedFieldIds);
 
         const pinned = fields.filter((f) => pinnedSet.has(f.id));
@@ -373,7 +377,7 @@ export function CanvasSidebar({
     }
 
     function appendFieldToFormula(fieldId: PivotFieldId) {
-        const field = getFieldDefinition(fieldId, customMetrics);
+        const field = getFieldDefinition(fieldId, columns, customMetrics);
         if (field.kind !== "measure") {
             setBuilderError("Only metric fields can be used in calculations.");
             return;
@@ -735,14 +739,14 @@ export function CanvasSidebar({
                                         <div className="flex min-w-0 items-start gap-1.5">
                                             <Grip className="mt-0.5 h-3 w-3 shrink-0 text-slate-500" />
                                             <span className="truncate font-display text-[0.92rem] font-light leading-[1.08] tracking-tight text-ink">
-                                                {getFieldDefinition(fieldId, customMetrics).label}
+                                                {getFieldDefinition(fieldId, columns, customMetrics).label}
                                             </span>
                                         </div>
                                         <button
                                             type="button"
                                             onClick={() => removeFieldFromZone(fieldId, zone.id)}
                                             className="rounded-full p-0.5 text-slate-500 transition hover:text-ink"
-                                            aria-label={`Remove ${getFieldDefinition(fieldId, customMetrics).label}`}
+                                            aria-label={`Remove ${getFieldDefinition(fieldId, columns, customMetrics).label}`}
                                         >
                                             <X className="h-3.5 w-3.5" />
                                         </button>
@@ -924,6 +928,7 @@ export function CanvasSidebar({
                                                     <FormulaTokenChip
                                                         key={`formula-token:${tokenIndex}`}
                                                         token={token}
+                                                        columns={columns}
                                                         customMetrics={customMetrics}
                                                     />
                                                 ))}

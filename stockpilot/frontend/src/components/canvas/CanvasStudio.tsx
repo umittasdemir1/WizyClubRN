@@ -125,7 +125,7 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
         }> = [
             ...view.table.layout.rows.map((fieldId, rowIndex) => ({
                 key: `row-field:${fieldId}:${rowIndex}`,
-                title: getFieldDefinition(fieldId, orchestration.customMetrics).label,
+                title: getFieldDefinition(fieldId, orchestration.columns, orchestration.customMetrics).label,
                 kind: "row-field" as const,
                 options: getRowFieldFilterOptions(view, fieldId, rowIndex, orchestration.headerFilterSortDirections),
                 fieldId,
@@ -136,7 +136,7 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                       {
                           key: "column-group",
                           title: view.table.layout.columns
-                              .map((fieldId) => getFieldDefinition(fieldId, orchestration.customMetrics).label)
+                              .map((fieldId) => getFieldDefinition(fieldId, orchestration.columns, orchestration.customMetrics).label)
                               .join(" / "),
                           kind: "column-group" as const,
                           options: getColumnGroupFilterOptions(view, orchestration.headerFilterSortDirections)
@@ -144,7 +144,7 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                   ]
                 : view.pivotResult.valueFields.map((fieldId) => ({
                       key: `value-field:${fieldId}`,
-                      title: getFieldDefinition(fieldId, orchestration.customMetrics).label,
+                      title: getFieldDefinition(fieldId, orchestration.columns, orchestration.customMetrics).label,
                       kind: "value-field" as const,
                       options: getValueFieldFilterOptions(view, fieldId, orchestration.headerFilterSortDirections),
                       fieldId
@@ -370,6 +370,7 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                 addCustomMetric={orchestration.addCustomMetric}
                 deleteCustomMetric={orchestration.deleteCustomMetric}
                 setPinnedFieldIds={orchestration.setPinnedFieldIds}
+                columns={orchestration.columns}
             />
 
             <section className="relative flex h-[940px] max-h-[940px] flex-col overflow-hidden rounded-[12px] border border-slate-200/70 bg-white/80 p-[10px] shadow-[0_32px_90px_-46px_rgba(11,14,20,0.34)] backdrop-blur-xl">

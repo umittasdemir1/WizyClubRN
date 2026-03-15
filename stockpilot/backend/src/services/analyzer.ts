@@ -1,8 +1,8 @@
 import type {
     AlertItem,
-    AnalysisResult,
     AnalyzedInventoryRecord,
     InventoryRecord,
+    LegacyAnalysisResult,
     LifecyclePoint,
     PlanningPoint,
     WarehouseBreakdownPoint
@@ -71,7 +71,7 @@ function computeLifecycleStatus(
     return "healthy";
 }
 
-export function analyzeInventory(records: InventoryRecord[]): AnalysisResult {
+export function analyzeInventory(records: InventoryRecord[]): LegacyAnalysisResult {
     const enriched = records.map((record) => {
         const netSalesQty = Math.max(record.salesQty - record.returnQty, 0);
         const returnRate = record.salesQty > 0 ? record.returnQty / record.salesQty : 0;

@@ -20,7 +20,7 @@ interface StudioNavProps {
 
 export function StudioNav({ active, onChange }: StudioNavProps) {
     return (
-        <nav className="flex items-center gap-1 rounded-full border border-slate-200/80 bg-white/70 p-1.5 backdrop-blur-sm">
+        <nav className="flex items-center gap-1">
             {NAV_MODULES.map((mod) => (
                 <button
                     key={mod.id}
