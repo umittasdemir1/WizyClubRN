@@ -265,6 +265,49 @@ function FormulaTokenChip({
     );
 }
 
+const TYPEWRITER_PLACEHOLDERS = ["Total Revenue", "Gross Margin", "Net Profit %", "YoY Growth", "Customer LTV", "Retention Rate"];
+
+function MetricNameInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+    const [placeholder, setPlaceholder] = useState("");
+    const [isFocused, setIsFocused] = useState(false);
+
+    useEffect(() => {
+        if (isFocused) return;
+        let cancelled = false;
+        let pIndex = 0;
+        let charIndex = 0;
+        let deleting = false;
+        let timer: ReturnType<typeof setTimeout>;
+
+        const tick = () => {
+            if (cancelled) return;
+            const full = TYPEWRITER_PLACEHOLDERS[pIndex];
+            if (deleting) { setPlaceholder(full.substring(0, charIndex - 1)); charIndex--; }
+            else { setPlaceholder(full.substring(0, charIndex + 1)); charIndex++; }
+            let delay = deleting ? 60 : 120;
+            if (!deleting && charIndex === full.length) { deleting = true; delay = 2000; }
+            else if (deleting && charIndex === 0) { deleting = false; pIndex = (pIndex + 1) % TYPEWRITER_PLACEHOLDERS.length; delay = 500; }
+            timer = setTimeout(tick, delay);
+        };
+
+        timer = setTimeout(tick, 500);
+        return () => { cancelled = true; clearTimeout(timer); };
+    }, [isFocused]);
+
+    return (
+        <div className="rounded-[10px] border border-slate-200/70 bg-white/80 h-[36px] flex items-center shadow-sm">
+            <input
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
+                placeholder={placeholder}
+                className={`w-full appearance-none bg-transparent px-4 outline-none border-none ring-0 focus:ring-0 ${PIVOT_FIELD_TEXT_TYPOGRAPHY} text-ink !leading-none -translate-y-[2px] placeholder:text-slate-400`}
+            />
+        </div>
+    );
+}
+
 export function CanvasSidebar({
     activeLayout,
     columns,
@@ -293,52 +336,6 @@ export function CanvasSidebar({
     const [isFormulaDropActive, setIsFormulaDropActive] = useState(false);
     const [builderError, setBuilderError] = useState<string | null>(null);
 
-    // --- Typewriter Placeholder logic ---
-    const [placeholderText, setPlaceholderText] = useState("");
-    const placeholders = ["Total Revenue", "Gross Margin", "Net Profit %", "YoY Growth", "Customer LTV", "Retention Rate"];
-    const [isNameInputFocused, setIsNameInputFocused] = useState(false);
-    
-    useEffect(() => {
-        if (isNameInputFocused) return;
-        let isCancelled = false;
-        let pIndex = 0;
-        let charIndex = 0;
-        let isDeleting = false;
-        let timeout: NodeJS.Timeout;
-
-        const tick = () => {
-            if (isCancelled) return;
-            const fullText = placeholders[pIndex];
-            
-            if (isDeleting) {
-                setPlaceholderText(fullText.substring(0, charIndex - 1));
-                charIndex--;
-            } else {
-                setPlaceholderText(fullText.substring(0, charIndex + 1));
-                charIndex++;
-            }
-
-            let delta = isDeleting ? 60 : 120; // Silme hızı vs yazma hızı
-
-            if (!isDeleting && charIndex === fullText.length) {
-                isDeleting = true;
-                delta = 2000; // Tamamlandığında 2sn bekle
-            } else if (isDeleting && charIndex === 0) {
-                isDeleting = false;
-                pIndex = (pIndex + 1) % placeholders.length;
-                delta = 500;
-            }
-
-            timeout = setTimeout(tick, delta);
-        };
-
-        timeout = setTimeout(tick, 500);
-        return () => {
-            isCancelled = true;
-            clearTimeout(timeout);
-        };
-    }, [isNameInputFocused]);
-    // ------------------------------------
     const [manualInputValue, setManualInputValue] = useState("");
     const [isInputFocused, setIsInputFocused] = useState(false);
 
@@ -1022,16 +1019,7 @@ export function CanvasSidebar({
                                     <div className="flex flex-col gap-4 -mx-[10px]">
                                         <div className="flex items-center justify-between gap-3 px-0 -mt-[10px]" onClick={(e) => e.stopPropagation()}>
                                             <div className="min-w-0 flex-1">
-                                                <div className="rounded-[10px] border border-slate-200/70 bg-white/80 h-[36px] flex items-center shadow-sm">
-                                                    <input
-                                                        value={calculationName}
-                                                        onChange={(event) => setCalculationName(event.target.value)}
-                                                        onFocus={() => setIsNameInputFocused(true)}
-                                                        onBlur={() => setIsNameInputFocused(false)}
-                                                        placeholder={placeholderText}
-                                                        className={`w-full appearance-none bg-transparent px-4 outline-none border-none ring-0 focus:ring-0 ${PIVOT_FIELD_TEXT_TYPOGRAPHY} text-ink !leading-none -translate-y-[2px] placeholder:text-slate-400`}
-                                                    />
-                                                </div>
+                                                <MetricNameInput value={calculationName} onChange={setCalculationName} />
                                             </div>
                                             <div className="flex shrink-0 items-center gap-1.5">
                                                 <MetricFormatSelect

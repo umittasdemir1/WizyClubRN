@@ -354,10 +354,12 @@ export function getFieldDefinition(
     customMetrics: CustomMetricDefinition[] = [],
     columnOverrides: Record<string, ColumnOverride> = {}
 ) {
-    return (
-        getAvailablePivotFields(columns, customMetrics, columnOverrides).find((field) => field.id === fieldId) ??
-        FALLBACK_FIELD_DEF(fieldId)
-    );
+    if (isCustomMetricFieldId(fieldId)) {
+        const metric = customMetrics.find((m) => m.id === fieldId);
+        return metric ? buildCustomMetricFieldDefinition(metric) : FALLBACK_FIELD_DEF(fieldId);
+    }
+    const col = columns.find((c) => c.key === fieldId);
+    return col ? columnMetaToFieldDefinition(col, columnOverrides) : FALLBACK_FIELD_DEF(fieldId);
 }
 
 function slugifyCustomMetricName(value: string) {

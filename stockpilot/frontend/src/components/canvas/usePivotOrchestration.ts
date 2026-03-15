@@ -64,14 +64,12 @@ export function usePivotOrchestration(analysis: AnalysisResult | null) {
         setColumnOverrides(nextState.columnOverrides);
     }, []);
 
+    const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
     useEffect(() => {
-        persistStudioState({
-            tables,
-            activeTableId,
-            customMetrics,
-            pinnedFieldIds,
-            columnOverrides
-        });
+        const state = { tables, activeTableId, customMetrics, pinnedFieldIds, columnOverrides };
+        if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+        persistTimerRef.current = setTimeout(() => persistStudioState(state), 500);
     }, [activeTableId, customMetrics, tables, pinnedFieldIds, columnOverrides]);
 
     // Derived States
