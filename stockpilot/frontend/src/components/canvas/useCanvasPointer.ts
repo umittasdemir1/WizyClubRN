@@ -7,14 +7,16 @@ import {
     type PointerEvent as ReactPointerEvent
 } from "react";
 import {
-    AUTO_FIT_SCROLLBAR_GUTTER,
-    DEFAULT_TABLE_HEIGHT,
+    CANVAS_ZOOM_STEP,
+    DEFAULT_CANVAS_ZOOM,
+    MAX_CANVAS_ZOOM,
+    MIN_CANVAS_ZOOM,
     MIN_TABLE_HEIGHT,
+    MIN_TABLE_WIDTH,
     type MoveState,
     type PivotTableInstance,
     type ResizeState,
-    type TableResizeDirection,
-    MIN_TABLE_WIDTH
+    type TableResizeDirection
 } from "./canvasModel";
 import type { AnalysisResult } from "../../types/stock";
 
@@ -41,14 +43,17 @@ export function useCanvasPointer({
 }: UseCanvasPointerParams) {
     const [movingTableId, setMovingTableId] = useState<string | null>(null);
     const [resizingTableId, setResizingTableId] = useState<string | null>(null);
+    const [canvasZoom, setCanvasZoom] = useState(DEFAULT_CANVAS_ZOOM);
 
     const tableCanvasRef = useRef<HTMLDivElement | null>(null);
+    const canvasInnerRef = useRef<HTMLDivElement | null>(null);
     const moveStateRef = useRef<MoveState | null>(null);
     const resizeStateRef = useRef<ResizeState | null>(null);
     const tablesRef = useRef(tables);
     const activeTableIdRef = useRef(activeTableId);
     const editingTableIdRef = useRef(editingTableId);
     const resizingTableIdRef = useRef<string | null>(resizingTableId);
+    const canvasZoomRef = useRef(canvasZoom);
     const prevAutoFitKeyRef = useRef("");
 
     useEffect(() => {
@@ -67,42 +72,34 @@ export function useCanvasPointer({
         resizingTableIdRef.current = resizingTableId;
     }, [resizingTableId]);
 
-    useLayoutEffect(() => {
-        const canvas = tableCanvasRef.current;
-        if (!canvas) {
-            return;
-        }
+    useEffect(() => {
+        canvasZoomRef.current = canvasZoom;
+    }, [canvasZoom]);
 
-        // Skip auto-fit when only position/name/color changed (not layout/data)
+    useLayoutEffect(() => {
+        // Skip auto-fit when only position/name/color changed (not layout/data/scale)
         const autoFitKey = tables.map((t) =>
-            `${t.id}:${t.hasCustomizedSize}:${JSON.stringify(t.layout)}:${JSON.stringify(t.filterSelections)}`
+            `${t.id}:${t.scale}:${JSON.stringify(t.layout)}:${JSON.stringify(t.filterSelections)}`
         ).join("|");
         if (autoFitKey === prevAutoFitKeyRef.current) return;
         prevAutoFitKeyRef.current = autoFitKey;
 
+        const currentCanvasZoom = canvasZoomRef.current;
         setTables((current) => {
             let hasChanges = false;
 
             const nextTables = current.map((table) => {
-                if (table.hasCustomizedSize) {
-                    return table;
-                }
-
                 const tableElement = tableElementRefs.current[table.id];
                 if (!tableElement) {
                     return table;
                 }
 
-                const availableWidth = Math.max(0, canvas.clientWidth - table.position.x);
-                const availableHeight = Math.max(0, canvas.clientHeight - table.position.y);
-                const contentHeight = Math.ceil(tableElement.getBoundingClientRect().height);
-                const nextHeight = Math.min(contentHeight, DEFAULT_TABLE_HEIGHT, availableHeight);
-                const needsVerticalScrollbar = contentHeight > nextHeight;
-                const contentWidth = Math.ceil(tableElement.getBoundingClientRect().width);
-                const nextWidth = Math.min(
-                    contentWidth + (needsVerticalScrollbar ? AUTO_FIT_SCROLLBAR_GUTTER : 0),
-                    availableWidth
-                );
+                // getBoundingClientRect includes both CSS zoom (table.scale) AND
+                // canvas transform scale (canvasZoom). Divide by canvasZoom to get
+                // the size in inner-canvas coordinates (which is what we store).
+                const rect = tableElement.getBoundingClientRect();
+                const nextWidth = Math.ceil(rect.width / currentCanvasZoom);
+                const nextHeight = Math.ceil(rect.height / currentCanvasZoom);
 
                 if (nextWidth <= 0 || nextHeight <= 0) {
                     return table;
@@ -133,24 +130,13 @@ export function useCanvasPointer({
                 return;
             }
 
-            const canvasRect = canvas.getBoundingClientRect();
             const moveState = moveStateRef.current;
             if (moveState) {
-                const currentTable = tablesRef.current.find((table) => table.id === moveState.tableId);
-                if (!currentTable) {
-                    return;
-                }
-
-                const deltaX = event.clientX - moveState.startPointerX;
-                const deltaY = event.clientY - moveState.startPointerY;
-                const nextX = Math.min(
-                    Math.max(0, moveState.startX + deltaX),
-                    Math.max(0, canvasRect.width - currentTable.size.width)
-                );
-                const nextY = Math.min(
-                    Math.max(0, moveState.startY + deltaY),
-                    Math.max(0, canvasRect.height - currentTable.size.height)
-                );
+                const zoom = canvasZoomRef.current;
+                const deltaX = (event.clientX - moveState.startPointerX) / zoom;
+                const deltaY = (event.clientY - moveState.startPointerY) / zoom;
+                const nextX = Math.max(0, moveState.startX + deltaX);
+                const nextY = Math.max(0, moveState.startY + deltaY);
 
                 moveState.currentX = nextX;
                 moveState.currentY = nextY;
@@ -166,46 +152,65 @@ export function useCanvasPointer({
 
             const resizeState = resizeStateRef.current;
             if (resizeState) {
-                const deltaX = event.clientX - resizeState.startPointerX;
-                const deltaY = event.clientY - resizeState.startPointerY;
+                const zoom = canvasZoomRef.current;
+                const deltaX = (event.clientX - resizeState.startPointerX) / zoom;
+                const deltaY = (event.clientY - resizeState.startPointerY) / zoom;
                 const startLeft = resizeState.startX;
                 const startTop = resizeState.startY;
                 const startRight = resizeState.startX + resizeState.startWidth;
                 const startBottom = resizeState.startY + resizeState.startHeight;
 
-                let nextLeft = startLeft;
-                let nextTop = startTop;
-                let nextRight = startRight;
-                let nextBottom = startBottom;
+                // Calculate raw dragged bounds
+                let rawRight = startRight;
+                let rawBottom = startBottom;
+                let rawLeft = startLeft;
+                let rawTop = startTop;
 
-                if (resizeState.direction.includes("e")) {
-                    nextRight = startRight + deltaX;
-                }
+                if (resizeState.direction.includes("e")) rawRight = startRight + deltaX;
+                if (resizeState.direction.includes("s")) rawBottom = startBottom + deltaY;
+                if (resizeState.direction.includes("w")) rawLeft = startLeft + deltaX;
+                if (resizeState.direction.includes("n")) rawTop = startTop + deltaY;
 
-                if (resizeState.direction.includes("s")) {
-                    nextBottom = startBottom + deltaY;
-                }
+                // Derive new scale: use height for pure-vertical handles, width for all others
+                const isPureVertical = resizeState.direction === "n" || resizeState.direction === "s";
+                const minScale = Math.max(
+                    MIN_TABLE_WIDTH / resizeState.naturalWidth,
+                    MIN_TABLE_HEIGHT / resizeState.naturalHeight
+                );
+                const rawScale = isPureVertical
+                    ? (rawBottom - rawTop) / resizeState.naturalHeight
+                    : (rawRight - rawLeft) / resizeState.naturalWidth;
+                const newScale = Math.max(rawScale, minScale);
 
-                if (resizeState.direction.includes("w")) {
-                    nextLeft = startLeft + deltaX;
-                }
+                // New dimensions are always naturalSize × scale (uniform scaling)
+                const newWidth = resizeState.naturalWidth * newScale;
+                const newHeight = resizeState.naturalHeight * newScale;
 
-                if (resizeState.direction.includes("n")) {
-                    nextTop = startTop + deltaY;
-                }
+                // Recompute origin so the "fixed" edge stays in place
+                let finalLeft = startLeft;
+                let finalTop = startTop;
+                if (resizeState.direction.includes("w")) finalLeft = startRight - newWidth;
+                if (resizeState.direction.includes("n")) finalTop = startBottom - newHeight;
 
-                resizeState.currentX = nextLeft;
-                resizeState.currentY = nextTop;
-                resizeState.currentWidth = nextRight - nextLeft;
-                resizeState.currentHeight = nextBottom - nextTop;
+                resizeState.currentX = finalLeft;
+                resizeState.currentY = finalTop;
+                resizeState.currentWidth = newWidth;
+                resizeState.currentHeight = newHeight;
+                resizeState.currentScale = newScale;
                 resizeState.hasMoved = true;
+
+                // Apply zoom directly to table element for immediate visual feedback
+                const tableElement = tableElementRefs.current[resizeState.tableId];
+                if (tableElement) {
+                    (tableElement.style as CSSStyleDeclaration & { zoom: string }).zoom = String(newScale);
+                }
 
                 const wrapper = tableWrapperRefs.current[resizeState.tableId];
                 if (wrapper) {
-                    wrapper.style.left = `${nextLeft}px`;
-                    wrapper.style.top = `${nextTop}px`;
-                    wrapper.style.width = `${nextRight - nextLeft}px`;
-                    wrapper.style.height = `${nextBottom - nextTop}px`;
+                    wrapper.style.left = `${finalLeft}px`;
+                    wrapper.style.top = `${finalTop}px`;
+                    wrapper.style.width = `${newWidth}px`;
+                    wrapper.style.height = `${newHeight}px`;
                 }
                 return;
             }
@@ -227,10 +232,15 @@ export function useCanvasPointer({
                 const state = resizeStateRef.current;
                 setTables((current) =>
                     current.map((table) =>
-                        table.id === state.tableId && state.currentX !== undefined && state.currentY !== undefined && state.currentWidth !== undefined && state.currentHeight !== undefined
+                        table.id === state.tableId &&
+                        state.currentX !== undefined &&
+                        state.currentY !== undefined &&
+                        state.currentWidth !== undefined &&
+                        state.currentHeight !== undefined &&
+                        state.currentScale !== undefined
                             ? {
                                   ...table,
-                                  hasCustomizedSize: true,
+                                  scale: state.currentScale,
                                   position: { x: state.currentX, y: state.currentY },
                                   size: { width: state.currentWidth, height: state.currentHeight }
                               }
@@ -253,6 +263,60 @@ export function useCanvasPointer({
             window.removeEventListener("pointerup", handlePointerUp);
         };
     }, [setTables]);
+
+    // ── Canvas zoom via Ctrl+Wheel ──
+    useEffect(() => {
+        const canvas = tableCanvasRef.current;
+        if (!canvas) return;
+
+        function handleWheel(event: WheelEvent) {
+            if (!event.ctrlKey && !event.metaKey) return;
+            event.preventDefault();
+
+            const delta = event.deltaY > 0 ? -CANVAS_ZOOM_STEP : CANVAS_ZOOM_STEP;
+            setCanvasZoom((prev) => {
+                const next = Math.round((prev + delta) * 100) / 100;
+                return Math.min(MAX_CANVAS_ZOOM, Math.max(MIN_CANVAS_ZOOM, next));
+            });
+        }
+
+        canvas.addEventListener("wheel", handleWheel, { passive: false });
+        return () => canvas.removeEventListener("wheel", handleWheel);
+    }, []);
+
+    const zoomIn = useCallback(() => {
+        setCanvasZoom((prev) => Math.min(MAX_CANVAS_ZOOM, Math.round((prev + CANVAS_ZOOM_STEP) * 100) / 100));
+    }, []);
+
+    const zoomOut = useCallback(() => {
+        setCanvasZoom((prev) => Math.max(MIN_CANVAS_ZOOM, Math.round((prev - CANVAS_ZOOM_STEP) * 100) / 100));
+    }, []);
+
+    const zoomReset = useCallback(() => {
+        setCanvasZoom(DEFAULT_CANVAS_ZOOM);
+    }, []);
+
+    const zoomToFit = useCallback(() => {
+        const canvas = tableCanvasRef.current;
+        if (!canvas) return;
+        const currentTables = tablesRef.current;
+        if (currentTables.length === 0) return;
+
+        // Compute bounding box of all tables in inner canvas coordinates
+        let maxRight = 0;
+        let maxBottom = 0;
+        for (const table of currentTables) {
+            maxRight = Math.max(maxRight, table.position.x + table.size.width);
+            maxBottom = Math.max(maxBottom, table.position.y + table.size.height);
+        }
+
+        if (maxRight <= 0 || maxBottom <= 0) return;
+
+        const viewportWidth = canvas.clientWidth;
+        const viewportHeight = canvas.clientHeight;
+        const fitZoom = Math.min(viewportWidth / maxRight, viewportHeight / maxBottom, MAX_CANVAS_ZOOM);
+        setCanvasZoom(Math.max(MIN_CANVAS_ZOOM, Math.round(fitZoom * 100) / 100));
+    }, []);
 
     const startTableMove = useCallback((tableId: string, event: ReactPointerEvent<HTMLDivElement>) => {
         if (editingTableIdRef.current || resizingTableIdRef.current) {
@@ -309,6 +373,8 @@ export function useCanvasPointer({
         setMovingTableId(null);
         setActiveTableId(tableId);
         setResizingTableId(tableId);
+        const naturalWidth = currentTable.size.width / currentTable.scale;
+        const naturalHeight = currentTable.size.height / currentTable.scale;
         resizeStateRef.current = {
             tableId,
             direction,
@@ -317,12 +383,22 @@ export function useCanvasPointer({
             startX: currentTable.position.x,
             startY: currentTable.position.y,
             startWidth: currentTable.size.width,
-            startHeight: currentTable.size.height
+            startHeight: currentTable.size.height,
+            startScale: currentTable.scale,
+            naturalWidth,
+            naturalHeight
         };
     }, [setActiveTableId]);
 
     return {
         tableCanvasRef,
+        canvasInnerRef,
+
+        canvasZoom,
+        zoomIn,
+        zoomOut,
+        zoomReset,
+        zoomToFit,
 
         movingTableId,
         resizingTableId,

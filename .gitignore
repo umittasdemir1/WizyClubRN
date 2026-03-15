@@ -17,6 +17,7 @@ node_modules/
 # Credentials / Secrets
 google-credentials.json
 **/google-credentials.json
+.mcp.json
 
 # Build Outputs
 dist/

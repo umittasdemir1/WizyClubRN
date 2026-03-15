@@ -125,7 +125,7 @@ export interface PivotTableInstance {
     layout: PivotLayout;
     headerColor: string;
     filterSelections: Record<string, string>;
-    hasCustomizedSize: boolean;
+    scale: number;
     position: {
         x: number;
         y: number;
@@ -198,10 +198,14 @@ export interface ResizeState {
     startY: number;
     startWidth: number;
     startHeight: number;
+    startScale: number;
+    naturalWidth: number;
+    naturalHeight: number;
     currentX?: number;
     currentY?: number;
     currentWidth?: number;
     currentHeight?: number;
+    currentScale?: number;
     hasMoved?: boolean;
 }
 
@@ -223,6 +227,11 @@ export const MIN_TABLE_HEIGHT = 220;
 export const DEFAULT_TABLE_WIDTH = 560;
 export const DEFAULT_TABLE_HEIGHT = 460;
 export const AUTO_FIT_SCROLLBAR_GUTTER = 16;
+
+export const MIN_CANVAS_ZOOM = 0.1;
+export const MAX_CANVAS_ZOOM = 3;
+export const DEFAULT_CANVAS_ZOOM = 1;
+export const CANVAS_ZOOM_STEP = 0.1;
 export const ACTION_BAR_ICON_CLASS = "h-[18px] w-[18px]";
 export const ACTION_BAR_ICON_STROKE = 1.95;
 export const PIVOT_FIELD_TEXT_TYPOGRAPHY = "font-display text-[0.96rem] font-light leading-[1.04] tracking-tight";
@@ -970,7 +979,7 @@ export function createPivotTable(index: number): PivotTableInstance {
         layout: DEFAULT_LAYOUT,
         headerColor: DEFAULT_TABLE_HEADER_COLOR,
         filterSelections: {},
-        hasCustomizedSize: false,
+        scale: 1,
         position: {
             x: offset,
             y: offset
@@ -1148,10 +1157,12 @@ function sanitizeTable(
                   )
               )
             : {};
-    const hasCustomizedSize =
-        typeof candidate.hasCustomizedSize === "boolean"
-            ? candidate.hasCustomizedSize
-            : nextSize.width !== fallback.size.width || nextSize.height !== fallback.size.height;
+    const scale =
+        typeof (candidate as { scale?: unknown }).scale === "number" &&
+        Number.isFinite((candidate as { scale?: unknown }).scale as number) &&
+        (candidate as { scale?: unknown }).scale as number > 0
+            ? (candidate as { scale?: unknown }).scale as number
+            : 1;
 
     return {
         id: typeof candidate.id === "string" && candidate.id ? candidate.id : fallback.id,
@@ -1161,7 +1172,7 @@ function sanitizeTable(
         filterSelections: nextFilterSelections,
         position: nextPosition,
         size: nextSize,
-        hasCustomizedSize
+        scale
     };
 }
 

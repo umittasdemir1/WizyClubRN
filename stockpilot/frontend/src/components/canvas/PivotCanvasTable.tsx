@@ -1,4 +1,4 @@
-import {
+import React, {
     memo,
     useMemo,
     type MutableRefObject,
@@ -149,7 +149,7 @@ function PivotCanvasTableComponent({
                 height: view.table.size.height,
                 zIndex
             }}
-            className={`absolute left-0 top-0 isolate flex max-h-full max-w-full flex-col overflow-visible rounded-none bg-white ${
+            className={`absolute left-0 top-0 isolate overflow-visible rounded-none bg-white ${
                 isMoving ? "cursor-grabbing " : isActive ? "cursor-grab " : ""
             }${
                 isActive
@@ -157,11 +157,8 @@ function PivotCanvasTableComponent({
                     : "shadow-[0_18px_42px_-34px_rgba(11,14,20,0.24)]"
             }`}
         >
-            {view.filteredRecords.length === 0 ? (
-                <div className="min-h-0 flex-1" />
-            ) : (
-                <div className="min-h-0 flex-1 overflow-hidden">
-                    <div className="h-full w-full overflow-auto">
+            {view.filteredRecords.length > 0 && (
+                <div className="absolute inset-0 overflow-hidden">
                         <table
                             ref={(node) => {
                                 if (node) {
@@ -171,9 +168,10 @@ function PivotCanvasTableComponent({
 
                                 delete tableElementRefs.current[view.table.id];
                             }}
+                            style={{ zoom: view.table.scale } as React.CSSProperties}
                             className="pivot-table w-max min-w-max table-auto border-collapse text-[13px] leading-tight text-slate-800"
                         >
-                            <thead className="sticky top-0 z-10 text-white" style={tableHeaderStyle}>
+                            <thead className="text-white" style={tableHeaderStyle}>
                                 <tr>
                                     {rowFields.map((fieldId, index) => (
                                         <th
@@ -330,7 +328,6 @@ function PivotCanvasTableComponent({
                                 </tr>
                             </tfoot>
                         </table>
-                    </div>
                 </div>
             )}
 

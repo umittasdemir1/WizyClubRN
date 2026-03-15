@@ -1,9 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import {
     ArrowUpAZ,
     ArrowUpZA,
     Check,
     ChevronDown,
+    Maximize2,
+    Minus,
     Palette,
     Plus,
     SquarePen,
@@ -63,6 +65,21 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
     });
 
     const emptyHeaderText = useTypewriter(["Table Editor"]);
+
+    // Compute the minimum inner canvas size to hold all tables (in unscaled coordinates)
+    // Then multiply by canvasZoom so the scrollable area fits the scaled content.
+    const canvasInnerStyle = useMemo(() => {
+        let maxRight = 0;
+        let maxBottom = 0;
+        for (const table of orchestration.tables) {
+            maxRight = Math.max(maxRight, table.position.x + table.size.width);
+            maxBottom = Math.max(maxBottom, table.position.y + table.size.height);
+        }
+        return {
+            width: maxRight * pointer.canvasZoom,
+            height: maxBottom * pointer.canvasZoom
+        };
+    }, [orchestration.tables, pointer.canvasZoom]);
 
     // Handle outside clicks to close menus
     useEffect(() => {
@@ -613,38 +630,89 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                         <div className="canvas-grid-pattern" />
                         <div
                             ref={pointer.tableCanvasRef}
-                            className="relative min-h-0 flex-1 overflow-hidden rounded-none"
+                            className="relative min-h-0 flex-1 overflow-auto rounded-none"
                             onPointerDown={(event) => {
-                                if (event.target === event.currentTarget) {
+                                if (event.target === event.currentTarget || (event.target as HTMLElement).hasAttribute("data-canvas-inner")) {
                                     orchestration.clearTableSelection();
                                 }
                             }}
                         >
-                            {orchestration.visibleTableViews.map((view, viewIndex) => {
-                                const isMoving =
-                                    pointer.movingTableId === view.table.id || pointer.resizingTableId === view.table.id;
-                                const tableLayer = isMoving
-                                    ? orchestration.visibleTableViews.length + 2
-                                    : orchestration.activeTableId === view.table.id
-                                      ? orchestration.visibleTableViews.length + 1
-                                      : viewIndex + 1;
+                            <div
+                                ref={pointer.canvasInnerRef}
+                                data-canvas-inner="true"
+                                style={{
+                                    transform: `scale(${pointer.canvasZoom})`,
+                                    transformOrigin: "0 0",
+                                    position: "relative",
+                                    width: canvasInnerStyle.width,
+                                    height: canvasInnerStyle.height,
+                                    minWidth: "100%",
+                                    minHeight: "100%"
+                                }}
+                            >
+                                {orchestration.visibleTableViews.map((view, viewIndex) => {
+                                    const isMoving =
+                                        pointer.movingTableId === view.table.id || pointer.resizingTableId === view.table.id;
+                                    const tableLayer = isMoving
+                                        ? orchestration.visibleTableViews.length + 2
+                                        : orchestration.activeTableId === view.table.id
+                                          ? orchestration.visibleTableViews.length + 1
+                                          : viewIndex + 1;
 
-                                return (
-                                    <PivotCanvasTable
-                                        key={view.table.id}
-                                        view={view}
-                                        zIndex={tableLayer}
-                                        isActive={orchestration.activeTableId === view.table.id}
-                                        isMoving={isMoving}
-                                        headerFilterSelections={orchestration.headerFilterSelections}
-                                        headerFilterSortDirections={orchestration.headerFilterSortDirections}
-                                        tableElementRefs={orchestration.tableElementRefs}
-                                        tableWrapperRefs={tableWrapperRefs}
-                                        onTablePointerDown={pointer.handleTablePointerDown}
-                                        onTableResizeStart={pointer.startTableResize}
-                                    />
-                                );
-                            })}
+                                    return (
+                                        <PivotCanvasTable
+                                            key={view.table.id}
+                                            view={view}
+                                            zIndex={tableLayer}
+                                            isActive={orchestration.activeTableId === view.table.id}
+                                            isMoving={isMoving}
+                                            headerFilterSelections={orchestration.headerFilterSelections}
+                                            headerFilterSortDirections={orchestration.headerFilterSortDirections}
+                                            tableElementRefs={orchestration.tableElementRefs}
+                                            tableWrapperRefs={tableWrapperRefs}
+                                            onTablePointerDown={pointer.handleTablePointerDown}
+                                            onTableResizeStart={pointer.startTableResize}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* ── Canvas zoom controls (bottom-left) ── */}
+                        <div className="absolute bottom-3 left-3 z-[100] flex items-center gap-1 rounded-[10px] border border-slate-200/80 bg-white/90 px-1 py-0.5 shadow-sm backdrop-blur-sm">
+                            <button
+                                type="button"
+                                onClick={pointer.zoomOut}
+                                className="inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+                                aria-label="Zoom out"
+                            >
+                                <Minus className="h-3.5 w-3.5" strokeWidth={2} />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={pointer.zoomReset}
+                                className="inline-flex h-6 min-w-[42px] items-center justify-center rounded-md px-1 font-display text-[11px] font-medium tabular-nums text-slate-700 transition hover:bg-slate-100"
+                                aria-label="Reset zoom"
+                            >
+                                {Math.round(pointer.canvasZoom * 100)}%
+                            </button>
+                            <button
+                                type="button"
+                                onClick={pointer.zoomIn}
+                                className="inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+                                aria-label="Zoom in"
+                            >
+                                <Plus className="h-3.5 w-3.5" strokeWidth={2} />
+                            </button>
+                            <div className="mx-0.5 h-4 w-px bg-slate-200" />
+                            <button
+                                type="button"
+                                onClick={pointer.zoomToFit}
+                                className="inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+                                aria-label="Zoom to fit"
+                            >
+                                <Maximize2 className="h-3.5 w-3.5" strokeWidth={2} />
+                            </button>
                         </div>
                     </div>
                 )}
