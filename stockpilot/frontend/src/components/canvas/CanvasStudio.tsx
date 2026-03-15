@@ -125,7 +125,7 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
         }> = [
             ...view.table.layout.rows.map((fieldId, rowIndex) => ({
                 key: `row-field:${fieldId}:${rowIndex}`,
-                title: getFieldDefinition(fieldId, orchestration.columns, orchestration.customMetrics).label,
+                title: getFieldDefinition(fieldId, orchestration.columns, orchestration.customMetrics, orchestration.columnOverrides).label,
                 kind: "row-field" as const,
                 options: getRowFieldFilterOptions(view, fieldId, rowIndex, orchestration.headerFilterSortDirections),
                 fieldId,
@@ -136,7 +136,7 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                       {
                           key: "column-group",
                           title: view.table.layout.columns
-                              .map((fieldId) => getFieldDefinition(fieldId, orchestration.columns, orchestration.customMetrics).label)
+                              .map((fieldId) => getFieldDefinition(fieldId, orchestration.columns, orchestration.customMetrics, orchestration.columnOverrides).label)
                               .join(" / "),
                           kind: "column-group" as const,
                           options: getColumnGroupFilterOptions(view, orchestration.headerFilterSortDirections)
@@ -144,7 +144,7 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                   ]
                 : view.pivotResult.valueFields.map((fieldId) => ({
                       key: `value-field:${fieldId}`,
-                      title: getFieldDefinition(fieldId, orchestration.columns, orchestration.customMetrics).label,
+                      title: getFieldDefinition(fieldId, orchestration.columns, orchestration.customMetrics, orchestration.columnOverrides).label,
                       kind: "value-field" as const,
                       options: getValueFieldFilterOptions(view, fieldId, orchestration.headerFilterSortDirections),
                       fieldId
