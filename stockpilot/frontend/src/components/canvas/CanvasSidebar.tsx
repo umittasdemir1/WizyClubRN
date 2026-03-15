@@ -180,6 +180,58 @@ function FieldListItem({
     );
 }
 
+function CellSelect<T extends string>({
+    value,
+    options,
+    onChange
+}: {
+    value: T;
+    options: { value: T; label: string }[];
+    onChange: (v: T) => void;
+}) {
+    const [open, setOpen] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+    const current = options.find((o) => o.value === value);
+
+    useEffect(() => {
+        if (!open) return;
+        function handleClick(e: MouseEvent) {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+        }
+        document.addEventListener("mousedown", handleClick);
+        return () => document.removeEventListener("mousedown", handleClick);
+    }, [open]);
+
+    return (
+        <div ref={ref} className="relative inline-block">
+            <button
+                type="button"
+                onClick={() => setOpen((p) => !p)}
+                className="flex items-center gap-1 rounded-[5px] px-2 py-0.5 text-[0.8rem] text-slate-600 transition hover:bg-slate-100"
+            >
+                <span>{current?.label ?? value}</span>
+                <ChevronDown className="h-3 w-3 text-slate-400" strokeWidth={1.8} />
+            </button>
+            {open && (
+                <div className="absolute left-0 top-full z-50 mt-1 min-w-[110px] overflow-hidden rounded-[8px] border border-slate-200 bg-white shadow-[0_8px_24px_-8px_rgba(11,14,20,0.18)]">
+                    {options.map((opt) => (
+                        <button
+                            key={opt.value}
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => { onChange(opt.value); setOpen(false); }}
+                            className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-[0.8rem] transition hover:bg-slate-50 ${opt.value === value ? "text-ink font-medium" : "text-slate-600"}`}
+                        >
+                            {opt.label}
+                            {opt.value === value && <Check className="h-3 w-3 text-brand" strokeWidth={2.5} />}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
 function FormulaTokenChip({
     token,
     columns,
@@ -1122,60 +1174,51 @@ export function CanvasSidebar({
 
         {activePanel === "field-editor" && createPortal(
             <div
-                className="fixed inset-0 z-[9999] flex items-center justify-center p-6"
+                className="fixed inset-0 z-[9999] flex items-center justify-center p-8"
                 onMouseDown={() => setActivePanel("layout")}
             >
-                <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[6px]" />
+                <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
                 <div
-                    className="relative z-10 flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-[20px] border border-slate-200/60 bg-white shadow-[0_40px_120px_-30px_rgba(11,14,20,0.45)]"
+                    className="relative z-10 flex max-h-[84vh] w-full max-w-3xl flex-col overflow-hidden rounded-[14px] border border-slate-200 bg-white shadow-[0_24px_64px_-16px_rgba(11,14,20,0.22)]"
                     onMouseDown={(e) => e.stopPropagation()}
                 >
                     {/* Header */}
-                    <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-5">
-                        <div>
-                            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-slate-400">Dataset</p>
-                            <h2 className="mt-0.5 font-display text-[1.6rem] font-light leading-[1.05] tracking-tight text-ink">
-                                Field editor
-                            </h2>
-                        </div>
+                    <div className="flex items-center justify-between px-5 py-4">
                         <div className="flex items-center gap-3">
-                            <span className="text-[0.75rem] text-slate-400">
-                                {columns.length} fields · {Object.keys(columnOverrides).length} modified
-                            </span>
+                            <h2 className="text-[0.9rem] font-semibold text-ink">Field editor</h2>
+                            <span className="text-[0.78rem] text-slate-400">{columns.length} fields</span>
                             {Object.keys(columnOverrides).length > 0 && (
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        columns.forEach((col) => updateColumnOverride(col.key, null));
-                                    }}
-                                    className="rounded-[8px] px-2.5 py-1 text-[0.75rem] text-slate-400 transition hover:bg-slate-100 hover:text-red-500"
+                                    onClick={() => columns.forEach((col) => updateColumnOverride(col.key, null))}
+                                    className="text-[0.78rem] text-slate-400 transition hover:text-red-400"
                                 >
                                     Reset all
                                 </button>
                             )}
-                            <button
-                                type="button"
-                                onClick={() => setActivePanel("layout")}
-                                className="rounded-full p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-ink"
-                            >
-                                <X className="h-4 w-4" strokeWidth={1.5} />
-                            </button>
                         </div>
+                        <button
+                            type="button"
+                            onClick={() => setActivePanel("layout")}
+                            className="rounded-[6px] p-1 text-slate-400 transition hover:bg-slate-100 hover:text-ink"
+                        >
+                            <X className="h-4 w-4" strokeWidth={1.5} />
+                        </button>
                     </div>
 
                     {/* Table */}
-                    <div className="flex-1 overflow-auto">
-                        <table className="w-full border-collapse text-[13px]">
-                            <thead className="sticky top-0 z-10 bg-slate-50">
-                                <tr>
-                                    <th className="border-b border-slate-100 px-5 py-2 text-left text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-slate-400">Field</th>
-                                    <th className="border-b border-slate-100 px-3 py-2 text-left text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-slate-400">Display name</th>
-                                    <th className="w-[110px] border-b border-slate-100 px-3 py-2 text-left text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-slate-400">Type</th>
-                                    <th className="w-[80px] border-b border-slate-100 px-3 py-2 text-left text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-slate-400">Format</th>
-                                    <th className="w-8 border-b border-slate-100" />
+                    <div className="flex-1 overflow-auto border-t border-slate-100">
+                        <table className="w-full border-collapse">
+                            <thead className="sticky top-0 z-10 bg-white">
+                                <tr className="border-b border-slate-100">
+                                    <th className="px-5 py-2 text-left text-[0.68rem] font-medium text-slate-400">Field</th>
+                                    <th className="px-4 py-2 text-left text-[0.68rem] font-medium text-slate-400">Display name</th>
+                                    <th className="w-[100px] px-4 py-2 text-left text-[0.68rem] font-medium text-slate-400">Type</th>
+                                    <th className="w-[110px] px-4 py-2 text-left text-[0.68rem] font-medium text-slate-400">Format</th>
+                                    <th className="w-9 px-3 py-2" />
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100">
+                            <tbody>
                                 {columns.map((col) => {
                                     const override = columnOverrides[col.key];
                                     const effectiveType = override?.typeOverride ?? col.type;
@@ -1183,59 +1226,56 @@ export function CanvasSidebar({
                                     const isSaved = savedRows.has(col.key);
 
                                     return (
-                                        <tr key={col.key} className="hover:bg-slate-50/50">
-                                            {/* Original key */}
-                                            <td className="px-5 py-1.5 align-middle">
-                                                <span className="font-mono text-[0.76rem] text-slate-400">{col.key}</span>
+                                        <tr key={col.key} className="border-b border-slate-100/80 transition-colors hover:bg-slate-50">
+                                            {/* Original field key */}
+                                            <td className="px-5 py-2 align-middle">
+                                                <span className="font-mono text-[0.75rem] text-slate-400">{col.key}</span>
                                             </td>
 
                                             {/* Display name */}
-                                            <td className="px-3 py-1.5 align-middle">
+                                            <td className="px-4 py-2 align-middle">
                                                 <input
-                                                    className="w-full appearance-none border-0 bg-transparent text-[0.84rem] text-ink outline-none placeholder:text-slate-300 focus:outline-none"
+                                                    className="w-full bg-transparent text-[0.84rem] text-ink outline-none placeholder:text-slate-300"
                                                     value={override?.label ?? col.label}
                                                     placeholder={col.label}
                                                     onChange={(e) => applyColumnOverride(col.key, { baseCol: col, label: e.target.value || col.label })}
                                                 />
                                             </td>
 
-                                            {/* Type dropdown */}
-                                            <td className="px-3 py-1.5 align-middle">
-                                                <select
-                                                    className="w-full appearance-none border-0 bg-transparent text-[0.82rem] text-slate-600 outline-none cursor-pointer"
+                                            {/* Type */}
+                                            <td className="px-4 py-2 align-middle">
+                                                <CellSelect<"text" | "numeric" | "date">
                                                     value={effectiveType}
-                                                    onChange={(e) => {
-                                                        const t = e.target.value as "text" | "numeric" | "date";
-                                                        applyColumnOverride(col.key, { baseCol: col, typeOverride: t, format: override?.format ?? "integer" });
-                                                    }}
-                                                >
-                                                    <option value="text">Text</option>
-                                                    <option value="numeric">Number</option>
-                                                    <option value="date">Date</option>
-                                                </select>
+                                                    options={[
+                                                        { value: "text", label: "Text" },
+                                                        { value: "numeric", label: "Number" },
+                                                        { value: "date", label: "Date" }
+                                                    ]}
+                                                    onChange={(t) => applyColumnOverride(col.key, { baseCol: col, typeOverride: t, format: override?.format ?? "integer" })}
+                                                />
                                             </td>
 
-                                            {/* Format dropdown */}
-                                            <td className="px-3 py-1.5 align-middle">
+                                            {/* Format */}
+                                            <td className="px-4 py-2 align-middle">
                                                 {effectiveType === "numeric" ? (
-                                                    <select
-                                                        className="w-full appearance-none border-0 bg-transparent text-[0.82rem] text-slate-600 outline-none cursor-pointer"
+                                                    <CellSelect<CustomMetricFormat>
                                                         value={override?.format ?? "integer"}
-                                                        onChange={(e) => applyColumnOverride(col.key, { baseCol: col, format: e.target.value as CustomMetricFormat })}
-                                                    >
-                                                        <option value="integer">Integer</option>
-                                                        <option value="decimal">Decimal</option>
-                                                        <option value="percent">Percent</option>
-                                                        <option value="currency">Currency</option>
-                                                        <option value="multiplier">Multiplier</option>
-                                                    </select>
+                                                        options={[
+                                                            { value: "integer", label: "Integer" },
+                                                            { value: "decimal", label: "Decimal" },
+                                                            { value: "percent", label: "Percent" },
+                                                            { value: "currency", label: "Currency" },
+                                                            { value: "multiplier", label: "Multiplier" }
+                                                        ]}
+                                                        onChange={(fmt) => applyColumnOverride(col.key, { baseCol: col, format: fmt })}
+                                                    />
                                                 ) : (
-                                                    <span className="text-slate-300">—</span>
+                                                    <span className="text-[0.8rem] text-slate-300">—</span>
                                                 )}
                                             </td>
 
-                                            {/* Actions */}
-                                            <td className="pr-4 align-middle">
+                                            {/* Status / reset */}
+                                            <td className="px-3 py-2 align-middle">
                                                 {isSaved ? (
                                                     <Check className="h-3.5 w-3.5 text-emerald-400" strokeWidth={2.5} />
                                                 ) : isModified ? (
@@ -1243,7 +1283,6 @@ export function CanvasSidebar({
                                                         type="button"
                                                         onMouseDown={(e) => e.preventDefault()}
                                                         onClick={() => { updateColumnOverride(col.key, null); flashSaved(col.key); }}
-                                                        title="Reset"
                                                         className="text-slate-300 transition hover:text-red-400"
                                                     >
                                                         <RotateCcw className="h-3.5 w-3.5" strokeWidth={1.8} />
