@@ -40,13 +40,16 @@ export function toIsoDate(value: unknown): string | null {
     const isoMatch = text.match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})$/);
     if (isoMatch) return buildIsoDate(Number(isoMatch[1]), Number(isoMatch[2]), Number(isoMatch[3]));
 
-    const localeMatch = text.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
+    // Strip trailing time component: "12.03.2026 00:00:00" → "12.03.2026"
+    const dateOnlyText = text.replace(/\s+\d{1,2}:\d{2}(:\d{2})?$/, "").trim();
+
+    const localeMatch = dateOnlyText.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
     if (localeMatch) {
         const year = localeMatch[3].length === 2 ? Number(`20${localeMatch[3]}`) : Number(localeMatch[3]);
         return buildIsoDate(year, Number(localeMatch[2]), Number(localeMatch[1]));
     }
 
-    const ts = Date.parse(text);
+    const ts = Date.parse(dateOnlyText);
     if (Number.isFinite(ts)) return new Date(ts).toISOString().slice(0, 10);
 
     return null;
@@ -56,6 +59,7 @@ export function toFiniteNumber(value: unknown): number | null {
     if (typeof value === "number" && Number.isFinite(value)) return value;
     if (typeof value === "string" && value.trim()) {
         const cleaned = value.replace(/[^\d,.-]/g, "").trim();
+        if (!cleaned) return null;
         const normalized =
             cleaned.includes(",") && cleaned.includes(".")
                 ? cleaned.lastIndexOf(",") > cleaned.lastIndexOf(".")
