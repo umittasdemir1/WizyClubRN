@@ -780,62 +780,45 @@ function getRecordFieldValue(
     return result;
 }
 
-function getDimensionValue(
+// ── Perf helpers: pre-built Map lookups instead of array.find() per record ──
+
+function fieldDefFromMaps(
+    fieldId: PivotFieldId,
+    colMap: Map<string, ColumnMeta>,
+    metricMap: Map<string, CustomMetricDefinition>
+): PivotFieldDefinition {
+    if (isCustomMetricFieldId(fieldId)) {
+        const m = metricMap.get(fieldId);
+        return m ? buildCustomMetricFieldDefinition(m) : FALLBACK_FIELD_DEF(fieldId);
+    }
+    const col = colMap.get(fieldId);
+    return col ? columnMetaToFieldDefinition(col) : FALLBACK_FIELD_DEF(fieldId);
+}
+
+function getDimensionValueFast(
     record: GenericRow,
     fieldId: PivotFieldId,
-    columns: ColumnMeta[] = [],
-    customMetrics: CustomMetricDefinition[] = []
-) {
-    const field = getFieldDefinition(fieldId, columns, customMetrics);
-    const rawValue = getRecordFieldValue(record, fieldId, customMetrics);
-
-    if (rawValue === null || rawValue === undefined || rawValue === "") {
-        return "(Blank)";
+    fieldDef: PivotFieldDefinition,
+    customMetrics: CustomMetricDefinition[]
+): string {
+    let rawValue: unknown;
+    if (isCustomMetricFieldId(fieldId)) {
+        rawValue = getRecordFieldValue(record, fieldId, customMetrics);
+    } else {
+        rawValue = record[fieldId] ?? null;
     }
-
+    if (rawValue === null || rawValue === undefined || rawValue === "") return "(Blank)";
     if (isCustomMetricFieldId(fieldId)) {
         const metric = customMetrics.find((m) => m.id === fieldId);
         if (metric) return formatWithCustomMetricFormat(toFiniteNumber(rawValue), metric.format);
     }
-
-    if (field.format === "date") {
-        return formatNullableDate(typeof rawValue === "string" ? rawValue : String(rawValue));
-    }
-
-    if (field.format === "percent") {
-        return formatPercent(toFiniteNumber(rawValue));
-    }
-
-    if (field.format === "number") {
-        return formatNumber(toFiniteNumber(rawValue));
-    }
-
+    if (fieldDef.format === "date") return formatNullableDate(typeof rawValue === "string" ? rawValue : String(rawValue));
+    if (fieldDef.format === "percent") return formatPercent(toFiniteNumber(rawValue));
+    if (fieldDef.format === "number") return formatNumber(toFiniteNumber(rawValue));
     return String(rawValue);
 }
 
-function getMeasureInput(
-    record: GenericRow,
-    fieldId: PivotFieldId,
-    columns: ColumnMeta[] = [],
-    customMetrics: CustomMetricDefinition[] = []
-) {
-    const field = getFieldDefinition(fieldId, columns, customMetrics);
-    const rawValue = getRecordFieldValue(record, fieldId, customMetrics);
-
-    if (field.kind === "dimension" || field.summary === "count") {
-        return {
-            sum: rawValue === null || rawValue === undefined || rawValue === "" ? 0 : 1,
-            count: rawValue === null || rawValue === undefined || rawValue === "" ? 0 : 1
-        };
-    }
-
-    const numericValue = toFiniteNumber(rawValue);
-
-    return {
-        sum: numericValue,
-        count: 1
-    };
-}
+// ────────────────────────────────────────────────────────────────────────────
 
 export function resolveAggregationValue(
     fieldId: PivotFieldId,
@@ -923,26 +906,6 @@ export function formatAggregatedValue(
     const field = getFieldDefinition(fieldId, columns, customMetrics);
     if (field.format === "percent") return formatPercent(value);
     return formatNumber(value);
-}
-
-function buildComboKey(
-    record: GenericRow,
-    fieldIds: PivotFieldId[],
-    columns: ColumnMeta[] = [],
-    customMetrics: CustomMetricDefinition[] = []
-) {
-    if (fieldIds.length === 0) {
-        return {
-            key: "__total__",
-            labels: ["Grand Total"]
-        };
-    }
-
-    const labels = fieldIds.map((fieldId) => getDimensionValue(record, fieldId, columns, customMetrics));
-    return {
-        key: labels.join("|||"),
-        labels
-    };
 }
 
 function sortCombos(combos: PivotCombo[]) {
@@ -1251,12 +1214,17 @@ export function buildFilterOptions(
     columns: ColumnMeta[] = [],
     customMetrics: CustomMetricDefinition[] = []
 ) {
-    return filterFields.reduce<Record<string, string[]>>((accumulator, fieldId) => {
+    const colMap = new Map<string, ColumnMeta>(columns.map((c) => [c.key, c]));
+    const metricMap = new Map<string, CustomMetricDefinition>(customMetrics.map((m) => [m.id, m]));
+    const fieldDefs = filterFields.map((id) => fieldDefFromMaps(id, colMap, metricMap));
+
+    return filterFields.reduce<Record<string, string[]>>((accumulator, fieldId, i) => {
+        const fieldDef = fieldDefs[i];
         const values = sortCombos(
             Array.from(
                 new Map(
                     records.map((record) => {
-                        const label = getDimensionValue(record, fieldId, columns, customMetrics);
+                        const label = getDimensionValueFast(record, fieldId, fieldDef, customMetrics);
                         return [label, { key: label, labels: [label] }];
                     })
                 ).values()
@@ -1275,14 +1243,16 @@ export function applyFilters(
     columns: ColumnMeta[] = [],
     customMetrics: CustomMetricDefinition[] = []
 ) {
-    return records.filter((record) =>
-        layout.filters.every((fieldId) => {
-            const selectedValue = filterSelections[fieldId] ?? ALL_FILTER_VALUE;
-            if (selectedValue === ALL_FILTER_VALUE) {
-                return true;
-            }
+    if (layout.filters.length === 0) return records;
+    const colMap = new Map<string, ColumnMeta>(columns.map((c) => [c.key, c]));
+    const metricMap = new Map<string, CustomMetricDefinition>(customMetrics.map((m) => [m.id, m]));
+    const fieldDefs = layout.filters.map((id) => fieldDefFromMaps(id, colMap, metricMap));
 
-            return getDimensionValue(record, fieldId, columns, customMetrics) === selectedValue;
+    return records.filter((record) =>
+        layout.filters.every((fieldId, i) => {
+            const selectedValue = filterSelections[fieldId] ?? ALL_FILTER_VALUE;
+            if (selectedValue === ALL_FILTER_VALUE) return true;
+            return getDimensionValueFast(record, fieldId, fieldDefs[i], customMetrics) === selectedValue;
         })
     );
 }
@@ -1293,16 +1263,37 @@ export function buildPivotResult(
     columns: ColumnMeta[] = [],
     customMetrics: CustomMetricDefinition[] = []
 ): PivotResult {
+    // ── Pre-build O(1) lookup maps — avoids columns.find() per row×field ────
+    const colMap = new Map<string, ColumnMeta>(columns.map((c) => [c.key, c]));
+    const metricMap = new Map<string, CustomMetricDefinition>(customMetrics.map((m) => [m.id, m]));
+
+    // Pre-compute field defs for layout fields once (not per record)
+    const rowFieldDefs = layout.rows.map((id) => fieldDefFromMaps(id, colMap, metricMap));
+    const colFieldDefs = layout.columns.map((id) => fieldDefFromMaps(id, colMap, metricMap));
+
+    function getRowCombo(record: GenericRow): PivotCombo {
+        if (layout.rows.length === 0) return { key: "__total__", labels: ["Grand Total"] };
+        const labels = layout.rows.map((id, i) => getDimensionValueFast(record, id, rowFieldDefs[i], customMetrics));
+        return { key: labels.join("|||"), labels };
+    }
+
+    function getColCombo(record: GenericRow): PivotCombo {
+        if (layout.columns.length === 0) return { key: "__total__", labels: ["Grand Total"] };
+        const labels = layout.columns.map((id, i) => getDimensionValueFast(record, id, colFieldDefs[i], customMetrics));
+        return { key: labels.join("|||"), labels };
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
     const valueFields: PivotFieldId[] = layout.values.length > 0 ? layout.values : [];
 
     if (valueFields.length === 0) {
         const rowMap = new Map<string, PivotCombo>();
         const columnMap = new Map<string, PivotCombo>();
         for (const record of filteredRecords) {
-            const rowCombo = buildComboKey(record, layout.rows, columns, customMetrics);
-            const columnCombo = buildComboKey(record, layout.columns, columns, customMetrics);
+            const rowCombo = getRowCombo(record);
+            const colCombo = getColCombo(record);
             rowMap.set(rowCombo.key, rowCombo);
-            columnMap.set(columnCombo.key, columnCombo);
+            columnMap.set(colCombo.key, colCombo);
         }
         if (layout.rows.length === 0 && rowMap.size === 0) rowMap.set("__total__", { key: "__total__", labels: ["Grand Total"] });
         if (layout.columns.length === 0 && columnMap.size === 0) columnMap.set("__total__", { key: "__total__", labels: ["Grand Total"] });
@@ -1320,42 +1311,56 @@ export function buildPivotResult(
             return accumulator;
         }, new Set<PivotFieldId>())
     );
+
+    // Pre-compute agg field defs once
+    const aggFieldDefs = aggregateFieldIds.map((id) => fieldDefFromMaps(id, colMap, metricMap));
+    const nAgg = aggregateFieldIds.length;
+
     const rowMap = new Map<string, PivotCombo>();
     const columnMap = new Map<string, PivotCombo>();
     const matrix = new Map<string, Map<string, Record<string, AggregationState>>>();
 
     for (const record of filteredRecords) {
-        const rowCombo = buildComboKey(record, layout.rows, columns, customMetrics);
-        const columnCombo = buildComboKey(record, layout.columns, columns, customMetrics);
+        const rowCombo = getRowCombo(record);
+        const colCombo = getColCombo(record);
 
-        rowMap.set(rowCombo.key, rowCombo);
-        columnMap.set(columnCombo.key, columnCombo);
+        if (!rowMap.has(rowCombo.key)) rowMap.set(rowCombo.key, rowCombo);
+        if (!columnMap.has(colCombo.key)) columnMap.set(colCombo.key, colCombo);
 
-        const rowBucket = matrix.get(rowCombo.key) ?? new Map<string, Record<string, AggregationState>>();
-        const cell =
-            rowBucket.get(columnCombo.key) ??
-            (Object.fromEntries(aggregateFieldIds.map((fieldId) => [fieldId, { sum: 0, count: 0 }])) as Record<
-                string,
-                AggregationState
-            >);
+        let rowBucket = matrix.get(rowCombo.key);
+        if (!rowBucket) { rowBucket = new Map(); matrix.set(rowCombo.key, rowBucket); }
 
-        for (const fieldId of aggregateFieldIds) {
-            const input = getMeasureInput(record, fieldId, columns, customMetrics);
-            cell[fieldId].sum += input.sum;
-            cell[fieldId].count += input.count;
+        let cell = rowBucket.get(colCombo.key);
+        if (!cell) {
+            cell = {} as Record<string, AggregationState>;
+            for (const id of aggregateFieldIds) cell[id] = { sum: 0, count: 0 };
+            rowBucket.set(colCombo.key, cell);
         }
 
-        rowBucket.set(columnCombo.key, cell);
-        matrix.set(rowCombo.key, rowBucket);
+        // Inline measure accumulation — no getFieldDefinition call per record
+        for (let i = 0; i < nAgg; i++) {
+            const fieldId = aggregateFieldIds[i];
+            const fieldDef = aggFieldDefs[i];
+            let rawValue: unknown;
+            if (isCustomMetricFieldId(fieldId)) {
+                rawValue = getRecordFieldValue(record, fieldId, customMetrics);
+            } else {
+                rawValue = record[fieldId] ?? null;
+            }
+            const aggCell = cell[fieldId];
+            if (fieldDef.kind === "dimension" || fieldDef.summary === "count") {
+                const has = rawValue !== null && rawValue !== undefined && rawValue !== "";
+                aggCell.sum += has ? 1 : 0;
+                aggCell.count += has ? 1 : 0;
+            } else {
+                aggCell.sum += toFiniteNumber(rawValue);
+                aggCell.count += 1;
+            }
+        }
     }
 
-    if (layout.rows.length === 0 && rowMap.size === 0) {
-        rowMap.set("__total__", { key: "__total__", labels: ["Grand Total"] });
-    }
-
-    if (layout.columns.length === 0 && columnMap.size === 0) {
-        columnMap.set("__total__", { key: "__total__", labels: ["Grand Total"] });
-    }
+    if (layout.rows.length === 0 && rowMap.size === 0) rowMap.set("__total__", { key: "__total__", labels: ["Grand Total"] });
+    if (layout.columns.length === 0 && columnMap.size === 0) columnMap.set("__total__", { key: "__total__", labels: ["Grand Total"] });
 
     return {
         valueFields,
