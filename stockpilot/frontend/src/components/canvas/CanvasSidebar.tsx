@@ -349,6 +349,7 @@ export function CanvasSidebar({
     const savedTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
     const [savedRows, setSavedRows] = useState<Set<string>>(new Set());
     const [fieldEditorSort, setFieldEditorSort] = useState<{ key: "field" | "label" | "type" | "format"; direction: "asc" | "desc" } | null>(null);
+    const [pendingOverrides, setPendingOverrides] = useState<Record<string, { label: string; typeOverride?: "text" | "numeric" | "date"; format: CustomMetricFormat }>>({});
 
     function flashSaved(key: string) {
         if (savedTimeoutsRef.current[key]) clearTimeout(savedTimeoutsRef.current[key]);
@@ -358,17 +359,31 @@ export function CanvasSidebar({
         }, 1800);
     }
 
-    function applyColumnOverride(key: string, patch: Partial<ColumnOverride> & { baseCol: import("../../types/stock").ColumnMeta }) {
-        const { baseCol, ...rest } = patch;
-        const current = columnOverrides[key];
-        const base: ColumnOverride = {
-            label: current?.label ?? baseCol.label,
-            format: current?.format ?? "integer"
-        };
-        if (current?.typeOverride) base.typeOverride = current.typeOverride;
-        const next: ColumnOverride = { ...base, ...rest };
+    function updatePending(key: string, col: import("../../types/stock").ColumnMeta, patch: Partial<{ label: string; typeOverride: "text" | "numeric" | "date"; format: CustomMetricFormat }>) {
+        setPendingOverrides((prev) => {
+            const committed = columnOverrides[key];
+            const current = prev[key] ?? {
+                label: committed?.label ?? col.label,
+                ...(committed?.typeOverride ? { typeOverride: committed.typeOverride } : {}),
+                format: (committed?.format ?? "integer") as CustomMetricFormat
+            };
+            return { ...prev, [key]: { ...current, ...patch } };
+        });
+    }
+
+    function saveRow(key: string) {
+        const pending = pendingOverrides[key];
+        if (!pending) return;
+        const next: ColumnOverride = { label: pending.label, format: pending.format };
+        if (pending.typeOverride) next.typeOverride = pending.typeOverride;
         updateColumnOverride(key, next);
+        setPendingOverrides((prev) => { const n = { ...prev }; delete n[key]; return n; });
         flashSaved(key);
+    }
+
+    function resetRow(key: string) {
+        updateColumnOverride(key, null);
+        setPendingOverrides((prev) => { const n = { ...prev }; delete n[key]; return n; });
     }
     const allFields = useMemo(() => {
         const fields = getAvailablePivotFields(columns, customMetrics, columnOverrides);
@@ -412,6 +427,9 @@ export function CanvasSidebar({
     useEffect(() => {
         if (activePanel === "calculations") {
             setTimeout(() => manualInputRef.current?.focus(), 100);
+        }
+        if (activePanel !== "field-editor") {
+            setPendingOverrides({});
         }
     }, [activePanel]);
 
@@ -1244,7 +1262,7 @@ export function CanvasSidebar({
                                 <col />
                                 <col className="w-[110px]" />
                                 <col className="w-[120px]" />
-                                <col className="w-9" />
+                                <col className="w-[72px]" />
                             </colgroup>
                             <thead className="sticky top-0 z-10 bg-white">
                                 <tr className="border-b border-slate-100">
@@ -1265,9 +1283,13 @@ export function CanvasSidebar({
                             </thead>
                             <tbody>
                                 {sortedColumns.map((col) => {
-                                    const override = columnOverrides[col.key];
-                                    const effectiveType = override?.typeOverride ?? col.type;
-                                    const isModified = !!override;
+                                    const pending = pendingOverrides[col.key];
+                                    const committed = columnOverrides[col.key];
+                                    const effectiveLabel = pending?.label ?? committed?.label ?? col.label;
+                                    const effectiveType = (pending?.typeOverride ?? committed?.typeOverride ?? col.type) as "text" | "numeric" | "date";
+                                    const effectiveFormat = (pending?.format ?? committed?.format ?? "integer") as CustomMetricFormat;
+                                    const isDirty = !!pending;
+                                    const isModified = !!committed;
                                     const isSaved = savedRows.has(col.key);
 
                                     return (
@@ -1281,9 +1303,9 @@ export function CanvasSidebar({
                                             <td className="px-4 py-2 align-middle">
                                                 <input
                                                     className="w-full bg-transparent text-[0.84rem] text-ink outline-none placeholder:text-slate-300"
-                                                    value={override?.label ?? col.label}
+                                                    value={effectiveLabel}
                                                     placeholder={col.label}
-                                                    onChange={(e) => applyColumnOverride(col.key, { baseCol: col, label: e.target.value || col.label })}
+                                                    onChange={(e) => updatePending(col.key, col, { label: e.target.value || col.label })}
                                                 />
                                             </td>
 
@@ -1296,7 +1318,7 @@ export function CanvasSidebar({
                                                         { value: "numeric", label: "Number" },
                                                         { value: "date", label: "Date" }
                                                     ]}
-                                                    onChange={(t) => applyColumnOverride(col.key, { baseCol: col, typeOverride: t, format: override?.format ?? "integer" })}
+                                                    onChange={(t) => updatePending(col.key, col, { typeOverride: t })}
                                                 />
                                             </td>
 
@@ -1304,7 +1326,7 @@ export function CanvasSidebar({
                                             <td className="px-4 py-2 align-middle">
                                                 {effectiveType === "numeric" ? (
                                                     <CellSelect<CustomMetricFormat>
-                                                        value={override?.format ?? "integer"}
+                                                        value={effectiveFormat}
                                                         options={[
                                                             { value: "integer", label: "Integer" },
                                                             { value: "decimal", label: "Decimal" },
@@ -1312,23 +1334,33 @@ export function CanvasSidebar({
                                                             { value: "currency", label: "Currency" },
                                                             { value: "multiplier", label: "Multiplier" }
                                                         ]}
-                                                        onChange={(fmt) => applyColumnOverride(col.key, { baseCol: col, format: fmt })}
+                                                        onChange={(fmt) => updatePending(col.key, col, { format: fmt })}
                                                     />
                                                 ) : (
                                                     <span className="text-[0.8rem] text-slate-300">—</span>
                                                 )}
                                             </td>
 
-                                            {/* Status / reset */}
-                                            <td className="px-3 py-2 align-middle text-center">
+                                            {/* Save / Saved / Reset */}
+                                            <td className="px-3 py-2 align-middle">
                                                 {isSaved ? (
-                                                    <Check className="h-3.5 w-3.5 text-emerald-400" strokeWidth={2.5} />
+                                                    <span className="text-[0.72rem] font-medium text-emerald-500">Saved</span>
+                                                ) : isDirty ? (
+                                                    <button
+                                                        type="button"
+                                                        onMouseDown={(e) => e.preventDefault()}
+                                                        onClick={() => saveRow(col.key)}
+                                                        className="rounded-full bg-ink px-2.5 py-0.5 text-[0.72rem] font-medium text-white transition hover:bg-slate-700"
+                                                    >
+                                                        Save
+                                                    </button>
                                                 ) : isModified ? (
                                                     <button
                                                         type="button"
                                                         onMouseDown={(e) => e.preventDefault()}
-                                                        onClick={() => { updateColumnOverride(col.key, null); flashSaved(col.key); }}
+                                                        onClick={() => resetRow(col.key)}
                                                         className="text-slate-300 transition hover:text-red-400"
+                                                        title="Reset"
                                                     >
                                                         <RotateCcw className="h-3.5 w-3.5" strokeWidth={1.8} />
                                                     </button>
