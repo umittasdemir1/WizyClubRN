@@ -2,6 +2,7 @@ import {
     STORAGE_KEY,
     sanitizeStudioState,
     type CustomMetricDefinition,
+    type PivotFieldId,
     type PivotTableInstance
 } from "./canvasModel";
 
@@ -9,6 +10,7 @@ interface PersistedStudioState {
     tables: PivotTableInstance[];
     activeTableId: string | null;
     customMetrics: CustomMetricDefinition[];
+    pinnedFieldIds: PivotFieldId[];
 }
 
 export function loadStudioState(): PersistedStudioState {

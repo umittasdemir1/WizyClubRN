@@ -29,6 +29,7 @@ export function usePivotOrchestration(analysis: AnalysisResult | null) {
     const [activeTableId, setActiveTableId] = useState<string | null>(initialState.activeTableId);
     const [lastActiveTableId, setLastActiveTableId] = useState<string | null>(initialState.activeTableId);
     const [customMetrics, setCustomMetrics] = useState<CustomMetricDefinition[]>(initialState.customMetrics);
+    const [pinnedFieldIds, setPinnedFieldIds] = useState<PivotFieldId[]>(initialState.pinnedFieldIds);
     
     // Drag and Drop State
     const [dragZone, setDragZone] = useState<PivotZoneId | null>(null);
@@ -57,15 +58,17 @@ export function usePivotOrchestration(analysis: AnalysisResult | null) {
         setTables(nextState.tables);
         setActiveTableId(nextState.activeTableId);
         setCustomMetrics(nextState.customMetrics);
+        setPinnedFieldIds(nextState.pinnedFieldIds);
     }, []);
 
     useEffect(() => {
         persistStudioState({
             tables,
             activeTableId,
-            customMetrics
+            customMetrics,
+            pinnedFieldIds
         });
-    }, [activeTableId, customMetrics, tables]);
+    }, [activeTableId, customMetrics, tables, pinnedFieldIds]);
 
     // Derived States
     useEffect(() => {
@@ -107,11 +110,6 @@ export function usePivotOrchestration(analysis: AnalysisResult | null) {
         }
 
         if (openHeaderFilter.kind === "column-group" && table.layout.columns.length === 0) {
-            setOpenHeaderFilter(null);
-            return;
-        }
-
-        if (openHeaderFilter.kind === "table-menu" && table.layout.values.length === 0) {
             setOpenHeaderFilter(null);
             return;
         }
@@ -508,6 +506,8 @@ export function usePivotOrchestration(analysis: AnalysisResult | null) {
         tables,
         setTables,
         customMetrics,
+        pinnedFieldIds,
+        setPinnedFieldIds,
         fieldDefinitions,
         activeTable,
         activeTableId,

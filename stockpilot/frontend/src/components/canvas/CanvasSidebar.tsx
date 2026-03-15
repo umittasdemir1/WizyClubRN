@@ -1,7 +1,10 @@
 import { motion } from "framer-motion";
 import {
+    ArrowUpAZ,
+    ArrowUpZA,
     BetweenHorizontalStart,
     BetweenVerticalStart,
+    Bookmark,
     Check,
     ChevronDown,
     ChevronUp,
@@ -9,7 +12,6 @@ import {
     Diff,
     EyeClosed,
     Grip,
-    Pin,
     Sigma,
     SlidersHorizontal,
     SquarePen,
@@ -68,6 +70,7 @@ interface CanvasSidebarProps {
     dragZone: PivotZoneId | null;
     activeDrag: DragState | null;
     dropIndicator: { zoneId: PivotZoneId; index: number } | null;
+    pinnedFieldIds: PivotFieldId[];
     setActiveDrag: (state: DragState | null) => void;
     setDropIndicator: React.Dispatch<React.SetStateAction<{ zoneId: PivotZoneId; index: number } | null>>;
     setDragZone: (zoneId: PivotZoneId | null) => void;
@@ -76,6 +79,7 @@ interface CanvasSidebarProps {
     removeFieldFromZone: (fieldId: PivotFieldId, zoneId: PivotZoneId) => void;
     addCustomMetric: (value: Omit<CustomMetricDefinition, "id">) => CustomMetricDefinition;
     deleteCustomMetric: (id: CustomMetricId) => void;
+    setPinnedFieldIds: React.Dispatch<React.SetStateAction<PivotFieldId[]>>;
 }
 
 function FieldListItem({
@@ -153,9 +157,9 @@ function FieldListItem({
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={onTogglePin}
-                    className={`rounded p-0.5 transition ${isPinned ? "text-brand" : "text-slate-400 hover:text-ink"}`}
+                    className={`rounded p-0.5 transition ${isPinned ? "text-danger" : "text-slate-400 hover:text-ink"}`}
                 >
-                    <Pin className="h-3.5 w-3.5" strokeWidth={1.5} />
+                    <Bookmark className="h-3.5 w-3.5" strokeWidth={1.5} fill={isPinned ? "currentColor" : "none"} />
                 </button>
                 <button
                     type="button"
@@ -206,6 +210,7 @@ export function CanvasSidebar({
     dragZone,
     activeDrag,
     dropIndicator,
+    pinnedFieldIds,
     setActiveDrag,
     setDropIndicator,
     setDragZone,
@@ -213,7 +218,8 @@ export function CanvasSidebar({
     handleZoneDrop,
     removeFieldFromZone,
     addCustomMetric,
-    deleteCustomMetric
+    deleteCustomMetric,
+    setPinnedFieldIds
 }: CanvasSidebarProps) {
     const [activePanel, setActivePanel] = useState<SidebarPanel>("layout");
     const [isFieldsOpen, setIsFieldsOpen] = useState(true);
@@ -272,22 +278,26 @@ export function CanvasSidebar({
     const [manualInputValue, setManualInputValue] = useState("");
     const [isInputFocused, setIsInputFocused] = useState(false);
 
-    const [pinnedFieldIds, setPinnedFieldIds] = useState<Set<PivotFieldId>>(() => new Set());
     const [hiddenFieldIds, setHiddenFieldIds] = useState<Set<PivotFieldId>>(() => new Set());
+    const [fieldSortDirection, setFieldSortDirection] = useState<"asc" | "desc" | null>(null);
 
     const manualInputRef = useRef<HTMLInputElement>(null);
     const allFields = useMemo(() => {
         const fields = getAvailablePivotFields(customMetrics);
-        return [...fields].sort((a, b) => {
-            const aPinned = pinnedFieldIds.has(a.id);
-            const bPinned = pinnedFieldIds.has(b.id);
-            const aHidden = hiddenFieldIds.has(a.id);
-            const bHidden = hiddenFieldIds.has(b.id);
-            if (aPinned !== bPinned) return aPinned ? -1 : 1;
-            if (aHidden !== bHidden) return aHidden ? 1 : -1;
-            return 0;
-        });
-    }, [customMetrics, pinnedFieldIds, hiddenFieldIds]);
+        const pinnedSet = new Set(pinnedFieldIds);
+
+        const pinned = fields.filter((f) => pinnedSet.has(f.id));
+        const hidden = fields.filter((f) => hiddenFieldIds.has(f.id));
+        const regular = fields.filter((f) => !pinnedSet.has(f.id) && !hiddenFieldIds.has(f.id));
+
+        if (fieldSortDirection === "asc") {
+            regular.sort((a, b) => a.label.localeCompare(b.label));
+        } else if (fieldSortDirection === "desc") {
+            regular.sort((a, b) => b.label.localeCompare(a.label));
+        }
+
+        return [...pinned, ...regular, ...hidden];
+    }, [customMetrics, pinnedFieldIds, hiddenFieldIds, fieldSortDirection]);
 
     useEffect(() => {
         if (activePanel === "calculations") {
@@ -784,9 +794,22 @@ export function CanvasSidebar({
                     <div className="mt-4 h-[184px] shrink-0 overflow-hidden">
                         <div className="h-full overflow-y-auto pr-1">
                             <div className="rounded-[10px] border border-slate-200/70 bg-white/80 px-3 pb-0 pt-2">
-                                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                                    Core fields
-                                </p>
+                                <div className="flex items-center justify-between">
+                                    <p className="text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                                        Core fields
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFieldSortDirection((d) => d === null ? "asc" : d === "asc" ? "desc" : null)}
+                                        className={`inline-flex h-5 w-5 items-center justify-center rounded transition ${fieldSortDirection ? "text-brand" : "text-slate-400 hover:text-slate-600"}`}
+                                        aria-label={fieldSortDirection === "desc" ? "Sort Z to A" : "Sort A to Z"}
+                                    >
+                                        {fieldSortDirection === "desc"
+                                            ? <ArrowUpZA className="h-3.5 w-3.5" strokeWidth={1.8} />
+                                            : <ArrowUpAZ className="h-3.5 w-3.5" strokeWidth={1.8} />
+                                        }
+                                    </button>
+                                </div>
                                 <div className="mt-2">
                                     {allFields.map((field) => {
                                         const metric = isCustomMetricFieldId(field.id)
@@ -797,16 +820,18 @@ export function CanvasSidebar({
                                                 key={field.id}
                                                 field={field}
                                                 isHidden={hiddenFieldIds.has(field.id)}
-                                                isPinned={pinnedFieldIds.has(field.id)}
+                                                isPinned={pinnedFieldIds.includes(field.id)}
                                                 setActiveDrag={setActiveDrag}
                                                 setDropIndicator={setDropIndicator}
                                                 clearDragState={clearDragState}
                                                 onEdit={metric ? () => loadMetricForEdit(metric) : undefined}
                                                 onDelete={metric ? () => deleteCustomMetric(metric.id) : undefined}
                                                 onTogglePin={() => setPinnedFieldIds((prev) => {
-                                                    const next = new Set(prev);
-                                                    next.has(field.id) ? next.delete(field.id) : next.add(field.id);
-                                                    return next;
+                                                    if (prev.includes(field.id)) {
+                                                        return prev.filter(id => id !== field.id);
+                                                    } else {
+                                                        return [...prev, field.id];
+                                                    }
                                                 })}
                                                 onToggleHide={() => setHiddenFieldIds((prev) => {
                                                     const next = new Set(prev);

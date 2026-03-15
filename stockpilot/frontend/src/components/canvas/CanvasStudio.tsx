@@ -66,7 +66,20 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
 
     // Handle outside clicks to close menus
     useEffect(() => {
-        function handlePointerDown() {
+        function handlePointerDown(event: PointerEvent) {
+            const target = event.target as HTMLElement;
+            
+            // Eğer tıklanan yer bir button, bir input, canvas-studio-header içindeki herhangi bir şey
+            // veya menünün kendisiyse kapatma.
+            if (
+                target.closest("button") || 
+                target.closest("input") || 
+                target.closest(".canvas-studio-header") ||
+                target.closest(".header-filter-menu")
+            ) {
+                return;
+            }
+            
             orchestration.setIsTableListOpen(false);
             orchestration.setOpenHeaderFilter(null);
             orchestration.setOpenHeaderColorTableId(null);
@@ -242,7 +255,7 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
 
         return (
             <div
-                className="absolute left-0 top-full z-[140] mt-[14px] isolate w-[265px] max-w-[420px] overflow-hidden rounded-[12px] border border-slate-200 bg-white p-1.5 shadow-[0_22px_48px_-28px_rgba(11,14,20,0.24)]"
+                className="header-filter-menu absolute left-0 top-full z-[140] mt-[14px] isolate w-[265px] max-w-[420px] overflow-hidden rounded-[12px] border border-slate-200 bg-white p-1.5 shadow-[0_22px_48px_-28px_rgba(11,14,20,0.24)]"
                 style={{ backgroundColor: "#ffffff", opacity: 1 }}
                 onPointerDown={(event) => event.stopPropagation()}
             >
@@ -288,7 +301,7 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
         return (
             <button
                 type="button"
-                onClick={(event) => {
+                onPointerDown={(event) => {
                     event.stopPropagation();
                     orchestration.setActiveTableId(view.table.id);
                     orchestration.setIsTableListOpen(false);
@@ -305,11 +318,8 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                               }
                     );
                 }}
-                onPointerDown={(event) => event.stopPropagation()}
                 className={`relative inline-flex shrink-0 items-center justify-center rounded-[10px] p-1 text-[#080a0f] transition ${
-                    isOpen || hasSelection || hasCustomSort
-                        ? "text-[#080a0f]"
-                        : "text-[#080a0f]"
+                    isOpen ? "bg-slate-100" : ""
                 }`}
                 aria-label={`Filter ${view.table.name}`}
             >
@@ -334,6 +344,7 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                 dragZone={orchestration.dragZone}
                 activeDrag={orchestration.activeDrag}
                 dropIndicator={orchestration.dropIndicator}
+                pinnedFieldIds={orchestration.pinnedFieldIds}
                 setActiveDrag={orchestration.setActiveDrag}
                 setDropIndicator={orchestration.setDropIndicator}
                 setDragZone={orchestration.setDragZone}
@@ -358,6 +369,7 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                 removeFieldFromZone={orchestration.removeFieldFromZone}
                 addCustomMetric={orchestration.addCustomMetric}
                 deleteCustomMetric={orchestration.deleteCustomMetric}
+                setPinnedFieldIds={orchestration.setPinnedFieldIds}
             />
 
             <section className="relative flex h-[940px] max-h-[940px] flex-col overflow-hidden rounded-[12px] border border-slate-200/70 bg-white/80 p-[10px] shadow-[0_32px_90px_-46px_rgba(11,14,20,0.34)] backdrop-blur-xl">

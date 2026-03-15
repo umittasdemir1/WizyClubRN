@@ -75,9 +75,24 @@ export function StudioApp() {
     const [result, setResult] = useState<UploadWorkflowResult | null>(() => loadLatestWorkflowResult());
     const [isHeaderVisible, setIsHeaderVisible] = useState(true);
     const [uploadError, setUploadError] = useState<string | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [uploadStageLabel, setUploadStageLabel] = useState("");
     const lastScrollYRef = useRef(0);
     const canvasSectionRef = useRef<HTMLElement | null>(null);
-    const uploadMutation = useFileUpload();
+    const uploadMutation = useFileUpload({
+        onProgressChange: setUploadProgress,
+        onStageChange: (stage) => {
+            const labels: Record<string, string> = {
+                uploading: "Uploading dataset",
+                analyzing: "Running product analysis",
+                "local-processing": "Switching to local engine",
+                ready: "Ready",
+                idle: ""
+            };
+            setUploadStageLabel(labels[stage] ?? "");
+        }
+    });
     const workspaceUrl = useMemo(
         () => resolveWorkspaceUrl(window.location),
         []
@@ -165,12 +180,17 @@ export function StudioApp() {
             }
 
             setUploadError(null);
+            setIsUploading(true);
+            setUploadProgress(0);
+            setUploadStageLabel("Uploading dataset");
             uploadMutation.mutate(file, {
                 onSuccess(nextResult) {
+                    setIsUploading(false);
                     setUploadError(null);
                     setResult(nextResult);
                 },
                 onError(error) {
+                    setIsUploading(false);
                     setUploadError(error instanceof Error ? error.message : "Upload workflow failed.");
                 }
             });
@@ -267,7 +287,24 @@ export function StudioApp() {
                         </p>
                     </section>
 
-                    {uploadError ? (
+                    {isUploading ? (
+                        <div className="mx-auto mt-8 max-w-3xl rounded-[28px] border border-slate-200/60 bg-white/85 px-6 py-5 shadow-soft backdrop-blur">
+                            <div className="flex items-center justify-between mb-3">
+                                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                    {uploadStageLabel}
+                                </span>
+                                <span className="text-xs font-semibold tabular-nums text-slate-400">
+                                    {Math.round(uploadProgress)}%
+                                </span>
+                            </div>
+                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                                <div
+                                    className="h-full rounded-full bg-brand transition-all duration-300 ease-out"
+                                    style={{ width: `${uploadProgress}%` }}
+                                />
+                            </div>
+                        </div>
+                    ) : uploadError ? (
                         <div className="mx-auto mt-8 max-w-3xl rounded-[28px] border border-rose-200/60 bg-white/85 px-6 py-5 text-sm text-rose-700 shadow-soft backdrop-blur">
                             {uploadError}
                         </div>

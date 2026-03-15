@@ -65,10 +65,11 @@ body {
 .bg-grid-pattern {
     position: absolute;
     inset: 0;
-    background-image: 
-        linear-gradient(to right, rgba(226, 232, 240, 0.9) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(226, 232, 240, 0.9) 1px, transparent 1px);
+    background-image:
+        linear-gradient(to right, rgba(226, 232, 240, 0.5) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(226, 232, 240, 0.5) 1px, transparent 1px);
     background-size: 144px 144px;
+    animation: grid-wave 22s ease-in-out infinite;
 }
 
 .canvas-grid-pattern {
@@ -76,9 +77,26 @@ body {
     inset: 0;
     pointer-events: none;
     background-image:
-        linear-gradient(to right, rgba(226, 232, 240, 0.3) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(226, 232, 240, 0.3) 1px, transparent 1px);
+        linear-gradient(to right, rgba(226, 232, 240, 0.22) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(226, 232, 240, 0.22) 1px, transparent 1px);
     background-size: 10px 10px;
+    animation: canvas-grid-wave 16s ease-in-out infinite;
+}
+
+@keyframes grid-wave {
+    0%   { background-position: 0px 0px; }
+    25%  { background-position: 36px 14px; }
+    50%  { background-position: 72px 0px; }
+    75%  { background-position: 36px -14px; }
+    100% { background-position: 0px 0px; }
+}
+
+@keyframes canvas-grid-wave {
+    0%   { background-position: 0px 0px; }
+    25%  { background-position: 3px 2px; }
+    50%  { background-position: 5px 0px; }
+    75%  { background-position: 3px -2px; }
+    100% { background-position: 0px 0px; }
 }
 
 @keyframes float-bg {

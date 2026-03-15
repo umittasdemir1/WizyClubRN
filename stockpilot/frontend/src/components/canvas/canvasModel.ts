@@ -140,6 +140,7 @@ export interface StudioCanvasState {
     tables: PivotTableInstance[];
     activeTableId: string | null;
     customMetrics: CustomMetricDefinition[];
+    pinnedFieldIds: PivotFieldId[];
 }
 
 export interface PivotTableView {
@@ -1177,7 +1178,8 @@ export function sanitizeStudioState(value: unknown): StudioCanvasState {
         return {
             tables: [initialTable],
             activeTableId: initialTable.id,
-            customMetrics: []
+            customMetrics: [],
+            pinnedFieldIds: []
         };
     }
 
@@ -1194,10 +1196,15 @@ export function sanitizeStudioState(value: unknown): StudioCanvasState {
             ? candidate.activeTableId
             : nextTables[0].id;
 
+    const pinnedFieldIds = Array.isArray(candidate.pinnedFieldIds)
+        ? uniqueFieldIds(candidate.pinnedFieldIds, customMetrics)
+        : [];
+
     return {
         tables: nextTables,
         activeTableId,
-        customMetrics
+        customMetrics,
+        pinnedFieldIds
     };
 }
 
