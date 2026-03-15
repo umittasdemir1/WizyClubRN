@@ -116,8 +116,13 @@ export function FileUploader({
                         </div>
                         <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
                             <div
-                                className="h-full rounded-full bg-brand transition-all duration-300 ease-out"
-                                style={{ width: `${uploadProgress}%` }}
+                                className="h-full rounded-full transition-all duration-300 ease-out"
+                                style={{
+                                    width: `${uploadProgress}%`,
+                                    background: "linear-gradient(to right, #FF416C, #FF9068, #FFD93D, #6BCF7F, #4D96FF, #FF416C)",
+                                    backgroundSize: "200% auto",
+                                    animation: "shimmer 3s linear infinite",
+                                }}
                             />
                         </div>
                     </div>
