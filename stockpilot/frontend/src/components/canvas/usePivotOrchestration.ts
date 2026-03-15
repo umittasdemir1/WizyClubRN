@@ -167,11 +167,11 @@ export function usePivotOrchestration(analysis: AnalysisResult | null) {
 
                 const cached = pivotCache.current.get(table.id);
                 if (cached && cached.cacheKey === cacheKey) {
-                    if (cached.tableRef === table) return cached.view;
+                    if (cached.tableRef === table && cached.view.columnOverrides === columnOverrides) return cached.view;
                     const updated = {
                         ...cached,
                         tableRef: table,
-                        view: { ...cached.view, table }
+                        view: { ...cached.view, table, columnOverrides }
                     };
                     pivotCache.current.set(table.id, updated);
                     return updated.view;

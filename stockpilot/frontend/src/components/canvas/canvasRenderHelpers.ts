@@ -156,45 +156,54 @@ export function getVisibleColumnCombos(view: PivotTableView, headerFilterSelecti
 }
 
 export function getVisibleRowCombos(view: PivotTableView, headerFilterSelections: Record<string, string[]>, headerFilterSortDirections: Record<string, HeaderFilterSortDirection>) {
-    const filteredRowCombos = view.pivotResult.rowCombos.filter((rowCombo) => {
-        const rowFieldSelectionPasses = view.table.layout.rows.every((fieldId, rowIndex) => {
-            const options = getRowFieldFilterOptions(view, fieldId, rowIndex, headerFilterSortDirections);
-            const selectedValues = new Set(
-                getHeaderFilterSelectedValues(
-                    view.table.id,
-                    "row-field",
-                    options.map((option) => option.value),
-                    headerFilterSelections,
-                    fieldId,
-                    rowIndex
-                )
-            );
+    // ── Pre-compute filter sets ONCE (not per-row) ──────────────────────────
+    const rowFieldSelectedSets = view.table.layout.rows.map((fieldId, rowIndex) => {
+        const options = getRowFieldFilterOptions(view, fieldId, rowIndex, headerFilterSortDirections);
+        return new Set(
+            getHeaderFilterSelectedValues(
+                view.table.id,
+                "row-field",
+                options.map((opt) => opt.value),
+                headerFilterSelections,
+                fieldId,
+                rowIndex
+            )
+        );
+    });
 
-            return selectedValues.has(rowCombo.labels[rowIndex]);
-        });
-
-        if (!rowFieldSelectionPasses) {
-            return false;
-        }
-
-        if (view.hasColumnGroups) {
-            return true;
-        }
-
-        return view.pivotResult.valueFields.every((fieldId) => {
+    let valueFieldSelectedSets: Map<PivotFieldId, Set<string>> | null = null;
+    if (!view.hasColumnGroups) {
+        valueFieldSelectedSets = new Map();
+        for (const fieldId of view.pivotResult.valueFields) {
             const options = getValueFieldFilterOptions(view, fieldId, headerFilterSortDirections);
-            const selectedValues = new Set(
-                getHeaderFilterSelectedValues(
-                    view.table.id,
-                    "value-field",
-                    options.map((option) => option.value),
-                    headerFilterSelections,
-                    fieldId
+            valueFieldSelectedSets.set(
+                fieldId,
+                new Set(
+                    getHeaderFilterSelectedValues(
+                        view.table.id,
+                        "value-field",
+                        options.map((opt) => opt.value),
+                        headerFilterSelections,
+                        fieldId
+                    )
                 )
             );
+        }
+    }
+    // ────────────────────────────────────────────────────────────────────────
 
-            return selectedValues.has(renderCell(view, rowCombo.key, "__total__", fieldId));
-        });
+    const filteredRowCombos = view.pivotResult.rowCombos.filter((rowCombo) => {
+        const rowFieldPasses = view.table.layout.rows.every((_, rowIndex) =>
+            rowFieldSelectedSets[rowIndex].has(rowCombo.labels[rowIndex])
+        );
+        if (!rowFieldPasses) return false;
+        if (view.hasColumnGroups) return true;
+
+        return view.pivotResult.valueFields.every((fieldId) =>
+            valueFieldSelectedSets!.get(fieldId)!.has(
+                renderCell(view, rowCombo.key, "__total__", fieldId)
+            )
+        );
     });
 
     const explicitValueSortFieldId =

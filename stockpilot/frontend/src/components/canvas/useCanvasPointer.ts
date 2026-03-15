@@ -49,6 +49,7 @@ export function useCanvasPointer({
     const activeTableIdRef = useRef(activeTableId);
     const editingTableIdRef = useRef(editingTableId);
     const resizingTableIdRef = useRef<string | null>(resizingTableId);
+    const prevAutoFitKeyRef = useRef("");
 
     useEffect(() => {
         tablesRef.current = tables;
@@ -71,6 +72,13 @@ export function useCanvasPointer({
         if (!canvas) {
             return;
         }
+
+        // Skip auto-fit when only position/name/color changed (not layout/data)
+        const autoFitKey = tables.map((t) =>
+            `${t.id}:${t.hasCustomizedSize}:${JSON.stringify(t.layout)}:${JSON.stringify(t.filterSelections)}`
+        ).join("|");
+        if (autoFitKey === prevAutoFitKeyRef.current) return;
+        prevAutoFitKeyRef.current = autoFitKey;
 
         setTables((current) => {
             let hasChanges = false;
