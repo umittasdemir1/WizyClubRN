@@ -1,6 +1,7 @@
 import {
     STORAGE_KEY,
     sanitizeStudioState,
+    type ColumnOverride,
     type CustomMetricDefinition,
     type PivotFieldId,
     type PivotTableInstance
@@ -11,6 +12,7 @@ interface PersistedStudioState {
     activeTableId: string | null;
     customMetrics: CustomMetricDefinition[];
     pinnedFieldIds: PivotFieldId[];
+    columnOverrides: Record<string, ColumnOverride>;
 }
 
 export function loadStudioState(): PersistedStudioState {

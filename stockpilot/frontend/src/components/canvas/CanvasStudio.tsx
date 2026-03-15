@@ -371,6 +371,8 @@ export function CanvasStudio({ analysis }: CanvasStudioProps) {
                 deleteCustomMetric={orchestration.deleteCustomMetric}
                 setPinnedFieldIds={orchestration.setPinnedFieldIds}
                 columns={orchestration.columns}
+                columnOverrides={orchestration.columnOverrides}
+                updateColumnOverride={orchestration.updateColumnOverride}
             />
 
             <section className="relative flex h-[940px] max-h-[940px] flex-col overflow-hidden rounded-[12px] border border-slate-200/70 bg-white/80 p-[10px] shadow-[0_32px_90px_-46px_rgba(11,14,20,0.34)] backdrop-blur-xl">

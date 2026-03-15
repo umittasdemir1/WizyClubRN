@@ -136,16 +136,23 @@ export interface PivotTableInstance {
     };
 }
 
+export interface ColumnOverride {
+    label: string;
+    format: CustomMetricFormat;
+}
+
 export interface StudioCanvasState {
     tables: PivotTableInstance[];
     activeTableId: string | null;
     customMetrics: CustomMetricDefinition[];
     pinnedFieldIds: PivotFieldId[];
+    columnOverrides: Record<string, ColumnOverride>;
 }
 
 export interface PivotTableView {
     table: PivotTableInstance;
     columns: ColumnMeta[];
+    columnOverrides: Record<string, ColumnOverride>;
     filterOptions: Record<string, string[]>;
     filteredRecords: GenericRow[];
     pivotResult: PivotResult;
@@ -294,10 +301,11 @@ function buildCustomMetricFieldDefinition(metric: CustomMetricDefinition): Pivot
     };
 }
 
-function columnMetaToFieldDefinition(col: ColumnMeta): PivotFieldDefinition {
+function columnMetaToFieldDefinition(col: ColumnMeta, overrides: Record<string, ColumnOverride> = {}): PivotFieldDefinition {
+    const override = overrides[col.key];
     return {
         id: col.key,
-        label: col.label,
+        label: override?.label ?? col.label,
         kind: col.type === "numeric" ? "measure" : "dimension",
         summary: col.type === "numeric" ? "sum" : "count",
         format: col.type === "numeric" ? "number" : col.type === "date" ? "date" : "text"
@@ -314,19 +322,21 @@ const FALLBACK_FIELD_DEF = (fieldId: PivotFieldId): PivotFieldDefinition => ({
 
 export function getAvailablePivotFields(
     columns: ColumnMeta[] = [],
-    customMetrics: CustomMetricDefinition[] = []
+    customMetrics: CustomMetricDefinition[] = [],
+    columnOverrides: Record<string, ColumnOverride> = {}
 ) {
     return [
-        ...columns.map(columnMetaToFieldDefinition),
+        ...columns.map((col) => columnMetaToFieldDefinition(col, columnOverrides)),
         ...customMetrics.map(buildCustomMetricFieldDefinition)
     ];
 }
 
 export function getMeasureFieldDefinitions(
     columns: ColumnMeta[] = [],
-    customMetrics: CustomMetricDefinition[] = []
+    customMetrics: CustomMetricDefinition[] = [],
+    columnOverrides: Record<string, ColumnOverride> = {}
 ) {
-    return getAvailablePivotFields(columns, customMetrics).filter((field) => field.kind === "measure");
+    return getAvailablePivotFields(columns, customMetrics, columnOverrides).filter((field) => field.kind === "measure");
 }
 
 function getCustomMetricDefinition(
@@ -339,10 +349,11 @@ function getCustomMetricDefinition(
 export function getFieldDefinition(
     fieldId: PivotFieldId,
     columns: ColumnMeta[] = [],
-    customMetrics: CustomMetricDefinition[] = []
+    customMetrics: CustomMetricDefinition[] = [],
+    columnOverrides: Record<string, ColumnOverride> = {}
 ) {
     return (
-        getAvailablePivotFields(columns, customMetrics).find((field) => field.id === fieldId) ??
+        getAvailablePivotFields(columns, customMetrics, columnOverrides).find((field) => field.id === fieldId) ??
         FALLBACK_FIELD_DEF(fieldId)
     );
 }
@@ -894,12 +905,16 @@ export function formatAggregatedValue(
     fieldId: PivotFieldId,
     value: number,
     columns: ColumnMeta[] = [],
-    customMetrics: CustomMetricDefinition[] = []
+    customMetrics: CustomMetricDefinition[] = [],
+    columnOverrides: Record<string, ColumnOverride> = {}
 ) {
     if (isCustomMetricFieldId(fieldId)) {
         const metric = customMetrics.find((m) => m.id === fieldId);
         if (metric) return formatWithCustomMetricFormat(value, metric.format);
     }
+
+    const override = columnOverrides[fieldId];
+    if (override) return formatWithCustomMetricFormat(value, override.format);
 
     const field = getFieldDefinition(fieldId, columns, customMetrics);
     if (field.format === "percent") return formatPercent(value);
@@ -1190,7 +1205,8 @@ export function sanitizeStudioState(value: unknown): StudioCanvasState {
             tables: [initialTable],
             activeTableId: initialTable.id,
             customMetrics: [],
-            pinnedFieldIds: []
+            pinnedFieldIds: [],
+            columnOverrides: {}
         };
     }
 
@@ -1211,11 +1227,17 @@ export function sanitizeStudioState(value: unknown): StudioCanvasState {
         ? uniqueFieldIds(candidate.pinnedFieldIds, customMetrics)
         : [];
 
+    const columnOverrides =
+        candidate.columnOverrides && typeof candidate.columnOverrides === "object" && !Array.isArray(candidate.columnOverrides)
+            ? (candidate.columnOverrides as Record<string, ColumnOverride>)
+            : {};
+
     return {
         tables: nextTables,
         activeTableId,
         customMetrics,
-        pinnedFieldIds
+        pinnedFieldIds,
+        columnOverrides
     };
 }
 

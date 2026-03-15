@@ -9,6 +9,7 @@ import {
     createPivotTable,
     getAvailablePivotFields,
     sanitizeStudioState,
+    type ColumnOverride,
     type CustomMetricDefinition,
     type CustomMetricId,
     type DragState,
@@ -30,6 +31,7 @@ export function usePivotOrchestration(analysis: AnalysisResult | null) {
     const [lastActiveTableId, setLastActiveTableId] = useState<string | null>(initialState.activeTableId);
     const [customMetrics, setCustomMetrics] = useState<CustomMetricDefinition[]>(initialState.customMetrics);
     const [pinnedFieldIds, setPinnedFieldIds] = useState<PivotFieldId[]>(initialState.pinnedFieldIds);
+    const [columnOverrides, setColumnOverrides] = useState<Record<string, ColumnOverride>>(initialState.columnOverrides);
     
     // Drag and Drop State
     const [dragZone, setDragZone] = useState<PivotZoneId | null>(null);
@@ -59,6 +61,7 @@ export function usePivotOrchestration(analysis: AnalysisResult | null) {
         setActiveTableId(nextState.activeTableId);
         setCustomMetrics(nextState.customMetrics);
         setPinnedFieldIds(nextState.pinnedFieldIds);
+        setColumnOverrides(nextState.columnOverrides);
     }, []);
 
     useEffect(() => {
@@ -66,9 +69,10 @@ export function usePivotOrchestration(analysis: AnalysisResult | null) {
             tables,
             activeTableId,
             customMetrics,
-            pinnedFieldIds
+            pinnedFieldIds,
+            columnOverrides
         });
-    }, [activeTableId, customMetrics, tables, pinnedFieldIds]);
+    }, [activeTableId, customMetrics, tables, pinnedFieldIds, columnOverrides]);
 
     // Derived States
     useEffect(() => {
@@ -140,7 +144,7 @@ export function usePivotOrchestration(analysis: AnalysisResult | null) {
 
     const rows = analysis?.rows ?? [];
     const columns: ColumnMeta[] = analysis?.columns ?? [];
-    const fieldDefinitions = useMemo(() => getAvailablePivotFields(columns, customMetrics), [columns, customMetrics]);
+    const fieldDefinitions = useMemo(() => getAvailablePivotFields(columns, customMetrics, columnOverrides), [columns, customMetrics, columnOverrides]);
 
     const pivotCache = useRef<Map<string, { cacheKey: string; tableRef: PivotTableInstance; view: PivotTableView }>>(
         new Map()
@@ -187,6 +191,7 @@ export function usePivotOrchestration(analysis: AnalysisResult | null) {
                     view: {
                         table,
                         columns,
+                        columnOverrides,
                         filterOptions,
                         filteredRecords,
                         pivotResult,
@@ -199,7 +204,7 @@ export function usePivotOrchestration(analysis: AnalysisResult | null) {
                 pivotCache.current.set(table.id, entry);
                 return entry.view;
             }),
-        [columns, customMetrics, customMetricsKey, rows, tables]
+        [columnOverrides, columns, customMetrics, customMetricsKey, rows, tables]
     );
 
     const activeLayout = activeTable?.layout ?? DEFAULT_LAYOUT;
@@ -463,6 +468,17 @@ export function usePivotOrchestration(analysis: AnalysisResult | null) {
         setDropIndicator(null);
     }
 
+    function updateColumnOverride(key: string, override: ColumnOverride | null) {
+        setColumnOverrides((current) => {
+            if (override === null) {
+                const next = { ...current };
+                delete next[key];
+                return next;
+            }
+            return { ...current, [key]: override };
+        });
+    }
+
     function updateHeaderFilterSelection(
         tableId: string,
         kind: HeaderFilterKind,
@@ -552,6 +568,8 @@ export function usePivotOrchestration(analysis: AnalysisResult | null) {
         getDropTargetTable,
         updateTable,
         updateActiveTable,
+        columnOverrides,
+        updateColumnOverride,
         addCustomMetric,
         deleteCustomMetric,
         addTable,

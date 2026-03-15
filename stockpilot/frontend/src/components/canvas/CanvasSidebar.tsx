@@ -28,6 +28,7 @@ import {
     getFieldDefinition,
     isValidCustomMetricExpression,
     isCustomMetricFieldId,
+    type ColumnOverride,
     type CustomMetricBinaryOperator,
     type CustomMetricDefinition,
     type CustomMetricFormat,
@@ -44,7 +45,7 @@ import {
 } from "./canvasModel";
 import { MetricDateDropdown, MetricFormatSelect, MetricFunctionDropdown } from "./MetricFormatSelect";
 
-type SidebarPanel = "calculations" | "layout" | null;
+type SidebarPanel = "calculations" | "layout" | "field-editor" | null;
 
 const CUSTOM_METRIC_BINARY_OPERATORS: CustomMetricBinaryOperator[] = ["+", "-", "*", "/", "=", ">", "<"];
 const CUSTOM_METRIC_OPERATOR_BUTTONS: Array<
@@ -67,6 +68,8 @@ const CUSTOM_METRIC_OPERATOR_BUTTONS: Array<
 interface CanvasSidebarProps {
     activeLayout: PivotLayout;
     columns: import("../../types/stock").ColumnMeta[];
+    columnOverrides: Record<string, ColumnOverride>;
+    updateColumnOverride: (key: string, override: ColumnOverride | null) => void;
     customMetrics: CustomMetricDefinition[];
     dragZone: PivotZoneId | null;
     activeDrag: DragState | null;
@@ -210,6 +213,8 @@ function FormulaTokenChip({
 export function CanvasSidebar({
     activeLayout,
     columns,
+    columnOverrides,
+    updateColumnOverride,
     customMetrics,
     dragZone,
     activeDrag,
@@ -287,7 +292,7 @@ export function CanvasSidebar({
 
     const manualInputRef = useRef<HTMLInputElement>(null);
     const allFields = useMemo(() => {
-        const fields = getAvailablePivotFields(columns, customMetrics);
+        const fields = getAvailablePivotFields(columns, customMetrics, columnOverrides);
         const pinnedSet = new Set(pinnedFieldIds);
 
         const pinned = fields.filter((f) => pinnedSet.has(f.id));
@@ -301,7 +306,7 @@ export function CanvasSidebar({
         }
 
         return [...pinned, ...regular, ...hidden];
-    }, [customMetrics, pinnedFieldIds, hiddenFieldIds, fieldSortDirection]);
+    }, [columns, columnOverrides, customMetrics, pinnedFieldIds, hiddenFieldIds, fieldSortDirection]);
 
     useEffect(() => {
         if (activePanel === "calculations") {
@@ -802,17 +807,29 @@ export function CanvasSidebar({
                                     <p className="text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-slate-400">
                                         Core fields
                                     </p>
-                                    <button
-                                        type="button"
-                                        onClick={() => setFieldSortDirection((d) => d === null ? "asc" : d === "asc" ? "desc" : null)}
-                                        className={`inline-flex h-5 w-5 items-center justify-center rounded transition ${fieldSortDirection ? "text-brand" : "text-slate-400 hover:text-slate-600"}`}
-                                        aria-label={fieldSortDirection === "desc" ? "Sort Z to A" : "Sort A to Z"}
-                                    >
-                                        {fieldSortDirection === "desc"
-                                            ? <ArrowUpZA className="h-3.5 w-3.5" strokeWidth={1.8} />
-                                            : <ArrowUpAZ className="h-3.5 w-3.5" strokeWidth={1.8} />
-                                        }
-                                    </button>
+                                    <div className="flex items-center gap-0.5">
+                                        {columns.length > 0 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setActivePanel((p) => p === "field-editor" ? "layout" : "field-editor")}
+                                                className={`inline-flex h-5 w-5 items-center justify-center rounded transition ${activePanel === "field-editor" ? "text-brand" : "text-slate-400 hover:text-slate-600"}`}
+                                                aria-label="Edit fields"
+                                            >
+                                                <SquarePen className="h-3.5 w-3.5" strokeWidth={1.8} />
+                                            </button>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={() => setFieldSortDirection((d) => d === null ? "asc" : d === "asc" ? "desc" : null)}
+                                            className={`inline-flex h-5 w-5 items-center justify-center rounded transition ${fieldSortDirection ? "text-brand" : "text-slate-400 hover:text-slate-600"}`}
+                                            aria-label={fieldSortDirection === "desc" ? "Sort Z to A" : "Sort A to Z"}
+                                        >
+                                            {fieldSortDirection === "desc"
+                                                ? <ArrowUpZA className="h-3.5 w-3.5" strokeWidth={1.8} />
+                                                : <ArrowUpAZ className="h-3.5 w-3.5" strokeWidth={1.8} />
+                                            }
+                                        </button>
+                                    </div>
                                 </div>
                                 <div className="mt-2">
                                     {allFields.map((field) => {
@@ -1037,6 +1054,60 @@ export function CanvasSidebar({
                                     {builderError ? (
                                         <p className="px-1 text-sm text-rose-600">{builderError}</p>
                                     ) : null}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
+
+                {activePanel === "field-editor" ? (
+                    <div className="mt-3 shrink-0 overflow-hidden">
+                        <div className="overflow-y-auto pr-1">
+                            <div className="rounded-[14px] border border-slate-200/70 bg-white/85 p-3 shadow-[0_18px_42px_-34px_rgba(11,14,20,0.24)]">
+                                <div className="flex flex-col gap-2">
+                                    {columns.map((col) => {
+                                        const override = columnOverrides[col.key];
+                                        return (
+                                            <div key={col.key} className="flex items-center gap-2 rounded-[10px] border border-slate-200/60 bg-white/80 px-3 py-2">
+                                                <div className="min-w-0 flex-1">
+                                                    <input
+                                                        className={`w-full appearance-none bg-transparent outline-none border-none ring-0 focus:ring-0 ${PIVOT_FIELD_TEXT_TYPOGRAPHY} text-ink placeholder:text-slate-400`}
+                                                        value={override?.label ?? col.label}
+                                                        placeholder={col.label}
+                                                        onChange={(e) => {
+                                                            const val = e.target.value;
+                                                            updateColumnOverride(col.key, {
+                                                                label: val || col.label,
+                                                                format: override?.format ?? "integer"
+                                                            });
+                                                        }}
+                                                    />
+                                                </div>
+                                                {col.type === "numeric" && (
+                                                    <div className="shrink-0">
+                                                        <MetricFormatSelect
+                                                            value={override?.format ?? "integer"}
+                                                            onChange={(fmt) => updateColumnOverride(col.key, {
+                                                                label: override?.label ?? col.label,
+                                                                format: fmt
+                                                            })}
+                                                        />
+                                                    </div>
+                                                )}
+                                                {override && (
+                                                    <button
+                                                        type="button"
+                                                        onMouseDown={(e) => e.preventDefault()}
+                                                        onClick={() => updateColumnOverride(col.key, null)}
+                                                        className="shrink-0 rounded p-0.5 text-slate-400 transition hover:text-red-500"
+                                                        aria-label="Reset to default"
+                                                    >
+                                                        <X className="h-3.5 w-3.5" strokeWidth={1.5} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         </div>
