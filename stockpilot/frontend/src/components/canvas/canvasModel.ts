@@ -138,6 +138,7 @@ export interface PivotTableInstance {
 
 export interface ColumnOverride {
     label: string;
+    typeOverride?: "numeric" | "text" | "date";
     format: CustomMetricFormat;
 }
 
@@ -303,12 +304,13 @@ function buildCustomMetricFieldDefinition(metric: CustomMetricDefinition): Pivot
 
 function columnMetaToFieldDefinition(col: ColumnMeta, overrides: Record<string, ColumnOverride> = {}): PivotFieldDefinition {
     const override = overrides[col.key];
+    const effectiveType = override?.typeOverride ?? col.type;
     return {
         id: col.key,
         label: override?.label ?? col.label,
-        kind: col.type === "numeric" ? "measure" : "dimension",
-        summary: col.type === "numeric" ? "sum" : "count",
-        format: col.type === "numeric" ? "number" : col.type === "date" ? "date" : "text"
+        kind: effectiveType === "numeric" ? "measure" : "dimension",
+        summary: effectiveType === "numeric" ? "sum" : "count",
+        format: effectiveType === "numeric" ? "number" : effectiveType === "date" ? "date" : "text"
     };
 }
 
