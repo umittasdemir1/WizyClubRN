@@ -104,21 +104,36 @@ export function FileUploader({
                     </div>
                 ) : null}
 
-                {visibleFileName ? (
+                {isLoading ? (
+                    <div className="mt-6 w-full max-w-xl">
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                {statusLabel}
+                            </span>
+                            <span className="text-xs font-semibold tabular-nums text-slate-500">
+                                {Math.round(uploadProgress)}%
+                            </span>
+                        </div>
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                            <div
+                                className="h-full rounded-full bg-brand transition-all duration-300 ease-out"
+                                style={{ width: `${uploadProgress}%` }}
+                            />
+                        </div>
+                    </div>
+                ) : visibleFileName ? (
                     <div className="relative mt-6 inline-flex items-center rounded-[24px] border border-white/10 bg-white/5 px-6 py-4 text-base text-slate-300 shadow-xl">
-                        {!isLoading ? (
-                            <button
-                                type="button"
-                                aria-label="Clear uploaded file"
-                                onClick={(event) => {
-                                    event.stopPropagation();
-                                    onClear();
-                                }}
-                                className="absolute right-4 top-1/2 -translate-y-1/2 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-slate-950/40 text-slate-300 transition hover:border-white/20 hover:bg-slate-950/60 hover:text-white"
-                            >
-                                <X className="h-4 w-4" />
-                            </button>
-                        ) : null}
+                        <button
+                            type="button"
+                            aria-label="Clear uploaded file"
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                onClear();
+                            }}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-slate-950/40 text-slate-300 transition hover:border-white/20 hover:bg-slate-950/60 hover:text-white"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
 
                         <div className="flex items-center gap-4 pr-10">
                             <FileSpreadsheet className="h-6 w-6 shrink-0 text-brand" />
