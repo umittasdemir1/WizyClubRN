@@ -8,6 +8,7 @@ import {
     Check,
     ChevronDown,
     ChevronUp,
+    ChevronsUpDown,
     Delete,
     Diff,
     EyeClosed,
@@ -207,7 +208,7 @@ function CellSelect<T extends string>({
             <button
                 type="button"
                 onClick={() => setOpen((p) => !p)}
-                className="flex items-center gap-1 rounded-[5px] px-2 py-0.5 text-[0.8rem] text-slate-600 transition hover:bg-slate-100"
+                className="flex items-center gap-1 rounded-[5px] pl-0 pr-2 py-0.5 text-[0.8rem] text-slate-600 transition hover:bg-slate-100"
             >
                 <span>{current?.label ?? value}</span>
                 <ChevronDown className="h-3 w-3 text-slate-400" strokeWidth={1.8} />
@@ -347,6 +348,7 @@ export function CanvasSidebar({
     const manualInputRef = useRef<HTMLInputElement>(null);
     const savedTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
     const [savedRows, setSavedRows] = useState<Set<string>>(new Set());
+    const [fieldEditorSort, setFieldEditorSort] = useState<{ key: "field" | "label" | "type" | "format"; direction: "asc" | "desc" } | null>(null);
 
     function flashSaved(key: string) {
         if (savedTimeoutsRef.current[key]) clearTimeout(savedTimeoutsRef.current[key]);
@@ -384,6 +386,28 @@ export function CanvasSidebar({
 
         return [...pinned, ...regular, ...hidden];
     }, [columns, columnOverrides, customMetrics, pinnedFieldIds, hiddenFieldIds, fieldSortDirection]);
+
+    const sortedColumns = useMemo(() => {
+        if (!fieldEditorSort) return columns;
+        return [...columns].sort((a, b) => {
+            let aVal: string, bVal: string;
+            const ak = fieldEditorSort.key;
+            if (ak === "field") { aVal = a.key; bVal = b.key; }
+            else if (ak === "label") { aVal = columnOverrides[a.key]?.label ?? a.label; bVal = columnOverrides[b.key]?.label ?? b.label; }
+            else if (ak === "type") { aVal = columnOverrides[a.key]?.typeOverride ?? a.type; bVal = columnOverrides[b.key]?.typeOverride ?? b.type; }
+            else { aVal = columnOverrides[a.key]?.format ?? ""; bVal = columnOverrides[b.key]?.format ?? ""; }
+            const cmp = aVal.localeCompare(bVal);
+            return fieldEditorSort.direction === "asc" ? cmp : -cmp;
+        });
+    }, [columns, columnOverrides, fieldEditorSort]);
+
+    function toggleFieldEditorSort(key: "field" | "label" | "type" | "format") {
+        setFieldEditorSort((prev) => {
+            if (!prev || prev.key !== key) return { key, direction: "asc" };
+            if (prev.direction === "asc") return { key, direction: "desc" };
+            return null;
+        });
+    }
 
     useEffect(() => {
         if (activePanel === "calculations") {
@@ -1183,10 +1207,16 @@ export function CanvasSidebar({
                     onMouseDown={(e) => e.stopPropagation()}
                 >
                     {/* Header */}
-                    <div className="flex items-center justify-between px-5 py-4">
-                        <div className="flex items-center gap-3">
-                            <h2 className="text-[0.9rem] font-semibold text-ink">Field editor</h2>
-                            <span className="text-[0.78rem] text-slate-400">{columns.length} fields</span>
+                    <div className="flex items-start justify-between px-6 pb-4 pt-5">
+                        <div className="px-1">
+                            <p className="pl-px text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                                {columns.length} Fields
+                            </p>
+                            <h2 className="mt-1 font-display text-[2rem] font-light leading-[1.08] tracking-tight text-ink">
+                                Field editor
+                            </h2>
+                        </div>
+                        <div className="mt-2 flex items-center gap-2">
                             {Object.keys(columnOverrides).length > 0 && (
                                 <button
                                     type="button"
@@ -1196,30 +1226,45 @@ export function CanvasSidebar({
                                     Reset all
                                 </button>
                             )}
+                            <button
+                                type="button"
+                                onClick={() => setActivePanel("layout")}
+                                className="rounded-[6px] p-1 text-slate-400 transition hover:bg-slate-100 hover:text-ink"
+                            >
+                                <X className="h-4 w-4" strokeWidth={1.5} />
+                            </button>
                         </div>
-                        <button
-                            type="button"
-                            onClick={() => setActivePanel("layout")}
-                            className="rounded-[6px] p-1 text-slate-400 transition hover:bg-slate-100 hover:text-ink"
-                        >
-                            <X className="h-4 w-4" strokeWidth={1.5} />
-                        </button>
                     </div>
 
                     {/* Table */}
                     <div className="flex-1 overflow-auto border-t border-slate-100">
-                        <table className="w-full border-collapse">
+                        <table className="w-full border-collapse table-fixed">
+                            <colgroup>
+                                <col className="w-[160px]" />
+                                <col />
+                                <col className="w-[110px]" />
+                                <col className="w-[120px]" />
+                                <col className="w-9" />
+                            </colgroup>
                             <thead className="sticky top-0 z-10 bg-white">
                                 <tr className="border-b border-slate-100">
-                                    <th className="px-5 py-2 text-left text-[0.68rem] font-medium text-slate-400">Field</th>
-                                    <th className="px-4 py-2 text-left text-[0.68rem] font-medium text-slate-400">Display name</th>
-                                    <th className="w-[100px] px-4 py-2 text-left text-[0.68rem] font-medium text-slate-400">Type</th>
-                                    <th className="w-[110px] px-4 py-2 text-left text-[0.68rem] font-medium text-slate-400">Format</th>
-                                    <th className="w-9 px-3 py-2" />
+                                    {(["field", "label", "type", "format"] as const).map((key, i) => (
+                                        <th key={key} className={`${i === 0 ? "px-6" : "px-4"} py-2 text-left text-[0.68rem] font-medium text-slate-400`}>
+                                            <button
+                                                type="button"
+                                                onClick={() => toggleFieldEditorSort(key)}
+                                                className={`inline-flex items-center gap-1 transition hover:text-slate-600 ${fieldEditorSort?.key === key ? "text-ink" : ""}`}
+                                            >
+                                                {key === "field" ? "Field" : key === "label" ? "Display name" : key === "type" ? "Type" : "Format"}
+                                                <ChevronsUpDown className="h-2.5 w-2.5 shrink-0" />
+                                            </button>
+                                        </th>
+                                    ))}
+                                    <th className="px-3 py-2" />
                                 </tr>
                             </thead>
                             <tbody>
-                                {columns.map((col) => {
+                                {sortedColumns.map((col) => {
                                     const override = columnOverrides[col.key];
                                     const effectiveType = override?.typeOverride ?? col.type;
                                     const isModified = !!override;
@@ -1228,8 +1273,8 @@ export function CanvasSidebar({
                                     return (
                                         <tr key={col.key} className="border-b border-slate-100/80 transition-colors hover:bg-slate-50">
                                             {/* Original field key */}
-                                            <td className="px-5 py-2 align-middle">
-                                                <span className="font-mono text-[0.75rem] text-slate-400">{col.key}</span>
+                                            <td className="px-6 py-2 align-middle">
+                                                <span className="block truncate font-mono text-[0.75rem] text-slate-400">{col.key}</span>
                                             </td>
 
                                             {/* Display name */}
@@ -1275,7 +1320,7 @@ export function CanvasSidebar({
                                             </td>
 
                                             {/* Status / reset */}
-                                            <td className="px-3 py-2 align-middle">
+                                            <td className="px-3 py-2 align-middle text-center">
                                                 {isSaved ? (
                                                     <Check className="h-3.5 w-3.5 text-emerald-400" strokeWidth={2.5} />
                                                 ) : isModified ? (
