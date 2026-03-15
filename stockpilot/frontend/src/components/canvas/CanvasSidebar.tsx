@@ -1249,11 +1249,11 @@ export function CanvasSidebar({
                             <thead className="sticky top-0 z-10 bg-white">
                                 <tr className="border-b border-slate-100">
                                     {(["field", "label", "type", "format"] as const).map((key, i) => (
-                                        <th key={key} className={`${i === 0 ? "px-6" : "px-4"} py-2 text-left text-[0.68rem] font-medium text-slate-400`}>
+                                        <th key={key} className={`${i === 0 ? "px-6" : "px-4"} py-2 text-left`}>
                                             <button
                                                 type="button"
                                                 onClick={() => toggleFieldEditorSort(key)}
-                                                className={`inline-flex items-center gap-1 transition hover:text-slate-600 ${fieldEditorSort?.key === key ? "text-ink" : ""}`}
+                                                className={`inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.22em] transition ${fieldEditorSort?.key === key ? "text-slate-600" : "text-slate-400 hover:text-slate-500"}`}
                                             >
                                                 {key === "field" ? "Field" : key === "label" ? "Display name" : key === "type" ? "Type" : "Format"}
                                                 <ChevronsUpDown className="h-2.5 w-2.5 shrink-0" />
