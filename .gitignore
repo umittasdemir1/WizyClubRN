@@ -55,3 +55,6 @@ stockpilot/frontend/*.zip
 
 # Claude local state
 .claude/settings.local.json
+
+# Temp uploads
+backend/temp_uploads/
