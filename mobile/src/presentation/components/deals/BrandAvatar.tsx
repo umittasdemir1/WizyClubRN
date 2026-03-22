@@ -1,0 +1,90 @@
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Image } from 'expo-image';
+import { shadowStyle } from '@/core/utils/shadow';
+
+interface BrandAvatarProps {
+    brandName: string;
+    discount: string;
+    backgroundColor: string;
+    iconSource?: React.ComponentProps<typeof Image>['source'];
+    iconComponent?: React.ComponentType<any>;
+    onPress?: () => void;
+}
+
+export function BrandAvatar({
+    brandName,
+    discount,
+    backgroundColor,
+    iconSource,
+    iconComponent: IconComponent,
+    onPress,
+}: BrandAvatarProps) {
+    return (
+        <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
+            <View style={styles.avatarWrapper}>
+                <View style={[styles.avatar, { backgroundColor }]}>
+                    {IconComponent ? (
+                        <IconComponent width={48} height={48} />
+                    ) : iconSource ? (
+                        <Image
+                            source={iconSource}
+                            style={styles.icon}
+                            contentFit="contain"
+                        />
+                    ) : null}
+                </View>
+                <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{discount}</Text>
+                </View>
+            </View>
+            <Text style={styles.brandName} numberOfLines={1}>
+                {brandName}
+            </Text>
+        </TouchableOpacity>
+    );
+}
+
+const styles = StyleSheet.create({
+    container: {
+        alignItems: 'center',
+        width: 70,
+    },
+    avatarWrapper: {
+        position: 'relative',
+        marginBottom: 6,
+    },
+    avatar: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        alignItems: 'center',
+        justifyContent: 'center',
+        ...shadowStyle({ color: '#000', offset: { width: 0, height: 1 }, opacity: 0.05, radius: 2, elevation: 1 }),
+    },
+    icon: {
+        width: 48,
+        height: 48,
+    },
+    badge: {
+        position: 'absolute',
+        top: -4,
+        right: -4,
+        backgroundColor: '#10B981',
+        paddingHorizontal: 4,
+        paddingVertical: 2,
+        borderRadius: 8,
+        minWidth: 20,
+        alignItems: 'center',
+    },
+    badgeText: {
+        color: 'white',
+        fontSize: 8,
+        fontWeight: 'bold',
+    },
+    brandName: {
+        fontSize: 10,
+        color: '#6b7280',
+        textAlign: 'center',
+    },
+});

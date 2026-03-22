@@ -1,0 +1,32 @@
+# EAS uploads only the mobile project directory.
+# Keep the archive limited to source, assets, and required config.
+
+# Generated / local-only folders
+node_modules/
+.expo/
+dist/
+web-build/
+android/
+ios/
+
+# Local diagnostics and logs
+doctor_output*.txt
+doctor_full*.txt
+doctor_utf8*.txt
+doctor_final*.txt
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# Local editor / OS noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Archives and temporary artifacts
+*.zip
+*.tar.gz
+*.tmp

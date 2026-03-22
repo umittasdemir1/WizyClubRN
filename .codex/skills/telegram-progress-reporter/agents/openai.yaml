@@ -1,0 +1,4 @@
+interface:
+  display_name: "Telegram Progress"
+  short_description: "Send concise Codex work summaries to Telegram"
+  default_prompt: "Use the Telegram progress reporter to send short, safe Codex session updates with outcome-first summaries, file impact, and command results when relevant."

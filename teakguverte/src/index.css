@@ -1,0 +1,126 @@
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600;700;800;900&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color: #1a1a1a;
+  background-color: #fdfcfb;
+  font-family: "Poppins", system-ui, -apple-system, sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: #fdfcfb;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+::selection {
+  background: rgba(0, 21, 41, 0.15);
+  color: #001529;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@property --border-angle {
+  syntax: "<angle>";
+  initial-value: 0turn;
+  inherits: false;
+}
+
+@keyframes spin-border {
+  to {
+    --border-angle: 1turn;
+  }
+}
+
+.cta-orbit-ring {
+  position: relative;
+  border-radius: 9999px;
+}
+
+.cta-orbit-ring::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.4px;
+  background: conic-gradient(
+    from var(--border-angle),
+    transparent 0%,
+    transparent 15%,
+    #4d96ff 30%,
+    #6bcf7f 45%,
+    #ffd93d 60%,
+    #ff9068 80%,
+    #ff416c 100%
+  );
+  animation: spin-border 3s linear infinite;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+@keyframes regions-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.regions-flow {
+  overflow: hidden;
+  white-space: nowrap;
+  mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+}
+
+.regions-flow-track {
+  display: inline-flex;
+  align-items: center;
+  min-width: max-content;
+  animation: regions-marquee 30s linear infinite;
+}
+
+.regions-flow-item {
+  display: inline-flex;
+  align-items: center;
+  color: #080A0F;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+.regions-flow-item::after {
+  content: "•";
+  margin-inline: 1.15rem;
+  color: rgba(8, 10, 15, 0.28);
+}

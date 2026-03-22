@@ -1,0 +1,15 @@
+{
+  "name": "stockpilot",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "build:frontend": "npm --prefix frontend run build",
+    "build:backend": "npm --prefix backend run build",
+    "test:backend": "npm --prefix backend run test",
+    "sync-env": "bash scripts/sync-env.sh",
+    "build": "npm run build:frontend && npm run build:backend",
+    "check": "npm run build:frontend && npm run test:backend"
+  }
+}

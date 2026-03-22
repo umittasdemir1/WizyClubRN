@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: stockpilot-api
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install --include=dev && npm run build && npm run academia:setup
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: "10000"

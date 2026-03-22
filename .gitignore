@@ -1,0 +1,57 @@
+# General
+.DS_Store
+.idea
+.vscode
+*.log
+*.tmp
+tmp/
+
+# Dependencies
+node_modules/
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# Credentials / Secrets
+google-credentials.json
+**/google-credentials.json
+.mcp.json
+
+# Build Outputs
+dist/
+build/
+android/
+ios/
+
+# Expo
+.expo/
+
+# Wizy Specific
+*.mp4
+*.mov
+debug-output.log
+dump-output.log
+audit_log.txt
+
+# Tools
+ngrok
+ngrok-v3-stable-linux-amd64.tgz
+# Expo local state
+.expo/
+
+# Codex runtime artifacts
+.codex/runtime/
+path_log.txt
+**/.tmp/
+
+# Local npm config
+.npmrc
+**/.npmrc
+stockpilot/frontend/dist.zip
+stockpilot/frontend/*.zip
+.tmp_secret_tools/
+
+# Claude local state
+.claude/settings.local.json

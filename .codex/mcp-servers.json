@@ -1,0 +1,165 @@
+{
+  "managedBlockName": "WIZYCLUB MANAGED MCP",
+  "servers": [
+    {
+      "name": "openaiDeveloperDocs",
+      "type": "url",
+      "startupTimeoutSec": 45,
+      "url": "https://developers.openai.com/mcp",
+      "description": "Official OpenAI developer docs MCP."
+    },
+    {
+      "name": "filesystem",
+      "type": "command",
+      "startupTimeoutSec": 30,
+      "command": {
+        "default": "npx",
+        "win32": "npx.cmd"
+      },
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "{workspace}"
+      ],
+      "description": "Workspace-scoped filesystem MCP rooted at the repo."
+    },
+    {
+      "name": "r2-local",
+      "type": "command",
+      "startupTimeoutSec": 20,
+      "command": {
+        "default": "node"
+      },
+      "args": [
+        "{workspace}/r2-mcp/custom-r2-server.js"
+      ],
+      "requiresEnv": [
+        "R2_ACCOUNT_ID",
+        "R2_ACCESS_KEY_ID",
+        "R2_SECRET_ACCESS_KEY"
+      ],
+      "description": "Repo-managed local R2 MCP server."
+    },
+    {
+      "name": "github",
+      "type": "command",
+      "startupTimeoutSec": 30,
+      "command": {
+        "default": "node"
+      },
+      "args": [
+        "{workspace}/scripts/mcp/github-wrapper.js"
+      ],
+      "requiresEnv": [
+        "GITHUB_PERSONAL_ACCESS_TOKEN"
+      ],
+      "optional": true,
+      "description": "GitHub MCP enabled when GITHUB_PERSONAL_ACCESS_TOKEN exists."
+    },
+    {
+      "name": "supabase-mcp-server",
+      "type": "command",
+      "startupTimeoutSec": 30,
+      "command": {
+        "default": "node"
+      },
+      "args": [
+        "{workspace}/scripts/mcp/supabase-wrapper.js"
+      ],
+      "requiresEnv": [
+        "SUPABASE_MCP_ACCESS_TOKEN"
+      ],
+      "optional": true,
+      "description": "Supabase MCP server enabled when SUPABASE_MCP_ACCESS_TOKEN exists."
+    },
+    {
+      "name": "postgres",
+      "type": "command",
+      "startupTimeoutSec": 30,
+      "command": {
+        "default": "npx",
+        "win32": "npx.cmd"
+      },
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "{env:POSTGRES_MCP_URL}"
+      ],
+      "requiresEnv": [
+        "POSTGRES_MCP_URL"
+      ],
+      "optional": true,
+      "description": "Direct Postgres MCP enabled when POSTGRES_MCP_URL exists."
+    },
+    {
+      "name": "netlify",
+      "type": "command",
+      "startupTimeoutSec": 90,
+      "command": {
+        "default": "npx",
+        "win32": "npx.cmd"
+      },
+      "args": [
+        "-y",
+        "@netlify/mcp"
+      ],
+      "requiresEnv": [
+        "NETLIFY_MCP_ENABLED",
+        "NETLIFY_PERSONAL_ACCESS_TOKEN"
+      ],
+      "env": {
+        "NETLIFY_PERSONAL_ACCESS_TOKEN": "{env:NETLIFY_PERSONAL_ACCESS_TOKEN}"
+      },
+      "optional": true,
+      "description": "Official Netlify MCP server enabled when NETLIFY_MCP_ENABLED and NETLIFY_PERSONAL_ACCESS_TOKEN exist."
+    },
+    {
+      "name": "render",
+      "type": "url",
+      "startupTimeoutSec": 45,
+      "url": "https://mcp.render.com/mcp",
+      "headers": {
+        "Authorization": "Bearer {env:RENDER_API_KEY}"
+      },
+      "requiresEnv": [
+        "RENDER_API_KEY"
+      ],
+      "optional": true,
+      "description": "Official Render MCP server for deployment management."
+    },
+    {
+      "name": "doppler",
+      "type": "command",
+      "startupTimeoutSec": 45,
+      "description": "Official Doppler MCP server for secret management",
+      "optional": true,
+      "sourceUrl": "https://github.com/DopplerHQ/mcp-server",
+      "requiresEnv": [
+        "DOPPLER_TOKEN"
+      ],
+      "command": {
+        "default": "node"
+      },
+      "args": [
+        "{workspace}/scripts/mcp/doppler-wrapper.js"
+      ]
+    },
+    {
+      "name": "bookmarks-local",
+      "type": "command",
+      "startupTimeoutSec": 20,
+      "command": {
+        "default": "node"
+      },
+      "args": [
+        "{workspace}/bookmarks-mcp/server.js"
+      ],
+      "requiresEnv": [
+        "SUPABASE_URL",
+        "SUPABASE_SERVICE_ROLE_KEY"
+      ],
+      "optional": true,
+      "description": "Supabase-backed bookmarks MCP server for search and lookup."
+    }
+  ]
+}

@@ -1,0 +1,119 @@
+import { IProfileRepository } from '../../domain/repositories/IProfileRepository';
+import { User } from '../../domain/entities';
+import { SupabaseProfileDataSource } from '../datasources/SupabaseProfileDataSource';
+import { logRepo, logError, LogCode } from '@/core/services/Logger';
+
+export class ProfileRepositoryImpl implements IProfileRepository {
+    private dataSource: SupabaseProfileDataSource;
+
+    constructor() {
+        this.dataSource = new SupabaseProfileDataSource();
+    }
+
+    async getProfile(userId: string, viewerId?: string): Promise<User | null> {
+        try {
+            const data = await this.dataSource.getProfile(userId, viewerId);
+
+            if (!data) {
+                // Profile doesn't exist - return null gracefully
+                return null;
+            }
+
+            return this.mapDtoToUser(data);
+        } catch (error: unknown) {
+            const err = error as Error;
+            logError(LogCode.REPO_ERROR, 'Profile repository getProfile error', { error: err, userId, viewerId });
+            return null;
+        }
+    }
+
+    async getProfileLite(userId: string): Promise<User | null> {
+        try {
+            const data = await this.dataSource.getProfileLite(userId);
+            if (!data) return null;
+            return this.mapDtoToUser({
+                ...data,
+                is_following: false,
+                has_stories: false,
+                has_unseen_story: false,
+                followers_count: 0,
+                following_count: 0,
+                posts_count: 0
+            });
+        } catch (error: unknown) {
+            const err = error as Error;
+            logError(LogCode.REPO_ERROR, 'Profile repository getProfileLite error', { error: err, userId });
+            return null;
+        }
+    }
+
+    async searchProfiles(query: string, limit: number = 20, viewerId?: string): Promise<User[]> {
+        try {
+            const data = await this.dataSource.searchProfiles(query, limit, viewerId);
+            return data.map((dto: any) => this.mapDtoToUser(dto));
+        } catch (error: unknown) {
+            const err = error as Error;
+            logError(LogCode.REPO_ERROR, 'Profile repository search error', { error: err, query, viewerId });
+            return [];
+        }
+    }
+
+    async searchProfilesByLocation(query: string, limit: number = 20, viewerId?: string): Promise<User[]> {
+        try {
+            const data = await this.dataSource.searchProfilesByLocation(query, limit, viewerId);
+            return data.map((dto: any) => this.mapDtoToUser(dto));
+        } catch (error: unknown) {
+            const err = error as Error;
+            logError(LogCode.REPO_ERROR, 'Profile repository location search error', { error: err, query, viewerId });
+            return [];
+        }
+    }
+
+    async updateProfile(userId: string, profile: Partial<User>): Promise<User> {
+        // Convert camelCase to snake_case for DB is handled in DataSource usually 
+        // or we need to map it here before sending if DataSource expects snake_case.
+        // Let's assume DataSource handles basic updates or takes Partial<User> and maps it.
+        // We will check DataSource next.
+        const data = await this.dataSource.updateProfile(userId, profile);
+        return this.mapDtoToUser(data);
+    }
+
+    async uploadAvatar(userId: string, fileUri: string): Promise<string> {
+        return await this.dataSource.uploadAvatar(userId, fileUri);
+    }
+
+    async checkUsernameAvailability(username: string, currentUserId: string): Promise<boolean> {
+        return await this.dataSource.checkUsernameAvailability(username, currentUserId);
+    }
+
+    async bootstrapProfileForSignUp(userId: string, email: string, fullName: string): Promise<string | null> {
+        return this.dataSource.bootstrapProfileForSignUp(userId, email, fullName);
+    }
+
+    private mapDtoToUser(dto: any): User {
+        return {
+            id: dto.id,
+            username: dto.username,
+            fullName: dto.full_name,
+            avatarUrl: dto.avatar_url,
+            isFollowing: !!dto.is_following, // Use the flag from DataSource
+            bio: dto.bio,
+            country: dto.country,
+            age: dto.age,
+            website: dto.website,
+            isVerified: dto.is_verified,
+            shopEnabled: dto.shop_enabled,
+            followersCount: dto.followers_count,
+            followingCount: dto.following_count,
+            postsCount: dto.posts_count,
+            hasStories: !!dto.has_stories,
+            hasUnseenStory: !!dto.has_unseen_story,
+            // New Social Fields
+            instagramUrl: dto.instagram_url,
+            tiktokUrl: dto.tiktok_url,
+            youtubeUrl: dto.youtube_url,
+            xUrl: dto.x_url,
+            facebookUrl: dto.facebook_url
+        };
+    }
+}

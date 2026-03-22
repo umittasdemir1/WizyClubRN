@@ -1,0 +1,44 @@
+import { User } from './User';
+
+export type VideoTaggedPerson = Pick<User, 'id' | 'username' | 'fullName' | 'avatarUrl' | 'isVerified'>;
+
+export interface Video {
+    id: string;
+    videoUrl: string;
+    thumbnailUrl: string;
+    description: string;
+    likesCount: number;
+    viewsCount?: number;
+    commentsCount: number;
+    sharesCount: number;
+    shopsCount: number;
+    spriteUrl?: string; // Sprite sheet URL for seekbar thumbnails
+    isLiked: boolean;
+    isSaved: boolean;
+    savesCount: number;
+    user: User;
+    musicName?: string;
+    musicAuthor?: string;
+    hlsUrl?: string; // HLS Master Playlist URL
+    processingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
+    brandName?: string | null;
+    brandUrl?: string | null;
+    isCommercial?: boolean;
+    commercialType?: string | null;
+    locationName?: string | null;
+    locationAddress?: string | null;
+    locationLatitude?: number | null;
+    locationLongitude?: number | null;
+    width?: number;
+    height?: number;
+    createdAt?: string;
+    taggedPeople?: VideoTaggedPerson[];
+    mediaUrls?: {
+        url: string;
+        type: 'video' | 'image';
+        thumbnail?: string;
+        width?: number;
+        height?: number;
+    }[];
+    postType?: 'video' | 'carousel';
+}

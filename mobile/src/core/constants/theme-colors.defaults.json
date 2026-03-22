@@ -1,0 +1,84 @@
+{
+  "background": {
+    "label": "Genel Arka Plan",
+    "description": "Sayfaların ve ana yüzeylerin varsayılan arka plan rengidir.",
+    "light": "#FFFFFF",
+    "dark": "#080A0F",
+    "usage": [
+      "mobile/app/search.tsx",
+      "mobile/app/(tabs)/profile.tsx",
+      "mobile/app/(tabs)/explore.tsx",
+      "mobile/src/presentation/components/poolFeed/PoolFeedManager.styles.ts",
+      "mobile/src/presentation/components/infiniteFeed/InfiniteFeedManager.tsx"
+    ]
+  },
+  "videoBackground": {
+    "label": "Video Sahne Arka Planı",
+    "description": "Video oynatıcıların ve hikaye ekranlarının zemin rengidir.",
+    "light": "#080A0F",
+    "dark": "#080A0F",
+    "usage": [
+      "mobile/src/presentation/components/story/StoryActions.tsx",
+      "mobile/src/presentation/components/story/StoryViewer.tsx",
+      "mobile/src/presentation/components/poolFeed/PoolFeedStatusViews.tsx",
+      "mobile/src/presentation/components/poolFeed/PoolFeedManager.styles.ts"
+    ]
+  },
+  "card": {
+    "label": "Kart Yüzeyi",
+    "description": "İçerik kartları ve listelerdeki öğelerin arka plan rengidir.",
+    "light": "#F2F2F7",
+    "dark": "#222222",
+    "usage": [
+      "mobile/app/user/[id].tsx",
+      "mobile/app/(tabs)/profile.tsx",
+      "mobile/app/paywall/badge.tsx",
+      "mobile/src/presentation/components/infiniteFeed/InfiniteFeedCard.tsx"
+    ]
+  },
+  "black": {
+    "label": "Siyah Yardımcı Renk",
+    "description": "Genellikle karartma ve overlay katmanlarında kullanılan sabit siyahtır.",
+    "light": "#080A0F",
+    "dark": "#080A0F",
+    "usage": [
+      "mobile/src/presentation/components/shared/InAppBrowserOverlay.tsx"
+    ]
+  },
+  "border": {
+    "label": "Sınır/Çizgi Rengi",
+    "description": "Ayraçlar ve kutu sınırları için kullanılan renk.",
+    "light": "#E5E5EA",
+    "dark": "#333333",
+    "usage": [
+      "mobile/src/presentation/components/shared/InAppBrowserOverlay.tsx",
+      "mobile/src/presentation/components/profile/EditProfileSheet.tsx"
+    ]
+  },
+  "textPrimary": {
+    "label": "Birincil Metin",
+    "description": "Başlıklar ve ana içerik metinleri için kullanılır.",
+    "light": "#080A0F",
+    "dark": "#FFFFFF",
+    "usage": [
+      "mobile/app/search.tsx",
+      "mobile/app/(tabs)/profile.tsx",
+      "mobile/app/(tabs)/notifications.tsx",
+      "mobile/src/presentation/components/infiniteFeed/InfiniteFeedManager.tsx",
+      "mobile/src/presentation/components/profile/EditProfileSheet.tsx"
+    ]
+  },
+  "textSecondary": {
+    "label": "İkincil Metin",
+    "description": "Açıklamalar, alt başlıklar ve daha az önemli metinler için kullanılır.",
+    "light": "#8E8E93",
+    "dark": "rgba(255, 255, 255, 0.6)",
+    "usage": [
+      "mobile/app/search.tsx",
+      "mobile/app/user/[id].tsx",
+      "mobile/app/paywall/badge.tsx",
+      "mobile/src/presentation/components/infiniteFeed/InfiniteFeedManager.tsx",
+      "mobile/src/presentation/components/profile/EditProfileSheet.tsx"
+    ]
+  }
+}

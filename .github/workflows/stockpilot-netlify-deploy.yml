@@ -1,0 +1,50 @@
+name: Deploy StockPilot Frontend to Netlify
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "stockpilot/frontend/**"
+      - ".github/workflows/stockpilot-netlify-deploy.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: stockpilot/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: stockpilot/frontend
+
+      - name: Build frontend
+        run: npm run build
+        working-directory: stockpilot/frontend
+
+      - name: Create deploy archive
+        run: |
+          cd stockpilot/frontend/dist
+          zip -r ../dist-netlify.zip .
+
+      - name: Deploy to Netlify
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: 1ae3eca2-6d69-4954-b3d7-156acdb8e0cf
+        run: |
+          curl --fail-with-body \
+            -X POST \
+            -H "Authorization: Bearer ${NETLIFY_AUTH_TOKEN}" \
+            -H "Content-Type: application/zip" \
+            --data-binary "@stockpilot/frontend/dist-netlify.zip" \
+            "https://api.netlify.com/api/v1/sites/${NETLIFY_SITE_ID}/deploys"

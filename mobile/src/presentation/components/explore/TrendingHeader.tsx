@@ -1,0 +1,66 @@
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Search } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+interface TrendingHeaderProps {
+    title?: string;
+    onSearchPress?: () => void;
+    isDark?: boolean;
+    rightElement?: React.ReactNode;
+    showSearch?: boolean;
+}
+
+export function TrendingHeader({
+    title = 'Şimdi Keşfet',
+    onSearchPress,
+    isDark = true,
+    rightElement,
+    showSearch = true,
+}: TrendingHeaderProps) {
+    const insets = useSafeAreaInsets();
+    const textColor = isDark ? '#FFFFFF' : '#080A0F';
+    const iconColor = isDark ? '#FFFFFF' : '#080A0F';
+
+    return (
+        <View style={[styles.container, { paddingTop: insets.top + 10 }]}>
+            <Text style={[styles.title, { color: textColor }]}>{title}</Text>
+
+            {rightElement ? (
+                rightElement
+            ) : showSearch ? (
+                <TouchableOpacity
+                    style={styles.iconButton}
+                    onPress={onSearchPress}
+                >
+                    <Search size={22} color={iconColor} strokeWidth={2.4} />
+                </TouchableOpacity>
+            ) : (
+                <View style={{ width: 44 }} /> 
+            )}
+        </View>
+    );
+}
+
+const styles = StyleSheet.create({
+    container: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingBottom: 8,
+        backgroundColor: 'transparent',
+    },
+    title: {
+        fontSize: 24,
+        fontWeight: '600',
+        letterSpacing: 0.3,
+    },
+    iconButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+});
