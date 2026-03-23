@@ -1,6 +1,6 @@
 import { type Dispatch, type SetStateAction, useEffect, useMemo, useRef, useState } from "react";
 import { readCachedNotes, writeCachedNotes } from "../cache";
-import type { AcademiaComposerVisualDraft, AcademiaNote, AcademiaSidebarTab } from "../types";
+import type { AcademiaComposerVisualDraft, AcademiaNote, AcademiaNoteColorToken, AcademiaNoteKind, AcademiaSidebarTab } from "../types";
 import { buildAcademiaNoteId } from "../utils";
 
 interface UseAcademiaNotesInput {
@@ -19,13 +19,18 @@ export interface UseAcademiaNotesResult {
     composerVisualDraft: AcademiaComposerVisualDraft | null;
     visualNotes: AcademiaNote[];
     writtenNotes: AcademiaNote[];
+    pinnedNotes: AcademiaNote[];
     canSubmitSidebarNote: boolean;
     setSidebarMessageDraft: Dispatch<SetStateAction<string>>;
     setComposerVisualDraft: Dispatch<SetStateAction<AcademiaComposerVisualDraft | null>>;
+    queueVisualDraft: (draft: AcademiaComposerVisualDraft) => void;
+    queuePinnedDraft: (message: string, pinnedTimeSeconds?: number) => void;
     submitSidebarNote: () => void;
     openExpandedNote: (noteId: string) => void;
     closeExpandedNote: () => void;
     clearComposerVisualDraft: () => void;
+    deleteNote: (noteId: string) => void;
+    updateNoteColor: (noteId: string, colorToken: AcademiaNoteColorToken) => void;
     scrollVisualNotes: (direction: "left" | "right") => void;
 }
 
@@ -43,13 +48,19 @@ export function useAcademiaNotes({
     const [expandedNoteId, setExpandedNoteId] = useState<string | null>(null);
     const [sidebarMessageDraft, setSidebarMessageDraft] = useState("");
     const [composerVisualDraft, setComposerVisualDraft] = useState<AcademiaComposerVisualDraft | null>(null);
+    const [draftNoteKind, setDraftNoteKind] = useState<AcademiaNoteKind>("typewriter");
+    const [draftPinnedTimeSeconds, setDraftPinnedTimeSeconds] = useState<number | null>(null);
 
     const visualNotes = useMemo(
-        () => notes.filter((note) => note.screenshotDataUrl.trim().length > 0),
+        () => notes.filter((note) => note.kind === "visual"),
         [notes]
     );
     const writtenNotes = useMemo(
-        () => notes.filter((note) => note.screenshotDataUrl.trim().length === 0 && note.text.trim().length > 0),
+        () => notes.filter((note) => note.kind === "typewriter" && note.text.trim().length > 0),
+        [notes]
+    );
+    const pinnedNotes = useMemo(
+        () => notes.filter((note) => note.kind === "pinned" && note.text.trim().length > 0),
         [notes]
     );
     const expandedNote = useMemo(
@@ -67,6 +78,8 @@ export function useAcademiaNotes({
             setNotes([]);
             setSidebarMessageDraft("");
             setComposerVisualDraft(null);
+            setDraftNoteKind("typewriter");
+            setDraftPinnedTimeSeconds(null);
             return;
         }
 
@@ -75,6 +88,8 @@ export function useAcademiaNotes({
 
         setNotes(cachedNotes.filter((note) => note.isSaved));
         setSidebarMessageDraft(cachedDraftNote?.text ?? "");
+        setDraftNoteKind(cachedDraftNote?.kind ?? "typewriter");
+        setDraftPinnedTimeSeconds(cachedDraftNote?.kind === "pinned" ? cachedDraftNote.capturedAtSeconds : null);
         setComposerVisualDraft(
             cachedDraftNote && cachedDraftNote.screenshotDataUrl.trim().length > 0
                 ? {
@@ -103,11 +118,14 @@ export function useAcademiaNotes({
             ? [
                   {
                       id: "academia_note_draft",
-                      capturedAtSeconds: composerVisualDraft?.capturedAtSeconds ?? videoCurrentTime,
+                      kind: composerVisualDraft !== null ? "visual" : draftNoteKind,
+                      capturedAtSeconds: composerVisualDraft?.capturedAtSeconds
+                          ?? (draftNoteKind === "pinned" ? draftPinnedTimeSeconds ?? videoCurrentTime : videoCurrentTime),
                       createdAt: new Date().toISOString(),
                       screenshotDataUrl: composerVisualDraft?.screenshotDataUrl ?? "",
                       sourceName: composerVisualDraft?.sourceName ?? mediaFile.name,
                       text: sidebarMessageDraft,
+                      colorToken: "slate" as const,
                       isSaved: false,
                       savedAt: null,
                   },
@@ -116,7 +134,7 @@ export function useAcademiaNotes({
             : notes;
 
         writeCachedNotes(mediaFile.name, persistedNotes);
-    }, [mediaFile, notes, sidebarMessageDraft, composerVisualDraft, videoCurrentTime]);
+    }, [mediaFile, notes, sidebarMessageDraft, composerVisualDraft, draftNoteKind, draftPinnedTimeSeconds, videoCurrentTime]);
 
     // Scroll notes viewport to top when switching to notes tab or when new notes arrive.
     useEffect(() => {
@@ -156,11 +174,14 @@ export function useAcademiaNotes({
         const nextTimestamp = new Date().toISOString();
         const nextNote: AcademiaNote = {
             id: buildAcademiaNoteId(),
-            capturedAtSeconds: composerVisualDraft?.capturedAtSeconds ?? videoCurrentTime,
+            kind: composerVisualDraft !== null ? "visual" : draftNoteKind,
+            capturedAtSeconds: composerVisualDraft?.capturedAtSeconds
+                ?? (draftNoteKind === "pinned" ? draftPinnedTimeSeconds ?? videoCurrentTime : videoCurrentTime),
             createdAt: nextTimestamp,
             screenshotDataUrl: composerVisualDraft?.screenshotDataUrl ?? "",
             sourceName: composerVisualDraft?.sourceName ?? mediaFile?.name ?? "Academia note",
             text: trimmedMessage,
+            colorToken: "slate",
             isSaved: true,
             savedAt: nextTimestamp,
         };
@@ -168,6 +189,24 @@ export function useAcademiaNotes({
         setNotes((current) => [nextNote, ...current]);
         setSidebarMessageDraft("");
         setComposerVisualDraft(null);
+        setDraftNoteKind("typewriter");
+        setDraftPinnedTimeSeconds(null);
+    }
+
+    function queueVisualDraft(draft: AcademiaComposerVisualDraft) {
+        setComposerVisualDraft(draft);
+        setDraftNoteKind("visual");
+        setDraftPinnedTimeSeconds(null);
+    }
+
+    function queuePinnedDraft(message: string, pinnedTimeSeconds?: number) {
+        setComposerVisualDraft(null);
+        setDraftNoteKind("pinned");
+        setDraftPinnedTimeSeconds(Number.isFinite(pinnedTimeSeconds) ? pinnedTimeSeconds ?? null : null);
+        setSidebarMessageDraft((current) => {
+            const trimmed = current.trim();
+            return trimmed.length > 0 ? `${trimmed}\n${message}` : message;
+        });
     }
 
     function scrollVisualNotes(direction: "left" | "right") {
@@ -187,13 +226,25 @@ export function useAcademiaNotes({
         composerVisualDraft,
         visualNotes,
         writtenNotes,
+        pinnedNotes,
         canSubmitSidebarNote,
         setSidebarMessageDraft,
         setComposerVisualDraft,
+        queueVisualDraft,
+        queuePinnedDraft,
         submitSidebarNote,
         openExpandedNote: (noteId) => setExpandedNoteId(noteId),
         closeExpandedNote: () => setExpandedNoteId(null),
         clearComposerVisualDraft: () => setComposerVisualDraft(null),
+        deleteNote: (noteId) => {
+            setNotes((current) => current.filter((note) => note.id !== noteId));
+            setExpandedNoteId((current) => (current === noteId ? null : current));
+        },
+        updateNoteColor: (noteId, colorToken) => {
+            setNotes((current) => current.map((note) => (
+                note.id === noteId ? { ...note, colorToken } : note
+            )));
+        },
         scrollVisualNotes,
     };
 }

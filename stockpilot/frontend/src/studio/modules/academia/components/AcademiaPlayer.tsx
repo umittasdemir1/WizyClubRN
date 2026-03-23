@@ -1,10 +1,12 @@
 import { type ChangeEvent } from "react";
 import {
+    MapPinPlusInside,
     Maximize,
     Minimize,
     Pause,
     Play,
     ScanText,
+    Upload,
     Volume2,
     VolumeX,
 } from "lucide-react";
@@ -13,6 +15,7 @@ import type { AcademiaMediaKind } from "../../../../types/academia";
 import closedCaptionsDarkIcon from "../closed-captions-dark.svg";
 import type { AcademiaSourceMode } from "../types";
 import { formatPlaybackTime } from "../utils";
+import { AcademiaBloomEmptyState } from "./AcademiaBloomEmptyState";
 
 interface Props {
     sourceMode: AcademiaSourceMode;
@@ -45,10 +48,13 @@ interface Props {
     onPlayerMouseMove: () => void;
     onPlayerTouchStart: () => void;
     onCaptureNote: () => void;
+    onPinNote: () => void;
     onAudioTimeUpdate: (time: number) => void;
     onVideoPlay: () => void;
     onVideoPause: () => void;
     onVideoEnded: () => void;
+    onUploadClick: () => void;
+    hasSidebar: boolean;
 }
 
 export function AcademiaPlayer({
@@ -82,10 +88,13 @@ export function AcademiaPlayer({
     onPlayerMouseMove,
     onPlayerTouchStart,
     onCaptureNote,
+    onPinNote,
     onAudioTimeUpdate,
     onVideoPlay,
     onVideoPause,
     onVideoEnded,
+    onUploadClick,
+    hasSidebar,
 }: Props) {
     const overlayOpacityClass = isFullscreen
         ? isVideoControllerVisible ? "opacity-100" : "opacity-0"
@@ -107,10 +116,15 @@ export function AcademiaPlayer({
             : "pointer-events-none opacity-0"
         : "pointer-events-none opacity-0 group-hover/player:pointer-events-auto group-hover/player:opacity-100";
 
+    const playerShapeClass = hasSidebar ? "rounded-l-[16px]" : "rounded-[16px]";
+    const playerClipClass = hasSidebar
+        ? "[clip-path:inset(0_round_16px_0_0_16px)]"
+        : "[clip-path:inset(0_round_16px)]";
+
     return (
         <div
             ref={playerSurfaceRef}
-            className="group/player aspect-video w-full overflow-hidden rounded-[12px] [clip-path:inset(0_round_12px)]"
+            className={`group/player relative h-full min-h-0 w-full overflow-hidden ${playerShapeClass} ${playerClipClass}`}
             onMouseEnter={onPlayerMouseEnter}
             onMouseMove={onPlayerMouseMove}
             onTouchStart={onPlayerTouchStart}
@@ -129,8 +143,24 @@ export function AcademiaPlayer({
                     {/* Capture note button */}
                     {canCaptureVideoNotes ? (
                         <div
-                            className={`absolute right-4 top-[11px] z-20 transition-opacity duration-150 ${actionVisibilityClass}`}
+                            className={`absolute right-4 top-[11px] z-20 flex items-center gap-2 transition-opacity duration-150 ${actionVisibilityClass}`}
                         >
+                            <button
+                                type="button"
+                                onClick={onUploadClick}
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[rgba(15,23,42,0.82)] text-white transition hover:bg-[rgba(15,23,42,0.92)]"
+                                aria-label="Upload media"
+                            >
+                                <Upload className="h-[21px] w-[21px]" strokeWidth={2.2} />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={onPinNote}
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[rgba(15,23,42,0.82)] text-white transition hover:bg-[rgba(15,23,42,0.92)]"
+                                aria-label="Pin current video time to notes"
+                            >
+                                <MapPinPlusInside className="h-[22px] w-[22px]" strokeWidth={2.2} />
+                            </button>
                             <button
                                 type="button"
                                 onClick={onCaptureNote}
@@ -145,7 +175,7 @@ export function AcademiaPlayer({
                     {/* Video element */}
                     <video
                         ref={videoElementRef}
-                        className="h-full w-full rounded-[12px] object-cover [clip-path:inset(0_round_12px)]"
+                        className={`h-full w-full object-cover ${playerShapeClass} ${playerClipClass}`}
                         src={previewUrl}
                         playsInline
                         onClick={onTogglePlayback}
@@ -309,7 +339,15 @@ export function AcademiaPlayer({
                     </div>
                 </>
             ) : sourceMode === "upload" && previewUrl && mediaKind === "audio" ? (
-                <div className="flex h-full w-full rounded-[12px] flex-col justify-end bg-[radial-gradient(circle_at_top,#1e3a8a,transparent_45%),linear-gradient(180deg,#0f172a_0%,#020617_100%)] p-8 text-white [clip-path:inset(0_round_12px)]">
+                <div className={`relative flex h-full w-full flex-col justify-end bg-[radial-gradient(circle_at_top,#1e3a8a,transparent_45%),linear-gradient(180deg,#0f172a_0%,#020617_100%)] p-8 text-white ${playerShapeClass} ${playerClipClass}`}>
+                    <button
+                        type="button"
+                        onClick={onUploadClick}
+                        className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-[rgba(15,23,42,0.82)] text-white transition hover:bg-[rgba(15,23,42,0.92)]"
+                        aria-label="Upload media"
+                    >
+                        <Upload className="h-[21px] w-[21px]" strokeWidth={2.2} />
+                    </button>
                     <div className="max-w-md text-sm leading-7 text-slate-300">
                         Audio source selected.
                     </div>
@@ -324,7 +362,7 @@ export function AcademiaPlayer({
                 </div>
             ) : youtubeEmbedUrl ? (
                 <iframe
-                    className="h-full w-full rounded-[12px] bg-white [clip-path:inset(0_round_12px)]"
+                    className={`h-full w-full bg-white ${playerShapeClass} ${playerClipClass}`}
                     src={youtubeEmbedUrl}
                     title="Academia lesson preview"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -332,9 +370,7 @@ export function AcademiaPlayer({
                     allowFullScreen
                 />
             ) : (
-                <div className="flex h-full w-full items-center justify-center bg-slate-50 px-6 text-sm text-slate-400">
-                    YouTube player could not be loaded.
-                </div>
+                <AcademiaBloomEmptyState onUploadClick={onUploadClick} />
             )}
         </div>
     );

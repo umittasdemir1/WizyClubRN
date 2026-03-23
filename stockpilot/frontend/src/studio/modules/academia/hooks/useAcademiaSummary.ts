@@ -1,5 +1,5 @@
-import { type Dispatch, type SetStateAction, useEffect, useMemo, useState } from "react";
-import { readCachedSummary, writeCachedSummary } from "../cache";
+import { type Dispatch, type SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { readCachedSummary, readCachedSummarySlate, writeCachedSummary, writeCachedSummarySlate } from "../cache";
 import type { AcademiaSourceMode } from "../types";
 
 interface UseAcademiaSummaryInput {
@@ -13,8 +13,10 @@ export interface UseAcademiaSummaryResult {
     summaryDraft: string;
     savedSummaryText: string;
     canSubmitSummary: boolean;
+    cachedSlateValue: unknown[] | null;
     setSummaryDraft: Dispatch<SetStateAction<string>>;
     submitSummary: () => void;
+    saveSummarySlateValue: (value: unknown[]) => void;
 }
 
 export function useAcademiaSummary({
@@ -24,6 +26,8 @@ export function useAcademiaSummary({
 }: UseAcademiaSummaryInput): UseAcademiaSummaryResult {
     const [summaryDraft, setSummaryDraft] = useState("");
     const [savedSummaryText, setSavedSummaryText] = useState("");
+    const [cachedSlateValue, setCachedSlateValue] = useState<unknown[] | null>(null);
+    const latestSlateValueRef = useRef<unknown[] | null>(null);
 
     const summaryCacheScope = useMemo(() => {
         if (sourceMode === "upload" && mediaFile) {
@@ -43,13 +47,20 @@ export function useAcademiaSummary({
         if (!summaryCacheScope) {
             setSummaryDraft("");
             setSavedSummaryText("");
+            setCachedSlateValue(null);
             return;
         }
 
         const cachedSummary = readCachedSummary(summaryCacheScope);
+        const cachedSlate = readCachedSummarySlate(summaryCacheScope);
         setSummaryDraft(cachedSummary);
         setSavedSummaryText(cachedSummary);
+        setCachedSlateValue(cachedSlate);
     }, [summaryCacheScope]);
+
+    const saveSummarySlateValue = useCallback((value: unknown[]) => {
+        latestSlateValueRef.current = value;
+    }, []);
 
     function submitSummary() {
         if (!summaryCacheScope) {
@@ -58,6 +69,10 @@ export function useAcademiaSummary({
 
         const normalizedSummary = summaryDraft.trim();
         writeCachedSummary(summaryCacheScope, normalizedSummary);
+        if (latestSlateValueRef.current) {
+            writeCachedSummarySlate(summaryCacheScope, latestSlateValueRef.current);
+            setCachedSlateValue(latestSlateValueRef.current);
+        }
         setSummaryDraft(normalizedSummary);
         setSavedSummaryText(normalizedSummary);
     }
@@ -67,7 +82,9 @@ export function useAcademiaSummary({
         summaryDraft,
         savedSummaryText,
         canSubmitSummary,
+        cachedSlateValue,
         setSummaryDraft,
         submitSummary,
+        saveSummarySlateValue,
     };
 }

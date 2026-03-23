@@ -7,7 +7,7 @@ import type {
     AcademiaTranscriptionStatus,
 } from "../../../types/academia";
 import { TURKEY_TIME_ZONE, TURKEY_WEEKDAY_INDEX } from "./constants";
-import type { AcademiaNote } from "./types";
+import type { AcademiaNote, AcademiaNoteColorToken, AcademiaNoteKind } from "./types";
 
 export function resolveMediaKind(file: File): AcademiaMediaKind {
     if (file.type.startsWith("video/")) return "video";
@@ -59,11 +59,78 @@ export function buildAcademiaRequestId(): string {
     return `academia_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+export interface AcademiaTimestampSegment {
+    text: string;
+    isTimestamp: boolean;
+}
+
+const ACADEMIA_TIMESTAMP_REGEX = /\b(?:\d{1,2}:)?\d{1,2}:\d{2}\b/g;
+
+export function splitTextWithTimestamps(value: string): AcademiaTimestampSegment[] {
+    const segments: AcademiaTimestampSegment[] = [];
+    let lastIndex = 0;
+
+    for (const match of value.matchAll(ACADEMIA_TIMESTAMP_REGEX)) {
+        const index = match.index ?? 0;
+        if (index > lastIndex) {
+            segments.push({ text: value.slice(lastIndex, index), isTimestamp: false });
+        }
+
+        segments.push({ text: match[0], isTimestamp: true });
+        lastIndex = index + match[0].length;
+    }
+
+    if (lastIndex < value.length) {
+        segments.push({ text: value.slice(lastIndex), isTimestamp: false });
+    }
+
+    return segments.length > 0 ? segments : [{ text: value, isTimestamp: false }];
+}
+
+export function parseTimestampToSeconds(value: string): number | null {
+    const trimmed = value.trim();
+    if (!trimmed) {
+        return null;
+    }
+
+    const parts = trimmed.split(":").map((part) => Number(part));
+    if (parts.some((part) => !Number.isFinite(part))) {
+        return null;
+    }
+
+    if (parts.length === 2) {
+        const [minutes, seconds] = parts;
+        return minutes * 60 + seconds;
+    }
+
+    if (parts.length === 3) {
+        const [hours, minutes, seconds] = parts;
+        return hours * 3600 + minutes * 60 + seconds;
+    }
+
+    return null;
+}
+
 export function buildAcademiaNoteId(): string {
     if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
         return `academia_note_${crypto.randomUUID()}`;
     }
     return `academia_note_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export function resolveAcademiaNoteColorToken(value: unknown): AcademiaNoteColorToken {
+    return value === "slate"
+        || value === "rose"
+        || value === "amber"
+        || value === "orange"
+        || value === "emerald"
+        || value === "teal"
+        || value === "sky"
+        || value === "indigo"
+        || value === "violet"
+        || value === "pink"
+        ? value
+        : "slate";
 }
 
 export function buildLocalStatus(
@@ -195,8 +262,15 @@ export function normalizeAcademiaNote(value: unknown): AcademiaNote | null {
         return null;
     }
 
+    const inferredKind: AcademiaNoteKind = note.screenshotDataUrl.trim().length > 0 ? "visual" : "typewriter";
+    const kind = note.kind === "visual" || note.kind === "typewriter" || note.kind === "pinned"
+        ? note.kind
+        : inferredKind;
+
     return {
         id: note.id,
+        kind,
+        colorToken: resolveAcademiaNoteColorToken(note.colorToken),
         capturedAtSeconds: note.capturedAtSeconds,
         createdAt: note.createdAt,
         screenshotDataUrl: note.screenshotDataUrl,

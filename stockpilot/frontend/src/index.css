@@ -1,8 +1,107 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@200;300;400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@200;300;400;500;600;700;800&family=Poppins:wght@400;500;600&family=Source+Serif+4:ital,wght@0,400;0,500;1,400;1,500&display=swap");
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer components {
+    .academia-bloom-shell {
+        --radius: 1rem;
+        --bloom-0: 0 0% 100%;
+        --bloom-1: 0 0% 88%;
+        --bloom-2: 0 0% 72%;
+        --bloom-3: 0 0% 54%;
+        --bloom-4: 0 0% 12%;
+    }
+
+    .font-bloom-display {
+        font-family: "Poppins", system-ui, sans-serif;
+    }
+
+    .font-bloom-serif {
+        font-family: "Source Serif 4", serif;
+    }
+
+    .liquid-glass,
+    .liquid-glass-strong {
+        position: relative;
+        overflow: hidden;
+        border: none;
+        border-radius: inherit;
+        isolation: isolate;
+        transform: translateZ(0);
+    }
+
+    .liquid-glass {
+        background: rgba(255, 255, 255, 0.02);
+        background-blend-mode: luminosity;
+        -webkit-backdrop-filter: blur(8px);
+        backdrop-filter: blur(8px);
+        box-shadow:
+            0 10px 30px rgba(0, 0, 0, 0.06),
+            inset 0 0 0 1px rgba(255, 255, 255, 0.14),
+            inset 0 1px 1px rgba(255, 255, 255, 0.08);
+    }
+
+    .liquid-glass::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: linear-gradient(
+            180deg,
+            rgba(255, 255, 255, 0.18) 0%,
+            rgba(255, 255, 255, 0.08) 18%,
+            rgba(255, 255, 255, 0.03) 42%,
+            transparent 62%
+        );
+        pointer-events: none;
+    }
+
+    .liquid-glass-strong {
+        background: rgba(255, 255, 255, 0.03);
+        background-blend-mode: luminosity;
+        -webkit-backdrop-filter: blur(28px);
+        backdrop-filter: blur(28px);
+        box-shadow:
+            0 18px 48px rgba(0, 0, 0, 0.12),
+            inset 0 0 0 1px rgba(255, 255, 255, 0.2),
+            inset 0 1px 1px rgba(255, 255, 255, 0.14);
+    }
+
+    .liquid-glass-strong::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: linear-gradient(
+            180deg,
+            rgba(255, 255, 255, 0.22) 0%,
+            rgba(255, 255, 255, 0.1) 18%,
+            rgba(255, 255, 255, 0.04) 40%,
+            transparent 64%
+        );
+        pointer-events: none;
+    }
+
+    .bloom-upload-cta {
+        will-change: transform;
+        backface-visibility: hidden;
+        -webkit-font-smoothing: antialiased;
+        transform: translate3d(0, 0, 0);
+        transition:
+            transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+            box-shadow 220ms ease;
+    }
+
+    .bloom-upload-cta:hover {
+        transform: translate3d(0, -1px, 0) scale(1.03);
+    }
+
+    .bloom-upload-cta:active {
+        transform: translate3d(0, 0, 0) scale(0.985);
+    }
+}
 
 :root {
     color: #15213a;

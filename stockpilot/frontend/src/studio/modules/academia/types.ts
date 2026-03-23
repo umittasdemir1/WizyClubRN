@@ -2,8 +2,23 @@ export type AcademiaRequestState = "idle" | "running" | "ready" | "error";
 export type AcademiaSourceMode = "youtube" | "upload";
 export type AcademiaSidebarTab = "transcript" | "notes" | "summary";
 
+export type AcademiaNoteKind = "visual" | "typewriter" | "pinned";
+export type AcademiaNoteColorToken =
+    | "slate"
+    | "rose"
+    | "amber"
+    | "orange"
+    | "emerald"
+    | "teal"
+    | "sky"
+    | "indigo"
+    | "violet"
+    | "pink";
+
 export type AcademiaNote = {
     id: string;
+    kind: AcademiaNoteKind;
+    colorToken: AcademiaNoteColorToken;
     capturedAtSeconds: number;
     createdAt: string;
     screenshotDataUrl: string;
