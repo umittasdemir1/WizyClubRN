@@ -11,5 +11,11 @@ export interface TranscribeAcademiaMediaRequest {
     requestId?: string;
 }
 
+export interface TranslateAcademiaTranscriptRequestBody {
+    transcript: AcademiaTranscriptResult;
+    targetLanguage: string;
+}
+
 export type TranscribeAcademiaMediaResponse = AcademiaTranscriptResult;
+export type TranslateAcademiaTranscriptResponse = AcademiaTranscriptResult;
 export type GetAcademiaTranscriptionStatusResponse = AcademiaTranscriptionStatus;

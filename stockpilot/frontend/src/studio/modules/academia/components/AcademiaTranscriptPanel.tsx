@@ -1,6 +1,8 @@
 import type { AcademiaTranscriptResult } from "../../../../types/academia";
 import { splitTranscriptWordText } from "../utils";
 
+export type AcademiaTranscriptLanguageView = "source" | "tr";
+
 interface Props {
     transcript: AcademiaTranscriptResult | null;
     transcriptViewportRef: React.RefObject<HTMLDivElement>;
@@ -10,6 +12,11 @@ interface Props {
     activePlaybackWordIndex: number;
     onScrollbarActivate: () => void;
     onScrollbarDeactivate: () => void;
+    canTranslateToTurkish: boolean;
+    selectedTranscriptLanguage: AcademiaTranscriptLanguageView;
+    onTranscriptLanguageChange: (language: AcademiaTranscriptLanguageView) => void;
+    isTranslationLoading: boolean;
+    translationError: string;
 }
 
 export function AcademiaTranscriptPanel({
@@ -21,12 +28,53 @@ export function AcademiaTranscriptPanel({
     activePlaybackWordIndex,
     onScrollbarActivate,
     onScrollbarDeactivate,
+    canTranslateToTurkish,
+    selectedTranscriptLanguage,
+    onTranscriptLanguageChange,
+    isTranslationLoading,
+    translationError,
 }: Props) {
     return (
         <>
+            {canTranslateToTurkish ? (
+                <div className="border-b border-slate-100 px-6 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="inline-flex rounded-full bg-slate-100 p-1">
+                            <button
+                                type="button"
+                                onClick={() => onTranscriptLanguageChange("source")}
+                                className={`rounded-full px-3 py-1 text-[12px] font-medium transition ${
+                                    selectedTranscriptLanguage === "source"
+                                        ? "bg-white text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.12)]"
+                                        : "text-slate-500"
+                                }`}
+                            >
+                                Original
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => onTranscriptLanguageChange("tr")}
+                                className={`rounded-full px-3 py-1 text-[12px] font-medium transition ${
+                                    selectedTranscriptLanguage === "tr"
+                                        ? "bg-white text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.12)]"
+                                        : "text-slate-500"
+                                }`}
+                            >
+                                Turkish
+                            </button>
+                        </div>
+                        {selectedTranscriptLanguage === "tr" && isTranslationLoading ? (
+                            <span className="text-[12px] text-slate-400">Translating…</span>
+                        ) : null}
+                    </div>
+                    {selectedTranscriptLanguage === "tr" && translationError ? (
+                        <p className="mt-2 text-[12px] text-rose-500">{translationError}</p>
+                    ) : null}
+                </div>
+            ) : null}
             <div
                 ref={transcriptViewportRef}
-                className={`min-h-[320px] h-full overflow-y-auto overflow-x-hidden px-6 pb-5 pt-3 academia-scrollbar ${
+                className={`min-h-[320px] h-full overflow-y-auto overflow-x-hidden px-6 pb-5 ${canTranslateToTurkish ? "pt-3" : "pt-3"} academia-scrollbar ${
                     isTranscriptScrollbarActive
                         ? "academia-scrollbar-active"
                         : "academia-scrollbar-idle"

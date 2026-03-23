@@ -1,13 +1,23 @@
 import type { AcademiaTranscriptResult } from "../../../types/academia";
-import { NOTES_CACHE_PREFIX, SUMMARY_CACHE_PREFIX, TRANSCRIPT_CACHE_PREFIX } from "./constants";
+import {
+    NOTES_CACHE_PREFIX,
+    SUMMARY_CACHE_PREFIX,
+    TRANSCRIPT_CACHE_PREFIX,
+    TRANSCRIPT_TRANSLATION_CACHE_PREFIX,
+} from "./constants";
 import type { AcademiaNote } from "./types";
 import { normalizeAcademiaNote } from "./utils";
 
 // Module-level memory cache — survives component re-mounts within the same page session.
 const transcriptMemoryCache = new Map<string, AcademiaTranscriptResult>();
+const transcriptTranslationMemoryCache = new Map<string, AcademiaTranscriptResult>();
 
 function buildTranscriptCacheKey(fileName: string): string {
     return `${TRANSCRIPT_CACHE_PREFIX}${fileName.trim().toLowerCase()}`;
+}
+
+function buildTranscriptTranslationCacheKey(fileName: string, targetLanguage: string): string {
+    return `${TRANSCRIPT_TRANSLATION_CACHE_PREFIX}${fileName.trim().toLowerCase()}:${targetLanguage.trim().toLowerCase()}`;
 }
 
 function buildNotesCacheKey(fileName: string): string {
@@ -42,6 +52,45 @@ export function readCachedTranscript(fileName: string): AcademiaTranscriptResult
 export function writeCachedTranscript(fileName: string, transcript: AcademiaTranscriptResult): void {
     const cacheKey = buildTranscriptCacheKey(fileName);
     transcriptMemoryCache.set(cacheKey, transcript);
+
+    try {
+        window.localStorage.setItem(cacheKey, JSON.stringify(transcript));
+    } catch {
+        // Ignore cache write failures and continue with in-memory state.
+    }
+}
+
+export function readCachedTranscriptTranslation(
+    fileName: string,
+    targetLanguage: string
+): AcademiaTranscriptResult | null {
+    const cacheKey = buildTranscriptTranslationCacheKey(fileName, targetLanguage);
+    const inMemory = transcriptTranslationMemoryCache.get(cacheKey);
+    if (inMemory) {
+        return inMemory;
+    }
+
+    try {
+        const raw = window.localStorage.getItem(cacheKey);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw) as AcademiaTranscriptResult;
+        if (!parsed || typeof parsed.text !== "string" || !Array.isArray(parsed.cues)) {
+            return null;
+        }
+        transcriptTranslationMemoryCache.set(cacheKey, parsed);
+        return parsed;
+    } catch {
+        return null;
+    }
+}
+
+export function writeCachedTranscriptTranslation(
+    fileName: string,
+    targetLanguage: string,
+    transcript: AcademiaTranscriptResult
+): void {
+    const cacheKey = buildTranscriptTranslationCacheKey(fileName, targetLanguage);
+    transcriptTranslationMemoryCache.set(cacheKey, transcript);
 
     try {
         window.localStorage.setItem(cacheKey, JSON.stringify(transcript));
@@ -99,5 +148,27 @@ export function writeCachedSummary(scope: string, summary: string): void {
         window.localStorage.setItem(cacheKey, summary);
     } catch {
         // Ignore cache write failures and continue with in-memory state.
+    }
+}
+
+const SUMMARY_SLATE_SUFFIX = ":slate";
+
+export function readCachedSummarySlate(scope: string): unknown[] | null {
+    try {
+        const raw = window.localStorage.getItem(buildSummaryCacheKey(scope) + SUMMARY_SLATE_SUFFIX);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : null;
+    } catch {
+        return null;
+    }
+}
+
+export function writeCachedSummarySlate(scope: string, value: unknown[]): void {
+    try {
+        const cacheKey = buildSummaryCacheKey(scope) + SUMMARY_SLATE_SUFFIX;
+        window.localStorage.setItem(cacheKey, JSON.stringify(value));
+    } catch {
+        // Ignore cache write failures.
     }
 }

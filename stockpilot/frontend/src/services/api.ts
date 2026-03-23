@@ -66,6 +66,20 @@ export async function transcribeAcademiaMedia(
     return response.data;
 }
 
+export async function translateAcademiaTranscript(
+    transcript: AcademiaTranscriptResult,
+    targetLanguage: string
+): Promise<AcademiaTranscriptResult> {
+    const response = await api.post<AcademiaTranscriptResult>("/academia/translate", {
+        transcript,
+        targetLanguage,
+    }, {
+        timeout: 600000,
+    });
+
+    return response.data;
+}
+
 export async function getAcademiaTranscriptionStatus(
     requestId: string
 ): Promise<AcademiaTranscriptionStatus | null> {

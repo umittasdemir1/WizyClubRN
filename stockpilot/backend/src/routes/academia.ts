@@ -4,11 +4,16 @@ import path from "node:path";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 import multer from "multer";
+import type { AcademiaTranscriptResult } from "../../../shared/academiaTypes.js";
 import {
     AcademiaTranscriptionError,
     MAX_ACADEMIA_UPLOAD_SIZE_BYTES,
     resolveAcademiaMediaKind,
 } from "../services/academiaTranscription.js";
+import {
+    AcademiaTranslationError,
+    translateAcademiaTranscript,
+} from "../services/academiaTranslation.js";
 import {
     getAcademiaJobStatus,
     upsertAcademiaJobStatus,
@@ -85,6 +90,15 @@ function logAcademiaRouteEvent(
     }
 
     console.info(line);
+}
+
+function isTranscriptPayload(value: unknown): value is AcademiaTranscriptResult {
+    if (!value || typeof value !== "object") {
+        return false;
+    }
+
+    const payload = value as Record<string, unknown>;
+    return typeof payload.text === "string" && Array.isArray(payload.cues);
 }
 
 academiaRouter.get("/status/:requestId", (req, res) => {
@@ -226,6 +240,65 @@ academiaRouter.post("/transcribe", upload.single("file"), async (req, res, next)
     }
 });
 
+academiaRouter.post("/translate", async (req, res, next) => {
+    const startedAt = Date.now();
+    res.setTimeout(10 * 60_000);
+
+    const transcript = req.body?.transcript;
+    const targetLanguage = typeof req.body?.targetLanguage === "string"
+        ? req.body.targetLanguage.trim()
+        : "";
+
+    if (!isTranscriptPayload(transcript) || !targetLanguage) {
+        logAcademiaRouteEvent("warn", "translate_request_invalid", {
+            method: req.method,
+            path: req.originalUrl,
+            hasTranscript: isTranscriptPayload(transcript),
+            targetLanguage,
+        });
+        res.status(400).json({
+            error: "VALIDATION_ERROR",
+            message: "Transcript payload and targetLanguage are required.",
+        });
+        return;
+    }
+
+    logAcademiaRouteEvent("info", "translate_request_received", {
+        sourceName: transcript.sourceName,
+        sourceLanguage: transcript.language,
+        targetLanguage,
+        cueCount: transcript.cues.length,
+    });
+
+    try {
+        const translatedTranscript = await translateAcademiaTranscript(transcript, targetLanguage);
+        logAcademiaRouteEvent("info", "translate_request_completed", {
+            sourceName: transcript.sourceName,
+            durationMs: Date.now() - startedAt,
+            sourceLanguage: transcript.language,
+            targetLanguage: translatedTranscript.language,
+            cueCount: translatedTranscript.cues.length,
+            model: translatedTranscript.model,
+        });
+        res.json(translatedTranscript);
+    } catch (error) {
+        if (error instanceof AcademiaTranslationError) {
+            logAcademiaRouteEvent("error", "translate_request_failed", {
+                sourceName: transcript.sourceName,
+                durationMs: Date.now() - startedAt,
+                sourceLanguage: transcript.language,
+                targetLanguage,
+                errorCode: error.code,
+                statusCode: error.statusCode,
+                message: error.message,
+            });
+            res.status(error.statusCode).json({ error: error.code, message: error.message });
+            return;
+        }
+        next(error);
+    }
+});
+
 academiaRouter.use((error: unknown, req: Request, res: Response, next: NextFunction) => {
     if (error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE") {
         const requestId = res.locals.academiaRequestId ?? readIncomingAcademiaRequestId(req) ?? createAcademiaRequestId();
@@ -250,7 +323,7 @@ academiaRouter.use((error: unknown, req: Request, res: Response, next: NextFunct
         return;
     }
 
-    if (error instanceof AcademiaTranscriptionError) {
+    if (error instanceof AcademiaTranscriptionError || error instanceof AcademiaTranslationError) {
         const requestId = res.locals.academiaRequestId ?? readIncomingAcademiaRequestId(req) ?? createAcademiaRequestId();
         upsertAcademiaJobStatus({
             requestId,

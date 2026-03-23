@@ -6,6 +6,10 @@ import {
     normalizeTranscriptResult,
     resolveAcademiaMediaKind,
 } from "../dist/backend/src/services/academiaTranscription.js";
+import {
+    buildTranslatedTranscriptResult,
+    canTranslateAcademiaTranscript,
+} from "../dist/backend/src/services/academiaTranslation.js";
 
 test("formatVttTimestamp returns WebVTT-compatible timestamps", () => {
     assert.equal(formatVttTimestamp(0), "00:00:00.000");
@@ -103,4 +107,62 @@ test("normalizeTranscriptResult creates a fallback cue when only transcript text
     assert.equal(result.cues[0].endSeconds, 4);
     assert.equal(result.cues[0].words.length, 1);
     assert.match(result.vtt, /Single block transcript/);
+});
+
+test("canTranslateAcademiaTranscript only enables supported en-to-tr flow", () => {
+    const transcript = normalizeTranscriptResult({
+        sourceName: "lesson.mp4",
+        mediaKind: "video",
+        payload: {
+            text: "Welcome to stock planning.",
+            language: "en",
+            duration: 3,
+            segments: [{ start: 0, end: 3, text: "Welcome to stock planning.", words: [] }],
+        },
+    });
+
+    assert.equal(canTranslateAcademiaTranscript(transcript, "tr"), true);
+    assert.equal(canTranslateAcademiaTranscript(transcript, "fr"), false);
+});
+
+test("buildTranslatedTranscriptResult preserves timings and disables translated word highlighting", () => {
+    const transcript = normalizeTranscriptResult({
+        sourceName: "lesson.mp4",
+        mediaKind: "video",
+        payload: {
+            text: "Welcome to stock planning. Let's review transfers.",
+            language: "en",
+            duration: 7.4,
+            segments: [
+                {
+                    start: 0.25,
+                    end: 3.4,
+                    text: "Welcome to stock planning.",
+                    words: [],
+                },
+                {
+                    start: 3.5,
+                    end: 7.4,
+                    text: "Let's review transfers.",
+                    words: [],
+                },
+            ],
+        },
+    });
+
+    const translated = buildTranslatedTranscriptResult({
+        transcript,
+        targetLanguage: "tr",
+        translatedCueTexts: [
+            "Stok planlamasına hoş geldiniz.",
+            "Transferleri gözden geçirelim.",
+        ],
+        model: "Helsinki-NLP/opus-tatoeba-en-tr",
+    });
+
+    assert.equal(translated.language, "tr");
+    assert.equal(translated.cues[0].startSeconds, 0.25);
+    assert.equal(translated.cues[1].endSeconds, 7.4);
+    assert.equal(translated.cues[0].words.length, 0);
+    assert.match(translated.vtt, /Stok planlamasına hoş geldiniz\./);
 });

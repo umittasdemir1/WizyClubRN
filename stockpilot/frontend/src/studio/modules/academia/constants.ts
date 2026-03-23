@@ -1,5 +1,6 @@
 export const DEFAULT_YOUTUBE_URL = "";
 export const TRANSCRIPT_CACHE_PREFIX = "stockpilot:academia:transcript:v2:";
+export const TRANSCRIPT_TRANSLATION_CACHE_PREFIX = "stockpilot:academia:transcript-translation:v1:";
 export const NOTES_CACHE_PREFIX = "stockpilot:academia:notes:v2:";
 export const SUMMARY_CACHE_PREFIX = "stockpilot:academia:summary:v1:";
 export const VIDEO_NOTE_CAPTURE_MAX_WIDTH = 960;

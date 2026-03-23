@@ -1,5 +1,6 @@
 import { accessSync, constants, readFileSync } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
+import os from "node:os";
 import path from "node:path";
 import type {
     AcademiaMediaKind,
@@ -328,6 +329,10 @@ function resolvePythonLibraryPath(): string | null {
     return null;
 }
 
+function resolveModelCacheDir(): string {
+    return process.env.STOCKPILOT_MODEL_CACHE_DIR?.trim() || path.join(os.tmpdir(), "stockpilot-model-cache");
+}
+
 /**
  * Read the pyvenv.cfg written by `python -m venv` to extract the `executable`
  * field — the absolute path of the Python binary that created the venv.
@@ -568,6 +573,9 @@ async function runPythonWorker(
             env: {
                 ...process.env,
                 PYTHONUNBUFFERED: "1",
+                HF_HOME: resolveModelCacheDir(),
+                TRANSFORMERS_CACHE: resolveModelCacheDir(),
+                XDG_CACHE_HOME: resolveModelCacheDir(),
                 FASTER_WHISPER_MODEL: configuredModel,
                 FASTER_WHISPER_DEVICE: configuredDevice,
                 FASTER_WHISPER_COMPUTE_TYPE: configuredComputeType,
