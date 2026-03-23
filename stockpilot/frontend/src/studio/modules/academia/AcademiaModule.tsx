@@ -221,7 +221,7 @@ export function AcademiaModule() {
                         <div className="mt-3 shrink-0 space-y-1.5 px-5 pb-5">
                             <div className="flex items-center justify-between gap-3">
                                 <span className="text-[12px] text-slate-400">
-                                    {transcription.transcriptionStatus?.message ?? "Processing…"}
+                                    {transcription.transcriptionStatus?.message ?? "Processing..."}
                                 </span>
                                 <span className="tabular-nums text-[12px] font-medium text-slate-500">
                                     {transcription.transcriptProgress}%

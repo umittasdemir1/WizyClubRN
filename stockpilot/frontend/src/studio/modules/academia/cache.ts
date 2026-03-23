@@ -12,6 +12,44 @@ import { normalizeAcademiaNote } from "./utils";
 const transcriptMemoryCache = new Map<string, AcademiaTranscriptResult>();
 const transcriptTranslationMemoryCache = new Map<string, AcademiaTranscriptResult>();
 
+function countLikelyMojibakeMarkers(text: string): number {
+    return (text.match(/[ÃÅÄÂâ]/g) ?? []).length;
+}
+
+function repairLikelyMojibake(text: string): string {
+    if (!/[ÃÅÄÂâ]/.test(text)) {
+        return text;
+    }
+
+    const bytes = Uint8Array.from(Array.from(text, (char) => char.charCodeAt(0) & 0xff));
+    const repaired = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+    if (repaired.includes("\uFFFD")) {
+        return text;
+    }
+
+    return countLikelyMojibakeMarkers(repaired) < countLikelyMojibakeMarkers(text)
+        ? repaired
+        : text;
+}
+
+function sanitizeTranscriptResult(transcript: AcademiaTranscriptResult): AcademiaTranscriptResult {
+    const cues = transcript.cues.map((cue) => ({
+        ...cue,
+        text: repairLikelyMojibake(cue.text),
+        words: cue.words.map((word) => ({
+            ...word,
+            text: repairLikelyMojibake(word.text),
+        })),
+    }));
+
+    return {
+        ...transcript,
+        text: repairLikelyMojibake(transcript.text),
+        vtt: repairLikelyMojibake(transcript.vtt),
+        cues,
+    };
+}
+
 function buildTranscriptCacheKey(fileName: string): string {
     return `${TRANSCRIPT_CACHE_PREFIX}${fileName.trim().toLowerCase()}`;
 }
@@ -77,8 +115,12 @@ export function readCachedTranscriptTranslation(
         if (!parsed || typeof parsed.text !== "string" || !Array.isArray(parsed.cues)) {
             return null;
         }
-        transcriptTranslationMemoryCache.set(cacheKey, parsed);
-        return parsed;
+        const sanitized = sanitizeTranscriptResult(parsed);
+        transcriptTranslationMemoryCache.set(cacheKey, sanitized);
+        if (JSON.stringify(sanitized) !== raw) {
+            window.localStorage.setItem(cacheKey, JSON.stringify(sanitized));
+        }
+        return sanitized;
     } catch {
         return null;
     }
@@ -90,10 +132,11 @@ export function writeCachedTranscriptTranslation(
     transcript: AcademiaTranscriptResult
 ): void {
     const cacheKey = buildTranscriptTranslationCacheKey(fileName, targetLanguage);
-    transcriptTranslationMemoryCache.set(cacheKey, transcript);
+    const sanitized = sanitizeTranscriptResult(transcript);
+    transcriptTranslationMemoryCache.set(cacheKey, sanitized);
 
     try {
-        window.localStorage.setItem(cacheKey, JSON.stringify(transcript));
+        window.localStorage.setItem(cacheKey, JSON.stringify(sanitized));
     } catch {
         // Ignore cache write failures and continue with in-memory state.
     }

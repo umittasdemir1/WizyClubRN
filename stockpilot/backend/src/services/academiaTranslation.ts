@@ -29,6 +29,8 @@ interface TranslationWorkerErrorPayload {
     };
 }
 
+const LIKELY_MOJIBAKE_PATTERN = /[ÃÅÄÂâ]/;
+
 export class AcademiaTranslationError extends Error {
     code: string;
     statusCode: number;
@@ -155,6 +157,25 @@ function normalizeCueText(text: string): string {
         .join("\n");
 }
 
+function countLikelyMojibakeMarkers(text: string): number {
+    return (text.match(/[ÃÅÄÂâ]/g) ?? []).length;
+}
+
+function repairLikelyMojibake(text: string): string {
+    if (!LIKELY_MOJIBAKE_PATTERN.test(text)) {
+        return text;
+    }
+
+    const repaired = Buffer.from(text, "latin1").toString("utf8");
+    if (repaired.includes("\uFFFD")) {
+        return text;
+    }
+
+    return countLikelyMojibakeMarkers(repaired) < countLikelyMojibakeMarkers(text)
+        ? repaired
+        : text;
+}
+
 function parseWorkerError(rawText: string): { code: string; message: string } {
     try {
         const payload = JSON.parse(rawText) as TranslationWorkerErrorPayload;
@@ -227,7 +248,7 @@ export function buildTranslatedTranscriptResult(input: {
     const cues: AcademiaTranscriptCue[] = input.transcript.cues.map((cue, index) => ({
         startSeconds: cue.startSeconds,
         endSeconds: cue.endSeconds,
-        text: normalizeCueText(input.translatedCueTexts[index] ?? ""),
+        text: normalizeCueText(repairLikelyMojibake(input.translatedCueTexts[index] ?? "")),
         words: [],
     }));
 

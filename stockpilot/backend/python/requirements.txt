@@ -1,5 +1,7 @@
 --extra-index-url https://download.pytorch.org/whl/cpu
 faster-whisper==1.2.1
-sentencepiece==0.2.0
-torch==2.5.1+cpu
+sentencepiece==0.2.0 ; python_version < "3.13"
+sentencepiece==0.2.1 ; python_version >= "3.13"
+torch==2.5.1+cpu ; python_version < "3.13"
+torch==2.6.0+cpu ; python_version >= "3.13"
 transformers==4.46.3

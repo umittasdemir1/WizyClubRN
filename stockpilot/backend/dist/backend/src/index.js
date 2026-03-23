@@ -1,3 +1,4 @@
+import "./loadEnv.js";
 import cors from "cors";
 import express from "express";
 import { academiaRouter } from "./routes/academia.js";

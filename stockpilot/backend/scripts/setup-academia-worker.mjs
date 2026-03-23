@@ -1,24 +1,12 @@
 /**
  * setup-academia-worker.mjs
  *
- * Sets up the faster-whisper Python worker for S+Academia.
- * Works on: standard Linux/macOS (python3 in PATH), Windows, and nix-based
- * cloud dev environments (Firebase Studio) where Python lives in the nix store.
- *
- * What it does:
- *  1. Finds a working Python 3 interpreter
- *  2. Creates / recreates .venv and installs requirements
- *  3. Pins the .venv symlinks to the absolute nix-store path so they survive
- *     future `nix-profile` updates (nix store paths are content-addressed and
- *     never change)
- *  4. Verifies that `faster_whisper` imports correctly; if it fails because of
- *     missing shared libs (libz, libstdc++ on nix), auto-detects the right
- *     LD_LIBRARY_PATH from the nix store and writes STOCKPILOT_PYTHON_LIBRARY_PATH
- *     into backend/.env so the backend picks it up automatically
+ * Sets up the faster-whisper and translation Python workers for S+Academia.
+ * Works on standard Linux/macOS, Windows, and nix-based cloud dev environments.
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync, unlinkSync, symlinkSync } from "node:fs";
+import { existsSync, readFileSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -29,14 +17,61 @@ const dotEnvPath = path.join(backendRoot, ".env");
 const NIX_STORE = "/nix/store";
 const isWin = process.platform === "win32";
 const isLinux = process.platform === "linux";
+const SUPPORTED_PYTHON_MINORS = new Set([11, 12, 13]);
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+loadDotEnv();
 
-function canRun(command, extraEnv = {}) {
-    if (!command) return false;
-    if (path.isAbsolute(command) && !existsSync(command)) return false;
-    const args = command === "py" ? ["-V"] : ["--version"];
-    const result = spawnSync(command, args, {
+function stripWrappingQuotes(value) {
+    if (
+        (value.startsWith("\"") && value.endsWith("\"")) ||
+        (value.startsWith("'") && value.endsWith("'"))
+    ) {
+        return value.slice(1, -1);
+    }
+
+    return value;
+}
+
+function loadDotEnv() {
+    if (!existsSync(dotEnvPath)) {
+        return;
+    }
+
+    const content = readFileSync(dotEnvPath, "utf8");
+    for (const rawLine of content.split(/\r?\n/)) {
+        const line = rawLine.trim();
+        if (!line || line.startsWith("#")) {
+            continue;
+        }
+
+        const separatorIndex = line.indexOf("=");
+        if (separatorIndex <= 0) {
+            continue;
+        }
+
+        const key = line.slice(0, separatorIndex).trim();
+        if (!key || process.env[key] !== undefined) {
+            continue;
+        }
+
+        process.env[key] = stripWrappingQuotes(line.slice(separatorIndex + 1).trim());
+    }
+}
+
+function commandSpec(command, args = []) {
+    return { command, args };
+}
+
+function formatCommand(spec) {
+    return [spec.command, ...spec.args].join(" ");
+}
+
+function canRun(spec, extraEnv = {}) {
+    if (!spec?.command) return false;
+    if (path.isAbsolute(spec.command) && !existsSync(spec.command)) return false;
+
+    const probeArgs = [...spec.args, spec.command === "py" ? "-V" : "--version"];
+    const result = spawnSync(spec.command, probeArgs, {
         stdio: "ignore",
         shell: false,
         env: { ...process.env, ...extraEnv },
@@ -44,8 +79,8 @@ function canRun(command, extraEnv = {}) {
     return !result.error && result.status === 0;
 }
 
-function run(command, args, extraEnv = {}) {
-    const result = spawnSync(command, args, {
+function run(spec, args, extraEnv = {}) {
+    const result = spawnSync(spec.command, [...spec.args, ...args], {
         cwd: backendRoot,
         stdio: "inherit",
         shell: false,
@@ -53,65 +88,126 @@ function run(command, args, extraEnv = {}) {
     });
     if (result.error) throw result.error;
     if (result.status !== 0) {
-        throw new Error(`${command} ${args.join(" ")} exited with code ${result.status}.`);
+        throw new Error(`${formatCommand(spec)} ${args.join(" ")} exited with code ${result.status}.`);
     }
+}
+
+function readPythonVersion(spec) {
+    const result = spawnSync(
+        spec.command,
+        [...spec.args, "-c", "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}')"],
+        {
+            cwd: backendRoot,
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "ignore"],
+            shell: false,
+            env: process.env,
+        }
+    );
+
+    if (result.error || result.status !== 0) {
+        return null;
+    }
+
+    return result.stdout.trim() || null;
+}
+
+function isSupportedPythonVersion(version) {
+    const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version);
+    if (!match) {
+        return false;
+    }
+
+    const major = Number(match[1]);
+    const minor = Number(match[2]);
+    return major === 3 && SUPPORTED_PYTHON_MINORS.has(minor);
 }
 
 function nixStoreEntries() {
     if (!existsSync(NIX_STORE)) return [];
-    const ls = spawnSync("ls", [NIX_STORE], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+    const ls = spawnSync("ls", [NIX_STORE], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+    });
     return ls.error || ls.status !== 0 ? [] : ls.stdout.split("\n").filter(Boolean);
 }
 
-// ── 1. Find bootstrap Python ─────────────────────────────────────────────────
-
 function resolveBootstrapPython() {
     const homeDir = process.env.HOME?.trim() ?? "";
+    const localAppData = process.env.LOCALAPPDATA?.trim() ?? "";
+    const preferredWindowsVersions = ["3.11", "3.12", "3.13"];
+    const candidates = [];
 
-    const candidates = [
-        process.env.STOCKPILOT_PYTHON_BOOTSTRAP_BIN?.trim(),
-        isWin ? "py" : null,
-        "python3",
-        "python3.11",
-        "python",
-        // nix-profile: present when user has run `nix-env -iA nixpkgs.python311`
-        homeDir ? path.join(homeDir, ".nix-profile", "bin", "python3") : null,
-        // nix store fallback — enumerate store for python3-3.1x dirs
-        ...(!isWin ? nixStoreEntries()
-            .filter((e) => /^[a-z0-9]+-python3-3\.(1[1-9]|[2-9]\d)\.\d+$/.test(e))
-            .sort((a, b) => b.localeCompare(a))               // newest first
-            .flatMap((e) => [
-                path.join(NIX_STORE, e, "bin", "python3.11"),
-                path.join(NIX_STORE, e, "bin", "python3"),
-            ]) : []),
-    ].filter(Boolean);
+    if (process.env.STOCKPILOT_PYTHON_BOOTSTRAP_BIN?.trim()) {
+        candidates.push(commandSpec(process.env.STOCKPILOT_PYTHON_BOOTSTRAP_BIN.trim()));
+    }
 
-    for (const c of candidates) {
-        if (canRun(c)) {
-            console.log(`Bootstrap Python: ${c}`);
-            return c;
+    if (isWin) {
+        for (const version of preferredWindowsVersions) {
+            candidates.push(commandSpec("py", [`-${version}`]));
         }
+
+        const windowsInstallRoots = [
+            localAppData ? path.join(localAppData, "Programs", "Python") : null,
+            "C:\\",
+        ].filter(Boolean);
+
+        for (const version of preferredWindowsVersions) {
+            const compactVersion = version.replace(".", "");
+            for (const root of windowsInstallRoots) {
+                const candidatePath = root === "C:\\"
+                    ? path.join(root, `Python${compactVersion}`, "python.exe")
+                    : path.join(root, `Python${compactVersion}`, "python.exe");
+                candidates.push(commandSpec(candidatePath));
+            }
+        }
+    }
+
+    candidates.push(
+        ...[
+            "python3.11",
+            "python3.12",
+            "python3.13",
+            "python3",
+            "python",
+        ].map((command) => commandSpec(command)),
+        ...(homeDir ? [commandSpec(path.join(homeDir, ".nix-profile", "bin", "python3"))] : []),
+        ...(!isWin
+            ? nixStoreEntries()
+                .filter((entry) => /^[a-z0-9]+-python3-3\.(1[1-9]|[2-9]\d)\.\d+$/.test(entry))
+                .sort((a, b) => b.localeCompare(a))
+                .flatMap((entry) => [
+                    commandSpec(path.join(NIX_STORE, entry, "bin", "python3.11")),
+                    commandSpec(path.join(NIX_STORE, entry, "bin", "python3")),
+                ])
+            : [])
+    );
+
+    for (const candidate of candidates) {
+        if (!canRun(candidate)) {
+            continue;
+        }
+
+        const version = readPythonVersion(candidate);
+        if (!version || !isSupportedPythonVersion(version)) {
+            continue;
+        }
+
+        console.log(`Bootstrap Python: ${formatCommand(candidate)} (${version})`);
+        return candidate;
     }
 
     throw new Error(
         [
-            "Python 3 not found. Try one of:",
-            "  • nix-env -iA nixpkgs.python311   (Firebase Studio / nix)",
-            "  • brew install python@3.11          (macOS)",
-            "  • winget install Python.Python.3.11 (Windows)",
-            "  • Set STOCKPILOT_PYTHON_BOOTSTRAP_BIN=/path/to/python3 in backend/.env",
+            "Supported Python runtime not found. Use Python 3.11, 3.12, or 3.13. Try one of:",
+            "  - nix-env -iA nixpkgs.python311   (Firebase Studio / nix)",
+            "  - brew install python@3.11        (macOS)",
+            "  - Install Python 3.11 locally     (Windows)",
+            "  - Set STOCKPILOT_PYTHON_BOOTSTRAP_BIN=/path/to/python3 in backend/.env",
         ].join("\n")
     );
 }
 
-// ── 2. Pin .venv symlinks to absolute nix-store path ────────────────────────
-
-/**
- * pyvenv.cfg records the `executable` path — the exact nix-store binary that
- * created the venv. Unlike ~/.nix-profile symlinks, nix-store paths are
- * content-addressed and permanent. Rewriting .venv/bin/python3 to this path
- * makes the venv resilient to `nix-profile` updates.
- */
 function pinVenvSymlinks() {
     const cfgPath = path.join(venvDir, "pyvenv.cfg");
     if (!existsSync(cfgPath)) return;
@@ -121,51 +217,49 @@ function pinVenvSymlinks() {
     const target = match?.[1]?.trim();
     if (!target || !existsSync(target)) return;
 
-    const readlink = (p) => {
-        const r = spawnSync("readlink", [p], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
-        return r.stdout?.trim() ?? "";
+    const readlink = (filePath) => {
+        const result = spawnSync("readlink", [filePath], {
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "ignore"],
+        });
+        return result.stdout?.trim() ?? "";
     };
 
     const binDir = path.join(venvDir, "bin");
     for (const name of ["python3", "python3.11"]) {
         const linkPath = path.join(binDir, name);
         if (!existsSync(linkPath)) continue;
+
         try {
             const current = readlink(linkPath);
-            // Only rewrite if it goes through nix-profile (fragile) or is relative
             if (current.includes(".nix-profile") || !path.isAbsolute(current)) {
                 unlinkSync(linkPath);
                 symlinkSync(target, linkPath);
-                console.log(`  pinned .venv/bin/${name} → ${target}`);
+                console.log(`  pinned .venv/bin/${name} -> ${target}`);
             }
         } catch {
-            // Non-fatal
+            // Non-fatal on systems without a symlink-based venv.
         }
     }
 }
-
-// ── 3. Resolve venv Python ───────────────────────────────────────────────────
 
 function resolveVenvPython() {
     const candidates = isWin
         ? [path.join(venvDir, "Scripts", "python.exe")]
         : [path.join(venvDir, "bin", "python3"), path.join(venvDir, "bin", "python")];
 
-    const resolved = candidates.find((c) => existsSync(c) && canRun(c));
-    if (!resolved) throw new Error(`Venv Python not found under ${venvDir}.`);
+    const resolved = candidates.find((candidate) => existsSync(candidate) && canRun(commandSpec(candidate)));
+    if (!resolved) {
+        throw new Error(`Venv Python not found under ${venvDir}.`);
+    }
+
     return resolved;
 }
 
-// ── 4. Auto-detect LD_LIBRARY_PATH for nix av/faster-whisper ────────────────
-
-/**
- * The PyAV wheel (used by faster-whisper) bundles ffmpeg but not libstdc++ or
- * libz. On nix systems, these live in the nix store, not /lib. We try nix-store
- * combinations until `import faster_whisper` succeeds, then persist the winner.
- */
 function testImport(venvPython, ldPath) {
     const env = { ...process.env };
     if (ldPath) env.LD_LIBRARY_PATH = ldPath;
+
     const result = spawnSync(venvPython, ["-c", "import faster_whisper"], {
         cwd: backendRoot,
         env,
@@ -176,46 +270,44 @@ function testImport(venvPython, ldPath) {
 }
 
 function detectNixLibPath(venvPython) {
-    // Already works? (standard Linux / macOS / Windows)
-    if (testImport(venvPython, undefined)) return null;
-
-    if (!existsSync(NIX_STORE)) return null;
-
-    console.log("  faster_whisper import failed — searching nix store for required libs…");
-
-    const entries = nixStoreEntries();
-
-    // Collect candidate lib dirs for each missing lib type
-    const zlibDirs = entries
-        .filter((e) => /^[a-z0-9]+-zlib-/.test(e))
-        .map((e) => path.join(NIX_STORE, e, "lib"))
-        .filter(existsSync);
-
-    const gccLibDirs = entries
-        .filter((e) => /^[a-z0-9]+-gcc-\d.*-lib$/.test(e))
-        .map((e) => path.join(NIX_STORE, e, "lib"))
-        .filter(existsSync);
-
-    // Try gcc-lib alone (includes libstdc++ and libgcc_s)
-    for (const g of gccLibDirs) {
-        if (testImport(venvPython, g)) return g;
+    if (testImport(venvPython, undefined)) {
+        return null;
     }
 
-    // Try gcc-lib + zlib combination
-    for (const g of gccLibDirs) {
-        for (const z of zlibDirs) {
-            const combined = `${g}:${z}`;
-            if (testImport(venvPython, combined)) return combined;
+    if (!existsSync(NIX_STORE)) {
+        return null;
+    }
+
+    console.log("  faster_whisper import failed; searching nix store for required libs...");
+
+    const entries = nixStoreEntries();
+    const zlibDirs = entries
+        .filter((entry) => /^[a-z0-9]+-zlib-/.test(entry))
+        .map((entry) => path.join(NIX_STORE, entry, "lib"))
+        .filter(existsSync);
+    const gccLibDirs = entries
+        .filter((entry) => /^[a-z0-9]+-gcc-\d.*-lib$/.test(entry))
+        .map((entry) => path.join(NIX_STORE, entry, "lib"))
+        .filter(existsSync);
+
+    for (const gccLibDir of gccLibDirs) {
+        if (testImport(venvPython, gccLibDir)) {
+            return gccLibDir;
+        }
+    }
+
+    for (const gccLibDir of gccLibDirs) {
+        for (const zlibDir of zlibDirs) {
+            const combined = `${gccLibDir}:${zlibDir}`;
+            if (testImport(venvPython, combined)) {
+                return combined;
+            }
         }
     }
 
     return null;
 }
 
-/**
- * Write STOCKPILOT_PYTHON_LIBRARY_PATH into backend/.env.
- * Creates the file if missing. Updates the line if it already exists.
- */
 function persistLibraryPath(libPath) {
     const key = "STOCKPILOT_PYTHON_LIBRARY_PATH";
     let content = "";
@@ -231,27 +323,48 @@ function persistLibraryPath(libPath) {
     }
 
     writeFileSync(dotEnvPath, content, "utf8");
-    console.log(`  wrote ${key}=${libPath} → backend/.env`);
+    console.log(`  wrote ${key}=${libPath} -> backend/.env`);
 }
 
-// ── Main ─────────────────────────────────────────────────────────────────────
-
 const bootstrapPython = resolveBootstrapPython();
+run(bootstrapPython, ["-m", "venv", "--clear", venvDir]);
 
-run(bootstrapPython, ["-m", "venv", venvDir]);
-
-if (!isWin) pinVenvSymlinks();
+if (!isWin) {
+    pinVenvSymlinks();
+}
 
 const venvPython = resolveVenvPython();
-run(venvPython, ["-m", "pip", "install", "--upgrade", "pip", "--quiet"]);
-run(venvPython, ["-m", "pip", "install", "-r", requirementsPath, "--quiet"]);
+run(commandSpec(venvPython), [
+    "-m",
+    "pip",
+    "install",
+    "--upgrade",
+    "pip",
+    "--retries",
+    "6",
+    "--timeout",
+    "120",
+    "--quiet",
+]);
+run(commandSpec(venvPython), [
+    "-m",
+    "pip",
+    "install",
+    "-r",
+    requirementsPath,
+    "--retries",
+    "6",
+    "--timeout",
+    "120",
+    "--quiet",
+]);
 
 if (isLinux) {
     const libPath = detectNixLibPath(venvPython);
     if (libPath) {
         persistLibraryPath(libPath);
     } else if (testImport(venvPython, undefined)) {
-        console.log("  faster_whisper imports OK — no extra library path needed.");
+        console.log("  faster_whisper imports OK; no extra library path needed.");
     } else {
         console.warn(
             "  WARNING: faster_whisper import still fails. " +
@@ -260,4 +373,4 @@ if (isLinux) {
     }
 }
 
-console.log(`\nS+Academia faster-whisper worker ready → ${venvPython}`);
+console.log(`\nS+Academia worker environment ready -> ${venvPython}`);

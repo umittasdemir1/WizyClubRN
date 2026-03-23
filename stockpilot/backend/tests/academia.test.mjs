@@ -165,4 +165,5 @@ test("buildTranslatedTranscriptResult preserves timings and disables translated 
     assert.equal(translated.cues[1].endSeconds, 7.4);
     assert.equal(translated.cues[0].words.length, 0);
     assert.match(translated.vtt, /Stok planlamasına hoş geldiniz\./);
+    assert.equal(translated.cues[1].text, "Transferleri gözden geçirelim.");
 });

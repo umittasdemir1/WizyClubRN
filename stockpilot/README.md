@@ -35,7 +35,8 @@ npm run academia:setup
 npm run dev
 ```
 
-`npm run academia:setup` creates `backend/.venv` and installs the `faster-whisper` worker dependencies used by S+Academia transcript generation.
+`npm run academia:setup` recreates `backend/.venv` and installs the Python worker dependencies used by S+Academia transcript generation and translation.
+Use Python 3.11, 3.12, or 3.13 for this setup. If auto-detection picks the wrong interpreter on a shared machine, set `STOCKPILOT_PYTHON_BOOTSTRAP_BIN` in `backend/.env`.
 
 Frontend expects the backend on `http://localhost:8787` through Vite proxy.
 

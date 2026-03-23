@@ -64,7 +64,7 @@ export function AcademiaTranscriptPanel({
                             </button>
                         </div>
                         {selectedTranscriptLanguage === "tr" && isTranslationLoading ? (
-                            <span className="text-[12px] text-slate-400">Translating…</span>
+                            <span className="text-[12px] text-slate-400">Translating...</span>
                         ) : null}
                     </div>
                     {selectedTranscriptLanguage === "tr" && translationError ? (
