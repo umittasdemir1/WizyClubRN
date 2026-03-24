@@ -1,4 +1,4 @@
-import { type ChangeEvent } from "react";
+import { type ChangeEvent, useMemo } from "react";
 import {
     MapPinPlusInside,
     Maximize,
@@ -14,7 +14,39 @@ import type { AcademiaTranscriptCue } from "../../../../types/academia";
 import type { AcademiaMediaKind } from "../../../../types/academia";
 import closedCaptionsDarkIcon from "../closed-captions-dark.svg";
 import type { AcademiaSourceMode } from "../types";
-import { formatPlaybackTime } from "../utils";
+import { formatPlaybackTime, interpolateWordTokens } from "../utils";
+
+interface PlayerCaptionOverlayProps {
+    cue: AcademiaTranscriptCue;
+    activeWordIndex: number;
+    captionOffsetClass: string;
+}
+
+function PlayerCaptionOverlay({ cue, activeWordIndex, captionOffsetClass }: PlayerCaptionOverlayProps) {
+    const words = useMemo(
+        () => (cue.words.length > 0 ? cue.words : interpolateWordTokens(cue)),
+        [cue]
+    );
+
+    return (
+        <div
+            className={`pointer-events-none absolute inset-x-0 z-10 flex justify-center px-6 transition-all duration-150 ${captionOffsetClass}`}
+        >
+            <div className="max-w-[78%] rounded-2xl bg-[rgba(0,0,0,0.72)] px-4 py-2.5 text-center text-[20px] font-medium leading-8 text-white md:text-[22px]">
+                <span className="whitespace-pre-wrap">
+                    {words.map((word, index) => (
+                        <span
+                            key={`${cue.startSeconds}-${index}`}
+                            className={index === activeWordIndex ? "text-amber-300" : "text-white"}
+                        >
+                            {word.text}
+                        </span>
+                    ))}
+                </span>
+            </div>
+        </div>
+    );
+}
 import { AcademiaBloomEmptyState } from "./AcademiaBloomEmptyState";
 
 interface Props {
@@ -212,28 +244,11 @@ export function AcademiaPlayer({
 
                     {/* Captions overlay */}
                     {activePlaybackCue ? (
-                        <div
-                            className={`pointer-events-none absolute inset-x-0 z-10 flex justify-center px-6 transition-all duration-150 ${captionOffsetClass}`}
-                        >
-                            <div className="max-w-[78%] rounded-2xl bg-[rgba(0,0,0,0.72)] px-4 py-2.5 text-center text-[20px] font-medium leading-8 text-white md:text-[22px]">
-                                <span className="whitespace-pre-wrap">
-                                    {activePlaybackCue.words.length > 0
-                                        ? activePlaybackCue.words.map((word, index) => (
-                                              <span
-                                                  key={`${activePlaybackCue.startSeconds}-${index}`}
-                                                  className={
-                                                      index === activePlaybackWordIndex
-                                                          ? "text-amber-300"
-                                                          : "text-white"
-                                                  }
-                                              >
-                                                  {word.text}
-                                              </span>
-                                          ))
-                                        : activePlaybackCue.text}
-                                </span>
-                            </div>
-                        </div>
+                        <PlayerCaptionOverlay
+                            cue={activePlaybackCue}
+                            activeWordIndex={activePlaybackWordIndex}
+                            captionOffsetClass={captionOffsetClass}
+                        />
                     ) : null}
 
                     {/* Video controls bar */}
