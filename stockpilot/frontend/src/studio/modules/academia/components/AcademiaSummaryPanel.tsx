@@ -46,7 +46,14 @@ type SummaryVisualNoteElement = {
     children: SummaryText[];
 };
 
-type SummaryElement = SummaryParagraphElement | SummaryVisualNoteElement;
+type SummaryQuoteElement = {
+    type: "quote";
+    startSeconds: number;
+    quoteText: string;
+    children: [{ text: "" }];
+};
+
+type SummaryElement = SummaryParagraphElement | SummaryVisualNoteElement | SummaryQuoteElement;
 
 type TimestampRange = BaseRange & {
     timestamp?: boolean;
@@ -183,9 +190,8 @@ function createSummaryValue(value: string): Descendant[] {
 function serializeSummaryValue(value: Descendant[]): string {
     return value.map((node) => {
         const element = node as SummaryElement;
-        if (element.type === "visual-note") {
-            return `[visual-note:${element.caption}]`;
-        }
+        if (element.type === "visual-note") return `[visual-note:${element.caption}]`;
+        if (element.type === "quote") return element.quoteText;
         return Node.string(node);
     }).join("\n");
 }
@@ -245,6 +251,30 @@ function VisualNoteElement({
                     onSeekToTime(ve.capturedAtSeconds);
                 }}
             />
+            {children}
+        </div>
+    );
+}
+
+function QuoteElement({
+    attributes,
+    children,
+    element,
+    onSeekToTime,
+}: RenderElementProps & { onSeekToTime: (seconds: number) => void }) {
+    const qe = element as SummaryQuoteElement;
+    return (
+        <div {...attributes} contentEditable={false}>
+            <div
+                className="my-1 cursor-pointer select-none border-l-2 border-sky-400 pl-3 italic text-slate-500 transition-colors hover:border-sky-500 hover:text-slate-700"
+                style={{ fontFamily: "Poppins, sans-serif", fontSize: "14px", lineHeight: "24px" }}
+                onMouseDown={(e) => {
+                    e.preventDefault();
+                    onSeekToTime(qe.startSeconds);
+                }}
+            >
+                {qe.quoteText}
+            </div>
             {children}
         </div>
     );
@@ -411,7 +441,10 @@ export function AcademiaSummaryPanel({
 }: Props) {
     const [editor] = useState(() => {
         const e = withReact(createEditor());
-        const { deleteBackward, insertBreak } = e;
+        const { deleteBackward, insertBreak, isVoid } = e;
+
+        e.isVoid = (element) =>
+            (element as SummaryElement).type === "quote" || isVoid(element);
 
         e.insertBreak = () => {
             const { selection } = e;
@@ -734,8 +767,29 @@ export function AcademiaSummaryPanel({
         if (!text) return;
 
         ReactEditor.focus(editor);
-        insertMultilineText(editor, `"${text}"\n${formatPlaybackTime(start)} – ${formatPlaybackTime(end)}`);
-        Transforms.insertText(editor, " ");
+
+        const quoteNode: SummaryQuoteElement = {
+            type: "quote",
+            startSeconds: start,
+            quoteText: `"${text}"`,
+            children: [{ text: "" }],
+        };
+
+        const [currentNodeEntry] = Editor.nodes(editor, {
+            match: (n) => SlateElement.isElement(n) && n.type === "paragraph",
+        });
+
+        if (currentNodeEntry && Node.string(currentNodeEntry[0]).trim() === "") {
+            Transforms.removeNodes(editor, { at: currentNodeEntry[1] });
+            Transforms.insertNodes(editor, quoteNode, { at: currentNodeEntry[1] });
+            const nextPath = [currentNodeEntry[1][0] + 1];
+            Transforms.insertNodes(editor, { type: "paragraph", children: [{ text: "" }] }, { at: nextPath });
+            Transforms.select(editor, Editor.end(editor, nextPath));
+        } else {
+            Transforms.insertNodes(editor, quoteNode);
+            Transforms.insertNodes(editor, { type: "paragraph", children: [{ text: "" }] });
+        }
+
         setActiveTranscriptPicker(null);
     }
 
@@ -750,6 +804,10 @@ export function AcademiaSummaryPanel({
     function handleRenderElement(props: RenderElementProps) {
         if (props.element.type === "visual-note") {
             return <VisualNoteElement {...props} onSeekToTime={onSeekToTime} />;
+        }
+
+        if (props.element.type === "quote") {
+            return <QuoteElement {...props} onSeekToTime={onSeekToTime} />;
         }
 
         return (
