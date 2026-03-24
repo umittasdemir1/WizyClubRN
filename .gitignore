@@ -51,6 +51,8 @@ path_log.txt
 **/.npmrc
 stockpilot/frontend/dist.zip
 stockpilot/frontend/*.zip
+stockpilot/backend/.venv/
+stockpilot/backend/model-cache/
 .tmp_secret_tools/
 
 # Claude local state

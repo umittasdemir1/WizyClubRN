@@ -6,7 +6,7 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -327,7 +327,37 @@ function persistLibraryPath(libPath) {
 }
 
 const bootstrapPython = resolveBootstrapPython();
-run(bootstrapPython, ["-m", "venv", "--clear", venvDir]);
+
+// Resolve the actual venv target path.
+// If .venv is a symlink to an external location (e.g. /tmp/stockpilot-backend-venv
+// on machines with a full /home), Python's venv --clear cannot create through the
+// symlink. We resolve to the real target and run venv there directly, then restore
+// the symlink so the rest of the script and the backend can find it via .venv.
+let venvTarget = venvDir;
+try {
+    const stat = lstatSync(venvDir);
+    if (stat.isSymbolicLink()) {
+        const linkTarget = readlinkSync(venvDir);
+        const resolved = path.isAbsolute(linkTarget) ? linkTarget : path.resolve(path.dirname(venvDir), linkTarget);
+        if (!existsSync(resolved)) {
+            // Broken symlink: recreate target dir so Python can populate it.
+            mkdirSync(resolved, { recursive: true });
+            console.log(`  recreated missing symlink target: ${resolved}`);
+        }
+        venvTarget = resolved;
+    }
+} catch {
+    // venvDir does not exist yet — no symlink to resolve.
+}
+
+run(bootstrapPython, ["-m", "venv", "--clear", venvTarget]);
+
+// Restore the .venv symlink if it was pointing somewhere else.
+if (venvTarget !== venvDir) {
+    try { unlinkSync(venvDir); } catch { /* already gone */ }
+    symlinkSync(venvTarget, venvDir);
+    console.log(`  .venv -> ${venvTarget}`);
+}
 
 if (!isWin) {
     pinVenvSymlinks();
