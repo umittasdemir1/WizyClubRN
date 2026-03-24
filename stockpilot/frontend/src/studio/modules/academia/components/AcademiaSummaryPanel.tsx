@@ -231,28 +231,21 @@ function VisualNoteElement({
     return (
         <div
             {...attributes}
-            className="my-2 rounded-[12px] p-1.5 text-slate-700"
-            style={{
-                fontFamily: "Poppins, sans-serif",
-                fontSize: "14px",
-                lineHeight: "24px",
-                fontWeight: 400,
-            }}
+            contentEditable={false}
+            style={{ float: "left", marginRight: "10px", marginBottom: "4px" }}
         >
             <img
                 src={ve.src}
                 alt="Screenshot"
                 className="rounded-[10px] object-cover cursor-pointer hover:opacity-80 transition-opacity"
-                style={{ width: "70px", height: "70px", float: "left", marginRight: "10px" }}
+                style={{ width: "70px", height: "70px", display: "block" }}
                 draggable={false}
-                contentEditable={false}
                 onMouseDown={(e) => {
                     e.preventDefault();
                     onSeekToTime(ve.capturedAtSeconds);
                 }}
             />
             {children}
-            <div contentEditable={false} style={{ clear: "both", height: 0 }} />
         </div>
     );
 }
@@ -442,54 +435,11 @@ export function AcademiaSummaryPanel({
 }: Props) {
     const [editor] = useState(() => {
         const e = withReact(createEditor());
-        const { deleteBackward, insertBreak, isVoid } = e;
+        const { isVoid } = e;
 
-        e.isVoid = (element) =>
-            (element as SummaryElement).type === "quote" || isVoid(element);
-
-        e.insertBreak = () => {
-            const { selection } = e;
-            if (selection && Range.isCollapsed(selection)) {
-                const [vnMatch] = Editor.nodes(e, {
-                    match: (n) => SlateElement.isElement(n) && n.type === "visual-note",
-                });
-                if (vnMatch) {
-                    // Get text after cursor
-                    const endOfVn = Editor.end(e, vnMatch[1]);
-                    const afterRange = { anchor: selection.anchor, focus: endOfVn };
-                    const afterText = Editor.string(e, afterRange);
-
-                    // Delete text after cursor from visual-note
-                    if (afterText.length > 0) {
-                        Transforms.delete(e, { at: afterRange });
-                    }
-
-                    // Insert new paragraph after visual-note with the remaining text
-                    const nextPath = [vnMatch[1][0] + 1];
-                    Transforms.insertNodes(
-                        e,
-                        { type: "paragraph", children: [{ text: afterText }] },
-                        { at: nextPath }
-                    );
-                    Transforms.select(e, { path: [...nextPath, 0], offset: 0 });
-                    return;
-                }
-            }
-            insertBreak();
-        };
-
-        e.deleteBackward = (unit) => {
-            const { selection } = e;
-            if (selection && Range.isCollapsed(selection)) {
-                const [vnMatch] = Editor.nodes(e, {
-                    match: (n) => SlateElement.isElement(n) && n.type === "visual-note",
-                });
-                if (vnMatch && selection.anchor.offset === 0 && Node.string(vnMatch[0]).trim() === "") {
-                    Transforms.removeNodes(e, { at: vnMatch[1] });
-                    return;
-                }
-            }
-            deleteBackward(unit);
+        e.isVoid = (element) => {
+            const el = element as SummaryElement;
+            return el.type === "quote" || el.type === "visual-note" || isVoid(element);
         };
 
         return e;
@@ -664,20 +614,18 @@ export function AcademiaSummaryPanel({
             src: item.screenshotDataUrl!,
             caption: "",
             capturedAtSeconds: item.capturedAtSeconds ?? 0,
-            children: [{ text: captionText }],
+            children: [{ text: "" }],
         };
 
         if (currentNodeEntry && Node.string(currentNodeEntry[0]).trim() === "") {
-            // Replace empty paragraph with visual note
             Transforms.removeNodes(editor, { at: currentNodeEntry[1] });
             Transforms.insertNodes(editor, visualNoteNode, { at: currentNodeEntry[1] });
-            // Add paragraph after and move cursor there
             const nextPath = [currentNodeEntry[1][0] + 1];
-            Transforms.insertNodes(editor, { type: "paragraph", children: [{ text: "" }] }, { at: nextPath });
+            Transforms.insertNodes(editor, { type: "paragraph", children: [{ text: captionText }] }, { at: nextPath });
             Transforms.select(editor, Editor.end(editor, nextPath));
         } else {
             Transforms.insertNodes(editor, visualNoteNode);
-            Transforms.insertNodes(editor, { type: "paragraph", children: [{ text: "" }] });
+            Transforms.insertNodes(editor, { type: "paragraph", children: [{ text: captionText }] });
         }
 
         clearMenuState();
