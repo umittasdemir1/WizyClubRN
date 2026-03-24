@@ -231,7 +231,7 @@ function VisualNoteElement({
     return (
         <div
             {...attributes}
-            className="my-2 flex items-start gap-2.5 rounded-[12px] p-1.5 text-slate-700"
+            className="my-2 rounded-[12px] p-1.5 text-slate-700"
             style={{
                 fontFamily: "Poppins, sans-serif",
                 fontSize: "14px",
@@ -243,7 +243,7 @@ function VisualNoteElement({
                 src={ve.src}
                 alt="Screenshot"
                 className="rounded-[10px] object-cover cursor-pointer hover:opacity-80 transition-opacity"
-                style={{ width: "75px", height: "75px", flexShrink: 0 }}
+                style={{ width: "70px", height: "70px", float: "left", marginRight: "10px" }}
                 draggable={false}
                 contentEditable={false}
                 onMouseDown={(e) => {
@@ -251,7 +251,8 @@ function VisualNoteElement({
                     onSeekToTime(ve.capturedAtSeconds);
                 }}
             />
-            <div style={{ flex: 1, minWidth: 0 }}>{children}</div>
+            {children}
+            <div contentEditable={false} style={{ clear: "both", height: 0 }} />
         </div>
     );
 }
