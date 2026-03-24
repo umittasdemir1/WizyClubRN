@@ -351,3 +351,20 @@ export function splitTranscriptWordText(value: string): { leadingSpace: boolean;
         content: match[2],
     };
 }
+
+/**
+ * Produces synthetic word-level tokens for cues that have no word timestamps
+ * (e.g. translated cues). Splits the cue text by whitespace and distributes
+ * the cue duration evenly so word-level amber highlighting can work.
+ */
+export function interpolateWordTokens(cue: AcademiaTranscriptCue): AcademiaTranscriptWord[] {
+    const tokens = cue.text.trim().split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) return [];
+    const duration = Math.max(cue.endSeconds - cue.startSeconds, 0);
+    const tokenDuration = duration / tokens.length;
+    return tokens.map((token, i) => ({
+        text: i === 0 ? token : ` ${token}`,
+        startSeconds: cue.startSeconds + i * tokenDuration,
+        endSeconds: cue.startSeconds + (i + 1) * tokenDuration,
+    }));
+}

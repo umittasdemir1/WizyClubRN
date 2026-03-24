@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { AcademiaTranscriptCue, AcademiaTranscriptResult } from "../../../../types/academia";
 import { TRANSCRIPT_SCROLL_LEAD_LINES } from "../constants";
 import type { AcademiaSourceMode } from "../types";
-import { findActiveCue, findActiveWordIndex, findLatestStartedCueIndex } from "../utils";
+import { findActiveCue, findActiveWordIndex, findLatestStartedCueIndex, interpolateWordTokens } from "../utils";
 
 interface UseTranscriptScrollInput {
     transcript: AcademiaTranscriptResult | null;
@@ -53,11 +53,14 @@ export function useTranscriptScroll({
         [sourceMode, transcript, videoCurrentTime]
     );
 
-    const activePlaybackWordIndex = useMemo(
-        () =>
-            activePlaybackCue ? findActiveWordIndex(activePlaybackCue.words, videoCurrentTime) : -1,
-        [activePlaybackCue, videoCurrentTime]
-    );
+    const activePlaybackWordIndex = useMemo(() => {
+        if (!activePlaybackCue) return -1;
+        const words =
+            activePlaybackCue.words.length > 0
+                ? activePlaybackCue.words
+                : interpolateWordTokens(activePlaybackCue);
+        return findActiveWordIndex(words, videoCurrentTime);
+    }, [activePlaybackCue, videoCurrentTime]);
 
     // Auto-scroll transcript to keep active cue visible.
     useEffect(() => {

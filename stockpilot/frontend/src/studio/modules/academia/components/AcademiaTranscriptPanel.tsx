@@ -1,5 +1,65 @@
-import type { AcademiaTranscriptResult } from "../../../../types/academia";
-import { splitTranscriptWordText } from "../utils";
+import { useMemo } from "react";
+import type { AcademiaTranscriptCue, AcademiaTranscriptResult } from "../../../../types/academia";
+import { interpolateWordTokens, splitTranscriptWordText } from "../utils";
+
+interface TranscriptCueItemProps {
+    cue: AcademiaTranscriptCue;
+    cueIndex: number;
+    isActiveCue: boolean;
+    activeCueWordIndex: number;
+    cueItemRefs: React.MutableRefObject<Map<number, HTMLDivElement>>;
+}
+
+function TranscriptCueItem({
+    cue,
+    cueIndex,
+    isActiveCue,
+    activeCueWordIndex,
+    cueItemRefs,
+}: TranscriptCueItemProps) {
+    const words = useMemo(
+        () => (cue.words.length > 0 ? cue.words : interpolateWordTokens(cue)),
+        [cue]
+    );
+
+    return (
+        <div
+            key={`${cue.startSeconds}-${cueIndex}`}
+            ref={(node) => {
+                if (node) {
+                    cueItemRefs.current.set(cueIndex, node);
+                    return;
+                }
+                cueItemRefs.current.delete(cueIndex);
+            }}
+            className={`origin-left whitespace-normal break-normal py-px text-left text-[17px] leading-7 transition-[color,transform] duration-200 transform-gpu ${
+                isActiveCue
+                    ? "scale-[1.08] font-normal text-slate-950"
+                    : "scale-100 font-light text-slate-400"
+            }`}
+        >
+            {words.map((word, wordIndex) => {
+                const { leadingSpace, content } = splitTranscriptWordText(word.text);
+                return (
+                    <span key={`${cue.startSeconds}-${wordIndex}`}>
+                        {leadingSpace ? " " : null}
+                        <span
+                            className={`transition-colors duration-150 ${
+                                wordIndex === activeCueWordIndex
+                                    ? "text-amber-500"
+                                    : isActiveCue
+                                      ? "text-slate-950"
+                                      : "text-slate-400"
+                            }`}
+                        >
+                            {content}
+                        </span>
+                    </span>
+                );
+            })}
+        </div>
+    );
+}
 
 export type AcademiaTranscriptLanguageView = "source" | "tr";
 
@@ -87,52 +147,16 @@ export function AcademiaTranscriptPanel({
             >
                 {transcript?.cues.length ? (
                     <div className="space-y-0.5 text-left">
-                        {transcript.cues.map((cue, cueIndex) => {
-                            const isActiveCue = cueIndex === activePlaybackCueIndex;
-                            const activeCueWordIndex = isActiveCue ? activePlaybackWordIndex : -1;
-
-                            return (
-                                <div
-                                    key={`${cue.startSeconds}-${cueIndex}`}
-                                    ref={(node) => {
-                                        if (node) {
-                                            cueItemRefs.current.set(cueIndex, node);
-                                            return;
-                                        }
-                                        cueItemRefs.current.delete(cueIndex);
-                                    }}
-                                    className={`origin-left whitespace-normal break-normal py-px text-left text-[17px] leading-7 transition-[color,transform] duration-200 transform-gpu ${
-                                        isActiveCue
-                                            ? "scale-[1.08] font-normal text-slate-950"
-                                            : "scale-100 font-light text-slate-400"
-                                    }`}
-                                >
-                                    {cue.words.length > 0
-                                        ? cue.words.map((word, wordIndex) => {
-                                              const { leadingSpace, content } = splitTranscriptWordText(
-                                                  word.text
-                                              );
-                                              return (
-                                                  <span key={`${cue.startSeconds}-${wordIndex}`}>
-                                                      {leadingSpace ? " " : null}
-                                                      <span
-                                                          className={`transition-colors duration-150 ${
-                                                              wordIndex === activeCueWordIndex
-                                                                  ? "text-amber-500"
-                                                                  : isActiveCue
-                                                                    ? "text-slate-950"
-                                                                    : "text-slate-400"
-                                                          }`}
-                                                      >
-                                                          {content}
-                                                      </span>
-                                                  </span>
-                                              );
-                                          })
-                                        : cue.text}
-                                </div>
-                            );
-                        })}
+                        {transcript.cues.map((cue, cueIndex) => (
+                            <TranscriptCueItem
+                                key={`${cue.startSeconds}-${cueIndex}`}
+                                cue={cue}
+                                cueIndex={cueIndex}
+                                isActiveCue={cueIndex === activePlaybackCueIndex}
+                                activeCueWordIndex={cueIndex === activePlaybackCueIndex ? activePlaybackWordIndex : -1}
+                                cueItemRefs={cueItemRefs}
+                            />
+                        ))}
                     </div>
                 ) : (
                     <div className="h-full" />
