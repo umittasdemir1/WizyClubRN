@@ -232,7 +232,7 @@ function VisualNoteElement({
         <div
             {...attributes}
             contentEditable={false}
-            style={{ float: "left", marginRight: "10px", marginBottom: "4px" }}
+            style={{ float: "left", marginRight: "10px" }}
         >
             <img
                 src={ve.src}
