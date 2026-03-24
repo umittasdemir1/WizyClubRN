@@ -297,6 +297,9 @@ export function AcademiaModule() {
                                 onSeekToTime={player.seekVideoToTime}
                                 onCaptureScreenshot={player.captureVideoFrame}
                                 onSubmit={summary.submitSummary}
+                                sourceTranscript={transcription.transcript}
+                                translatedTranscript={translatedTranscript}
+                                videoCurrentTime={player.videoCurrentTime}
                             />
                         ) : null}
                     </div>

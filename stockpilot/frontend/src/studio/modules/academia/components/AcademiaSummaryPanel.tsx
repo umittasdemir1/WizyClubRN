@@ -21,8 +21,10 @@ import {
     Slate,
     withReact,
 } from "slate-react";
+import type { AcademiaTranscriptResult } from "../../../../types/academia";
 import type { AcademiaNote } from "../types";
 import { formatPlaybackTime, parseTimestampToSeconds } from "../utils";
+import { TranscriptRangePicker } from "./TranscriptRangePicker";
 
 const TIMESTAMP_PATTERN = /\b\d{1,2}:\d{2}(?::\d{2})?\b/g;
 
@@ -50,7 +52,13 @@ type TimestampRange = BaseRange & {
     timestamp?: boolean;
 };
 
-type SummarySlashCommandId = "today" | "now" | "screenshot" | "visual-notes" | "pinned" | "typewriter";
+type SummarySlashCommandId = "today" | "now" | "screenshot" | "visual-notes" | "pinned" | "typewriter" | "transcript-original" | "transcript-translate";
+
+type ActiveTranscriptRangePicker = {
+    variant: "original" | "translate";
+    startSeconds: number | null;
+    endSeconds: number | null;
+};
 
 type SummarySlashCommand = {
     id: SummarySlashCommandId;
@@ -103,6 +111,9 @@ interface Props {
     onSeekToTime: (seconds: number) => void;
     onCaptureScreenshot: () => { screenshotDataUrl: string; capturedAtSeconds: number } | null;
     onSubmit: () => void;
+    sourceTranscript: AcademiaTranscriptResult | null;
+    translatedTranscript: AcademiaTranscriptResult | null;
+    videoCurrentTime: number;
 }
 
 const SUMMARY_SLASH_COMMANDS: SummarySlashCommand[] = [
@@ -141,6 +152,18 @@ const SUMMARY_SLASH_COMMANDS: SummarySlashCommand[] = [
         label: "typewriter",
         keywords: ["typewriter", "notes", "written"],
         description: "Pick a typewriter note",
+    },
+    {
+        id: "transcript-original",
+        label: "transcript original",
+        keywords: ["transcript", "original", "quote", "source"],
+        description: "Quote from original transcript",
+    },
+    {
+        id: "transcript-translate",
+        label: "transcript translate",
+        keywords: ["transcript", "translate", "turkish", "tr", "quote"],
+        description: "Quote from Turkish transcript",
     },
 ];
 
@@ -382,6 +405,9 @@ export function AcademiaSummaryPanel({
     onSeekToTime,
     onCaptureScreenshot,
     onSubmit,
+    sourceTranscript,
+    translatedTranscript,
+    videoCurrentTime,
 }: Props) {
     const [editor] = useState(() => {
         const e = withReact(createEditor());
@@ -440,6 +466,7 @@ export function AcademiaSummaryPanel({
     const [isSavedVisible, setIsSavedVisible] = useState(false);
     const [activeSlashMenu, setActiveSlashMenu] = useState<ActiveSlashMenu | null>(null);
     const [activeReferenceMenu, setActiveReferenceMenu] = useState<ActiveReferenceMenu | null>(null);
+    const [activeTranscriptPicker, setActiveTranscriptPicker] = useState<ActiveTranscriptRangePicker | null>(null);
     const [activeSlashIndex, setActiveSlashIndex] = useState(0);
     const [activeReferenceIndex, setActiveReferenceIndex] = useState(0);
     const [menuPosition, setMenuPosition] = useState<SummaryMenuPosition | null>(null);
@@ -447,20 +474,22 @@ export function AcademiaSummaryPanel({
     const editorSurfaceRef = useRef<HTMLDivElement | null>(null);
 
     const filteredSlashCommands = useMemo(() => {
-        if (!activeSlashMenu) {
-            return [];
-        }
+        if (!activeSlashMenu) return [];
+
+        const available = SUMMARY_SLASH_COMMANDS.filter((cmd) => {
+            if (cmd.id === "transcript-original") return sourceTranscript !== null;
+            if (cmd.id === "transcript-translate") return translatedTranscript !== null;
+            return true;
+        });
 
         const normalizedQuery = normalizeSlashQuery(activeSlashMenu.query);
-        if (!normalizedQuery) {
-            return SUMMARY_SLASH_COMMANDS;
-        }
+        if (!normalizedQuery) return available;
 
-        return SUMMARY_SLASH_COMMANDS.filter((command) => {
+        return available.filter((command) => {
             const haystack = [command.label, ...command.keywords].join(" ").toLowerCase();
             return haystack.includes(normalizedQuery);
         });
-    }, [activeSlashMenu]);
+    }, [activeSlashMenu, sourceTranscript, translatedTranscript]);
 
     useEffect(() => {
         setEditorValue((currentValue) => {
@@ -658,6 +687,16 @@ export function AcademiaSummaryPanel({
             return;
         }
 
+        if (command.id === "transcript-original" || command.id === "transcript-translate") {
+            const variant = command.id === "transcript-original" ? "original" : "translate";
+            Transforms.select(editor, activeSlashMenu.range);
+            Transforms.delete(editor);
+            setActiveTranscriptPicker({ variant, startSeconds: null, endSeconds: null });
+            setActiveSlashMenu(null);
+            setActiveSlashIndex(0);
+            return;
+        }
+
         const referenceMenu = buildReferenceMenu(
             command.id,
             activeSlashMenu.range,
@@ -674,6 +713,38 @@ export function AcademiaSummaryPanel({
         setActiveReferenceIndex(0);
         setActiveSlashMenu(null);
         setActiveSlashIndex(0);
+    }
+
+    function insertTranscriptQuote() {
+        if (!activeTranscriptPicker) return;
+        const { variant, startSeconds, endSeconds } = activeTranscriptPicker;
+        if (startSeconds === null || endSeconds === null) return;
+
+        const transcript = variant === "original" ? sourceTranscript : translatedTranscript;
+        if (!transcript) return;
+
+        const start = Math.min(startSeconds, endSeconds);
+        const end = Math.max(startSeconds, endSeconds);
+
+        const text = transcript.cues
+            .filter((cue) => cue.startSeconds < end && cue.endSeconds > start)
+            .map((cue) => cue.text.trim())
+            .join(" ");
+
+        if (!text) return;
+
+        ReactEditor.focus(editor);
+        insertMultilineText(editor, `"${text}"\n${formatPlaybackTime(start)} – ${formatPlaybackTime(end)}`);
+        Transforms.insertText(editor, " ");
+        setActiveTranscriptPicker(null);
+    }
+
+    function handleSetTranscriptStart() {
+        setActiveTranscriptPicker((prev) => prev ? { ...prev, startSeconds: videoCurrentTime } : null);
+    }
+
+    function handleSetTranscriptEnd() {
+        setActiveTranscriptPicker((prev) => prev ? { ...prev, endSeconds: videoCurrentTime } : null);
     }
 
     function handleRenderElement(props: RenderElementProps) {
@@ -850,6 +921,20 @@ export function AcademiaSummaryPanel({
                                 </button>
                             ))}
                         </div>
+                    ) : null}
+
+                    {activeTranscriptPicker ? (
+                        <TranscriptRangePicker
+                            variant={activeTranscriptPicker.variant}
+                            startSeconds={activeTranscriptPicker.startSeconds}
+                            endSeconds={activeTranscriptPicker.endSeconds}
+                            videoCurrentTime={videoCurrentTime}
+                            transcript={activeTranscriptPicker.variant === "original" ? sourceTranscript : translatedTranscript}
+                            onSetStart={handleSetTranscriptStart}
+                            onSetEnd={handleSetTranscriptEnd}
+                            onInsert={insertTranscriptQuote}
+                            onCancel={() => setActiveTranscriptPicker(null)}
+                        />
                     ) : null}
 
                     {activeReferenceMenu && menuPosition ? (
