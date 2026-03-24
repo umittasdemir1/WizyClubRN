@@ -28,9 +28,17 @@ import { TranscriptRangePicker } from "./TranscriptRangePicker";
 
 const TIMESTAMP_PATTERN = /\b\d{1,2}:\d{2}(?::\d{2})?\b/g;
 
+type SummaryTextColor = "slate" | "sky" | "emerald" | "amber" | "rose";
+type SummaryMark = "bold" | "italic" | "underline";
+type SummaryVisualNoteAlign = "left" | "right";
+
 type SummaryText = {
     text: string;
     timestamp?: boolean;
+    bold?: boolean;
+    italic?: boolean;
+    underline?: boolean;
+    color?: SummaryTextColor;
 };
 
 type SummaryParagraphElement = {
@@ -43,6 +51,7 @@ type SummaryVisualNoteElement = {
     src: string;
     caption: string;
     capturedAtSeconds: number;
+    align?: SummaryVisualNoteAlign;
     children: SummaryText[];
 };
 
@@ -98,6 +107,11 @@ type SummaryMenuPosition = {
     top: number;
 };
 
+type SummaryToolbarPosition = {
+    left: number;
+    top: number;
+};
+
 declare module "slate" {
     interface CustomTypes {
         Editor: BaseEditor & ReactEditor;
@@ -122,6 +136,24 @@ interface Props {
     translatedTranscript: AcademiaTranscriptResult | null;
     videoCurrentTime: number;
 }
+
+const SUMMARY_MENU_GAP = 10;
+const SUMMARY_SURFACE_PADDING = 10;
+const SUMMARY_TOOLBAR_WIDTH = 248;
+const SUMMARY_TOOLBAR_HEIGHT = 48;
+
+const SUMMARY_TEXT_COLORS: Array<{
+    id: SummaryTextColor;
+    label: string;
+    swatch: string;
+    textColor: string;
+}> = [
+    { id: "slate", label: "Slate", swatch: "#334155", textColor: "#334155" },
+    { id: "sky", label: "Sky", swatch: "#0369a1", textColor: "#0369a1" },
+    { id: "emerald", label: "Emerald", swatch: "#047857", textColor: "#047857" },
+    { id: "amber", label: "Amber", swatch: "#b45309", textColor: "#b45309" },
+    { id: "rose", label: "Rose", swatch: "#be123c", textColor: "#be123c" },
+];
 
 const SUMMARY_SLASH_COMMANDS: SummarySlashCommand[] = [
     {
@@ -225,26 +257,81 @@ function VisualNoteElement({
     children,
     element,
     onSeekToTime,
-}: RenderElementProps & { onSeekToTime: (seconds: number) => void }) {
+    onDropAt,
+}: RenderElementProps & {
+    onSeekToTime: (seconds: number) => void;
+    onDropAt: (element: SummaryVisualNoteElement, x: number, y: number) => void;
+}) {
     const ve = element as SummaryVisualNoteElement;
+    const align = ve.align === "right" ? "right" : "left";
+    const isRightAligned = align === "right";
+
+    const pointerDownPos = useRef<{ x: number; y: number } | null>(null);
+    const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+    const isDragging = dragOffset.x !== 0 || dragOffset.y !== 0;
 
     return (
         <div
             {...attributes}
             contentEditable={false}
-            style={{ float: "left", marginRight: "10px" }}
+            className="group relative"
+            style={{
+                float: align,
+                clear: "both",
+                marginRight: isRightAligned ? 0 : "12px",
+                marginLeft: isRightAligned ? "12px" : 0,
+            }}
         >
-            <img
-                src={ve.src}
-                alt="Screenshot"
-                className="rounded-[10px] object-cover cursor-pointer hover:opacity-80 transition-opacity"
-                style={{ width: "70px", height: "70px", display: "block" }}
-                draggable={false}
-                onMouseDown={(e) => {
-                    e.preventDefault();
-                    onSeekToTime(ve.capturedAtSeconds);
+            <div
+                style={{ 
+                    width: "70px", 
+                    height: "70px", 
+                    display: "block",
+                    transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)`,
+                    transition: isDragging ? "none" : "transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)",
+                    position: "relative",
+                    zIndex: isDragging ? 100 : 1,
                 }}
-            />
+            >
+                <img
+                    src={ve.src}
+                    alt="Screenshot"
+                    className={`h-full w-full rounded-[10px] object-cover shadow-[0_12px_30px_-22px_rgba(15,23,42,0.5)] transition-opacity hover:opacity-80 cursor-grab active:cursor-grabbing ${isDragging ? "opacity-60 ring-2 ring-sky-400 ring-offset-2" : ""}`}
+                    draggable={false}
+                    onPointerDown={(e) => {
+                        pointerDownPos.current = { x: e.clientX, y: e.clientY };
+                        setDragOffset({ x: 0, y: 0 });
+                        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                    }}
+                    onPointerMove={(e) => {
+                        if (!pointerDownPos.current) return;
+                        const dx = e.clientX - pointerDownPos.current.x;
+                        const dy = e.clientY - pointerDownPos.current.y;
+                        setDragOffset({ x: dx, y: dy });
+                    }}
+                    onPointerUp={(e) => {
+                        (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+                        if (!pointerDownPos.current) return;
+                        
+                        const dx = e.clientX - pointerDownPos.current.x;
+                        const dy = e.clientY - pointerDownPos.current.y;
+                        pointerDownPos.current = null;
+                        setDragOffset({ x: 0, y: 0 });
+
+                        if (Math.abs(dx) < 5 && Math.abs(dy) < 5) {
+                            e.preventDefault();
+                            onSeekToTime(ve.capturedAtSeconds);
+                            return;
+                        }
+
+                        onDropAt(ve, e.clientX, e.clientY);
+                    }}
+                    onPointerCancel={() => {
+                        pointerDownPos.current = null;
+                        setDragOffset({ x: 0, y: 0 });
+                    }}
+                />
+            </div>
             {children}
         </div>
     );
@@ -255,16 +342,59 @@ function QuoteElement({
     children,
     element,
     onSeekToTime,
-}: RenderElementProps & { onSeekToTime: (seconds: number) => void }) {
+    onDropAt,
+}: RenderElementProps & {
+    onSeekToTime: (seconds: number) => void;
+    onDropAt: (element: SummaryQuoteElement, y: number) => void;
+}) {
     const qe = element as SummaryQuoteElement;
+    const pointerDownPos = useRef<{ x: number; y: number } | null>(null);
+    const [dragOffset, setDragOffset] = useState(0);
+    const isDragging = dragOffset !== 0;
+
     return (
         <div {...attributes} contentEditable={false}>
             <div
-                className="my-1 cursor-pointer select-none border-l-2 border-sky-400 pl-3 italic text-slate-500 transition-colors hover:border-sky-500 hover:text-slate-700"
-                style={{ fontFamily: "Poppins, sans-serif", fontSize: "14px", lineHeight: "24px" }}
-                onMouseDown={(e) => {
-                    e.preventDefault();
-                    onSeekToTime(qe.startSeconds);
+                className={`my-1 select-none italic text-slate-500 transition hover:text-slate-700 cursor-grab active:cursor-grabbing ${isDragging ? "opacity-60 bg-sky-50/50" : ""}`}
+                style={{ 
+                    fontFamily: "Poppins, sans-serif", 
+                    fontSize: "14px", 
+                    lineHeight: "24px",
+                    transform: `translateY(${dragOffset}px)`,
+                    transition: isDragging ? "none" : "transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)",
+                    position: "relative",
+                    zIndex: isDragging ? 100 : 1
+                }}
+                onPointerDown={(e) => {
+                    pointerDownPos.current = { x: e.clientX, y: e.clientY };
+                    setDragOffset(0);
+                    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                }}
+                onPointerMove={(e) => {
+                    if (!pointerDownPos.current) return;
+                    const dy = e.clientY - pointerDownPos.current.y;
+                    setDragOffset(dy);
+                }}
+                onPointerUp={(e) => {
+                    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+                    if (!pointerDownPos.current) return;
+                    
+                    const dx = e.clientX - pointerDownPos.current.x;
+                    const dy = e.clientY - pointerDownPos.current.y;
+                    pointerDownPos.current = null;
+                    setDragOffset(0);
+
+                    if (Math.abs(dx) < 5 && Math.abs(dy) < 5) {
+                        e.preventDefault();
+                        onSeekToTime(qe.startSeconds);
+                        return;
+                    }
+
+                    onDropAt(qe, e.clientY);
+                }}
+                onPointerCancel={() => {
+                    pointerDownPos.current = null;
+                    setDragOffset(0);
                 }}
             >
                 {qe.quoteText}
@@ -417,6 +547,72 @@ function normalizeSlashQuery(value: string) {
     return value.trim().toLowerCase();
 }
 
+function clamp(value: number, min: number, max: number) {
+    return Math.min(Math.max(value, min), max);
+}
+
+function estimateSlashMenuHeight(itemCount: number) {
+    return Math.max(64, itemCount * 40 + 12);
+}
+
+function estimateReferenceMenuHeight(itemCount: number) {
+    return itemCount > 0 ? Math.min(340, 44 + itemCount * 52 + 16) : 76;
+}
+
+function resolveLeafColor(leaf: SummaryText) {
+    if (leaf.color) {
+        return SUMMARY_TEXT_COLORS.find((option) => option.id === leaf.color)?.textColor;
+    }
+    if (leaf.timestamp) {
+        return "#0284c7";
+    }
+    return undefined;
+}
+
+function resolveFloatingPosition({
+    anchorRect,
+    surfaceRect,
+    width,
+    height,
+    gap = SUMMARY_MENU_GAP,
+}: {
+    anchorRect: Pick<DOMRect, "left" | "top" | "bottom">;
+    surfaceRect: DOMRect;
+    width: number;
+    height: number;
+    gap?: number;
+}): SummaryMenuPosition {
+    const maxLeft = Math.max(surfaceRect.width - width - SUMMARY_SURFACE_PADDING, SUMMARY_SURFACE_PADDING);
+    const left = clamp(
+        anchorRect.left - surfaceRect.left,
+        SUMMARY_SURFACE_PADDING,
+        maxLeft
+    );
+
+    const spaceBelow = surfaceRect.bottom - anchorRect.bottom - gap;
+    const spaceAbove = anchorRect.top - surfaceRect.top - gap;
+    const preferredTop =
+        spaceBelow < height && spaceAbove > spaceBelow
+            ? anchorRect.top - surfaceRect.top - height - gap
+            : anchorRect.bottom - surfaceRect.top + gap;
+    const maxTop = Math.max(surfaceRect.height - height - SUMMARY_SURFACE_PADDING, SUMMARY_SURFACE_PADDING);
+
+    return {
+        left,
+        top: clamp(preferredTop, SUMMARY_SURFACE_PADDING, maxTop),
+    };
+}
+
+function isTextMarkActive(editor: Editor, mark: SummaryMark) {
+    const marks = Editor.marks(editor) as Partial<SummaryText> | null;
+    return Boolean(marks?.[mark]);
+}
+
+function getActiveTextColor(editor: Editor) {
+    const marks = Editor.marks(editor) as Partial<SummaryText> | null;
+    return marks?.color ?? null;
+}
+
 export function AcademiaSummaryPanel({
     summaryDraft,
     cachedSlateValue,
@@ -454,7 +650,9 @@ export function AcademiaSummaryPanel({
     const [activeSlashIndex, setActiveSlashIndex] = useState(0);
     const [activeReferenceIndex, setActiveReferenceIndex] = useState(0);
     const [menuPosition, setMenuPosition] = useState<SummaryMenuPosition | null>(null);
+    const [selectionToolbarPosition, setSelectionToolbarPosition] = useState<SummaryToolbarPosition | null>(null);
     const resetSavedStateTimeoutRef = useRef<number | null>(null);
+    const selectionToolbarFrameRef = useRef<number | null>(null);
     const editorSurfaceRef = useRef<HTMLDivElement | null>(null);
 
     const filteredSlashCommands = useMemo(() => {
@@ -517,6 +715,9 @@ export function AcademiaSummaryPanel({
             if (resetSavedStateTimeoutRef.current !== null) {
                 window.clearTimeout(resetSavedStateTimeoutRef.current);
             }
+            if (selectionToolbarFrameRef.current !== null) {
+                window.cancelAnimationFrame(selectionToolbarFrameRef.current);
+            }
         };
     }, []);
 
@@ -537,23 +738,76 @@ export function AcademiaSummaryPanel({
                 domRange.setEnd(domNode, domOffset);
                 const caretRect = domRange.getBoundingClientRect();
                 const surfaceRect = surfaceElement.getBoundingClientRect();
-                const menuWidth = activeReferenceMenu ? 320 : 280;
-                const nextLeft = Math.min(
-                    Math.max(caretRect.left - surfaceRect.left, 10),
-                    Math.max(surfaceRect.width - menuWidth - 10, 10)
-                );
+                const menuWidth = 280;
+                const menuHeight = activeReferenceMenu
+                    ? estimateReferenceMenuHeight(activeReferenceMenu.items.length)
+                    : estimateSlashMenuHeight(filteredSlashCommands.length);
 
-                setMenuPosition({
-                    left: nextLeft,
-                    top: caretRect.bottom - surfaceRect.top + 10,
-                });
+                setMenuPosition(resolveFloatingPosition({
+                    anchorRect: caretRect,
+                    surfaceRect,
+                    width: menuWidth,
+                    height: menuHeight,
+                }));
             } catch {
                 setMenuPosition(null);
             }
         });
 
         return () => window.cancelAnimationFrame(frameId);
-    }, [activeReferenceMenu, activeSlashMenu, editor]);
+    }, [activeReferenceMenu, activeSlashMenu, editor, filteredSlashCommands.length]);
+
+    function scheduleSelectionToolbarUpdate() {
+        if (selectionToolbarFrameRef.current !== null) {
+            window.cancelAnimationFrame(selectionToolbarFrameRef.current);
+        }
+
+        selectionToolbarFrameRef.current = window.requestAnimationFrame(() => {
+            selectionToolbarFrameRef.current = null;
+
+            const surfaceElement = editorSurfaceRef.current;
+            const selection = editor.selection;
+            const domSelection = window.getSelection();
+
+            if (
+                !surfaceElement
+                || !selection
+                || Range.isCollapsed(selection)
+                || !domSelection
+                || domSelection.rangeCount === 0
+                || domSelection.isCollapsed
+                || activeSlashMenu
+                || activeReferenceMenu
+                || activeTranscriptPicker
+                || !ReactEditor.isFocused(editor)
+            ) {
+                setSelectionToolbarPosition(null);
+                return;
+            }
+
+            try {
+                const selectionRect = domSelection.getRangeAt(0).getBoundingClientRect();
+                if (selectionRect.width === 0 && selectionRect.height === 0) {
+                    setSelectionToolbarPosition(null);
+                    return;
+                }
+
+                setSelectionToolbarPosition(resolveFloatingPosition({
+                    anchorRect: selectionRect,
+                    surfaceRect: surfaceElement.getBoundingClientRect(),
+                    width: SUMMARY_TOOLBAR_WIDTH,
+                    height: SUMMARY_TOOLBAR_HEIGHT,
+                    gap: 12,
+                }));
+            } catch {
+                setSelectionToolbarPosition(null);
+            }
+        });
+    }
+
+    useEffect(() => {
+        scheduleSelectionToolbarUpdate();
+    }, [activeSlashMenu, activeReferenceMenu, activeTranscriptPicker]);
 
     function handleEditorChange(nextValue: Descendant[]) {
         setEditorValue(nextValue);
@@ -568,6 +822,8 @@ export function AcademiaSummaryPanel({
         if (nextText !== summaryDraft) {
             onDraftChange(nextText);
         }
+
+        scheduleSelectionToolbarUpdate();
     }
 
     function handleSubmit() {
@@ -614,6 +870,7 @@ export function AcademiaSummaryPanel({
             src: item.screenshotDataUrl!,
             caption: "",
             capturedAtSeconds: item.capturedAtSeconds ?? 0,
+            align: "left",
             children: [{ text: "" }],
         };
 
@@ -631,11 +888,125 @@ export function AcademiaSummaryPanel({
         clearMenuState();
     }
 
+    function updateVisualNoteAlignment(element: SummaryVisualNoteElement, align: SummaryVisualNoteAlign) {
+        try {
+            const path = ReactEditor.findPath(editor, element);
+            Transforms.setNodes(editor, { align }, { at: path });
+            scheduleSelectionToolbarUpdate();
+        } catch {
+            // Ignore stale node references when the editor re-normalizes.
+        }
+    }
+
+    function handleDropVisualNote(element: SummaryVisualNoteElement, clientX: number, clientY: number) {
+        if (!editorSurfaceRef.current) return;
+
+        const surfaceRect = editorSurfaceRef.current.getBoundingClientRect();
+        const relativeX = clientX - surfaceRect.left;
+        const align: SummaryVisualNoteAlign = relativeX < surfaceRect.width / 2 ? "left" : "right";
+
+        try {
+            const path = ReactEditor.findPath(editor, element);
+            
+            // Find all paragraph elements and their distances to the drop Y coordinate
+            const editorNodes = Array.from(Editor.nodes(editor, {
+                at: [],
+                match: (n) => SlateElement.isElement(n) && n.type === "paragraph",
+            }));
+
+            let bestIndex = path[0];
+            let minDistance = Infinity;
+
+            editorNodes.forEach(([node, nodePath]) => {
+                try {
+                    const domNode = ReactEditor.toDOMNode(editor, node);
+                    const rect = domNode.getBoundingClientRect();
+                    const centerY = rect.top + rect.height / 2;
+                    const distance = Math.abs(centerY - clientY);
+                    
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        bestIndex = nodePath[0];
+                    }
+                } catch {
+                    // Node might not be in DOM
+                }
+            });
+
+            // Perform movement and alignment update
+            Transforms.setNodes(editor, { align }, { at: path });
+            if (bestIndex !== path[0]) {
+                Transforms.moveNodes(editor, { at: path, to: [bestIndex] });
+            }
+            
+            scheduleSelectionToolbarUpdate();
+        } catch {
+            // Path might be invalid if editor structure changed
+        }
+    }
+
+    function handleDropQuote(element: SummaryQuoteElement, clientY: number) {
+        try {
+            const path = ReactEditor.findPath(editor, element);
+            const editorNodes = Array.from(Editor.nodes(editor, {
+                at: [],
+                match: (n) => SlateElement.isElement(n) && n.type === "paragraph",
+            }));
+
+            let bestIndex = path[0];
+            let minDistance = Infinity;
+
+            editorNodes.forEach(([node, nodePath]) => {
+                try {
+                    const domNode = ReactEditor.toDOMNode(editor, node);
+                    const rect = domNode.getBoundingClientRect();
+                    const centerY = rect.top + rect.height / 2;
+                    const distance = Math.abs(centerY - clientY);
+                    
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        bestIndex = nodePath[0];
+                    }
+                } catch {
+                    // Node might not be in DOM
+                }
+            });
+
+            if (bestIndex !== path[0]) {
+                Transforms.moveNodes(editor, { at: path, to: [bestIndex] });
+                scheduleSelectionToolbarUpdate();
+            }
+        } catch {
+            // Path might be invalid
+        }
+    }
+
+    function toggleTextMark(mark: SummaryMark) {
+        ReactEditor.focus(editor);
+        if (isTextMarkActive(editor, mark)) {
+            Editor.removeMark(editor, mark);
+        } else {
+            Editor.addMark(editor, mark, true);
+        }
+        scheduleSelectionToolbarUpdate();
+    }
+
+    function applyTextColor(color: SummaryTextColor) {
+        ReactEditor.focus(editor);
+        if (getActiveTextColor(editor) === color) {
+            Editor.removeMark(editor, "color");
+        } else {
+            Editor.addMark(editor, "color", color);
+        }
+        scheduleSelectionToolbarUpdate();
+    }
+
     function clearMenuState() {
         setActiveSlashMenu(null);
         setActiveSlashIndex(0);
         setActiveReferenceMenu(null);
         setActiveReferenceIndex(0);
+        setSelectionToolbarPosition(null);
     }
 
     function executeSlashCommand(command: SummarySlashCommand) {
@@ -752,11 +1123,23 @@ export function AcademiaSummaryPanel({
 
     function handleRenderElement(props: RenderElementProps) {
         if (props.element.type === "visual-note") {
-            return <VisualNoteElement {...props} onSeekToTime={onSeekToTime} />;
+            return (
+                <VisualNoteElement
+                    {...props}
+                    onSeekToTime={onSeekToTime}
+                    onDropAt={handleDropVisualNote}
+                />
+            );
         }
 
         if (props.element.type === "quote") {
-            return <QuoteElement {...props} onSeekToTime={onSeekToTime} />;
+            return (
+                <QuoteElement 
+                    {...props} 
+                    onSeekToTime={onSeekToTime} 
+                    onDropAt={handleDropQuote}
+                />
+            );
         }
 
         return (
@@ -776,8 +1159,15 @@ export function AcademiaSummaryPanel({
     }
 
     function renderSummaryLeaf({ attributes, children, leaf }: RenderLeafProps) {
+        const style = {
+            color: resolveLeafColor(leaf as SummaryText),
+            fontWeight: leaf.bold ? 600 : undefined,
+            fontStyle: leaf.italic ? "italic" : undefined,
+            textDecoration: leaf.underline ? "underline" : undefined,
+        };
+
         if (!leaf.timestamp) {
-            return <span {...attributes}>{children}</span>;
+            return <span {...attributes} style={style}>{children}</span>;
         }
 
         const timestampText = Text.isText(leaf) ? leaf.text : "";
@@ -786,7 +1176,8 @@ export function AcademiaSummaryPanel({
         return (
             <span
                 {...attributes}
-                className="cursor-pointer font-medium text-sky-600"
+                className="cursor-pointer font-medium"
+                style={style}
                 onMouseDown={(event) => {
                     if (timestampSeconds === null) {
                         return;
@@ -811,7 +1202,7 @@ export function AcademiaSummaryPanel({
                             renderElement={handleRenderElement}
                             renderLeaf={renderSummaryLeaf}
                             renderPlaceholder={renderSummaryPlaceholder}
-                            className="academia-scrollbar h-full min-h-0 w-full overflow-y-auto px-[5px] pb-[5px] pt-0 text-slate-700 outline-none"
+                            className="academia-scrollbar h-full min-h-0 w-full overflow-y-auto px-[5px] pb-[5px] pt-0 text-slate-700 outline-none selection:bg-sky-200 selection:text-slate-900"
                             style={{
                                 fontFamily: "Poppins, sans-serif",
                                 fontSize: "14px",
@@ -820,6 +1211,7 @@ export function AcademiaSummaryPanel({
                             }}
                             placeholder="Write your summary..."
                             spellCheck
+                            onBlur={() => setSelectionToolbarPosition(null)}
                             onKeyDown={(event) => {
                                 if (activeReferenceMenu) {
                                     if (activeReferenceMenu.items.length === 0) {
@@ -896,6 +1288,85 @@ export function AcademiaSummaryPanel({
                             }}
                         />
                     </Slate>
+
+                    {selectionToolbarPosition && !activeSlashMenu && !activeReferenceMenu && !activeTranscriptPicker ? (
+                        <div
+                            className="absolute z-30 flex items-center gap-1 rounded-[14px] border border-slate-200/80 bg-white/96 p-1.5 shadow-[0_20px_44px_-28px_rgba(15,23,42,0.45)] backdrop-blur"
+                            style={{
+                                left: `${selectionToolbarPosition.left}px`,
+                                top: `${selectionToolbarPosition.top}px`,
+                            }}
+                        >
+                            <button
+                                type="button"
+                                onMouseDown={(event) => {
+                                    event.preventDefault();
+                                    toggleTextMark("bold");
+                                }}
+                                className={`inline-flex h-8 min-w-[32px] items-center justify-center rounded-[10px] px-2 text-[13px] font-semibold transition ${
+                                    isTextMarkActive(editor, "bold")
+                                        ? "bg-slate-900 text-white"
+                                        : "text-slate-600 hover:bg-slate-100"
+                                }`}
+                                aria-label="Bold"
+                            >
+                                B
+                            </button>
+                            <button
+                                type="button"
+                                onMouseDown={(event) => {
+                                    event.preventDefault();
+                                    toggleTextMark("italic");
+                                }}
+                                className={`inline-flex h-8 min-w-[32px] items-center justify-center rounded-[10px] px-2 text-[13px] italic transition ${
+                                    isTextMarkActive(editor, "italic")
+                                        ? "bg-slate-900 text-white"
+                                        : "text-slate-600 hover:bg-slate-100"
+                                }`}
+                                aria-label="Italic"
+                            >
+                                I
+                            </button>
+                            <button
+                                type="button"
+                                onMouseDown={(event) => {
+                                    event.preventDefault();
+                                    toggleTextMark("underline");
+                                }}
+                                className={`inline-flex h-8 min-w-[32px] items-center justify-center rounded-[10px] px-2 text-[13px] underline transition ${
+                                    isTextMarkActive(editor, "underline")
+                                        ? "bg-slate-900 text-white"
+                                        : "text-slate-600 hover:bg-slate-100"
+                                }`}
+                                aria-label="Underline"
+                            >
+                                U
+                            </button>
+                            <div className="mx-1 h-5 w-px bg-slate-200" />
+                            {SUMMARY_TEXT_COLORS.map((option) => (
+                                <button
+                                    key={option.id}
+                                    type="button"
+                                    onMouseDown={(event) => {
+                                        event.preventDefault();
+                                        applyTextColor(option.id);
+                                    }}
+                                    className={`inline-flex h-7 w-7 items-center justify-center rounded-full border transition ${
+                                        getActiveTextColor(editor) === option.id
+                                            ? "border-slate-900 bg-slate-900/8"
+                                            : "border-transparent hover:border-slate-200 hover:bg-slate-100"
+                                    }`}
+                                    aria-label={`${option.label} text`}
+                                    title={option.label}
+                                >
+                                    <span
+                                        className="h-3.5 w-3.5 rounded-full"
+                                        style={{ backgroundColor: option.swatch }}
+                                    />
+                                </button>
+                            ))}
+                        </div>
+                    ) : null}
 
                     {activeSlashMenu && filteredSlashCommands.length > 0 && menuPosition ? (
                         <div

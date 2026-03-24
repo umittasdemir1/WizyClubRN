@@ -54,7 +54,7 @@ export function StudioApp() {
     const workflow = useStudioWorkflowState(workspaceUrl);
 
     return (
-        <div className="relative isolate min-h-screen text-ink selection:bg-brandSelection selection:text-white">
+        <div className="relative isolate min-h-screen text-ink selection:bg-sky-200 selection:text-slate-900">
             <div className="story-spectrum-bg">
             </div>
 
