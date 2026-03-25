@@ -1,4 +1,4 @@
-# StockPilot Translation Handoff - March 24, 2026
+# StockPilot Translation Handoff - March 25, 2026 (Updated)
 
 ## Today
 
@@ -19,6 +19,10 @@ Completed work:
 - Added Turkish-character repair on translated transcript text in the backend.
 - Added frontend-side translation cache sanitization and bumped the translation cache key version so old broken cached translations are not reused.
 - Cleaned the visible loading copy from broken punctuation variants to plain ASCII `...`.
+
+## March 25, 2026 — Additional Fix
+
+- Added `PYTHONIOENCODING=utf-8` and `PYTHONUTF8=1` to the Python worker spawn environment in `academiaTranslation.ts`. This closes the root cause of Turkish character corruption on Windows: Python was writing stdout with the platform's default locale encoding (often latin-1) instead of UTF-8. The mojibake repair added on March 24 remains in place as a safety net.
 
 ## Current State
 

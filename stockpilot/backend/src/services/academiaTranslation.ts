@@ -1,4 +1,4 @@
-import { accessSync, constants, readFileSync, writeFileSync, unlinkSync } from "node:fs";
+﻿import { accessSync, constants, readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
@@ -29,7 +29,7 @@ interface TranslationWorkerErrorPayload {
     };
 }
 
-const LIKELY_MOJIBAKE_PATTERN = /[ÃÅÄÂâ]/;
+const LIKELY_MOJIBAKE_PATTERN = /[ÃƒÃ…Ã„Ã‚Ã¢]/;
 
 export class AcademiaTranslationError extends Error {
     code: string;
@@ -158,7 +158,7 @@ function normalizeCueText(text: string): string {
 }
 
 function countLikelyMojibakeMarkers(text: string): number {
-    return (text.match(/[ÃÅÄÂâ]/g) ?? []).length;
+    return (text.match(/[ÃƒÃ…Ã„Ã‚Ã¢]/g) ?? []).length;
 }
 
 function repairLikelyMojibake(text: string): string {
@@ -304,6 +304,8 @@ async function runPythonTranslationWorker(
                 env: {
                     ...process.env,
                     PYTHONUNBUFFERED: "1",
+                    PYTHONIOENCODING: "utf-8",
+                    PYTHONUTF8: "1",
                     HF_HOME: resolveModelCacheDir(),
                     TRANSFORMERS_CACHE: resolveModelCacheDir(),
                     XDG_CACHE_HOME: resolveModelCacheDir(),

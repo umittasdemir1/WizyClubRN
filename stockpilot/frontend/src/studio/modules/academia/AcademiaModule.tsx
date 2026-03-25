@@ -1,4 +1,4 @@
-import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import React, { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { translateAcademiaTranscript } from "../../../services/api";
 import type { AcademiaTranscriptResult } from "../../../types/academia";
 import { AcademiaExpandedNote } from "./components/AcademiaExpandedNote";
@@ -25,8 +25,9 @@ import { useVideoPlayer } from "./hooks/useVideoPlayer";
 import type { AcademiaSidebarTab, AcademiaSourceMode } from "./types";
 import { buildYouTubeEmbedUrl, formatPlaybackTime, getErrorMessage } from "./utils";
 
-// Header fixed at 53px; main has pt-[53px]. Module adds pt-4 (16px) + pb-[10px].
-const CARD_HEIGHT = "calc(100vh - 79px)";
+// Desktop card has 10px padding on each side + 10px bottom + 16px top = 26px + 10px = 36px total vertical
+// On mobile: no padding, player fills full remaining height
+const DESKTOP_CARD_HEIGHT = "calc(100% - 26px)"; // 100% of parent (which is 100dvh - 53px header)
 
 function isEnglishTranscriptLanguage(language: string | null): boolean {
     if (!language) return false;
@@ -34,7 +35,11 @@ function isEnglishTranscriptLanguage(language: string | null): boolean {
     return normalized === "en" || normalized.startsWith("en-") || normalized.startsWith("en_");
 }
 
-export function AcademiaModule() {
+interface AcademiaModuleProps {
+    onHasMediaChange?: (hasMedia: boolean) => void;
+}
+
+export function AcademiaModule({ onHasMediaChange }: AcademiaModuleProps) {
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const translationRequestIdRef = useRef(0);
 
@@ -108,6 +113,7 @@ export function AcademiaModule() {
         const nextFile = event.target.files?.[0] ?? null;
         if (!nextFile) return;
         setMediaFile(nextFile);
+        onHasMediaChange?.(true);
         event.target.value = "";
     }
 
@@ -159,7 +165,7 @@ export function AcademiaModule() {
     }
 
     return (
-        <div className="px-[10px] pb-[10px] pt-4">
+        <div className={`flex h-full min-h-0 flex-col ${showSidebar ? "md:px-[10px] md:pb-[10px] md:pt-4" : ""}`}>
             <input
                 ref={fileInputRef}
                 type="file"
@@ -168,12 +174,18 @@ export function AcademiaModule() {
                 onChange={handleFileChange}
             />
 
+            {/*
+              Layout:
+              - Mobile (<md): no padding, full h-full, flex-col
+              - Desktop (md+): padded card with desktop height
+            */}
             <div
-                className="flex overflow-hidden rounded-[16px] bg-white shadow-[0_0_0_1px_rgba(226,232,240,0.8),0_12px_32px_rgba(15,23,42,0.09),0_2px_12px_rgba(15,23,42,0.06)]"
-                style={{ height: CARD_HEIGHT }}
+                className={`flex flex-1 min-h-0 flex-col md:flex-row overflow-hidden ${showSidebar ? "md:rounded-[16px] bg-white shadow-[0_0_0_1px_rgba(226,232,240,0.8),0_12px_32px_rgba(15,23,42,0.09),0_2px_12px_rgba(15,23,42,0.06)]" : ""}`}
             >
+                {/* Player column */}
                 <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-                    <section className={`relative flex min-h-0 flex-1 overflow-hidden ${showSidebar ? "rounded-l-[16px]" : "rounded-[16px]"}`}>
+                    {/* Mobile: flex-1 fills all remaining space. Desktop: same. */}
+                    <section className="relative flex flex-1 min-h-0 overflow-hidden">
                         <div className="absolute inset-0">
                             <AcademiaPlayer
                                 sourceMode={sourceMode}
@@ -244,7 +256,7 @@ export function AcademiaModule() {
                 </div>
 
                 {showSidebar ? (
-                <div className="relative flex w-[420px] shrink-0 flex-col border-l border-slate-100">
+                <div className="relative flex w-full md:w-[420px] shrink-0 flex-col border-t md:border-t-0 md:border-l border-slate-100 min-h-[320px] md:min-h-0">
                     <AcademiaTabBar
                         activeSidebarTab={activeSidebarTab}
                         onTabChange={setActiveSidebarTab}

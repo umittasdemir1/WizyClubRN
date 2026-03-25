@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { BrandSignature } from "../components/layout/BrandSignature";
 import { PivotStudioProvider } from "../components/canvas/PivotStudioContext";
 import { Spinner } from "../components/shared/Spinner";
@@ -50,31 +50,46 @@ function StudioModuleFallback() {
 
 export function StudioApp() {
     const [activeModule, setActiveModule] = useState<StudioModuleId>("atelier");
+    const [academiaHasMedia, setAcademiaHasMedia] = useState(false);
     const workspaceUrl = useMemo(() => resolveWorkspaceUrl(window.location), []);
     const workflow = useStudioWorkflowState(workspaceUrl);
 
+    // Lock body scroll while studio is mounted — prevents mobile page bounce/scroll
+    useEffect(() => {
+        document.body.classList.add("studio-page");
+        return () => document.body.classList.remove("studio-page");
+    }, []);
+
+    const isAcademiaHero = activeModule === "academia" && !academiaHasMedia;
+
     return (
-        <div className="relative isolate min-h-screen text-ink selection:bg-sky-200 selection:text-slate-900">
-            <div className="story-spectrum-bg">
-            </div>
+        <div className="relative isolate flex h-dvh flex-col overflow-hidden text-ink selection:bg-sky-200 selection:text-slate-900">
+            <div className="story-spectrum-bg" />
 
             {/* Shell header */}
-            <header className="fixed left-0 right-0 top-0 z-50 border-b border-white/20 bg-white/60 backdrop-blur-2xl">
-                <div className="relative mx-auto flex max-w-[1680px] items-center px-6 py-1.5 sm:px-10">
-                    <div className="relative z-10">
-                        <BrandSignature onClick={() => window.location.assign(workspaceUrl)} />
+            <header className={`z-50 transition-colors duration-300 ${isAcademiaHero ? "absolute inset-x-0 top-0 border-b border-transparent bg-transparent" : "border-b border-ink/10 bg-white/60 backdrop-blur-2xl"}`}>
+                <div className="relative mx-auto flex max-w-[1680px] h-[53px] items-center justify-between px-3 sm:px-6 md:px-10">
+                    {/* Logo */}
+                    <div className="relative z-10 shrink-0">
+                        <BrandSignature onClick={() => window.location.assign(workspaceUrl)} variant={isAcademiaHero ? "light" : "dark"} />
                     </div>
 
-                    <div className="pointer-events-none absolute inset-y-0 left-1/2 flex -translate-x-1/2 items-center">
+                    {/* Nav — centered absolute on desktop, right side on mobile (handled inside StudioNav) */}
+                    <div className="absolute inset-y-0 left-0 right-0 hidden md:flex items-center justify-center pointer-events-none">
                         <div className="pointer-events-auto">
-                            <StudioNav active={activeModule} onChange={setActiveModule} />
+                            <StudioNav active={activeModule} onChange={setActiveModule} variant={isAcademiaHero ? "light" : "dark"} />
                         </div>
+                    </div>
+
+                    {/* Mobile hamburger — only rendered <md */}
+                    <div className="md:hidden">
+                        <StudioNav active={activeModule} onChange={setActiveModule} variant={isAcademiaHero ? "light" : "dark"} />
                     </div>
                 </div>
             </header>
 
-            {/* Module content */}
-            <main className="relative z-10 pt-[53px]">
+            {/* Module content — fills remaining viewport height, NO scroll */}
+            <main className="relative z-10 flex flex-1 min-h-0 flex-col overflow-hidden">
                 <input
                     ref={workflow.fileInputRef}
                     type="file"
@@ -85,23 +100,25 @@ export function StudioApp() {
 
                 <PivotStudioProvider value={workflow.contextValue}>
                     <Suspense fallback={<StudioModuleFallback />}>
-                        <ErrorBoundary context="Labs">
-                            {activeModule === "labs" && <LabsModule />}
-                        </ErrorBoundary>
-                        <ErrorBoundary context="Atelier">
-                            {activeModule === "atelier" && (
-                                <AtelierModule onOpenLabs={() => setActiveModule("labs")} />
-                            )}
-                        </ErrorBoundary>
-                        <ErrorBoundary context="Academia">
-                            {activeModule === "academia" && <AcademiaModule />}
-                        </ErrorBoundary>
-                        <ErrorBoundary context="Senato">
-                            {activeModule === "senato" && <SenatoModule />}
-                        </ErrorBoundary>
-                        <ErrorBoundary context="Loyal">
-                            {activeModule === "loyal" && <LoyalModule />}
-                        </ErrorBoundary>
+                        <div className="h-full">
+                            <ErrorBoundary context="Labs">
+                                {activeModule === "labs" && <LabsModule />}
+                            </ErrorBoundary>
+                            <ErrorBoundary context="Atelier">
+                                {activeModule === "atelier" && (
+                                    <AtelierModule onOpenLabs={() => setActiveModule("labs")} />
+                                )}
+                            </ErrorBoundary>
+                            <ErrorBoundary context="Academia">
+                                {activeModule === "academia" && <AcademiaModule onHasMediaChange={setAcademiaHasMedia} />}
+                            </ErrorBoundary>
+                            <ErrorBoundary context="Senato">
+                                {activeModule === "senato" && <SenatoModule />}
+                            </ErrorBoundary>
+                            <ErrorBoundary context="Loyal">
+                                {activeModule === "loyal" && <LoyalModule />}
+                            </ErrorBoundary>
+                        </div>
                     </Suspense>
                 </PivotStudioProvider>
             </main>

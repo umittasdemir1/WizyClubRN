@@ -103,11 +103,10 @@ function App() {
                                 <span className="block">instant</span>
                             </h1>
 
-                            <div className="flex min-h-[1.35em] items-center justify-center overflow-visible text-center">
-                                <span className="text-gradient inline-block w-max max-w-none whitespace-nowrap font-display text-4xl font-normal italic leading-none tracking-[-0.06em] sm:text-6xl lg:text-[6.5rem]">
-                                    <span className="inline-block whitespace-nowrap">
-                                        {typewriterText}
-                                    </span>
+                            <div className="relative flex min-h-[1.5em] w-full items-center justify-center overflow-hidden text-center">
+                                <span className="text-gradient inline-block w-full text-center font-display font-normal italic leading-tight tracking-[-0.04em] sm:tracking-[-0.06em]"
+                                    style={{ fontSize: "clamp(1.75rem, 8.5vw, 6.5rem)" }}>
+                                    {typewriterText}
                                 </span>
                             </div>
 
@@ -117,13 +116,13 @@ function App() {
                             </p>
                         </div>
 
-                        <div className="mt-20 flex flex-wrap items-center justify-center gap-10">
+                        <div className="mt-16 sm:mt-20 flex flex-col sm:flex-row flex-wrap items-center justify-center gap-4 sm:gap-10">
                             <button
                                 onClick={handleStudioLaunch}
-                                className="btn-premium-solid h-20"
+                                className="btn-premium-solid h-14 sm:h-20 w-full sm:w-auto"
                             >
                                 <span className="flex items-center gap-3">
-                                    <Upload className="h-6 w-6 opacity-80" />
+                                    <Upload className="h-5 w-5 sm:h-6 sm:w-6 opacity-80" />
                                     Launch Studio
                                 </span>
                             </button>
@@ -133,7 +132,7 @@ function App() {
                                         .getElementById("features")
                                         ?.scrollIntoView({ behavior: "smooth" })
                                 }
-                                className="btn-premium-outline h-20"
+                                className="btn-premium-outline h-14 sm:h-20 w-full sm:w-auto"
                             >
                                 Technical overview
                             </button>
@@ -142,7 +141,7 @@ function App() {
                 </section>
 
                 {/* FEATURES */}
-                <section id="features" className="px-8 pt-16 pb-32">
+                <section id="features" className="px-4 sm:px-8 pt-16 pb-32">
                     <div className="mx-auto max-w-6xl">
                         <motion.div
                             initial={{ opacity: 0, y: 40 }}

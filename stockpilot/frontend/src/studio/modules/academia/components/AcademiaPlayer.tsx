@@ -148,10 +148,8 @@ export function AcademiaPlayer({
             : "pointer-events-none opacity-0"
         : "pointer-events-none opacity-0 group-hover/player:pointer-events-auto group-hover/player:opacity-100";
 
-    const playerShapeClass = hasSidebar ? "rounded-l-[16px]" : "rounded-[16px]";
-    const playerClipClass = hasSidebar
-        ? "[clip-path:inset(0_round_16px_0_0_16px)]"
-        : "[clip-path:inset(0_round_16px)]";
+    const playerShapeClass = hasSidebar ? "md:rounded-l-[16px]" : "";
+    const playerClipClass = hasSidebar ? "md:[clip-path:inset(0_round_16px_0_0_16px)]" : "";
 
     return (
         <div
