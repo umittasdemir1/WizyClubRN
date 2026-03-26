@@ -183,10 +183,9 @@ export function AcademiaModule({ onHasMediaChange, onVideoReady }: AcademiaModul
             <div
                 className={`flex flex-1 min-h-0 flex-col md:flex-row overflow-hidden ${showSidebar ? "md:rounded-[16px] bg-white shadow-[0_0_0_1px_rgba(226,232,240,0.8),0_12px_32px_rgba(15,23,42,0.09),0_2px_12px_rgba(15,23,42,0.06)]" : ""}`}
             >
-                {/* Player column — mobile: natural height via aspect-video; desktop: flex-1 */}
-                <div className="flex min-h-0 min-w-0 flex-col md:flex-1">
-                    {/* Mobile: aspect-video gives 16:9 height. Desktop: flex-1 fills all. */}
-                    <section className="relative w-full aspect-video md:aspect-auto md:flex-1 md:min-h-0 overflow-hidden">
+                {/* Player column — hero: flex-1 fills screen; with sidebar: aspect-video on mobile */}
+                <div className={`flex min-h-0 min-w-0 flex-col ${showSidebar ? "md:flex-1" : "flex-1"}`}>
+                    <section className={`relative overflow-hidden ${showSidebar ? "w-full aspect-video md:aspect-auto md:flex-1 md:min-h-0" : "flex flex-1 min-h-0"}`}>
                         <div className="absolute inset-0">
                             <AcademiaPlayer
                                 sourceMode={sourceMode}
