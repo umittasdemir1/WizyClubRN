@@ -78,7 +78,11 @@ export function StudioNav({ active, onChange, variant = "dark" }: StudioNavProps
                 <button
                     type="button"
                     onClick={() => setMenuOpen((prev) => !prev)}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#0b0e14] text-white shadow-sm"
+                    className={`inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-200 ${
+                        isLight
+                            ? "liquid-glass-strong text-white"
+                            : "bg-[#0b0e14] text-white shadow-sm"
+                    }`}
                     aria-label="Open module menu"
                     aria-expanded={menuOpen}
                 >
@@ -86,16 +90,24 @@ export function StudioNav({ active, onChange, variant = "dark" }: StudioNavProps
                 </button>
 
                 {menuOpen && (
-                    <div className="absolute right-0 top-full mt-2 z-[100] min-w-[160px] overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-xl">
+                    <div className={`absolute right-0 top-full mt-2 z-[100] min-w-[160px] overflow-hidden rounded-2xl ${
+                        isLight
+                            ? "bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.32)]"
+                            : "border border-slate-100 bg-white shadow-xl"
+                    }`}>
                         {AVAILABLE_MODULES.map((mod) => (
                             <button
                                 key={mod.id}
                                 type="button"
                                 onClick={() => handleSelect(mod.id)}
                                 className={`flex w-full items-center px-4 py-3 text-left text-[14px] font-semibold transition-colors ${
-                                    active === mod.id
-                                        ? "bg-slate-900 text-white"
-                                        : "text-slate-700 hover:bg-slate-50"
+                                    isLight
+                                        ? active === mod.id
+                                            ? "bg-white/20 text-white"
+                                            : "text-white/80 hover:bg-white/10 hover:text-white"
+                                        : active === mod.id
+                                            ? "bg-slate-900 text-white"
+                                            : "text-slate-700 hover:bg-slate-50"
                                 }`}
                             >
                                 {mod.label}

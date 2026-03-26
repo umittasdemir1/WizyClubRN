@@ -83,10 +83,20 @@ export function useFullscreen(
 
         if (document.fullscreenElement) {
             await document.exitFullscreen();
+            try {
+                (screen.orientation as unknown as { unlock: () => void }).unlock();
+            } catch {
+                // Not supported — ignore
+            }
             return;
         }
 
         await node.requestFullscreen();
+        try {
+            await (screen.orientation as unknown as { lock: (o: string) => Promise<void> }).lock("landscape");
+        } catch {
+            // Not supported on desktop or some browsers — ignore
+        }
     }
 
     function handlePlayerTouchStart() {

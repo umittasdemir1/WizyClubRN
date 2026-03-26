@@ -6,6 +6,7 @@ import { StudioNav, type StudioModuleId } from "../studio/StudioNav";
 import { useStudioWorkflowState } from "../studio/useStudioWorkflowState";
 import { isStudioHost } from "../utils/studio";
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import { AcademiaVideoSplash } from "../studio/modules/academia/components/AcademiaVideoSplash";
 
 const LabsModule = lazy(async () => {
     const mod = await import("../studio/modules/labs/LabsModule");
@@ -49,8 +50,9 @@ function StudioModuleFallback() {
 }
 
 export function StudioApp() {
-    const [activeModule, setActiveModule] = useState<StudioModuleId>("atelier");
+    const [activeModule, setActiveModule] = useState<StudioModuleId>("academia");
     const [academiaHasMedia, setAcademiaHasMedia] = useState(false);
+    const [academiaVideoReady, setAcademiaVideoReady] = useState(false);
     const workspaceUrl = useMemo(() => resolveWorkspaceUrl(window.location), []);
     const workflow = useStudioWorkflowState(workspaceUrl);
 
@@ -61,10 +63,14 @@ export function StudioApp() {
     }, []);
 
     const isAcademiaHero = activeModule === "academia" && !academiaHasMedia;
+    const showAcademiaSplash = isAcademiaHero && !academiaVideoReady;
 
     return (
         <div className="relative isolate flex h-dvh flex-col overflow-hidden text-ink selection:bg-sky-200 selection:text-slate-900">
             <div className="story-spectrum-bg" />
+
+            {/* Academia splash — covers EVERYTHING until video is ready */}
+            <AcademiaVideoSplash visible={showAcademiaSplash} />
 
             {/* Shell header */}
             <header className={`z-50 transition-colors duration-300 ${isAcademiaHero ? "absolute inset-x-0 top-0 border-b border-transparent bg-transparent" : "border-b border-ink/10 bg-white/60 backdrop-blur-2xl"}`}>
@@ -110,7 +116,7 @@ export function StudioApp() {
                                 )}
                             </ErrorBoundary>
                             <ErrorBoundary context="Academia">
-                                {activeModule === "academia" && <AcademiaModule onHasMediaChange={setAcademiaHasMedia} />}
+                                {activeModule === "academia" && <AcademiaModule onHasMediaChange={setAcademiaHasMedia} onVideoReady={() => setAcademiaVideoReady(true)} />}
                             </ErrorBoundary>
                             <ErrorBoundary context="Senato">
                                 {activeModule === "senato" && <SenatoModule />}

@@ -37,9 +37,10 @@ function isEnglishTranscriptLanguage(language: string | null): boolean {
 
 interface AcademiaModuleProps {
     onHasMediaChange?: (hasMedia: boolean) => void;
+    onVideoReady?: () => void;
 }
 
-export function AcademiaModule({ onHasMediaChange }: AcademiaModuleProps) {
+export function AcademiaModule({ onHasMediaChange, onVideoReady }: AcademiaModuleProps) {
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const translationRequestIdRef = useRef(0);
 
@@ -182,10 +183,10 @@ export function AcademiaModule({ onHasMediaChange }: AcademiaModuleProps) {
             <div
                 className={`flex flex-1 min-h-0 flex-col md:flex-row overflow-hidden ${showSidebar ? "md:rounded-[16px] bg-white shadow-[0_0_0_1px_rgba(226,232,240,0.8),0_12px_32px_rgba(15,23,42,0.09),0_2px_12px_rgba(15,23,42,0.06)]" : ""}`}
             >
-                {/* Player column */}
-                <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-                    {/* Mobile: flex-1 fills all remaining space. Desktop: same. */}
-                    <section className="relative flex flex-1 min-h-0 overflow-hidden">
+                {/* Player column — mobile: natural height via aspect-video; desktop: flex-1 */}
+                <div className="flex min-h-0 min-w-0 flex-col md:flex-1">
+                    {/* Mobile: aspect-video gives 16:9 height. Desktop: flex-1 fills all. */}
+                    <section className="relative w-full aspect-video md:aspect-auto md:flex-1 md:min-h-0 overflow-hidden">
                         <div className="absolute inset-0">
                             <AcademiaPlayer
                                 sourceMode={sourceMode}
@@ -224,6 +225,7 @@ export function AcademiaModule({ onHasMediaChange }: AcademiaModuleProps) {
                                 onVideoPause={player.handleVideoPause}
                                 onVideoEnded={player.handleVideoEnded}
                                 onUploadClick={handleUploadClick}
+                                onVideoReady={onVideoReady}
                                 hasSidebar={showSidebar}
                             />
                         </div>
@@ -256,7 +258,7 @@ export function AcademiaModule({ onHasMediaChange }: AcademiaModuleProps) {
                 </div>
 
                 {showSidebar ? (
-                <div className="relative flex w-full md:w-[420px] shrink-0 flex-col border-t md:border-t-0 md:border-l border-slate-100 min-h-[320px] md:min-h-0">
+                <div className="relative flex w-full md:w-[420px] md:shrink-0 flex-1 flex-col border-t md:border-t-0 md:border-l border-slate-100 md:min-h-0 overflow-y-auto md:overflow-hidden">
                     <AcademiaTabBar
                         activeSidebarTab={activeSidebarTab}
                         onTabChange={setActiveSidebarTab}

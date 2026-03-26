@@ -32,7 +32,7 @@ function PlayerCaptionOverlay({ cue, activeWordIndex, captionOffsetClass }: Play
         <div
             className={`pointer-events-none absolute inset-x-0 z-10 flex justify-center px-6 transition-all duration-150 ${captionOffsetClass}`}
         >
-            <div className="max-w-[78%] rounded-2xl bg-[rgba(0,0,0,0.72)] px-4 py-2.5 text-center text-[20px] font-medium leading-8 text-white md:text-[22px]">
+            <div className="max-w-[86%] rounded-xl bg-[rgba(0,0,0,0.72)] px-3 py-1.5 text-center text-[13px] font-medium leading-5 text-white md:max-w-[78%] md:rounded-2xl md:px-4 md:py-2.5 md:text-[20px] md:leading-8">
                 <span className="whitespace-pre-wrap">
                     {words.map((word, index) => (
                         <span
@@ -86,6 +86,7 @@ interface Props {
     onVideoPause: () => void;
     onVideoEnded: () => void;
     onUploadClick: () => void;
+    onVideoReady?: () => void;
     hasSidebar: boolean;
 }
 
@@ -126,6 +127,7 @@ export function AcademiaPlayer({
     onVideoPause,
     onVideoEnded,
     onUploadClick,
+    onVideoReady,
     hasSidebar,
 }: Props) {
     const overlayOpacityClass = isFullscreen
@@ -205,7 +207,7 @@ export function AcademiaPlayer({
                     {/* Video element */}
                     <video
                         ref={videoElementRef}
-                        className={`h-full w-full object-cover ${playerShapeClass} ${playerClipClass}`}
+                        className={`h-full w-full ${isFullscreen ? "object-contain" : "object-cover"} ${playerShapeClass} ${playerClipClass}`}
                         src={previewUrl}
                         playsInline
                         onClick={onTogglePlayback}
@@ -383,7 +385,7 @@ export function AcademiaPlayer({
                     allowFullScreen
                 />
             ) : (
-                <AcademiaBloomEmptyState onUploadClick={onUploadClick} />
+                <AcademiaBloomEmptyState onUploadClick={onUploadClick} onVideoReady={onVideoReady} />
             )}
         </div>
     );
