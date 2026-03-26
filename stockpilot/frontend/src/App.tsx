@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect } from "react";
 import { motion } from "framer-motion";
 import { Upload } from "lucide-react";
 import { Header } from "./components/layout/Header";
@@ -38,7 +38,6 @@ const FEATURES = [
 ];
 
 function App() {
-    const studioWindowRef = useRef<Window | null>(null);
     const typewriterText = useTypewriter(ROTATING_WORDS);
 
     useLayoutEffect(() => {
@@ -47,26 +46,7 @@ function App() {
 
     function handleStudioLaunch() {
         const studioUrl = resolveStudioUrl(window.location);
-        const existing = studioWindowRef.current;
-
-        if (existing && !existing.closed) {
-            existing.focus();
-            return;
-        }
-
-        const next = window.open(
-            studioUrl,
-            "stockpilot-studio",
-            "width=1680,height=1040,resizable=yes,scrollbars=yes"
-        );
-
-        if (!next) {
-            window.location.assign(studioUrl);
-            return;
-        }
-
-        studioWindowRef.current = next;
-        next.focus();
+        window.location.assign(studioUrl);
     }
 
     return (
