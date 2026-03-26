@@ -83,17 +83,22 @@ export function useAcademiaTranscription(mediaFile: File | null): UseAcademiaTra
                 try {
                     const nextStatus = await getAcademiaTranscriptionStatus(requestId);
                     if (!isActive || stopped || requestIdRef.current !== currentRequestId) return;
-                    consecutiveErrors = 0;
                     if (nextStatus) {
+                        consecutiveErrors = 0;
                         updateLocalStatus(nextStatus);
                         if (nextStatus.phase === "completed" || nextStatus.phase === "failed") {
+                            return;
+                        }
+                    } else {
+                        // null = 404, job not found yet
+                        consecutiveErrors += 1;
+                        if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
                             return;
                         }
                     }
                 } catch {
                     consecutiveErrors += 1;
                     if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
-                        // Server not reachable — stop polling silently.
                         return;
                     }
                 }
