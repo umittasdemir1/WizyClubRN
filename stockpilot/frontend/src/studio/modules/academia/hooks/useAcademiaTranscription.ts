@@ -54,10 +54,21 @@ export function useAcademiaTranscription(mediaFile: File | null): UseAcademiaTra
         }
 
         let isActive = true;
+        let stopped = false;
         let pollTimer: number | null = null;
+        let consecutiveErrors = 0;
+        const MAX_CONSECUTIVE_ERRORS = 5;
         const currentRequestId = requestIdRef.current + 1;
         const requestId = buildAcademiaRequestId();
         requestIdRef.current = currentRequestId;
+
+        const stopPolling = () => {
+            stopped = true;
+            if (pollTimer !== null) {
+                window.clearTimeout(pollTimer);
+                pollTimer = null;
+            }
+        };
 
         const updateLocalStatus = (nextStatus: AcademiaTranscriptionStatus) => {
             if (!isActive || requestIdRef.current !== currentRequestId) return;
@@ -66,11 +77,13 @@ export function useAcademiaTranscription(mediaFile: File | null): UseAcademiaTra
         };
 
         const scheduleStatusPoll = (delayMs: number) => {
-            if (!isActive || requestIdRef.current !== currentRequestId) return;
+            if (!isActive || stopped || requestIdRef.current !== currentRequestId) return;
             pollTimer = window.setTimeout(async () => {
+                if (!isActive || stopped || requestIdRef.current !== currentRequestId) return;
                 try {
                     const nextStatus = await getAcademiaTranscriptionStatus(requestId);
-                    if (!isActive || requestIdRef.current !== currentRequestId) return;
+                    if (!isActive || stopped || requestIdRef.current !== currentRequestId) return;
+                    consecutiveErrors = 0;
                     if (nextStatus) {
                         updateLocalStatus(nextStatus);
                         if (nextStatus.phase === "completed" || nextStatus.phase === "failed") {
@@ -78,7 +91,11 @@ export function useAcademiaTranscription(mediaFile: File | null): UseAcademiaTra
                         }
                     }
                 } catch {
-                    // Keep polling; transient 404/network states are expected during upload handoff.
+                    consecutiveErrors += 1;
+                    if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+                        // Server not reachable — stop polling silently.
+                        return;
+                    }
                 }
                 scheduleStatusPoll(900);
             }, delayMs);
@@ -116,9 +133,7 @@ export function useAcademiaTranscription(mediaFile: File | null): UseAcademiaTra
         })
             .then((result) => {
                 if (!isActive || requestIdRef.current !== currentRequestId) return;
-                if (pollTimer !== null) {
-                    window.clearTimeout(pollTimer);
-                }
+                stopPolling();
                 writeCachedTranscript(mediaFile.name, result);
                 setTranscript(result);
                 setRequestState("ready");
@@ -130,9 +145,7 @@ export function useAcademiaTranscription(mediaFile: File | null): UseAcademiaTra
             })
             .catch((error) => {
                 if (!isActive || requestIdRef.current !== currentRequestId) return;
-                if (pollTimer !== null) {
-                    window.clearTimeout(pollTimer);
-                }
+                stopPolling();
                 const message = getErrorMessage(error);
                 setTranscript(null);
                 setRequestState("error");
@@ -154,9 +167,7 @@ export function useAcademiaTranscription(mediaFile: File | null): UseAcademiaTra
 
         return () => {
             isActive = false;
-            if (pollTimer !== null) {
-                window.clearTimeout(pollTimer);
-            }
+            stopPolling();
         };
     }, [mediaFile]);
 

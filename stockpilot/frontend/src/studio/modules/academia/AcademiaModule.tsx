@@ -258,7 +258,7 @@ export function AcademiaModule({ onHasMediaChange, onVideoReady }: AcademiaModul
                 </div>
 
                 {showSidebar ? (
-                <div className="relative flex w-full md:w-[420px] md:shrink-0 flex-1 flex-col border-t md:border-t-0 md:border-l border-slate-100 md:min-h-0 overflow-y-auto md:overflow-hidden">
+                <div className="relative flex w-full md:w-[420px] md:shrink-0 md:flex-none flex-1 flex-col border-t md:border-t-0 md:border-l border-slate-100 md:min-h-0 overflow-y-auto md:overflow-hidden">
                     <AcademiaTabBar
                         activeSidebarTab={activeSidebarTab}
                         onTabChange={setActiveSidebarTab}
