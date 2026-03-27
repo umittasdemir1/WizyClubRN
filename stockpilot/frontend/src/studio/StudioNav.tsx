@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Menu, X } from "lucide-react";
 
-export type StudioModuleId = "labs" | "atelier" | "academia" | "senato" | "loyal";
+export type StudioModuleId = "labs" | "atelier" | "academia" | "audit" | "senato" | "loyal";
 
 interface NavModule {
     id: StudioModuleId;
@@ -14,6 +14,7 @@ const NAV_MODULES: NavModule[] = [
     { id: "labs",     label: "S+Labs",     shortLabel: "Labs",     available: true  },
     { id: "atelier",  label: "S+Atelier",  shortLabel: "Atelier",  available: true  },
     { id: "academia", label: "S+Academia", shortLabel: "Academia", available: true  },
+    { id: "audit",    label: "S+Audit",    shortLabel: "Audit",    available: true  },
     { id: "senato",   label: "S+Senato",   shortLabel: "Senato",   available: false },
     { id: "loyal",    label: "S+Loyal",    shortLabel: "Loyal",    available: false },
 ];

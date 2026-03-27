@@ -23,6 +23,11 @@ const AcademiaModule = lazy(async () => {
     return { default: mod.AcademiaModule };
 });
 
+const AuditModule = lazy(async () => {
+    const mod = await import("../studio/modules/audit/AuditModule");
+    return { default: mod.AuditModule };
+});
+
 const SenatoModule = lazy(async () => {
     const mod = await import("../studio/modules/plus/SenatoModule");
     return { default: mod.SenatoModule };
@@ -53,6 +58,7 @@ export function StudioApp() {
     const [activeModule, setActiveModule] = useState<StudioModuleId>("academia");
     const [academiaHasMedia, setAcademiaHasMedia] = useState(false);
     const [academiaVideoReady, setAcademiaVideoReady] = useState(false);
+    const [auditIsHero, setAuditIsHero] = useState(false);
     const workspaceUrl = useMemo(() => resolveWorkspaceUrl(window.location), []);
     const workflow = useStudioWorkflowState(workspaceUrl);
 
@@ -63,6 +69,8 @@ export function StudioApp() {
     }, []);
 
     const isAcademiaHero = activeModule === "academia" && !academiaHasMedia;
+    const isAuditHero = activeModule === "audit" && auditIsHero;
+    const isTransparentHeroShell = isAcademiaHero || isAuditHero;
     const showAcademiaSplash = isAcademiaHero && !academiaVideoReady;
 
     return (
@@ -73,23 +81,23 @@ export function StudioApp() {
             <AcademiaVideoSplash visible={showAcademiaSplash} />
 
             {/* Shell header */}
-            <header className={`z-50 transition-colors duration-300 ${isAcademiaHero ? "absolute inset-x-0 top-0 border-b border-transparent bg-transparent" : "border-b border-ink/10 bg-white/60 backdrop-blur-2xl"}`}>
-                <div className="relative mx-auto flex max-w-[1680px] h-[53px] items-center justify-between px-3 sm:px-6 md:px-10">
+            <header className={`z-50 transition-colors duration-300 ${isTransparentHeroShell ? "absolute inset-x-0 top-0 border-b border-transparent bg-transparent" : "border-b border-ink/10 bg-white/60 backdrop-blur-2xl"}`}>
+                <div className="relative mx-auto flex h-[53px] max-w-[1680px] items-center justify-between px-3 sm:px-6 md:px-10">
                     {/* Logo */}
                     <div className="relative z-10 shrink-0">
-                        <BrandSignature onClick={() => window.location.assign(workspaceUrl)} variant={isAcademiaHero ? "light" : "dark"} />
+                        <BrandSignature onClick={() => window.location.assign(workspaceUrl)} variant={isTransparentHeroShell ? "light" : "dark"} />
                     </div>
 
                     {/* Nav — centered absolute on desktop, right side on mobile (handled inside StudioNav) */}
-                    <div className="absolute inset-y-0 left-0 right-0 hidden md:flex items-center justify-center pointer-events-none">
+                    <div className="absolute inset-y-0 left-0 right-0 hidden items-center justify-center pointer-events-none md:flex">
                         <div className="pointer-events-auto">
-                            <StudioNav active={activeModule} onChange={setActiveModule} variant={isAcademiaHero ? "light" : "dark"} />
+                            <StudioNav active={activeModule} onChange={setActiveModule} variant={isTransparentHeroShell ? "light" : "dark"} />
                         </div>
                     </div>
 
                     {/* Mobile hamburger — only rendered <md */}
                     <div className="md:hidden">
-                        <StudioNav active={activeModule} onChange={setActiveModule} variant={isAcademiaHero ? "light" : "dark"} />
+                        <StudioNav active={activeModule} onChange={setActiveModule} variant={isTransparentHeroShell ? "light" : "dark"} />
                     </div>
                 </div>
             </header>
@@ -117,6 +125,9 @@ export function StudioApp() {
                             </ErrorBoundary>
                             <ErrorBoundary context="Academia">
                                 {activeModule === "academia" && <AcademiaModule onHasMediaChange={setAcademiaHasMedia} onVideoReady={() => setAcademiaVideoReady(true)} />}
+                            </ErrorBoundary>
+                            <ErrorBoundary context="Audit">
+                                {activeModule === "audit" && <AuditModule onHeroModeChange={setAuditIsHero} />}
                             </ErrorBoundary>
                             <ErrorBoundary context="Senato">
                                 {activeModule === "senato" && <SenatoModule />}
