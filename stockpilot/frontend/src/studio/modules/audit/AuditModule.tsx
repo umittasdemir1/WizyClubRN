@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ShieldCheck } from "lucide-react";
 import { clearActiveAuditSession, getActiveAuditSession, getAuditHistory } from "./cache";
 import { AUDIT_TABS } from "./constants";
 import { AuditChecklist } from "./components/AuditChecklist";
@@ -183,59 +182,25 @@ export function AuditModule({ onHeroModeChange }: AuditModuleProps) {
         await navigator.clipboard.writeText(payload);
     }, [demoSession, reportSession]);
 
-    const showTabs = view === "checklist" || view === "report" || history.length > 0 || Boolean(activeDraft);
     const reportMode = activeTab === "history" ? "history" : "report";
     const resolvedReportSession = reportSession ?? (history[0] ?? demoSession);
     const isLandingView = view === "landing";
-    const showHeaderTabs = !isLandingView && showTabs;
+    const isChecklistView = view === "checklist";
     const rootClassName = isLandingView
         ? "flex h-full min-h-0 flex-col"
-        : "flex h-full min-h-0 flex-col px-4 pb-4 pt-4 md:px-6 lg:px-8";
+        : isChecklistView
+            ? "flex h-full min-h-0 flex-col"
+            : "flex h-full min-h-0 flex-col px-4 pb-4 pt-4 md:px-6 lg:px-8";
     const shellClassName = isLandingView
         ? "flex h-full min-h-0 w-full flex-1 flex-col"
-        : "mx-auto flex h-full min-h-0 w-full max-w-[1680px] flex-1 flex-col gap-4";
+        : isChecklistView
+            ? "flex h-full min-h-0 w-full flex-1 flex-col"
+            : "mx-auto flex h-full min-h-0 w-full max-w-[1680px] flex-1 flex-col gap-4";
     const contentViewportClassName = "min-h-0 flex-1 overflow-hidden";
 
     return (
         <div className={rootClassName}>
             <div className={shellClassName}>
-                {showHeaderTabs ? (
-                    <div className="shrink-0 rounded-[24px] border border-line bg-white px-5 py-4 shadow-soft sm:px-6">
-                        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                            <div>
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
-                                    Studio module
-                                </p>
-                                <div className="mt-2 flex items-center gap-3">
-                                    <span className="inline-flex h-10 w-10 items-center justify-center rounded-[14px] bg-mist text-brand">
-                                        <ShieldCheck className="h-5 w-5" />
-                                    </span>
-                                    <div>
-                                        <h2 className="font-display text-[1.25rem] font-semibold tracking-tight text-ink">
-                                            S+Audit
-                                        </h2>
-                                        <p className="text-sm text-slate-500">
-                                            Checklist, report, and history in one place.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="inline-flex w-full flex-wrap gap-2 lg:w-auto lg:justify-end">
-                                {AUDIT_TABS.map((tab) => (
-                                    <button
-                                        key={tab.id}
-                                        type="button"
-                                        onClick={() => handleTabChange(tab.id)}
-                                        className={`rounded-full border px-4 py-2 text-sm font-semibold ${activeTab === tab.id ? "border-ink bg-ink text-white" : "border-line bg-white text-slate-500"}`}
-                                    >
-                                        {tab.label}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                ) : null}
-
                 <div className={contentViewportClassName}>
                     {view === "landing" ? (
                         <AuditLanding
@@ -257,7 +222,12 @@ export function AuditModule({ onHeroModeChange }: AuditModuleProps) {
                             location={selectedLocation}
                             questions={AUDIT_QUESTIONS}
                             responses={checklist.responses}
+                            canSubmit={checklist.canSubmit}
                             onBack={() => setView("location-picker")}
+                            onReset={checklist.reset}
+                            onSubmit={() => {
+                                checklist.submit();
+                            }}
                             onAnswerChange={checklist.setAnswer}
                             onCommentChange={checklist.setComment}
                             onAddMedia={checklist.addMediaBatch}

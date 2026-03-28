@@ -49,6 +49,7 @@ interface UseAuditChecklistReturn {
     addMedia: (questionId: number, file: File) => void;
     addMediaBatch: (questionId: number, files: File[]) => void;
     removeMedia: (questionId: number, index: number) => void;
+    reset: () => void;
     saveDraft: () => void;
     submit: () => AuditSession | null;
     resume: () => boolean;
@@ -186,6 +187,21 @@ export function useAuditChecklist({
             mediaFiles: removeMediaFiles(response.mediaFiles, index),
         }));
     }, [patchResponse, removeMediaFiles]);
+
+    const reset = useCallback(() => {
+        setSession((currentSession) => {
+            if (currentSession) {
+                revokeResponseMedia(currentSession.responses);
+            }
+
+            const nextSession = buildInitialSession(questions, location, null);
+            onSessionSaved?.(nextSession);
+            return nextSession;
+        });
+        setLastSavedAt(null);
+        clearActiveAuditSession();
+    }, [location, onSessionSaved, questions, revokeResponseMedia]);
+
     const saveDraft = useCallback(() => {
         if (!session || session.completedAt) {
             return;
@@ -253,6 +269,7 @@ export function useAuditChecklist({
         addMedia,
         addMediaBatch,
         removeMedia,
+        reset,
         saveDraft,
         submit,
         resume,
