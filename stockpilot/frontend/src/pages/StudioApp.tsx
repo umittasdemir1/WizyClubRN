@@ -59,6 +59,12 @@ export function StudioApp() {
     const [academiaHasMedia, setAcademiaHasMedia] = useState(false);
     const [academiaVideoReady, setAcademiaVideoReady] = useState(false);
     const [auditIsHero, setAuditIsHero] = useState(false);
+    const [headerHidden, setHeaderHidden] = useState(false);
+
+    // Reset header visibility when switching modules
+    useEffect(() => {
+        setHeaderHidden(false);
+    }, [activeModule]);
     const workspaceUrl = useMemo(() => resolveWorkspaceUrl(window.location), []);
     const workflow = useStudioWorkflowState(workspaceUrl);
 
@@ -81,7 +87,7 @@ export function StudioApp() {
             <AcademiaVideoSplash visible={showAcademiaSplash} />
 
             {/* Shell header */}
-            <header className={`z-50 transition-colors duration-300 ${isTransparentHeroShell ? "absolute inset-x-0 top-0 border-b border-transparent bg-transparent" : "border-b border-ink/10 bg-white/60 backdrop-blur-2xl"}`}>
+            <header className={`z-50 transition-[margin] duration-300 ${headerHidden && !isTransparentHeroShell ? "-mt-[54px]" : "mt-0"} ${isTransparentHeroShell ? "absolute inset-x-0 top-0 border-b border-transparent bg-transparent" : "border-b border-ink/10 bg-white/60 backdrop-blur-2xl"}`}>
                 <div className="relative mx-auto flex h-[53px] max-w-[1680px] items-center justify-between px-3 sm:px-6 md:px-10">
                     {/* Logo */}
                     <div className="relative z-10 shrink-0">
@@ -127,7 +133,7 @@ export function StudioApp() {
                                 {activeModule === "academia" && <AcademiaModule onHasMediaChange={setAcademiaHasMedia} onVideoReady={() => setAcademiaVideoReady(true)} />}
                             </ErrorBoundary>
                             <ErrorBoundary context="Audit">
-                                {activeModule === "audit" && <AuditModule onHeroModeChange={setAuditIsHero} />}
+                                {activeModule === "audit" && <AuditModule onHeroModeChange={setAuditIsHero} onHeaderHiddenChange={setHeaderHidden} />}
                             </ErrorBoundary>
                             <ErrorBoundary context="Senato">
                                 {activeModule === "senato" && <SenatoModule />}

@@ -1,8 +1,8 @@
 export const AUDIT_SESSION_ACTIVE_KEY = "stockpilot.audit.active-session";
 export const AUDIT_HISTORY_KEY = "stockpilot.audit.history";
 export const AUDIT_HISTORY_LIMIT = 20;
-export const AUDIT_MEDIA_LIMIT = 3;
-export const AUDIT_MIN_COMPLETION_RATIO = 0.8;
+export const AUDIT_MEDIA_LIMIT = 4;
+export const AUDIT_MIN_COMPLETION_RATIO = 1.0;
 
 export const AUDIT_SECTIONS = [
     { id: "general", title: "Entrance & General Environment", startId: 1, endId: 10 },

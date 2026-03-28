@@ -20,9 +20,9 @@ const ANSWERS: Array<{
     label: string;
     activeClassName: string;
 }> = [
-    { value: "yes", label: "Yes", activeClassName: "bg-emerald-50 text-emerald-700 shadow-[0_1px_2px_rgba(15,23,42,0.12)]" },
-    { value: "no", label: "No", activeClassName: "bg-rose-50 text-rose-700 shadow-[0_1px_2px_rgba(15,23,42,0.12)]" },
-    { value: "na", label: "N/A", activeClassName: "bg-amber-50 text-amber-700 shadow-[0_1px_2px_rgba(15,23,42,0.12)]" },
+    { value: "yes", label: "Yes", activeClassName: "bg-emerald-50 text-emerald-700 shadow-[0_0_7px_2px_rgba(16,185,129,0.22)]" },
+    { value: "no", label: "No", activeClassName: "bg-rose-50 text-rose-700 shadow-[0_0_7px_2px_rgba(244,63,94,0.22)]" },
+    { value: "na", label: "N/A", activeClassName: "bg-amber-50 text-amber-700 shadow-[0_0_7px_2px_rgba(245,158,11,0.22)]" },
 ];
 
 export function AuditQuestionCard({
@@ -115,7 +115,7 @@ export function AuditQuestionCard({
                                 <div className="flex flex-col gap-2.5 pt-2">
                                     <div className="flex items-center justify-between gap-3">
                                         <div className="min-w-0 max-w-full overflow-x-auto pr-2">
-                                            <div className="inline-flex rounded-full bg-slate-100 p-1">
+                                            <div className="inline-flex gap-1.5 rounded-full bg-slate-100 p-1">
                                                 {ANSWERS.map((answerOption) => {
                                                     const isActive = response.answer === answerOption.value;
 
@@ -124,10 +124,10 @@ export function AuditQuestionCard({
                                                             key={answerOption.value}
                                                             type="button"
                                                             onClick={() => onAnswerChange(answerOption.value)}
-                                                            className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] font-medium transition ${
+                                                            className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-all ${
                                                                 isActive
                                                                     ? answerOption.activeClassName
-                                                                    : "text-slate-500"
+                                                                    : "text-slate-500 hover:bg-white/70 hover:shadow-[0_1px_4px_rgba(15,23,42,0.10)]"
                                                             }`}
                                                         >
                                                             {answerOption.label}
@@ -192,17 +192,13 @@ export function AuditQuestionCard({
                                     </div>
 
                                     {hasComment || hasMedia ? (
-                                        <div className="flex flex-col gap-2.5 rounded-[18px] bg-slate-100 px-2.5 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                                        <div className="flex min-h-[78px] flex-col gap-2.5 rounded-[18px] bg-slate-100 px-2.5 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                                             <div className="min-w-0 flex-1">
                                                 {hasComment ? (
                                                     <p className="min-w-0 text-[14px] leading-5 text-slate-600 sm:hidden">
                                                         {response.comment}
                                                     </p>
-                                                ) : (
-                                                    <p className="min-w-0 text-[12px] leading-4.5 text-slate-500 sm:hidden">
-                                                        {response.mediaFiles.length} media added
-                                                    </p>
-                                                )}
+                                                ) : null}
 
                                                 <div className="mt-2 flex items-end justify-between gap-3 sm:mt-0 sm:items-center sm:justify-start sm:gap-2.5">
                                                     {hasMedia ? (
@@ -215,7 +211,7 @@ export function AuditQuestionCard({
                                                                 return (
                                                                     <div
                                                                         key={`${media.name}-${media.createdAt}-${index}`}
-                                                                        className="relative h-[54px] w-[54px] shrink-0"
+                                                                        className="relative h-[74px] w-[74px] shrink-0"
                                                                     >
                                                                         {media.type.startsWith("image/") ? (
                                                                             <img
@@ -234,9 +230,9 @@ export function AuditQuestionCard({
                                                                             type="button"
                                                                             onClick={() => onRemoveMedia(index)}
                                                                             aria-label={`Remove ${media.name}`}
-                                                                            className="absolute right-1 top-1 inline-flex h-4.5 w-4.5 items-center justify-center rounded-full bg-ink text-white shadow-[0_4px_10px_rgba(15,23,42,0.18)]"
+                                                                            className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-slate-100 bg-white p-0 text-slate-500 shadow-[0_0_8px_2px_#f1f5f9] transition hover:text-slate-700"
                                                                         >
-                                                                            <X className="h-3 w-3" />
+                                                                            <X className="block h-3 w-3" />
                                                                         </button>
                                                                     </div>
                                                                 );
@@ -269,11 +265,7 @@ export function AuditQuestionCard({
                                                         <p className="hidden min-w-0 flex-1 text-[14px] leading-5 text-slate-600 sm:block">
                                                             {response.comment}
                                                         </p>
-                                                    ) : (
-                                                        <p className="hidden min-w-0 flex-1 text-[12px] leading-4.5 text-slate-500 sm:block">
-                                                            {response.mediaFiles.length} media added
-                                                        </p>
-                                                    )}
+                                                    ) : null}
                                                 </div>
                                             </div>
 

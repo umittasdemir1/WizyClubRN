@@ -24,9 +24,10 @@ function resolveLocation(session: AuditSession | null) {
 
 interface AuditModuleProps {
     onHeroModeChange?: (isHeroMode: boolean) => void;
+    onHeaderHiddenChange?: (hidden: boolean) => void;
 }
 
-export function AuditModule({ onHeroModeChange }: AuditModuleProps) {
+export function AuditModule({ onHeroModeChange, onHeaderHiddenChange }: AuditModuleProps) {
     const [view, setView] = useState<AuditView>("landing");
     const [history, setHistory] = useState<AuditSession[]>(() => getAuditHistory());
     const [activeDraft, setActiveDraft] = useState<AuditSession | null>(() => getActiveAuditSession());
@@ -225,6 +226,7 @@ export function AuditModule({ onHeroModeChange }: AuditModuleProps) {
                             canSubmit={checklist.canSubmit}
                             onBack={() => setView("location-picker")}
                             onReset={checklist.reset}
+                            onSaveDraft={checklist.saveDraft}
                             onSubmit={() => {
                                 checklist.submit();
                             }}
@@ -232,6 +234,7 @@ export function AuditModule({ onHeroModeChange }: AuditModuleProps) {
                             onCommentChange={checklist.setComment}
                             onAddMedia={checklist.addMediaBatch}
                             onRemoveMedia={checklist.removeMedia}
+                            onHeaderHiddenChange={onHeaderHiddenChange}
                         />
                     ) : null}
 
