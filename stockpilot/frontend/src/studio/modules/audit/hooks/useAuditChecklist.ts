@@ -86,19 +86,9 @@ export function useAuditChecklist({
     const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
 
     useEffect(() => {
-        setSession((currentSession) => {
-            if (
-                currentSession
-                && currentSession.id !== initialSession?.id
-                && currentSession.locationCode !== location?.code
-            ) {
-                revokeResponseMedia(currentSession.responses);
-            }
-
-            return buildInitialSession(questions, location, initialSession);
-        });
+        setSession(() => buildInitialSession(questions, location, initialSession));
         setLastSavedAt(null);
-    }, [initialSession?.id, location?.code, questions, revokeResponseMedia]);
+    }, [initialSession?.id, location?.code, questions]);
 
     const responses = session?.responses ?? {};
     const minimumRequired = Math.ceil(questions.length * minCompletionRatio);
