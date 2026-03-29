@@ -1,4 +1,4 @@
-import{c}from"./BrandSignature-D9rNYqyc.js";/**
+import{c}from"./BrandSignature-Dvk9tBUs.js";/**
  * @license lucide-react v0.511.0 - ISC
  *
  * This source code is licensed under the ISC license.

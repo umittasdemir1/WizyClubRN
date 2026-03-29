@@ -1,4 +1,4 @@
-import{c as le}from"./BrandSignature-D9rNYqyc.js";import{m as S,f as me}from"./index-BSm1N-RY.js";/**
+import{c as le}from"./BrandSignature-Dvk9tBUs.js";import{m as S,f as me}from"./index-CO54jLJT.js";/**
  * @license lucide-react v0.511.0 - ISC
  *
  * This source code is licensed under the ISC license.

@@ -338,8 +338,8 @@ export function AuditReport({
     return (
         <div className="min-h-full bg-[#f4f7fb]">
             <div className="mx-auto flex min-h-full w-full max-w-[1680px] flex-col px-4 pb-8 pt-4 sm:px-6 lg:px-8">
-                <div className="grid items-start gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
-                    <aside className="space-y-4 xl:self-start">
+                <div className="grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
+                    <aside className="flex flex-col gap-4">
                         <ReportCard className="px-5 py-5">
                             <div className="flex items-start justify-between gap-3">
                                 <div>
@@ -451,7 +451,7 @@ export function AuditReport({
                             </div>
                         </ReportCard>
 
-                        <ReportCard className="px-5 py-5">
+                        <ReportCard className="flex-1 px-5 py-5">
                             <div className="flex items-start justify-between gap-3">
                                 <div>
                                     <h2 className="font-display text-[1.35rem] font-semibold tracking-tight text-ink">
