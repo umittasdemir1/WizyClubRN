@@ -3,6 +3,7 @@ import Hero from "@/components/Hero";
 import RegionsTicker from "@/components/RegionsTicker";
 import { ServicesSection, MaterialsSection } from "@/components/FeatureSection";
 import Footer from "@/components/Footer";
+import WhatsAppButton from "@/components/WhatsAppButton";
 
 export default function App() {
   return (
@@ -13,6 +14,7 @@ export default function App() {
       <ServicesSection />
       <MaterialsSection />
       <Footer />
+      <WhatsAppButton />
     </main>
   );
 }

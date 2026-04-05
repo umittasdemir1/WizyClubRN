@@ -4,13 +4,13 @@ import { COMPANY_INFO, SERVICES } from "@/constants/data";
 export default function Footer() {
   return (
     <footer id="contact" className="py-10 md:py-12">
-      <div className="mx-auto max-w-[1400px] px-8">
-        <div className="grid grid-cols-1 gap-10 md:grid-cols-3 md:gap-8">
+      <div className="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-3 md:gap-8">
           <div className="flex items-start">
             <img
-              src="/guverteteakicon.svg"
+              src="/guverteteakiconlight.svg"
               alt="Güverte Teak"
-              className="h-24 w-auto object-contain md:h-28"
+              className="h-16 w-auto object-contain sm:h-20 md:h-28"
             />
           </div>
 
